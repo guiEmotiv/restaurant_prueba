@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+# IDE-specific
+.vscode/
+.idea/
+# macOS
+.DS_Store
+# Compiled/static
+dist/
+build/
+*.egg-info/
+# Coverage / testing
+.coverage
+htmlcov/
+# Env & secrets
+.env
+.env.*

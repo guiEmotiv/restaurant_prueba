@@ -1,0 +1,603 @@
+import { useState, useEffect } from 'react';
+import { X, Plus, Minus, Save, Trash2, ShoppingCart } from 'lucide-react';
+import Button from '../common/Button';
+import { apiService } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
+
+const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
+  const { showSuccess, showError } = useToast();
+  const [formData, setFormData] = useState({
+    table: '',
+    status: 'CREATED'
+  });
+  
+  const [orderItems, setOrderItems] = useState([]);
+  const [availableRecipes, setAvailableRecipes] = useState([]);
+  const [availableTables, setAvailableTables] = useState([]);
+  const [availableGroups, setAvailableGroups] = useState([]);
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState('');
+  const [deletedItemIds, setDeletedItemIds] = useState([]); // Llevar registro de items eliminados
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    if (isOpen) {
+      console.log('Modal opened with order:', order);
+      loadAvailableData();
+      if (order) {
+        // Modo edición
+        console.log('Editing order with status:', order.status);
+        setFormData({
+          table: order.table?.id || order.table || '',
+          status: order.status || 'CREATED'
+        });
+        loadOrderItems();
+      } else {
+        // Modo creación
+        console.log('Creating new order');
+        resetForm();
+      }
+    }
+  }, [isOpen, order]);
+
+  const resetForm = () => {
+    setFormData({
+      table: '',
+      status: 'CREATED'
+    });
+    setOrderItems([]);
+    setSelectedGroupFilter('');
+    setDeletedItemIds([]);
+    setErrors({});
+  };
+
+  // Filtrar recetas según el grupo seleccionado (solo para items sin seleccionar)
+  const getFilteredRecipes = (itemHasSelection = false) => {
+    // Si el item ya tiene una selección, mostrar todas las recetas
+    if (itemHasSelection) {
+      return availableRecipes.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    
+    // Si no hay selección, aplicar el filtro
+    let filtered;
+    if (!selectedGroupFilter) {
+      filtered = availableRecipes;
+    } else if (selectedGroupFilter === 'null') {
+      filtered = availableRecipes.filter(recipe => !recipe.group || recipe.group === null);
+    } else {
+      filtered = availableRecipes.filter(recipe => recipe.group === parseInt(selectedGroupFilter));
+    }
+    
+    // Ordenar alfabéticamente por nombre
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
+  };
+
+  // Obtener el nombre del grupo seleccionado
+  const getSelectedGroupName = () => {
+    if (!selectedGroupFilter) return 'Todos los grupos';
+    if (selectedGroupFilter === 'null') return 'Sin grupo';
+    const group = availableGroups.find(g => g.id === parseInt(selectedGroupFilter));
+    return group ? group.name : 'Grupo desconocido';
+  };
+
+  const loadAvailableData = async () => {
+    try {
+      const [recipesData, tablesData, groupsData] = await Promise.all([
+        apiService.recipes.getAll(),
+        apiService.tables.getAll(),
+        apiService.groups.getAll()
+      ]);
+      setAvailableRecipes(Array.isArray(recipesData) ? recipesData.filter(r => r.is_available) : []);
+      setAvailableTables(Array.isArray(tablesData) ? tablesData : []);
+      setAvailableGroups(Array.isArray(groupsData) ? groupsData : []);
+    } catch (error) {
+      console.error('Error loading available data:', error);
+    }
+  };
+
+  const loadOrderItems = async () => {
+    if (!order?.id) return;
+    
+    try {
+      const orderDetails = await apiService.orders.getById(order.id);
+      const items = orderDetails.items || [];
+      setOrderItems(items.map(item => ({
+        id: item.id,
+        recipe: item.recipe,
+        recipe_name: item.recipe_name,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        status: item.status,
+        notes: item.notes || '',
+        can_delete: item.status === 'CREATED'
+      })));
+    } catch (error) {
+      console.error('Error loading order items:', error);
+      setOrderItems([]);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: null }));
+    }
+  };
+
+  const addOrderItem = () => {
+    console.log('addOrderItem called - current orderItems:', orderItems);
+    setOrderItems(prev => {
+      const newItem = {
+        id: null,
+        recipe: '',
+        recipe_name: '',
+        unit_price: '',
+        total_price: '',
+        status: 'CREATED',
+        notes: '',
+        can_delete: true
+      };
+      const newItems = [...prev, newItem];
+      console.log('Adding new item:', newItem);
+      console.log('New orderItems list:', newItems);
+      return newItems;
+    });
+  };
+
+  const removeOrderItem = (index) => {
+    const item = orderItems[index];
+    if (!item.can_delete) {
+      showError('No se puede eliminar este item porque ya fue entregado');
+      return;
+    }
+    
+    // Si el item tiene ID (existe en backend), agregarlo a la lista de eliminados
+    if (item.id) {
+      setDeletedItemIds(prev => [...prev, item.id]);
+    }
+    
+    // Eliminar del estado local
+    setOrderItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateOrderItem = (index, field, value) => {
+    console.log('updateOrderItem called:', { index, field, value });
+    
+    setOrderItems(prev => {
+      const newItems = prev.map((item, i) => {
+        if (i === index) {
+          if (field === 'recipe') {
+            const selectedRecipe = availableRecipes.find(recipe => recipe.id === parseInt(value));
+            console.log('Selected recipe:', selectedRecipe);
+            return {
+              ...item,
+              recipe: value,
+              recipe_name: selectedRecipe?.name || '',
+              unit_price: selectedRecipe?.base_price || 0,
+              total_price: selectedRecipe?.base_price || 0
+            };
+          }
+          return { ...item, [field]: value };
+        }
+        return item;
+      });
+      
+      console.log('New orderItems:', newItems);
+      return newItems;
+    });
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.table) {
+      newErrors.table = 'La mesa es requerida';
+    }
+    
+    // Validar items - al menos uno debe estar completo
+    const validItems = orderItems.filter(item => 
+      item.recipe && item.recipe !== ''
+    );
+    
+    if (validItems.length === 0) {
+      newErrors.items = 'Debe agregar al menos un item válido';
+    }
+    
+    // No validar duplicados - está permitido tener múltiples items del mismo tipo
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
+    console.log('=== SAVE PROCESS STARTED ===');
+    console.log('Current orderItems:', orderItems);
+    console.log('Order being edited:', order);
+    
+    if (!validateForm()) {
+      console.log('Validation failed, stopping save');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // Preparar items válidos
+      const validItems = orderItems.filter(item => 
+        item.recipe && item.recipe !== ''
+      );
+      console.log('Valid items to save:', validItems);
+      
+      let savedOrder;
+      if (order?.id) {
+        // Actualizar orden existente - table_id requerido por serializer (UI deshabilitada)
+        const orderData = {
+          table_id: parseInt(formData.table),
+          status: formData.status
+        };
+        console.log('Actualizando orden:', orderData);
+        savedOrder = await apiService.orders.update(order.id, orderData);
+        console.log('Order updated successfully');
+        
+        // Manejar actualización de items - COMPLETO
+        console.log('=== PROCESSING ITEMS ===');
+        console.log('Current deletedItemIds:', deletedItemIds);
+        
+        // 1. Eliminar items que fueron removidos
+        if (deletedItemIds.length > 0) {
+          console.log(`Deleting ${deletedItemIds.length} items...`);
+          for (const itemId of deletedItemIds) {
+            try {
+              console.log('Deleting item with ID:', itemId);
+              await apiService.orderItems.delete(itemId);
+              console.log('Item deleted successfully:', itemId);
+            } catch (error) {
+              console.error('Error deleting item:', itemId, error);
+              console.error('Error details:', error.response?.data);
+              throw error;
+            }
+          }
+        } else {
+          console.log('No items to delete');
+        }
+        
+        // 2. Crear nuevos items (los que no tienen id)
+        const newItems = orderItems.filter(item => !item.id && item.recipe);
+        console.log('New items to create:', newItems);
+        
+        if (newItems.length > 0) {
+          console.log(`Creating ${newItems.length} new items...`);
+          for (const item of newItems) {
+            try {
+              const createData = {
+                order: order.id,
+                recipe: parseInt(item.recipe),
+                notes: item.notes || ''
+              };
+              console.log('Creating new item with data:', createData);
+              const createdItem = await apiService.orderItems.create(createData);
+              console.log('New item created successfully:', createdItem);
+            } catch (error) {
+              console.error('Error creating new item:', error);
+              console.error('Error details:', error.response?.data);
+              throw error; // Re-lanzar el error para que sea capturado arriba
+            }
+          }
+        } else {
+          console.log('No new items to create');
+        }
+      } else {
+        // Crear nueva orden con items incluidos según OrderCreateSerializer
+        const orderData = {
+          table: parseInt(formData.table),
+          items: validItems.map(item => ({
+            recipe: parseInt(item.recipe),
+            notes: item.notes || ''
+          }))
+        };
+        
+        console.log('Creando orden:', orderData);
+        savedOrder = await apiService.orders.create(orderData);
+      }
+      
+      onSave();
+      onClose();
+      showSuccess(order ? 'Orden actualizada exitosamente' : 'Orden creada exitosamente');
+    } catch (error) {
+      console.error('=== ERROR SAVING ORDER ===');
+      console.error('Full error object:', error);
+      console.error('Error response:', error.response);
+      console.error('Error response data:', error.response?.data);
+      
+      let errorMessage = 'Error desconocido';
+      
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else {
+          // Si es un objeto con errores de validación
+          const errors = [];
+          for (const [field, fieldErrors] of Object.entries(error.response.data)) {
+            if (Array.isArray(fieldErrors)) {
+              errors.push(`${field}: ${fieldErrors.join(', ')}`);
+            } else if (typeof fieldErrors === 'object' && fieldErrors !== null) {
+              errors.push(`${field}: ${JSON.stringify(fieldErrors)}`);
+            } else {
+              errors.push(`${field}: ${fieldErrors}`);
+            }
+          }
+          errorMessage = errors.length > 0 ? errors.join('; ') : JSON.stringify(error.response.data);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showError('Error al guardar la orden: ' + errorMessage);
+      console.error('Final error message shown to user:', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('es-PE', {
+      style: 'currency',
+      currency: 'PEN'
+    }).format(amount || 0);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {order ? `Editar Orden #${order.id}` : 'Nueva Orden'}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+          <div className="space-y-6">
+            {/* Información básica */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Información Básica</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mesa *
+                  </label>
+                  <select
+                    name="table"
+                    value={formData.table}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                      errors.table ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    disabled={!!order} // No cambiar mesa en edición para evitar confusión operativa
+                  >
+                    <option value="">Seleccionar mesa...</option>
+                    {availableTables.map(table => (
+                      <option key={table.id} value={table.id}>
+                        {table.table_number} - {table.zone_name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.table && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.table}
+                    </p>
+                  )}
+                </div>
+
+                {order && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Estado Actual
+                    </label>
+                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 font-medium">
+                      {formData.status === 'CREATED' && 'Creado'}
+                      {formData.status === 'SERVED' && 'Entregado'}
+                      {formData.status === 'PAID' && 'Pagado'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Items */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Items de la Orden</h3>
+                <Button
+                  onClick={addOrderItem}
+                  size="sm"
+                  className="flex items-center gap-2"
+                  disabled={order && order.status !== 'CREATED'}
+                  title={order && order.status !== 'CREATED' ? 'Solo se pueden agregar items a órdenes creadas' : 'Agregar nuevo item'}
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar Item
+                </Button>
+              </div>
+
+              {/* Filtro por Grupo */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Filtrar recetas por grupo
+                  </label>
+                  {selectedGroupFilter && (
+                    <button
+                      onClick={() => setSelectedGroupFilter('')}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Limpiar filtro
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={selectedGroupFilter}
+                    onChange={(e) => setSelectedGroupFilter(e.target.value)}
+                    className="flex-1 md:flex-none md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Todos los grupos ({availableRecipes.length} recetas)</option>
+                    {availableGroups.map(group => (
+                      <option key={group.id} value={group.id}>
+                        {group.name} ({availableRecipes.filter(r => r.group === group.id).length} recetas)
+                      </option>
+                    ))}
+                    <option value="null">Sin grupo ({availableRecipes.filter(r => !r.group).length} recetas)</option>
+                  </select>
+                </div>
+              </div>
+
+              {errors.items && (
+                <p className="mb-4 text-sm text-red-600">
+                  {errors.items}
+                </p>
+              )}
+
+              <div className="space-y-3">
+                {orderItems.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg bg-white">
+                    <ShoppingCart className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="font-medium">No hay items agregados</p>
+                    <p className="text-sm">El total se calculará automáticamente al agregar items</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Header de tabla */}
+                    <div className="grid grid-cols-12 gap-3 px-3 py-2 bg-gray-100 rounded-md text-sm font-medium text-gray-700">
+                      <div className="col-span-4">Item</div>
+                      <div className="col-span-2 text-center">Precio Unit.</div>
+                      <div className="col-span-2 text-center">Estado</div>
+                      <div className="col-span-3">Notas</div>
+                      <div className="col-span-1 text-center">Acción</div>
+                    </div>
+                    
+                    {orderItems.map((item, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-3 p-3 border border-gray-200 rounded-lg bg-white items-center">
+                        <div className="col-span-4">
+                          <select
+                            value={item.recipe}
+                            onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                            disabled={!item.can_delete}
+                          >
+                            <option value="">
+                              {getFilteredRecipes(!!item.recipe && item.recipe !== '').length === 0 ? 'No hay recetas disponibles' : 'Seleccionar...'}
+                            </option>
+                            {getFilteredRecipes(!!item.recipe && item.recipe !== '').map(recipe => (
+                              <option key={recipe.id} value={recipe.id}>
+                                {!!item.recipe && item.recipe !== '' ? (
+                                  // Si ya hay un item seleccionado, solo mostrar el nombre
+                                  recipe.name
+                                ) : (
+                                  // Si no hay selección, mostrar información completa para ayudar a seleccionar
+                                  `${recipe.name} (${formatCurrency(recipe.base_price)})${!selectedGroupFilter && recipe.group_name ? ` - ${recipe.group_name}` : ''}`
+                                )}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div className="col-span-2 text-center text-sm font-semibold text-gray-900">
+                          {formatCurrency(item.unit_price)}
+                        </div>
+                        
+                        <div className="col-span-2 text-center">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            item.status === 'CREATED' ? 'bg-yellow-100 text-yellow-800' :
+                            item.status === 'SERVED' ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {item.status === 'CREATED' && 'Creado'}
+                            {item.status === 'SERVED' && 'Entregado'}
+                          </span>
+                        </div>
+
+                        <div className="col-span-3">
+                          <input
+                            type="text"
+                            value={item.notes}
+                            onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
+                            placeholder="Ej: Sin cebolla"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            disabled={!item.can_delete}
+                          />
+                        </div>
+                        
+                        <div className="col-span-1 text-center">
+                          {item.can_delete && (
+                            <button
+                              onClick={() => removeOrderItem(index)}
+                              className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <Button
+            onClick={onClose}
+            variant="secondary"
+            disabled={loading}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                {order ? 'Actualizar Orden' : 'Crear Orden'}
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default OrderModal;

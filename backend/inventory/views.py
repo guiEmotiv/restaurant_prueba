@@ -1,0 +1,170 @@
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from django.db import transaction
+from .models import Group, Ingredient, Recipe, RecipeItem
+from .serializers import (
+    GroupSerializer,
+    IngredientSerializer, IngredientDetailSerializer,
+    RecipeSerializer, RecipeDetailSerializer, RecipeWithItemsCreateSerializer,
+    RecipeItemSerializer, RecipeItemCreateSerializer
+)
+
+
+class GroupViewSet(viewsets.ModelViewSet):
+    queryset = Group.objects.all().order_by('name')
+    serializer_class = GroupSerializer
+    
+    @action(detail=True, methods=['get'])
+    def recipes(self, request, pk=None):
+        """Obtener todas las recetas de un grupo"""
+        group = self.get_object()
+        recipes = group.recipe_set.all().order_by('name')
+        
+        from .serializers import RecipeSerializer
+        serializer = RecipeSerializer(recipes, many=True)
+        return Response(serializer.data)
+
+
+class IngredientViewSet(viewsets.ModelViewSet):
+    queryset = Ingredient.objects.all().order_by('name')
+    
+    def get_serializer_class(self):
+        if self.action in ['retrieve', 'create', 'update', 'partial_update']:
+            return IngredientDetailSerializer
+        return IngredientSerializer
+    
+    def get_queryset(self):
+        queryset = Ingredient.objects.all().order_by('name')
+        category = self.request.query_params.get('category')
+        unit = self.request.query_params.get('unit')
+        is_active = self.request.query_params.get('is_active')
+        
+        if category:
+            queryset = queryset.filter(category_id=category)
+        if unit:
+            queryset = queryset.filter(unit_id=unit)
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+            
+        return queryset
+    
+    @action(detail=True, methods=['post'])
+    def update_stock(self, request, pk=None):
+        """Actualizar stock de un ingrediente"""
+        ingredient = self.get_object()
+        quantity = request.data.get('quantity')
+        operation = request.data.get('operation', 'add')  # 'add' or 'subtract'
+        
+        if not quantity:
+            return Response({'error': 'Se requiere la cantidad'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            ingredient.update_stock(float(quantity), operation)
+            serializer = self.get_serializer(ingredient)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({'error': str(e)}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+
+
+class RecipeViewSet(viewsets.ModelViewSet):
+    queryset = Recipe.objects.all().order_by('name')
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return RecipeWithItemsCreateSerializer
+        elif self.action == 'retrieve':
+            return RecipeDetailSerializer
+        return RecipeSerializer
+    
+    def get_queryset(self):
+        queryset = Recipe.objects.all().order_by('name')
+        is_available = self.request.query_params.get('is_available')
+        group = self.request.query_params.get('group')
+        
+        if is_available is not None:
+            queryset = queryset.filter(is_available=is_available.lower() == 'true')
+        if group:
+            queryset = queryset.filter(group_id=group)
+            
+        return queryset
+    
+    @action(detail=True, methods=['post'])
+    def update_price(self, request, pk=None):
+        """Recalcular precio base de una receta"""
+        recipe = self.get_object()
+        recipe.update_base_price()
+        serializer = self.get_serializer(recipe)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def check_availability(self, request, pk=None):
+        """Verificar disponibilidad de una receta según stock"""
+        recipe = self.get_object()
+        is_available = recipe.check_availability()
+        
+        # Obtener detalles de disponibilidad por ingrediente
+        availability_details = []
+        for recipe_item in recipe.recipeitem_set.all():
+            ingredient = recipe_item.ingredient
+            available = ingredient.current_stock >= recipe_item.quantity
+            availability_details.append({
+                'ingredient_name': ingredient.name,
+                'required_quantity': recipe_item.quantity,
+                'current_stock': ingredient.current_stock,
+                'available': available
+            })
+        
+        return Response({
+            'is_available': is_available,
+            'details': availability_details
+        })
+    
+    @action(detail=True, methods=['post'])
+    def add_ingredient(self, request, pk=None):
+        """Agregar ingrediente a una receta"""
+        recipe = self.get_object()
+        serializer = RecipeItemCreateSerializer(
+            data=request.data, 
+            context={'recipe': recipe}
+        )
+        
+        if serializer.is_valid():
+            serializer.save(recipe=recipe)
+            recipe.update_base_price()  # Actualizar precio
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['delete'])
+    def remove_ingredient(self, request, pk=None):
+        """Remover ingrediente de una receta"""
+        recipe = self.get_object()
+        ingredient_id = request.data.get('ingredient_id')
+        
+        try:
+            recipe_item = RecipeItem.objects.get(recipe=recipe, ingredient_id=ingredient_id)
+            recipe_item.delete()
+            recipe.update_base_price()  # Actualizar precio
+            return Response({'message': 'Ingrediente removido exitosamente'})
+        except RecipeItem.DoesNotExist:
+            return Response({'error': 'Ingrediente no encontrado en la receta'}, 
+                          status=status.HTTP_404_NOT_FOUND)
+
+
+class RecipeItemViewSet(viewsets.ModelViewSet):
+    queryset = RecipeItem.objects.all().order_by('recipe__name', 'ingredient__name')
+    serializer_class = RecipeItemSerializer
+    
+    def get_queryset(self):
+        queryset = RecipeItem.objects.all().order_by('recipe__name', 'ingredient__name')
+        recipe = self.request.query_params.get('recipe')
+        ingredient = self.request.query_params.get('ingredient')
+        
+        if recipe:
+            queryset = queryset.filter(recipe_id=recipe)
+        if ingredient:
+            queryset = queryset.filter(ingredient_id=ingredient)
+            
+        return queryset

@@ -1,0 +1,17 @@
+El INGREDIENT no puede ser eliminado si pertenece a una RECIPE.
+
+Si el UNIT_PRICE de un INGREDIENT es modificado entonces se debe actualizar el BASE_PRICE de los RECIPE relacionados.
+
+el RECIPE debe permitir la creación de múltiples ingredientes en una sola solicitud.
+
+El ORDER_ITEM se puede repetir, es decir,  un mismo RECIPE puede estar en varias lineas de un ORDER, dado que un ORDER_ITEM tiene notes que es para cada uno.
+
+Cuando el ORDER tiene el status de CREATED, entonces se debe descontar el stock de los ingredientes de todos los ORDER_ITEM y su estado de los ORDER_ITEM es de CREATED.
+
+Si el ORDER es modificado y el ORDER_ITEM es eliminado o modificado, se debe actualizar la cantidad al stock de los ingredientes relacionados.
+
+El ORDER_ITEM_INGREDIENT puedes agregar/modificar/eliminar cualquier ingrediente, solo modificas el QUANTITY, el precio unitario de un ingrediente no es modificable.
+
+El ORDER_ITEM_INGREDIENT actualiza el UNIT_PRICE Y TOTAL_PRICE de ORDER_ITEM_INGREDIENT y ORDER_ITEM, y a su vez el TOTAL_AMOUNT de ORDER.
+
+Solo se puede actualizar el ORDER_ITEM si tiene el estatus CREATED.

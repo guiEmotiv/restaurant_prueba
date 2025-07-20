@@ -1,0 +1,45 @@
+from rest_framework import serializers
+from .models import Category, Unit, Zone, Table
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class UnitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Unit
+        fields = ['id', 'name', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class ZoneSerializer(serializers.ModelSerializer):
+    tables_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Zone
+        fields = ['id', 'name', 'created_at', 'tables_count']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_tables_count(self, obj):
+        return obj.table_set.count()
+
+
+class TableSerializer(serializers.ModelSerializer):
+    zone_name = serializers.CharField(source='zone.name', read_only=True)
+    
+    class Meta:
+        model = Table
+        fields = ['id', 'zone', 'zone_name', 'table_number', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class TableDetailSerializer(TableSerializer):
+    zone = ZoneSerializer(read_only=True)
+    zone_id = serializers.IntegerField(write_only=True)
+    
+    class Meta(TableSerializer.Meta):
+        fields = TableSerializer.Meta.fields + ['zone_id']
