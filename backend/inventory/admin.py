@@ -1,11 +1,18 @@
 from django.contrib import admin
-from .models import Ingredient, Recipe, RecipeItem
+from .models import Group, Ingredient, Recipe, RecipeItem
 
 
 class RecipeItemInline(admin.TabularInline):
     model = RecipeItem
     extra = 1
     min_num = 1
+
+
+@admin.register(Group)
+class GroupAdmin(admin.ModelAdmin):
+    list_display = ['name', 'created_at']
+    search_fields = ['name']
+    readonly_fields = ['created_at']
 
 
 @admin.register(Ingredient)

@@ -1,7 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from django.db import transaction
 from django.utils import timezone
 from .models import Order, OrderItem, OrderItemIngredient, Payment
 from .serializers import (
