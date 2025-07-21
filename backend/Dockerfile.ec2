@@ -50,7 +50,7 @@ EXPOSE 8000
 CMD ["sh", "-c", "\
     echo '🚀 Starting Restaurant Management System - EC2 Production' && \
     python manage.py migrate --noinput && \
-    python manage.py collectstatic --noinput --clear && \
+    python manage.py collectstatic --noinput && \
     chown -R appuser:appuser /app/data /app/staticfiles /app/media && \
     if [ -n \"$DJANGO_SUPERUSER_USERNAME\" ] && [ -n \"$DJANGO_SUPERUSER_PASSWORD\" ] && [ -n \"$DJANGO_SUPERUSER_EMAIL\" ]; then \
         python manage.py createsuperuser --noinput || echo 'Superuser already exists'; \
