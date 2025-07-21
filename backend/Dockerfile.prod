@@ -1,0 +1,61 @@
+# Multi-stage build for production
+FROM node:18-alpine as frontend-builder
+
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
+FROM python:3.12-slim as backend
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=backend.settings_prod
+
+# Install system dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Install Python dependencies
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn
+
+# Copy backend code
+COPY backend/ .
+
+# Copy frontend build
+COPY --from=frontend-builder /frontend/dist ./static/
+
+# Create directories
+RUN mkdir -p /app/staticfiles /app/media /app/data
+
+# Collect static files script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "🔧 Running migrations..."\n\
+python manage.py migrate --noinput\n\
+echo "📦 Collecting static files..."\n\
+python manage.py collectstatic --noinput --clear\n\
+echo "🚀 Starting server..."\n\
+exec gunicorn \\\n\
+    --bind 0.0.0.0:8000 \\\n\
+    --workers 3 \\\n\
+    --timeout 60 \\\n\
+    --keep-alive 5 \\\n\
+    --max-requests 1000 \\\n\
+    --max-requests-jitter 100 \\\n\
+    backend.wsgi:application\n\
+' > /app/start.sh && chmod +x /app/start.sh
+
+EXPOSE 8000
+
+CMD ["/app/start.sh"]
