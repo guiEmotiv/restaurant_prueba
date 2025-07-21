@@ -1,21 +1,19 @@
-version: '3.8'
-
 services:
   web:
     build:
       context: ./backend
-      dockerfile: Dockerfile.prod
-    container_name: restaurant_web_prod
+      dockerfile: Dockerfile.ec2
+    container_name: restaurant_web_ec2
     environment:
-      - DJANGO_SETTINGS_MODULE=backend.settings_prod
+      - DJANGO_SETTINGS_MODULE=backend.settings_ec2
     env_file:
-      - .env.prod
+      - .env.ec2
     ports:
       - "80:8000"
     volumes:
+      - ./data:/app/data
       - static_volume:/app/staticfiles
       - media_volume:/app/media
-      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/admin/"]
