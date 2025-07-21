@@ -24,3 +24,5 @@ urlpatterns = [
 if settings.DEBUG is False:  # In production
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Serve frontend assets from /assets/ path
+    urlpatterns += static('/assets/', document_root=settings.STATIC_ROOT / 'assets')
