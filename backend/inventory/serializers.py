@@ -32,13 +32,11 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 
 class IngredientDetailSerializer(IngredientSerializer):
-    category = CategorySerializer(read_only=True)
-    unit = UnitSerializer(read_only=True)
-    category_id = serializers.IntegerField(write_only=True)
-    unit_id = serializers.IntegerField(write_only=True)
+    category_detail = CategorySerializer(source='category', read_only=True)
+    unit_detail = UnitSerializer(source='unit', read_only=True)
     
     class Meta(IngredientSerializer.Meta):
-        fields = IngredientSerializer.Meta.fields + ['category_id', 'unit_id']
+        fields = IngredientSerializer.Meta.fields + ['category_detail', 'unit_detail']
 
 
 class RecipeItemSerializer(serializers.ModelSerializer):
@@ -86,13 +84,12 @@ class RecipeSerializer(serializers.ModelSerializer):
 
 
 class RecipeDetailSerializer(RecipeSerializer):
-    group = GroupSerializer(read_only=True)
+    group_detail = GroupSerializer(source='group', read_only=True)
     recipe_items = RecipeItemSerializer(source='recipeitem_set', many=True, read_only=True)
     calculated_price = serializers.SerializerMethodField()
-    group_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     
     class Meta(RecipeSerializer.Meta):
-        fields = RecipeSerializer.Meta.fields + ['recipe_items', 'calculated_price', 'group_id']
+        fields = RecipeSerializer.Meta.fields + ['group_detail', 'recipe_items', 'calculated_price']
     
     def get_calculated_price(self, obj):
         return obj.calculate_base_price()

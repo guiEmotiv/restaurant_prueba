@@ -88,12 +88,11 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class OrderDetailSerializer(OrderSerializer):
-    table = TableSerializer(read_only=True)
+    table_detail = TableSerializer(source='table', read_only=True)
     items = OrderItemSerializer(source='orderitem_set', many=True, read_only=True)
-    table_id = serializers.IntegerField(write_only=True)
     
     class Meta(OrderSerializer.Meta):
-        fields = OrderSerializer.Meta.fields + ['table_id', 'items']
+        fields = OrderSerializer.Meta.fields + ['table_detail', 'items']
 
 
 class OrderItemCreateSerializer(serializers.ModelSerializer):

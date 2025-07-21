@@ -56,13 +56,41 @@ check_disk_space() {
     local available=$(df / | awk 'NR==2 {print $4}')
     local available_gb=$(echo "scale=2; $available / 1048576" | bc 2>/dev/null || echo "0")
     
-    if (( $(echo "$available < 1048576" | bc -l) )); then
-        print_error "Insufficient disk space! Only ${available_gb}GB available."
-        print_warning "At least 1GB free space is required."
-        echo "Run: ./deploy/clean-ec2-space.sh"
+    if (( $(echo "$available < 1048576" | bc -l 2>/dev/null || echo "1") )); then
+        print_warning "Low disk space detected! Only ${available_gb}GB available."
         return 1
     fi
     return 0
+}
+
+# Function to clean disk space
+clean_disk_space() {
+    print_status "🧹 Cleaning disk space..."
+    
+    # Stop containers
+    docker-compose -f docker-compose.ec2.yml down 2>/dev/null || true
+    
+    # Clean Docker aggressively
+    docker system prune -a --volumes -f
+    
+    # Clean package cache
+    sudo apt-get clean 2>/dev/null || true
+    sudo rm -rf /var/lib/apt/lists/* 2>/dev/null || true
+    
+    # Clean logs
+    sudo journalctl --vacuum-size=100M 2>/dev/null || true
+    sudo find /var/log -type f -name "*.gz" -delete 2>/dev/null || true
+    sudo find /var/log -type f -name "*.1" -delete 2>/dev/null || true
+    
+    # Clean npm cache
+    npm cache clean --force 2>/dev/null || true
+    
+    print_success "Disk space cleaned"
+    
+    # Show new disk usage
+    local new_available=$(df / | awk 'NR==2 {print $4}')
+    local new_available_gb=$(echo "scale=2; $new_available / 1048576" | bc 2>/dev/null || echo "0")
+    print_status "Available space: ${new_available_gb}GB"
 }
 
 # Main deployment function
@@ -73,9 +101,18 @@ deploy() {
     # Check disk space
     print_status "💾 Checking disk space..."
     if ! check_disk_space; then
-        exit 1
+        print_warning "Performing automatic cleanup..."
+        clean_disk_space
+        
+        # Check again after cleanup
+        if ! check_disk_space; then
+            print_error "Still insufficient disk space after cleanup!"
+            print_warning "Consider increasing EC2 volume size"
+            exit 1
+        fi
+    else
+        print_success "Sufficient disk space available"
     fi
-    print_success "Sufficient disk space available"
     
     # Step 1: Update code
     print_status "📥 Pulling latest code from Git..."
@@ -200,12 +237,28 @@ case "$1" in
         shift
         docker-compose -f docker-compose.ec2.yml exec web python manage.py "$@"
         ;;
+    "quick")
+        print_status "⚡ Quick deployment (code changes only)..."
+        git pull origin main || exit 1
+        docker-compose -f docker-compose.ec2.yml restart
+        print_success "Quick deployment complete!"
+        ;;
+    "rebuild")
+        print_status "🔨 Rebuilding without full cleanup..."
+        git pull origin main || exit 1
+        docker-compose -f docker-compose.ec2.yml down
+        docker-compose -f docker-compose.ec2.yml build
+        docker-compose -f docker-compose.ec2.yml up -d
+        print_success "Rebuild complete!"
+        ;;
     *)
         echo "Usage: $0 [command]"
         echo ""
         echo "Commands:"
-        echo "  (no command)  Deploy the application"
-        echo "  --clean       Deploy with Docker cleanup"
+        echo "  (no command)  Deploy the application (with auto-cleanup if needed)"
+        echo "  --clean       Deploy with forced Docker cleanup"
+        echo "  quick         Quick restart (code changes only, no rebuild)"
+        echo "  rebuild       Rebuild containers (no cleanup)"
         echo "  status        Check application status"
         echo "  logs          View application logs"
         echo "  restart       Restart the application"
