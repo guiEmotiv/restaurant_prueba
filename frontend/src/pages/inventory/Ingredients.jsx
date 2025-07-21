@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Package, Plus } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import StockUpdateModal from '../../components/inventory/StockUpdateModal';
@@ -8,14 +8,13 @@ import { useToast } from '../../contexts/ToastContext';
 
 const Ingredients = () => {
   const { showSuccess, showError } = useToast();
+  const crudTableRef = useRef();
   const [ingredients, setIngredients] = useState([]);
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showStockModal, setShowStockModal] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingIngredient, setEditingIngredient] = useState(null);
 
   const columns = [
     { key: 'id', title: 'ID' },
@@ -114,17 +113,18 @@ const Ingredients = () => {
     }
   };
 
-  const handleAdd = () => {
-    setEditingIngredient(null);
-    setIsModalOpen(true);
+  const handleAdd = async (formData) => {
+    try {
+      await apiService.ingredients.create(formData);
+      await loadIngredients();
+      showSuccess('Ingrediente creado exitosamente');
+    } catch (error) {
+      console.error('Error creating ingredient:', error);
+      showError('Error al crear el ingrediente');
+    }
   };
 
-  const handleEditClick = (ingredient) => {
-    setEditingIngredient(ingredient);
-    setIsModalOpen(true);
-  };
-
-  const handleEditFromTable = async (id, formData) => {
+  const handleEdit = async (id, formData) => {
     try {
       await apiService.ingredients.update(id, formData);
       await loadIngredients();
@@ -132,24 +132,6 @@ const Ingredients = () => {
     } catch (error) {
       console.error('Error updating ingredient:', error);
       showError('Error al actualizar el ingrediente');
-    }
-  };
-
-  const handleModalSubmit = async (formData) => {
-    try {
-      if (editingIngredient) {
-        await apiService.ingredients.update(editingIngredient.id, formData);
-        showSuccess('Ingrediente actualizado exitosamente');
-      } else {
-        await apiService.ingredients.create(formData);
-        showSuccess('Ingrediente creado exitosamente');
-      }
-      await loadIngredients();
-      setIsModalOpen(false);
-      setEditingIngredient(null);
-    } catch (error) {
-      console.error('Error saving ingredient:', error);
-      showError('Error al guardar el ingrediente');
     }
   };
 
@@ -203,20 +185,25 @@ const Ingredients = () => {
           <h1 className="text-2xl font-bold text-gray-900">Ingredientes</h1>
           <p className="text-gray-600">Gestiona el inventario de ingredientes</p>
         </div>
-        <Button onClick={handleAdd} className="flex items-center gap-2">
+        <Button 
+          onClick={() => crudTableRef.current?.handleAdd()} 
+          className="flex items-center gap-2"
+        >
           <Plus className="h-4 w-4" />
           Agregar Ingrediente
         </Button>
       </div>
 
       <CrudTable
+        ref={crudTableRef}
         title="Ingredientes"
         data={ingredients}
         columns={columnsWithOptions}
-        onAdd={handleModalSubmit}
-        onEdit={handleEditFromTable}
+        onAdd={handleAdd}
+        onEdit={handleEdit}
         onDelete={handleDelete}
         loading={loading}
+        addButtonText="Agregar Ingrediente"
         hideAddButton={true}
         hideTitle={true}
       />
