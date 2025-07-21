@@ -2,112 +2,94 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+This is a full-stack restaurant management system with Django REST Framework backend and React (Vite) frontend. The system handles configuration (categories, units, zones, tables), inventory management (groups, ingredients, recipes), and operations (orders, payments, kitchen management).
+
 ## Development Commands
 
-### Local Development (Make targets)
-- `make run` - Start Django development server on 0.0.0.0:8000
-- `make migrate` - Apply database migrations  
-- `make test` - Run tests with pytest
-- `make coverage` - Run pytest with coverage
-- `make shell` - Open Django shell (shell_plus preferred, falls back to shell)
-- `make createsuperuser` - Create Django admin superuser
+### Backend (Django)
+- **Start development server**: `python manage.py runserver` or `make run` (from backend/)
+- **Run migrations**: `python manage.py migrate` or `make migrate`
+- **Create migrations**: `python manage.py makemigrations`
+- **Create superuser**: `python manage.py createsuperuser` or `make createsuperuser`
+- **Django shell**: `make shell`
+- **Run tests**: `make test` or `pytest -q`
+
+### Frontend (React + Vite)
+- **Start development server**: `npm run dev` (runs on port 5173)
+- **Build**: `npm run build`
+- **Lint**: `npm run lint`
+- **Preview build**: `npm run preview`
 
 ### Docker Development
-- `docker-compose up web` - Start web service
-- `docker-compose up -d db` - Start PostgreSQL database only
-- `docker-compose exec web python manage.py migrate` - Run migrations in container
-- `docker-compose exec web python manage.py createsuperuser` - Create superuser in container
-- `docker-compose exec web python manage.py collectstatic` - Collect static files
-
-### Dependencies
-- `make init` - Install dependencies from requirements-dev.txt
-- `make deps` - Compile requirements files using pip-compile
-- `make audit` - Run security audit with pip-audit
-
-### Frontend Development (React 19)
-- `cd frontend && npm install` - Install frontend dependencies
-- `cd frontend && npm run dev` - Start React development server on localhost:5173
-- `cd frontend && npm run build` - Build for production
-- `cd frontend && npm run preview` - Preview production build
+- **Start services**: `docker-compose up`
+- **Start specific service**: `docker-compose up web` or `docker-compose up db`
+- **Execute commands in container**: `docker-compose exec web python manage.py [command]`
+- **View logs**: `docker-compose logs [service]`
 
 ## Architecture
 
-### Project Structure
-Django REST API for restaurant management with three main apps:
+### Backend Structure
+- **Django Apps**:
+  - `config`: Base configuration models (Category, Unit, Zone, Table)
+  - `inventory`: Inventory management (Group, Ingredient, Recipe, RecipeItem)
+  - `operation`: Operations (Order, OrderItem, OrderItemIngredient, Payment)
 
-1. **config** - Basic configuration models (categories, units, zones, tables)
-2. **inventory** - Ingredients, recipes, and recipe items with stock management
-3. **operation** - Orders, order items, customizations, and payments
-
-### Key Models & Relationships
-
-**Config App:**
-- `Category` → `Ingredient` (one-to-many)
-- `Unit` → `Ingredient` (one-to-many) 
-- `Zone` → `Table` (one-to-many)
-
-**Inventory App:**
-- `Recipe` → `RecipeItem` → `Ingredient` (recipe composition)
-- Stock tracking with automatic price calculation
-- Ingredient consumption tracking
-
-**Operation App:**
-- `Table` → `Order` → `OrderItem` → `Recipe`
-- `OrderItem` → `OrderItemIngredient` (customizations)
-- `Order` → `Payment` (one-to-one)
-
-### Database
-- PostgreSQL 17 with custom table names (no `app_` prefix)
-- Uses environment variables from `.env` file
-- Docker setup with health checks
-
-### API Structure
-- REST API with DRF ViewSets
-- API docs at `/api/docs/` (Swagger UI)
-- Schema at `/api/schema/`
-- All endpoints under `/api/v1/`
+### Frontend Structure
+- **React SPA** with React Router for navigation
+- **Pages organized by domain**: config/, inventory/, operation/
+- **Shared components**: Layout, common components (Button, Modal, Toast, CrudTable)
+- **Context**: ToastContext for notifications
+- **Styling**: TailwindCSS with Lucide React icons
 
 ### Key Business Logic
-- Automatic stock consumption when orders are created
-- Stock restoration when orders are cancelled
-- Dynamic price calculation including customizations
-- Order status flow: CREATED → SERVED → PAID
-- Protected deletion with relationship validation
+- **Inventory**: Recipes consume ingredients when orders are created
+- **Order Lifecycle**: CREATED → SERVED → PAID
+- **Stock Management**: Automatic stock updates when orders are processed
+- **Price Calculation**: Dynamic pricing based on ingredient costs and customizations
 
-### Settings
-- Spanish locale (es-pe) with Lima timezone
-- Token authentication enabled
-- CORS configured for localhost:3000 (React frontend)
-- AllowAny permissions (development mode)
+### Database
+- **Development**: SQLite (db.sqlite3)
+- **Production**: PostgreSQL via RDS
+- **Models use PROTECT**: Prevents deletion of referenced objects
 
-## Frontend Architecture
+### API Integration
+- **Backend API**: Django REST Framework with token authentication
+- **Frontend**: Axios for API calls (services/api.js)
+- **CORS**: Configured for localhost:5173 development and production domains
 
-### Technology Stack
-- React 19 with Vite build tool
-- Tailwind CSS for styling (mobile-first responsive design)
-- React Router DOM for navigation
-- Axios for API communication
-- Lucide React for icons
+## Production Deployment (AWS)
 
-### Project Structure
-```
-frontend/
-├── src/
-│   ├── components/
-│   │   ├── common/          # Reusable UI components
-│   │   ├── orders/          # Order-specific components
-│   │   └── recipes/         # Recipe-specific components
-│   ├── pages/
-│   │   ├── config/          # Configuration CRUD pages
-│   │   ├── inventory/       # Inventory management pages
-│   │   └── operation/       # Order management pages
-│   └── services/
-│       └── api.js           # API service layer
-```
+### Architecture
+- **EC2 t3.micro**: Backend Django with Docker
+- **RDS db.t3.micro**: PostgreSQL database
+- **S3**: Static files and frontend hosting
+- **CloudFront**: CDN for frontend distribution
 
-### Key Features
-- **Responsive Design**: Mobile-first approach with collapsible sidebar
-- **CRUD Operations**: Complete Create, Read, Update, Delete for all models
-- **Business Logic**: Stock tracking, order workflow, payment processing
-- **Real-time Updates**: Dashboard with statistics and low stock alerts
-- **Order Management**: Full order lifecycle from creation to payment
+### Production Commands
+- **Deploy application**: `./deploy/deploy.sh`
+- **Deploy frontend only**: `./deploy/frontend-deploy.sh`
+- **Backup database**: `./deploy/backup-db.sh`
+- **View production logs**: `docker-compose -f docker-compose.prod.yml logs -f`
+
+### Configuration Files
+- **Production settings**: `backend/backend/settings_prod.py`
+- **Production Docker**: `backend/Dockerfile.prod`
+- **Production compose**: `docker-compose.prod.yml`
+- **Environment template**: `.env.example`
+- **AWS setup guide**: `deploy/aws-setup.md`
+
+### Environment Variables (Production)
+Required variables in `.env`:
+- `DJANGO_SECRET_KEY`: Django secret key
+- `RDS_HOSTNAME`: RDS endpoint
+- `RDS_USERNAME`, `RDS_PASSWORD`: Database credentials
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: AWS credentials
+- `AWS_S3_BUCKET_NAME`: S3 bucket for static files
+
+## File Patterns
+- **Backend models**: Each app has models.py, views.py, serializers.py, admin.py
+- **Frontend pages**: Organized by domain with shared components
+- **API endpoints**: RESTful design following DRF conventions
+- **Deployment scripts**: All in `deploy/` directory

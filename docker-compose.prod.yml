@@ -1,0 +1,26 @@
+version: '3.9'
+
+services:
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: restaurant_web_prod
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=backend.settings_prod
+    ports:
+      - "8000:8000"
+    volumes:
+      - logs:/var/log/django
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/admin/', timeout=10)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  logs:
