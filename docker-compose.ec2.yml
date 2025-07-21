@@ -1,8 +1,8 @@
 services:
   web:
     build:
-      context: ./backend
-      dockerfile: Dockerfile.ec2
+      context: .
+      dockerfile: backend/Dockerfile.ec2
     container_name: restaurant_web_ec2
     environment:
       - DJANGO_SETTINGS_MODULE=backend.settings_ec2
