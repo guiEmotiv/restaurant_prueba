@@ -138,7 +138,13 @@ deploy() {
         print_success "Cleanup complete"
     fi
     
-    # Step 4: Build new image
+    # Step 4: Clean Docker resources before build to free space
+    print_status "🧹 Cleaning Docker resources to free space..."
+    docker system prune -f --volumes
+    docker image prune -a -f
+    print_success "Docker resources cleaned"
+    
+    # Step 5: Build new image
     print_status "🔨 Building Docker image (this may take a few minutes)..."
     docker-compose -f docker-compose.ec2.yml build --no-cache || {
         print_error "Docker build failed"
@@ -146,7 +152,7 @@ deploy() {
     }
     print_success "Docker image built"
     
-    # Step 5: Start containers
+    # Step 6: Start containers
     print_status "🚀 Starting containers..."
     docker-compose -f docker-compose.ec2.yml up -d || {
         print_error "Failed to start containers"
@@ -154,15 +160,15 @@ deploy() {
     }
     print_success "Containers started"
     
-    # Step 6: Wait for health check
+    # Step 7: Wait for health check
     print_status "⏳ Waiting for application to be ready..."
     sleep 10
     
-    # Step 7: Check container status
+    # Step 8: Check container status
     print_status "📊 Checking container status..."
     docker-compose -f docker-compose.ec2.yml ps
     
-    # Step 8: Run health checks
+    # Step 9: Run health checks
     print_status "🏥 Running health checks..."
     
     # Check if Django admin is accessible
@@ -179,7 +185,7 @@ deploy() {
         print_warning "API endpoints might not be ready yet"
     fi
     
-    # Step 9: Show logs
+    # Step 10: Show logs
     print_status "📜 Recent logs:"
     docker-compose -f docker-compose.ec2.yml logs --tail=20
     
