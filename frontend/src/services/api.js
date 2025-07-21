@@ -3,20 +3,41 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/v1` : 'http://localhost:8000/api/v1';
 
 // Debug log to see what URL is being used
-console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('API_BASE_URL:', API_BASE_URL);
+console.log('🔍 API Configuration Debug:');
+console.log('  VITE_API_URL:', import.meta.env.VITE_API_URL);
+console.log('  API_BASE_URL:', API_BASE_URL);
+console.log('  MODE:', import.meta.env.MODE);
+console.log('  PROD:', import.meta.env.PROD);
+console.log('  Timestamp:', new Date().toISOString());
 
 // Create axios instance with default configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
   },
+  timeout: 30000, // 30 second timeout
 });
+
+// Add request interceptor for debugging
+api.interceptors.request.use(
+  (config) => {
+    console.log(`📡 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    return config;
+  },
+  (error) => {
+    console.error('🚨 Request Error:', error);
+    return Promise.reject(error);
+  }
+);
 
 // Add response interceptor to handle pagination
 api.interceptors.response.use(
   (response) => {
+    console.log(`✅ API Response: ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
     // If the response has a 'results' field, it's paginated
     if (response.data && response.data.results !== undefined) {
       return { ...response, data: response.data.results };
@@ -24,7 +45,13 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error('API Error:', error);
+    console.error('🚨 API Error Details:');
+    console.error('  URL:', error.config?.url);
+    console.error('  Method:', error.config?.method?.toUpperCase());
+    console.error('  Full URL:', error.config?.baseURL + error.config?.url);
+    console.error('  Status:', error.response?.status);
+    console.error('  Error:', error.message);
+    console.error('  Response:', error.response?.data);
     return Promise.reject(error);
   }
 );

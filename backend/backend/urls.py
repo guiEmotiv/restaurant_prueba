@@ -11,7 +11,12 @@ def index_view(request):
     """Serve React index.html for production"""
     try:
         with open(settings.BASE_DIR / 'frontend_static' / 'index.html', 'r') as f:
-            return HttpResponse(f.read(), content_type='text/html')
+            response = HttpResponse(f.read(), content_type='text/html')
+            # Add anti-cache headers for production
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response['Pragma'] = 'no-cache' 
+            response['Expires'] = '0'
+            return response
     except FileNotFoundError:
         return HttpResponse('Frontend not built yet. Build the React app first.', status=404)
 

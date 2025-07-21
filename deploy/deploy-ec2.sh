@@ -144,9 +144,12 @@ deploy() {
     docker image prune -a -f
     print_success "Docker resources cleaned"
     
-    # Step 5: Build new image
-    print_status "🔨 Building Docker image (this may take a few minutes)..."
-    docker-compose -f docker-compose.ec2.yml build --no-cache || {
+    # Step 5: Build new image with fresh environment
+    print_status "🔨 Building Docker image with fresh environment (this may take a few minutes)..."
+    # Remove any existing containers to ensure fresh build
+    docker-compose -f docker-compose.ec2.yml rm -f || true
+    # Build with no cache and fresh build args
+    docker-compose -f docker-compose.ec2.yml build --no-cache --pull || {
         print_error "Docker build failed"
         exit 1
     }
