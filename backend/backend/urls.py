@@ -53,33 +53,48 @@ def serve_vite_svg(request):
 
 def debug_static_files(request):
     """Debug view to show where files are located"""
-    if not settings.DEBUG:
-        import os
-        debug_info = []
-        
-        # Check frontend_static
-        frontend_dir = settings.BASE_DIR / 'frontend_static'
-        debug_info.append(f"frontend_static exists: {frontend_dir.exists()}")
-        if frontend_dir.exists():
-            try:
-                files = list(frontend_dir.rglob('*'))[:20]  # First 20 files
-                debug_info.append(f"frontend_static files: {[str(f) for f in files]}")
-            except Exception as e:
-                debug_info.append(f"Error reading frontend_static: {e}")
-        
-        # Check staticfiles
-        static_dir = Path(settings.STATIC_ROOT)
-        debug_info.append(f"staticfiles exists: {static_dir.exists()}")
-        if static_dir.exists():
-            try:
-                files = list(static_dir.rglob('*'))[:20]  # First 20 files
-                debug_info.append(f"staticfiles files: {[str(f) for f in files]}")
-            except Exception as e:
-                debug_info.append(f"Error reading staticfiles: {e}")
-        
-        return HttpResponse('<br>'.join(debug_info), content_type='text/html')
-    else:
-        raise Http404("Debug only available in production")
+    import os
+    debug_info = []
+    
+    debug_info.append(f"DEBUG setting: {settings.DEBUG}")
+    debug_info.append(f"BASE_DIR: {settings.BASE_DIR}")
+    debug_info.append(f"STATIC_ROOT: {settings.STATIC_ROOT}")
+    debug_info.append("")
+    
+    # Check frontend_static
+    frontend_dir = settings.BASE_DIR / 'frontend_static'
+    debug_info.append(f"frontend_static exists: {frontend_dir.exists()}")
+    if frontend_dir.exists():
+        try:
+            files = list(frontend_dir.rglob('*'))[:20]  # First 20 files
+            debug_info.append(f"frontend_static files: {[str(f) for f in files]}")
+        except Exception as e:
+            debug_info.append(f"Error reading frontend_static: {e}")
+    
+    debug_info.append("")
+    
+    # Check staticfiles
+    static_dir = Path(settings.STATIC_ROOT)
+    debug_info.append(f"staticfiles exists: {static_dir.exists()}")
+    if static_dir.exists():
+        try:
+            files = list(static_dir.rglob('*'))[:30]  # First 30 files
+            debug_info.append(f"staticfiles files: {[str(f) for f in files]}")
+        except Exception as e:
+            debug_info.append(f"Error reading staticfiles: {e}")
+    
+    # Look for the specific assets we need
+    debug_info.append("")
+    debug_info.append("Looking for specific assets:")
+    search_files = ['index-dsb0hPYX.css', 'index-BCaE9ebp.js', 'vite.svg']
+    for search_file in search_files:
+        try:
+            found_files = list(Path('/app').rglob(f'*{search_file}*'))
+            debug_info.append(f"{search_file}: {found_files}")
+        except Exception as e:
+            debug_info.append(f"Error searching {search_file}: {e}")
+    
+    return HttpResponse('<br>'.join(debug_info), content_type='text/html')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
