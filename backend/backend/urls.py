@@ -43,6 +43,9 @@ def debug_static_files(request):
     import os
     debug_info = []
     
+    # Debug: Log all requests to this endpoint
+    print(f"DEBUG: Request to debug-static from {request.META.get('REMOTE_ADDR')}")
+    
     debug_info.append(f"DEBUG setting: {settings.DEBUG}")
     debug_info.append(f"BASE_DIR: {settings.BASE_DIR}")
     debug_info.append(f"STATIC_ROOT: {settings.STATIC_ROOT}")
@@ -83,15 +86,36 @@ def debug_static_files(request):
     
     return HttpResponse('<br>'.join(debug_info), content_type='text/html')
 
+def debug_api_requests(request):
+    """Debug function to see API requests"""
+    print(f"DEBUG API: Request path={request.path}, method={request.method}, remote={request.META.get('REMOTE_ADDR')}")
+    return HttpResponse(f"API Debug: {request.path} from {request.META.get('REMOTE_ADDR')}")
+
+def simple_api_test(request):
+    """Simple API test that bypasses DRF"""
+    from django.http import JsonResponse
+    return JsonResponse({"status": "API is working", "path": request.path, "method": request.method})
+
+# Add middleware-like debugging
+def debug_all_requests(get_response):
+    """Middleware to debug all requests"""
+    def middleware(request):
+        print(f"MIDDLEWARE DEBUG: {request.method} {request.path} from {request.META.get('REMOTE_ADDR')}")
+        response = get_response(request)
+        print(f"MIDDLEWARE DEBUG: Response status: {response.status_code}")
+        return response
+    return middleware
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # API routes FIRST
-    path('', include('api_urls')),
-    # Debug view
-    path('debug-static/', debug_static_files, name='debug_static'),
+    # Debug views
+    path('debug-static/', debug_static_files, name='debug_static'), 
+    path('test-endpoint/', simple_api_test, name='test_endpoint'),
     # Serve frontend assets - MUST come before the catch-all route
     re_path(r'^assets/(?P<path>.*)$', serve_frontend_asset, name='frontend_assets'),
     path('vite.svg', serve_vite_svg, name='vite_svg'),
+    # Include API routes with explicit api/v1/ prefix
+    path('api/v1/', include('api_urls')),
 ]
 
 # Serve static and media files in production
@@ -100,7 +124,7 @@ urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 # Also serve assets directly from static
 urlpatterns += static('/assets/', document_root=settings.STATIC_ROOT / 'assets')
 
-# Serve React app for all other routes (MUST be last)
+# Serve React app only for root and specific frontend routes (after API routes)
 urlpatterns += [
-    path('', index_view, name='frontend_index'),
+    path('', index_view, name='frontend_index'),  # Root only
 ]
