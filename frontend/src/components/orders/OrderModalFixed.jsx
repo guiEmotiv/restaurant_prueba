@@ -195,22 +195,53 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.table) {
+    // Validar mesa
+    if (!formData.table || formData.table === '') {
       newErrors.table = 'La mesa es requerida';
+    } else {
+      const tableId = parseInt(formData.table);
+      if (isNaN(tableId) || tableId <= 0) {
+        newErrors.table = 'Debe seleccionar una mesa válida';
+      }
     }
     
     // Validar items - al menos uno debe estar completo
-    const validItems = orderItems.filter(item => 
-      item.recipe && item.recipe !== ''
-    );
+    const validItems = orderItems.filter(item => {
+      let hasValidRecipe = false;
+      
+      if (item.recipe) {
+        if (typeof item.recipe === 'object' && item.recipe !== null) {
+          hasValidRecipe = item.recipe.id && !isNaN(parseInt(item.recipe.id));
+        } else {
+          hasValidRecipe = item.recipe !== '' && !isNaN(parseInt(item.recipe));
+        }
+      }
+      
+      return hasValidRecipe;
+    });
     
     if (validItems.length === 0) {
-      newErrors.items = 'Debe agregar al menos un item válido';
+      newErrors.items = 'Debe agregar al menos un item válido con receta seleccionada';
     }
     
-    // No validar duplicados - está permitido tener múltiples items del mismo tipo
+    // Validar cada item individual
+    orderItems.forEach((item, index) => {
+      if (item.recipe && item.recipe !== '') {
+        let recipeId;
+        if (typeof item.recipe === 'object' && item.recipe !== null) {
+          recipeId = item.recipe.id || item.recipe;
+        } else {
+          recipeId = item.recipe;
+        }
+        
+        if (!recipeId || isNaN(parseInt(recipeId))) {
+          newErrors[`item_${index}`] = `El item ${index + 1} tiene una receta inválida`;
+        }
+      }
+    });
     
     setErrors(newErrors);
+    console.log('Form validation errors:', newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
@@ -292,17 +323,38 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         }
       } else {
         // Crear nueva orden con items incluidos según OrderCreateSerializer
-        const processedItems = validItems.map(item => {
-          const recipeId = parseInt(item.recipe);
-          if (isNaN(recipeId)) {
-            console.error('Invalid recipe ID for item:', item);
-            throw new Error(`Invalid recipe ID: ${item.recipe}`);
+        console.log('=== PROCESSING ITEMS FOR NEW ORDER ===');
+        console.log('Raw validItems:', JSON.stringify(validItems, null, 2));
+        
+        const processedItems = validItems.map((item, index) => {
+          console.log(`Processing item ${index}:`, JSON.stringify(item, null, 2));
+          
+          // Extract recipe ID properly
+          let recipeId;
+          if (typeof item.recipe === 'object' && item.recipe !== null) {
+            recipeId = item.recipe.id || item.recipe;
+          } else {
+            recipeId = item.recipe;
           }
-          return {
-            recipe: recipeId,
+          
+          console.log(`Extracted recipe ID for item ${index}:`, recipeId);
+          
+          const parsedRecipeId = parseInt(recipeId);
+          if (isNaN(parsedRecipeId) || parsedRecipeId <= 0) {
+            console.error(`Invalid recipe ID for item ${index}:`, item);
+            throw new Error(`Invalid recipe ID: ${recipeId} (from item.recipe: ${JSON.stringify(item.recipe)})`);
+          }
+          
+          const processedItem = {
+            recipe: parsedRecipeId,
             notes: item.notes || ''
           };
+          
+          console.log(`Processed item ${index}:`, JSON.stringify(processedItem, null, 2));
+          return processedItem;
         });
+        
+        console.log('Final processedItems:', JSON.stringify(processedItems, null, 2));
         
         const orderData = {
           table: parseInt(formData.table),
@@ -365,7 +417,24 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                   errors.push(`${field}: ${JSON.stringify(fieldErrors)}`);
                 }
               } else {
-                errors.push(`${field}: ${JSON.stringify(fieldErrors)}`);
+                // Better handling for non-items nested objects
+                try {
+                  if (typeof fieldErrors === 'object' && fieldErrors !== null) {
+                    const objErrors = [];
+                    for (const [subField, subValue] of Object.entries(fieldErrors)) {
+                      if (Array.isArray(subValue)) {
+                        objErrors.push(`${subField}: ${subValue.join(', ')}`);
+                      } else {
+                        objErrors.push(`${subField}: ${subValue}`);
+                      }
+                    }
+                    errors.push(`${field}: ${objErrors.join('; ')}`);
+                  } else {
+                    errors.push(`${field}: ${fieldErrors}`);
+                  }
+                } catch (parseError) {
+                  errors.push(`${field}: Error parsing validation data`);
+                }
               }
             } else {
               errors.push(`${field}: ${fieldErrors}`);
