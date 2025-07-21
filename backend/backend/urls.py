@@ -16,26 +16,13 @@ def index_view(request):
         return HttpResponse('Frontend not built yet. Build the React app first.', status=404)
 
 def serve_frontend_asset(request, path):
-    """Serve frontend assets (CSS, JS, etc.) - try multiple locations"""
-    # Try frontend_static first
-    asset_path = settings.BASE_DIR / 'frontend_static' / 'assets' / path
-    if asset_path.exists() and asset_path.is_file():
-        content_type, _ = mimetypes.guess_type(str(asset_path))
-        return FileResponse(open(asset_path, 'rb'), content_type=content_type)
-    
-    # Try staticfiles directory
+    """Serve frontend assets (CSS, JS, etc.) - we know they're in staticfiles/assets"""
     static_asset_path = settings.STATIC_ROOT / 'assets' / path
     if static_asset_path.exists() and static_asset_path.is_file():
         content_type, _ = mimetypes.guess_type(str(static_asset_path))
         return FileResponse(open(static_asset_path, 'rb'), content_type=content_type)
     
-    # Try direct in staticfiles
-    static_direct_path = settings.STATIC_ROOT / path
-    if static_direct_path.exists() and static_direct_path.is_file():
-        content_type, _ = mimetypes.guess_type(str(static_direct_path))
-        return FileResponse(open(static_direct_path, 'rb'), content_type=content_type)
-    
-    raise Http404(f"Asset not found: {path}")
+    raise Http404(f"Asset not found at {static_asset_path}: {path}")
 
 def serve_vite_svg(request):
     """Serve vite.svg - try multiple locations"""
@@ -101,14 +88,18 @@ urlpatterns = [
     path('', include('api_urls')),
     # Debug view
     path('debug-static/', debug_static_files, name='debug_static'),
-    # Serve frontend assets
+    # Serve frontend assets - MUST come before the catch-all route
     re_path(r'^assets/(?P<path>.*)$', serve_frontend_asset, name='frontend_assets'),
     path('vite.svg', serve_vite_svg, name='vite_svg'),
-    # Serve React app for all other routes
-    path('', index_view, name='frontend_index'),
 ]
 
 # Serve static and media files in production
-if settings.DEBUG is False:  # In production
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Also serve assets directly from static
+urlpatterns += static('/assets/', document_root=settings.STATIC_ROOT / 'assets')
+
+# Serve React app for all other routes (MUST be last)
+urlpatterns += [
+    path('', index_view, name='frontend_index'),
+]
