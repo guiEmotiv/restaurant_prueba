@@ -18,6 +18,7 @@ ENV DJANGO_SETTINGS_MODULE=backend.settings_ec2
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     sqlite3 \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user for security
@@ -36,12 +37,8 @@ COPY backend/ .
 # Copy frontend build
 COPY --from=frontend-builder /frontend/dist ./frontend_static/
 
-# Create directories and set permissions
-RUN mkdir -p /app/staticfiles /app/media /app/data \
-    && chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
+# Create directories
+RUN mkdir -p /app/staticfiles /app/media /app/data
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
@@ -49,12 +46,13 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 8000
 
-# Start script
+# Start script - Run Django commands as root, then switch to appuser for gunicorn
 CMD ["sh", "-c", "\
     echo '🚀 Starting Restaurant Management System - EC2 Production' && \
     python manage.py migrate --noinput && \
     python manage.py collectstatic --noinput --clear && \
+    chown -R appuser:appuser /app/data /app/staticfiles /app/media && \
     if [ -n \"$DJANGO_SUPERUSER_USERNAME\" ] && [ -n \"$DJANGO_SUPERUSER_PASSWORD\" ] && [ -n \"$DJANGO_SUPERUSER_EMAIL\" ]; then \
         python manage.py createsuperuser --noinput || echo 'Superuser already exists'; \
     fi && \
-    exec gunicorn --bind 0.0.0.0:8000 --workers 2 --timeout 120 --keep-alive 5 --max-requests 1000 --access-logfile - --error-logfile - backend.wsgi:application"]
+    exec gosu appuser gunicorn --bind 0.0.0.0:8000 --workers 2 --timeout 120 --keep-alive 5 --max-requests 1000 --access-logfile - --error-logfile - backend.wsgi:application"]
