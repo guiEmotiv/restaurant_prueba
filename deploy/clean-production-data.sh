@@ -43,10 +43,10 @@ echo "  - All ingredients stock reset to 0"
 echo "  - Keep: Categories, Units, Zones, Tables, Groups, Recipes structure"
 echo ""
 
-read -p "Are you sure you want to proceed? (type 'YES' to confirm): " confirm
+read -p "Are you sure you want to proceed? (type 'YES' exactly): " confirm
 
 if [ "$confirm" != "YES" ]; then
-    print_status "Operation cancelled"
+    print_status "Operation cancelled (you typed: '$confirm', expected: 'YES')"
     exit 0
 fi
 

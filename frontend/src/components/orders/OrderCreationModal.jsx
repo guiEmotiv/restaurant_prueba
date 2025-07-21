@@ -128,13 +128,21 @@ const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
       setLoading(true);
       
       // Create order first
+      // Handle quantities by creating multiple items for the same recipe
+      const itemsArray = [];
+      selectedItems.forEach(item => {
+        const quantity = item.quantity || 1;
+        for (let i = 0; i < quantity; i++) {
+          itemsArray.push({
+            recipe: item.recipe.id,
+            notes: item.notes || ''
+          });
+        }
+      });
+      
       const orderData = {
         table: selectedTable.id,
-        items: selectedItems.map(item => ({
-          recipe: item.recipe.id,
-          notes: item.notes || '',
-          quantity: item.quantity || 1
-        }))
+        items: itemsArray
       };
 
       await apiService.orders.create(orderData);

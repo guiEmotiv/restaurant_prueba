@@ -103,7 +103,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       const items = orderDetails.items || [];
       setOrderItems(items.map(item => ({
         id: item.id,
-        recipe: item.recipe,
+        recipe: typeof item.recipe === 'object' ? item.recipe.id : item.recipe,
         recipe_name: item.recipe_name,
         unit_price: item.unit_price,
         total_price: item.total_price,
@@ -292,15 +292,25 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         }
       } else {
         // Crear nueva orden con items incluidos según OrderCreateSerializer
+        const processedItems = validItems.map(item => {
+          const recipeId = parseInt(item.recipe);
+          if (isNaN(recipeId)) {
+            console.error('Invalid recipe ID for item:', item);
+            throw new Error(`Invalid recipe ID: ${item.recipe}`);
+          }
+          return {
+            recipe: recipeId,
+            notes: item.notes || ''
+          };
+        });
+        
         const orderData = {
           table: parseInt(formData.table),
-          items: validItems.map(item => ({
-            recipe: parseInt(item.recipe),
-            notes: item.notes || ''
-          }))
+          items: processedItems
         };
         
-        console.log('Creando orden:', orderData);
+        console.log('Creando orden:', JSON.stringify(orderData, null, 2));
+        console.log('Original validItems:', JSON.stringify(validItems, null, 2));
         savedOrder = await apiService.orders.create(orderData);
       }
       
@@ -329,7 +339,34 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
             if (Array.isArray(fieldErrors)) {
               errors.push(`${field}: ${fieldErrors.join(', ')}`);
             } else if (typeof fieldErrors === 'object' && fieldErrors !== null) {
-              errors.push(`${field}: ${JSON.stringify(fieldErrors)}`);
+              // Handle nested validation errors for items array
+              if (field === 'items' && Array.isArray(fieldErrors)) {
+                const itemErrors = [];
+                fieldErrors.forEach((itemError, index) => {
+                  if (typeof itemError === 'object' && itemError !== null) {
+                    const itemErrorMessages = [];
+                    for (const [itemField, itemFieldError] of Object.entries(itemError)) {
+                      if (Array.isArray(itemFieldError)) {
+                        itemErrorMessages.push(`${itemField}: ${itemFieldError.join(', ')}`);
+                      } else {
+                        itemErrorMessages.push(`${itemField}: ${itemFieldError}`);
+                      }
+                    }
+                    if (itemErrorMessages.length > 0) {
+                      itemErrors.push(`Item ${index + 1}: ${itemErrorMessages.join(', ')}`);
+                    }
+                  } else {
+                    itemErrors.push(`Item ${index + 1}: ${itemError}`);
+                  }
+                });
+                if (itemErrors.length > 0) {
+                  errors.push(`${field}: ${itemErrors.join('; ')}`);
+                } else {
+                  errors.push(`${field}: ${JSON.stringify(fieldErrors)}`);
+                }
+              } else {
+                errors.push(`${field}: ${JSON.stringify(fieldErrors)}`);
+              }
             } else {
               errors.push(`${field}: ${fieldErrors}`);
             }
