@@ -96,6 +96,23 @@ def simple_api_test(request):
     from django.http import JsonResponse
     return JsonResponse({"status": "API is working", "path": request.path, "method": request.method})
 
+def api_root_test(request):
+    """API root test"""
+    from django.http import JsonResponse
+    return JsonResponse({
+        "status": "API v1 root is working", 
+        "endpoints": [
+            "/api/v1/categories/",
+            "/api/v1/units/", 
+            "/api/v1/zones/",
+            "/api/v1/tables/",
+            "/api/v1/groups/",
+            "/api/v1/ingredients/",
+            "/api/v1/recipes/",
+            "/api/v1/orders/"
+        ]
+    })
+
 # Add middleware-like debugging
 def debug_all_requests(get_response):
     """Middleware to debug all requests"""
@@ -111,6 +128,7 @@ urlpatterns = [
     # Debug views
     path('debug-static/', debug_static_files, name='debug_static'), 
     path('test-endpoint/', simple_api_test, name='test_endpoint'),
+    path('api/', api_root_test, name='api_root_test'),  # Test API root
     # Serve frontend assets - MUST come before the catch-all route
     re_path(r'^assets/(?P<path>.*)$', serve_frontend_asset, name='frontend_assets'),
     path('vite.svg', serve_vite_svg, name='vite_svg'),
