@@ -361,9 +361,28 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           items: processedItems
         };
         
-        console.log('Creando orden:', JSON.stringify(orderData, null, 2));
+        console.log('=== FINAL ORDER DATA TO SEND ===');
+        console.log('Table ID:', orderData.table, 'Type:', typeof orderData.table);
+        console.log('Items count:', orderData.items.length);
+        console.log('Full order data:', JSON.stringify(orderData, null, 2));
         console.log('Original validItems:', JSON.stringify(validItems, null, 2));
+        
+        // Validate data before sending
+        console.log('=== VALIDATION BEFORE SEND ===');
+        orderData.items.forEach((item, index) => {
+          console.log(`Item ${index}:`, {
+            recipe: item.recipe,
+            recipe_type: typeof item.recipe,
+            recipe_valid: !isNaN(parseInt(item.recipe)) && parseInt(item.recipe) > 0,
+            notes: item.notes,
+            notes_type: typeof item.notes
+          });
+        });
+        
+        console.log('About to call apiService.orders.create...');
+        
         savedOrder = await apiService.orders.create(orderData);
+        console.log('Order creation successful:', savedOrder);
       }
       
       onSave();
@@ -372,9 +391,12 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
     } catch (error) {
       console.error('=== ERROR SAVING ORDER ===');
       console.error('Full error object:', error);
-      console.error('Error response:', error.response);
+      console.error('Error response status:', error.response?.status);
       console.error('Error response data:', error.response?.data);
-      
+      console.error('Type of response data:', typeof error.response?.data);
+      if (error.response?.data) {
+        console.error('Response data JSON:', JSON.stringify(error.response.data, null, 2));
+      }
       let errorMessage = 'Error desconocido';
       
       if (error.response?.data) {
@@ -394,10 +416,15 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
               // Handle nested validation errors for items array
               if (field === 'items' && Array.isArray(fieldErrors)) {
                 const itemErrors = [];
+                console.log('Processing items array errors:', fieldErrors);
+                
                 fieldErrors.forEach((itemError, index) => {
+                  console.log(`Processing item error ${index}:`, itemError);
+                  
                   if (typeof itemError === 'object' && itemError !== null) {
                     const itemErrorMessages = [];
                     for (const [itemField, itemFieldError] of Object.entries(itemError)) {
+                      console.log(`Item ${index} field ${itemField} error:`, itemFieldError);
                       if (Array.isArray(itemFieldError)) {
                         itemErrorMessages.push(`${itemField}: ${itemFieldError.join(', ')}`);
                       } else {
@@ -407,14 +434,21 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                     if (itemErrorMessages.length > 0) {
                       itemErrors.push(`Item ${index + 1}: ${itemErrorMessages.join(', ')}`);
                     }
-                  } else {
+                  } else if (typeof itemError === 'string') {
                     itemErrors.push(`Item ${index + 1}: ${itemError}`);
+                  } else {
+                    // Handle other types of item errors
+                    const errorString = String(itemError);
+                    itemErrors.push(`Item ${index + 1}: ${errorString}`);
                   }
                 });
+                
                 if (itemErrors.length > 0) {
                   errors.push(`${field}: ${itemErrors.join('; ')}`);
                 } else {
-                  errors.push(`${field}: ${JSON.stringify(fieldErrors)}`);
+                  // Fallback - try to show raw error data
+                  const rawErrorString = JSON.stringify(fieldErrors, null, 2);
+                  errors.push(`${field}: ${rawErrorString}`);
                 }
               } else {
                 // Better handling for non-items nested objects
