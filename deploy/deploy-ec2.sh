@@ -51,6 +51,9 @@ if [ -z "$DJANGO_SECRET_KEY" ]; then
     exit 1
 fi
 
+# Export EC2_PUBLIC_IP for docker-compose
+export EC2_PUBLIC_IP
+
 # Function to check disk space
 check_disk_space() {
     local available=$(df / | awk 'NR==2 {print $4}')
