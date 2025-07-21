@@ -18,21 +18,32 @@ ALLOWED_HOSTS = [
 ]
 
 # ──────────────────────────────────────────────────────────────
-# Database - PostgreSQL RDS
+# Database - PostgreSQL RDS with SQLite fallback
 # ──────────────────────────────────────────────────────────────
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ['RDS_DB_NAME'],
-        'USER': os.environ['RDS_USERNAME'],
-        'PASSWORD': os.environ['RDS_PASSWORD'],
-        'HOST': os.environ['RDS_HOSTNAME'],
-        'PORT': os.environ.get('RDS_PORT', '5432'),
-        'OPTIONS': {
-            'connect_timeout': 20,
+if all(key in os.environ for key in ['RDS_DB_NAME', 'RDS_USERNAME', 'RDS_PASSWORD', 'RDS_HOSTNAME']):
+    # Use PostgreSQL RDS if all variables are set
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ['RDS_DB_NAME'],
+            'USER': os.environ['RDS_USERNAME'],
+            'PASSWORD': os.environ['RDS_PASSWORD'],
+            'HOST': os.environ['RDS_HOSTNAME'],
+            'PORT': os.environ.get('RDS_PORT', '5432'),
+            'OPTIONS': {
+                'connect_timeout': 20,
+            }
         }
     }
-}
+else:
+    # Fallback to SQLite for development/testing
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': '/app/db.sqlite3',
+        }
+    }
+    print("⚠️  Using SQLite database (RDS variables not found)")
 
 # ──────────────────────────────────────────────────────────────
 # Static files - AWS S3
