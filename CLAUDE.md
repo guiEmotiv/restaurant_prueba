@@ -51,7 +51,7 @@ This is a full-stack restaurant management system with Django REST Framework bac
 
 ### Database
 - **Development**: SQLite (db.sqlite3)
-- **Production**: PostgreSQL via RDS
+- **Production**: SQLite (simple deployment) or PostgreSQL (advanced)
 - **Models use PROTECT**: Prevents deletion of referenced objects
 
 ### API Integration
@@ -59,34 +59,34 @@ This is a full-stack restaurant management system with Django REST Framework bac
 - **Frontend**: Axios for API calls (services/api.js)
 - **CORS**: Configured for localhost:5173 development and production domains
 
-## Production Deployment (AWS)
+## Production Deployment (EC2 + SQLite + Docker)
 
 ### Architecture
-- **EC2 t3.micro**: Backend Django with Docker
-- **RDS db.t3.micro**: PostgreSQL database
-- **S3**: Static files and frontend hosting
-- **CloudFront**: CDN for frontend distribution
+- **EC2 t3.micro**: Ubuntu server with Docker
+- **SQLite**: Simple, reliable database
+- **Local Storage**: Static files and media
+- **Single Container**: Streamlined deployment
 
 ### Production Commands
-- **Deploy application**: `./deploy/deploy.sh`
-- **Deploy frontend only**: `./deploy/frontend-deploy.sh`
-- **Backup database**: `./deploy/backup-db.sh`
-- **View production logs**: `docker-compose -f docker-compose.prod.yml logs -f`
+- **Setup new server**: `./deploy/ec2-setup.sh`
+- **Deploy application**: `./deploy/ec2-deploy.sh`
+- **Check status**: `./deploy/ec2-deploy.sh status`
+- **View logs**: `./deploy/ec2-deploy.sh logs`
+- **Create backup**: `./deploy/ec2-deploy.sh backup`
+- **Restart app**: `./deploy/ec2-deploy.sh restart`
 
 ### Configuration Files
-- **Production settings**: `backend/backend/settings_prod.py`
-- **Production Docker**: `backend/Dockerfile.prod`
-- **Production compose**: `docker-compose.prod.yml`
-- **Environment template**: `.env.example`
-- **AWS setup guide**: `deploy/aws-setup.md`
+- **EC2 settings**: `backend/backend/settings_ec2.py`
+- **EC2 Docker**: `backend/Dockerfile.ec2`
+- **EC2 compose**: `docker-compose.ec2.yml`
+- **Simple template**: `.env.ec2`
+- **Setup guide**: `deploy/EC2-DEPLOYMENT-GUIDE.md`
 
-### Environment Variables (Production)
-Required variables in `.env`:
+### Environment Variables (Required)
+Minimal configuration in `.env`:
 - `DJANGO_SECRET_KEY`: Django secret key
-- `RDS_HOSTNAME`: RDS endpoint
-- `RDS_USERNAME`, `RDS_PASSWORD`: Database credentials
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: AWS credentials
-- `AWS_S3_BUCKET_NAME`: S3 bucket for static files
+- `EC2_PUBLIC_IP`: Your EC2 public IP
+- `DOMAIN_NAME`: Your domain (optional)
 
 ## File Patterns
 - **Backend models**: Each app has models.py, views.py, serializers.py, admin.py

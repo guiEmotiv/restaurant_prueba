@@ -1,0 +1,128 @@
+# Multi-stage Dockerfile optimized for EC2 + SQLite production deployment
+FROM python:3.12-slim as builder
+
+# Build arguments
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Set environment variables for build
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install build dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+WORKDIR /build
+COPY requirements-prod.txt .
+RUN pip install --no-cache-dir --user -r requirements-prod.txt
+
+# Production stage
+FROM python:3.12-slim
+
+# Build arguments
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=backend.settings_ec2
+ENV PATH=/home/appuser/.local/bin:$PATH
+
+# Create application user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Install only runtime dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        sqlite3 \
+        curl \
+        dumb-init \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python packages from builder stage
+COPY --from=builder /root/.local /home/appuser/.local
+
+# Create application directories with proper permissions
+RUN mkdir -p /app/data /app/logs /app/staticfiles /app/media \
+    && chown -R appuser:appuser /app
+
+# Set working directory
+WORKDIR /app
+
+# Copy application code
+COPY --chown=appuser:appuser . .
+
+# Switch to non-root user
+USER appuser
+
+# Create necessary directories if they don't exist
+RUN mkdir -p data logs staticfiles media
+
+# Expose port
+EXPOSE 8000
+
+# Health check with proper timeout
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python manage.py check --deploy || exit 1
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+echo "🚀 Starting Restaurant Management System on EC2"\n\
+echo "📍 Environment: production"\n\
+echo "💾 Database: SQLite"\n\
+echo "🐳 Container: $(hostname)"\n\
+\n\
+# Wait for database directory to be available\n\
+while [ ! -d "/app/data" ]; do\n\
+    echo "⏳ Waiting for data directory..."\n\
+    sleep 2\n\
+done\n\
+\n\
+# Initialize database if needed\n\
+if [ ! -f "/app/data/db.sqlite3" ]; then\n\
+    echo "🔧 Initializing database..."\n\
+    python manage.py migrate --noinput\n\
+    echo "✅ Database initialized"\n\
+else\n\
+    echo "🔧 Running migrations..."\n\
+    python manage.py migrate --noinput\n\
+    echo "✅ Migrations completed"\n\
+fi\n\
+\n\
+# Collect static files\n\
+echo "📦 Collecting static files..."\n\
+python manage.py collectstatic --noinput --clear\n\
+echo "✅ Static files collected"\n\
+\n\
+# Create superuser if environment variables are set\n\
+if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ] && [ -n "$DJANGO_SUPERUSER_EMAIL" ]; then\n\
+    echo "👤 Creating superuser..."\n\
+    python manage.py createsuperuser --noinput --username "$DJANGO_SUPERUSER_USERNAME" --email "$DJANGO_SUPERUSER_EMAIL" || echo "Superuser already exists"\n\
+fi\n\
+\n\
+echo "🎯 Starting application server..."\n\
+exec gunicorn \\\n\
+    --bind 0.0.0.0:8000 \\\n\
+    --workers 2 \\\n\
+    --worker-class sync \\\n\
+    --worker-connections 1000 \\\n\
+    --timeout 60 \\\n\
+    --keep-alive 5 \\\n\
+    --max-requests 1000 \\\n\
+    --max-requests-jitter 100 \\\n\
+    --preload \\\n\
+    --access-logfile /app/logs/access.log \\\n\
+    --error-logfile /app/logs/error.log \\\n\
+    --capture-output \\\n\
+    backend.wsgi:application\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["/app/entrypoint.sh"]
