@@ -27,12 +27,26 @@ local_settings.py
 db.sqlite3
 media/
 
-# Environment variables
+# Environment variables and sensitive files
 .env
+.env.*
+!.env.example
+!.env.*.example
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+.env.sqlite
+.env.safe-template
+
+# AWS and secrets
+*.pem
+*.key
+*.crt
+*credentials*
+*secrets*
+*config.json
 
 # Node.js
 node_modules/
@@ -67,8 +81,20 @@ ENV/
 env.bak/
 venv.bak/
 
-# Backup files
+# Backup files and logs
 *.bak
 *.backup
 *.tmp
 *.temp
+backups/
+logs/
+/opt/backups/
+*.log.*
+deployment.log
+backup.log
+frontend-deployment.log
+
+# Production database
+db.sqlite3
+*.db
+*.sqlite

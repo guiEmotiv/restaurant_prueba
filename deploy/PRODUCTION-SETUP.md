@@ -1,321 +1,367 @@
-# 🚀 Guía Paso a Paso - Despliegue a Producción AWS
+# Production Deployment Guide
 
-## Requisitos Previos
+This guide provides step-by-step instructions for deploying the Restaurant Management System to production.
 
-1. ✅ Cuenta AWS activa
-2. ✅ Par de llaves EC2 (.pem)
-3. ✅ Acceso SSH al EC2
+## Prerequisites
 
----
+### System Requirements
+- Ubuntu 20.04+ (recommended) or similar Linux distribution
+- Docker and Docker Compose installed
+- At least 2GB RAM and 20GB disk space
+- Node.js 18+ (for frontend deployment)
+- AWS CLI v2 (for S3 deployment)
 
-## PASO 1: Configurar RDS (Base de Datos)
+### AWS Resources Required
+- **EC2 Instance**: t3.micro or larger
+- **RDS Instance**: PostgreSQL db.t3.micro or larger (optional, SQLite fallback available)
+- **S3 Bucket**: For static files and frontend hosting
+- **IAM User**: With appropriate permissions for S3 and RDS access
 
-### 1.1 Crear RDS PostgreSQL
+## Quick Start
 
+1. **Clone and Setup**
+   ```bash
+   git clone <repository-url>
+   cd restaurant-web
+   cp .env.example .env
+   ```
+
+2. **Configure Environment**
+   Edit `.env` with your production values (see Configuration section)
+
+3. **Deploy Backend**
+   ```bash
+   ./deploy/deploy.sh
+   ```
+
+4. **Deploy Frontend**
+   ```bash
+   ./deploy/frontend-deploy.sh
+   ```
+
+## Detailed Configuration
+
+### Environment Variables (.env file)
+
+#### Critical Variables (Required)
 ```bash
-# En la consola AWS -> RDS -> Create Database
-# 1. Engine: PostgreSQL
-# 2. Template: Free tier
-# 3. DB instance class: db.t3.micro
-# 4. Storage: 20 GB
-# 5. DB instance identifier: restaurant-db
-# 6. Master username: postgres
-# 7. Master password: [ANOTA ESTE PASSWORD]
-# 8. VPC: Default VPC
-# 9. Public access: Yes
-# 10. Security group: Crear nuevo con nombre "restaurant-rds-sg"
+DJANGO_SECRET_KEY=your-super-secret-key-change-this-in-production
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_S3_BUCKET_NAME=your-s3-bucket-name
 ```
 
-### 1.2 Configurar Security Group de RDS
-
+#### Database Configuration
+**Option 1: PostgreSQL RDS (Recommended for production)**
 ```bash
-# En EC2 -> Security Groups -> restaurant-rds-sg
-# Agregar regla:
-# Type: PostgreSQL
-# Port: 5432
-# Source: 0.0.0.0/0 (solo para testing, luego restringir a EC2)
-```
-
----
-
-## PASO 2: Crear S3 Bucket
-
-### 2.1 Crear Bucket
-
-```bash
-# En S3 -> Create bucket
-# 1. Bucket name: restaurant-app-[tu-nombre-unico]
-# 2. Region: us-east-1
-# 3. DESMARCAR "Block all public access"
-# 4. Crear bucket
-```
-
-### 2.2 Configurar Bucket Policy
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "PublicReadGetObject",
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::TU-BUCKET-NAME/*"
-    }
-  ]
-}
-```
-
----
-
-## PASO 3: Crear Usuario IAM
-
-### 3.1 Crear Usuario
-
-```bash
-# En IAM -> Users -> Add user
-# 1. User name: restaurant-app-user
-# 2. Access type: Programmatic access
-# 3. Attach policy: AmazonS3FullAccess
-# 4. GUARDAR Access Key ID y Secret Access Key
-```
-
----
-
-## PASO 4: Configurar EC2
-
-### 4.1 Lanzar Instancia EC2
-
-```bash
-# En EC2 -> Launch Instance
-# 1. AMI: Amazon Linux 2 AMI
-# 2. Instance type: t3.micro
-# 3. Key pair: Tu par de llaves
-# 4. Security group: Crear nuevo con reglas:
-#    - SSH (22): Tu IP
-#    - HTTP (80): 0.0.0.0/0
-#    - Custom TCP (8000): 0.0.0.0/0
-```
-
-### 4.2 Conectar a EC2
-
-```bash
-# Conectar vía SSH
-ssh -i tu-key.pem ec2-user@tu-ec2-ip
-```
-
----
-
-## PASO 5: Configurar Servidor
-
-### 5.1 Actualizar sistema e instalar Git
-
-```bash
-sudo yum update -y
-sudo yum install git -y
-```
-
-### 5.2 Clonar repositorio
-
-```bash
-cd /opt
-sudo mkdir restaurant-app
-sudo chown ec2-user:ec2-user restaurant-app
-cd restaurant-app
-git clone https://github.com/guiEmotiv/restaurant-web.git .
-```
-
-### 5.3 Instalar Docker
-
-```bash
-# Usar script automatizado
-sudo ./deploy/setup-docker.sh
-
-# IMPORTANTE: Después del script, hacer logout y login
-exit
-ssh -i tu-key.pem ec2-user@tu-ec2-ip
-ssh -i clave_ec2_fds.pem ec2-user@ec2-35-92-76-174.us-west-2.compute.amazonaws.com
-
-cd /opt/restaurant-app
-```
-
----
-
-## PASO 6: Configurar Variables de Entorno
-
-### 6.1 Crear archivo .env
-
-```bash
-# Copiar template
-cp .env.safe-template .env
-
-# Editar con tus valores reales
-nano .env
-```
-
-### 6.2 Completar .env con tus valores:
-
-```bash
-# Copiar y pegar esto, reemplazando los valores:
-
-DJANGO_SECRET_KEY="Ntj_jvD_qPpjX5Zc7JVZRqet9Mdjiz97ZvrZxYbaMcx4hQE8JQ"
-DEBUG=0
-
-# Tu IP pública de EC2 (encontrarla en AWS console)
-DOMAIN_NAME="tu-ip-publica-ec2"
-EC2_PUBLIC_IP="tu-ip-publica-ec2"
-
-# Datos de tu RDS (encontrar en AWS RDS console)
-RDS_DB_NAME="restaurant_db"
-RDS_USERNAME="postgres"
-RDS_PASSWORD="tu-password-rds-que-anotaste"
-RDS_HOSTNAME="restaurant-db.xxxxxxxxx.us-east-1.rds.amazonaws.com"
-RDS_PORT="5432"
-
-# Datos IAM que guardaste
-AWS_ACCESS_KEY_ID="tu-access-key-id"
-AWS_SECRET_ACCESS_KEY="tu-secret-access-key"
-AWS_DEFAULT_REGION="us-east-1"
-AWS_S3_BUCKET_NAME="tu-bucket-name"
-
-FRONTEND_DOMAIN="localhost"
-USE_SSL="false"
-TIME_ZONE="America/Lima"
-```
-
-DJANGO_SECRET_KEY=Ntj_jvD_qPpjX5Zc7JVZRqet9Mdjiz97ZvrZxYbaMcx4hQE8JQ
-DEBUG=0
-DOMAIN_NAME=localhost
 RDS_DB_NAME=restaurant_db
 RDS_USERNAME=postgres
-RDS_PASSWORD=postgres123
-RDS_HOSTNAME=restaurant-db.c96ukge6aq9c.us-west-2.rds.amazonaws.com
+RDS_PASSWORD=your-secure-db-password
+RDS_HOSTNAME=your-rds-endpoint.region.rds.amazonaws.com
 RDS_PORT=5432
-AWS_ACCESS_KEY_ID=your-access-key-here
-AWS_SECRET_ACCESS_KEY=your-secret-key-here
-AWS_DEFAULT_REGION=us-west-2
-AWS_S3_BUCKET_NAME=restaurant-app-s3
-FRONTEND_DOMAIN=d2d6pb5m6rj7o9.cloudfront.net
+```
+
+**Option 2: SQLite (Development/Testing)**
+Leave RDS variables empty or unset to use SQLite fallback.
+
+#### Domain and SSL
+```bash
+DOMAIN_NAME=yourdomain.com
+EC2_PUBLIC_IP=your-ec2-public-ip
+FRONTEND_DOMAIN=yourdomain.com
 USE_SSL=true
-TIME_ZONE=America/Lima
-
----
-
-## PASO 7: Desplegar Aplicación
-
-### 7.1 Verificar estructura
-
-```bash
-./deploy/check-structure.sh
+CLOUDFRONT_DISTRIBUTION_ID=your-cloudfront-distribution-id
 ```
 
-### 7.2 Validar configuración
+### AWS Setup
 
+#### 1. Create IAM User
+Create an IAM user with the following policies:
+- AmazonS3FullAccess
+- AmazonRDSFullAccess (if using RDS)
+- CloudFrontFullAccess (if using CloudFront)
+
+#### 2. Create S3 Bucket
 ```bash
-docker-compose -f docker-compose.prod.yml config
+aws s3 mb s3://your-bucket-name --region us-east-1
+aws s3 website s3://your-bucket-name --index-document index.html --error-document index.html
 ```
 
-### 7.3 Construir imagen
-
+#### 3. Setup RDS (Optional)
 ```bash
-docker-compose -f docker-compose.prod.yml build --no-cache
+aws rds create-db-instance \
+    --db-instance-identifier restaurant-db \
+    --db-instance-class db.t3.micro \
+    --engine postgres \
+    --master-username postgres \
+    --master-user-password your-secure-password \
+    --allocated-storage 20 \
+    --vpc-security-group-ids sg-xxxxxxxx
 ```
 
-### 7.4 Levantar servicios
+#### 4. Setup EC2 Instance
+- Launch Ubuntu 20.04+ instance
+- Configure security groups (ports 22, 80, 443, 8000)
+- Install Docker and Docker Compose
 
+## Deployment Scripts
+
+### 1. Backend Deployment (`./deploy/deploy.sh`)
+
+**Features:**
+- Automated deployment with health checks
+- Database backup before deployment
+- Zero-downtime deployment
+- Docker container management
+- Automatic migrations and static file collection
+
+**Usage:**
 ```bash
+./deploy/deploy.sh [command]
+
+Commands:
+  deploy  - Full deployment (default)
+  status  - Show application status
+  backup  - Create database backup only
+  health  - Run health check only
+  logs    - Show application logs
+  restart - Restart application
+```
+
+**Example:**
+```bash
+# Full deployment
+./deploy/deploy.sh
+
+# Check status
+./deploy/deploy.sh status
+
+# View logs
+./deploy/deploy.sh logs
+```
+
+### 2. Frontend Deployment (`./deploy/frontend-deploy.sh`)
+
+**Features:**
+- Build optimization and minification
+- S3 deployment with proper cache headers
+- CloudFront cache invalidation
+- Build verification
+
+**Usage:**
+```bash
+./deploy/frontend-deploy.sh [command]
+
+Commands:
+  deploy  - Full frontend deployment (default)
+  build   - Build frontend only
+  test    - Run tests only
+  lint    - Run linting only
+  upload  - Upload existing build to S3
+  info    - Show deployment information
+```
+
+### 3. Database Backup (`./deploy/backup-db.sh`)
+
+**Features:**
+- Support for both PostgreSQL and SQLite
+- Automated retention management
+- S3 backup upload
+- Data integrity verification
+
+**Usage:**
+```bash
+./deploy/backup-db.sh [command]
+
+Commands:
+  backup          - Create database backup (default)
+  status          - Show backup status and statistics
+  restore <file>  - Restore from backup file
+  cleanup         - Remove old backups
+  list            - List available backups
+```
+
+## Security Considerations
+
+### 1. Environment Variables
+- Never commit `.env` files to version control
+- Use strong, unique passwords
+- Rotate credentials regularly
+- Use AWS IAM roles when possible
+
+### 2. Django Security
+- Set `DEBUG=false` in production
+- Use strong `DJANGO_SECRET_KEY`
+- Configure proper `ALLOWED_HOSTS`
+- Enable SSL/HTTPS (`USE_SSL=true`)
+
+### 3. Database Security
+- Use RDS with encryption at rest
+- Configure proper security groups
+- Use strong database passwords
+- Enable automated backups
+
+### 4. Infrastructure Security
+- Keep EC2 instances updated
+- Use security groups to limit access
+- Enable CloudTrail for auditing
+- Monitor with CloudWatch
+
+## Monitoring and Maintenance
+
+### 1. Application Logs
+```bash
+# View application logs
+docker logs restaurant_web_prod -f
+
+# View deployment logs
+tail -f /var/log/deployment.log
+```
+
+### 2. Health Checks
+```bash
+# Check application health
+./deploy/deploy.sh health
+
+# Check container status
+docker ps
+docker stats
+```
+
+### 3. Database Maintenance
+```bash
+# Create manual backup
+./deploy/backup-db.sh
+
+# Check database status
+docker exec restaurant_web_prod python manage.py dbshell
+```
+
+### 4. System Resources
+```bash
+# Check disk usage
+df -h
+
+# Check memory usage
+free -h
+
+# Check Docker resources
+docker system df
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Container Won't Start
+```bash
+# Check logs
+docker logs restaurant_web_prod
+
+# Check Docker Compose status
+docker-compose -f docker-compose.prod.yml ps
+
+# Rebuild container
+docker-compose -f docker-compose.prod.yml build --no-cache web
+```
+
+#### 2. Database Connection Issues
+```bash
+# Test database connection
+docker exec restaurant_web_prod python manage.py dbshell
+
+# Check environment variables
+docker exec restaurant_web_prod env | grep RDS
+```
+
+#### 3. Static Files Not Loading
+```bash
+# Collect static files manually
+docker exec restaurant_web_prod python manage.py collectstatic --noinput
+
+# Check S3 bucket permissions
+aws s3 ls s3://your-bucket-name/static/
+```
+
+#### 4. Frontend Not Loading
+```bash
+# Check S3 bucket contents
+aws s3 ls s3://your-bucket-name/frontend/
+
+# Rebuild and redeploy frontend
+./deploy/frontend-deploy.sh build
+./deploy/frontend-deploy.sh upload
+```
+
+### Log Locations
+- Application logs: `/var/log/django/django.log`
+- Deployment logs: `/var/log/deployment.log`
+- Frontend deployment logs: `/var/log/frontend-deployment.log`
+- Backup logs: `/var/log/backup.log`
+
+### Recovery Procedures
+
+#### 1. Rollback Deployment
+```bash
+# Stop current deployment
+docker-compose -f docker-compose.prod.yml down
+
+# Restore from backup
+./deploy/backup-db.sh restore /opt/backups/latest_backup.json.gz
+
+# Start with previous image
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-### 7.5 Ejecutar migraciones
-
+#### 2. Database Recovery
 ```bash
-# Esperar 30 segundos a que el contenedor esté listo
-sleep 30
+# List available backups
+./deploy/backup-db.sh list
 
-# Ejecutar migraciones
-docker-compose -f docker-compose.prod.yml exec web python manage.py migrate
+# Restore specific backup
+./deploy/backup-db.sh restore /opt/backups/django_data_20240101_120000.json.gz
 ```
 
-### 7.6 Crear superusuario
+## Performance Optimization
 
-```bash
-docker-compose -f docker-compose.prod.yml exec web python manage.py createsuperuser
-```
+### 1. Database Optimization
+- Enable PostgreSQL connection pooling
+- Configure appropriate `shared_buffers` and `effective_cache_size`
+- Regular VACUUM and ANALYZE operations
 
-### 7.7 Verificar funcionamiento
+### 2. Application Optimization
+- Use Django caching framework
+- Configure Gunicorn worker processes based on CPU cores
+- Implement database query optimization
 
-```bash
-# Ver logs
-docker-compose -f docker-compose.prod.yml logs -f
+### 3. Infrastructure Optimization
+- Use CloudFront CDN for static files
+- Configure proper S3 cache headers
+- Monitor resource usage and scale accordingly
 
-# En otra terminal, probar
-curl http://localhost:8000/admin/
-```
+## Scaling Considerations
 
----
+### 1. Horizontal Scaling
+- Use AWS Application Load Balancer
+- Deploy multiple EC2 instances
+- Configure shared PostgreSQL RDS instance
 
-## PASO 8: Acceder a la Aplicación
+### 2. Vertical Scaling
+- Upgrade EC2 instance type
+- Increase RDS instance resources
+- Optimize Docker container resources
 
-### 8.1 URLs de acceso:
+### 3. Database Scaling
+- Use RDS read replicas
+- Implement database connection pooling
+- Consider database partitioning for large datasets
 
-```bash
-# Backend API
-http://tu-ip-publica-ec2:8000/
+## Support
 
-# Admin Panel
-http://tu-ip-publica-ec2:8000/admin/
+For issues and support:
+1. Check the troubleshooting section above
+2. Review application and deployment logs
+3. Verify configuration in `.env` file
+4. Test individual components with provided scripts
 
-# API Documentation
-http://tu-ip-publica-ec2:8000/api/docs/
-```
-
----
-
-## 🔧 Solución de Problemas Comunes
-
-### Error: "yxr1 variable is not set"
-
-```bash
-# El .env tiene caracteres especiales sin quotes
-# Solución: Usar .env.safe-template que tiene quotes
-```
-
-### Error: "Cannot connect to database"
-
-```bash
-# Verificar RDS Security Group
-# Verificar valores en .env
-# Probar conexión:
-docker-compose -f docker-compose.prod.yml exec web python manage.py check --deploy
-```
-
-### Error: "exec web failed"
-
-```bash
-# El contenedor no está corriendo
-docker-compose -f docker-compose.prod.yml ps
-docker-compose -f docker-compose.prod.yml logs web
-```
-
----
-
-## 🎯 Lista de Verificación Final
-
-- [ ] RDS creado y accesible
-- [ ] S3 bucket creado con policy pública
-- [ ] Usuario IAM con keys guardadas
-- [ ] EC2 con Docker instalado
-- [ ] Código clonado en `/opt/restaurant-app`
-- [ ] Archivo `.env` configurado correctamente
-- [ ] Contenedor construido sin errores
-- [ ] Migraciones ejecutadas exitosamente
-- [ ] Superusuario creado
-- [ ] Aplicación accesible desde internet
-
-## 🆘 Si algo sale mal:
-
-1. Ver logs: `docker-compose -f docker-compose.prod.yml logs -f`
-2. Consultar: `deploy/troubleshooting.md`
-3. Verificar estructura: `./deploy/check-structure.sh`
+Remember to always test deployments in a staging environment before deploying to production.
