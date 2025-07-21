@@ -265,9 +265,9 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       
       let savedOrder;
       if (order?.id) {
-        // Actualizar orden existente - table_id requerido por serializer (UI deshabilitada)
+        // Actualizar orden existente - table requerido por serializer (UI deshabilitada)
         const orderData = {
-          table_id: parseInt(formData.table),
+          table: parseInt(formData.table),
           status: formData.status
         };
         console.log('Actualizando orden:', orderData);
