@@ -51,10 +51,31 @@ if [ -z "$DJANGO_SECRET_KEY" ]; then
     exit 1
 fi
 
+# Function to check disk space
+check_disk_space() {
+    local available=$(df / | awk 'NR==2 {print $4}')
+    local available_gb=$(echo "scale=2; $available / 1048576" | bc 2>/dev/null || echo "0")
+    
+    if (( $(echo "$available < 1048576" | bc -l) )); then
+        print_error "Insufficient disk space! Only ${available_gb}GB available."
+        print_warning "At least 1GB free space is required."
+        echo "Run: ./deploy/clean-ec2-space.sh"
+        return 1
+    fi
+    return 0
+}
+
 # Main deployment function
 deploy() {
     print_status "🚀 Starting EC2 deployment for Restaurant Management System"
     print_status "EC2 IP: $EC2_PUBLIC_IP"
+    
+    # Check disk space
+    print_status "💾 Checking disk space..."
+    if ! check_disk_space; then
+        exit 1
+    fi
+    print_success "Sufficient disk space available"
     
     # Step 1: Update code
     print_status "📥 Pulling latest code from Git..."
