@@ -16,23 +16,76 @@ def index_view(request):
         return HttpResponse('Frontend not built yet. Build the React app first.', status=404)
 
 def serve_frontend_asset(request, path):
-    """Serve frontend assets (CSS, JS, etc.) from frontend_static directory"""
+    """Serve frontend assets (CSS, JS, etc.) - try multiple locations"""
+    # Try frontend_static first
     asset_path = settings.BASE_DIR / 'frontend_static' / 'assets' / path
     if asset_path.exists() and asset_path.is_file():
         content_type, _ = mimetypes.guess_type(str(asset_path))
         return FileResponse(open(asset_path, 'rb'), content_type=content_type)
-    raise Http404("Asset not found")
+    
+    # Try staticfiles directory
+    static_asset_path = settings.STATIC_ROOT / 'assets' / path
+    if static_asset_path.exists() and static_asset_path.is_file():
+        content_type, _ = mimetypes.guess_type(str(static_asset_path))
+        return FileResponse(open(static_asset_path, 'rb'), content_type=content_type)
+    
+    # Try direct in staticfiles
+    static_direct_path = settings.STATIC_ROOT / path
+    if static_direct_path.exists() and static_direct_path.is_file():
+        content_type, _ = mimetypes.guess_type(str(static_direct_path))
+        return FileResponse(open(static_direct_path, 'rb'), content_type=content_type)
+    
+    raise Http404(f"Asset not found: {path}")
 
 def serve_vite_svg(request):
-    """Serve vite.svg from frontend_static directory"""
+    """Serve vite.svg - try multiple locations"""
+    # Try frontend_static first
     svg_path = settings.BASE_DIR / 'frontend_static' / 'vite.svg'
     if svg_path.exists():
         return FileResponse(open(svg_path, 'rb'), content_type='image/svg+xml')
+    
+    # Try staticfiles
+    static_svg_path = settings.STATIC_ROOT / 'vite.svg'
+    if static_svg_path.exists():
+        return FileResponse(open(static_svg_path, 'rb'), content_type='image/svg+xml')
+    
     raise Http404("vite.svg not found")
+
+def debug_static_files(request):
+    """Debug view to show where files are located"""
+    if not settings.DEBUG:
+        import os
+        debug_info = []
+        
+        # Check frontend_static
+        frontend_dir = settings.BASE_DIR / 'frontend_static'
+        debug_info.append(f"frontend_static exists: {frontend_dir.exists()}")
+        if frontend_dir.exists():
+            try:
+                files = list(frontend_dir.rglob('*'))[:20]  # First 20 files
+                debug_info.append(f"frontend_static files: {[str(f) for f in files]}")
+            except Exception as e:
+                debug_info.append(f"Error reading frontend_static: {e}")
+        
+        # Check staticfiles
+        static_dir = Path(settings.STATIC_ROOT)
+        debug_info.append(f"staticfiles exists: {static_dir.exists()}")
+        if static_dir.exists():
+            try:
+                files = list(static_dir.rglob('*'))[:20]  # First 20 files
+                debug_info.append(f"staticfiles files: {[str(f) for f in files]}")
+            except Exception as e:
+                debug_info.append(f"Error reading staticfiles: {e}")
+        
+        return HttpResponse('<br>'.join(debug_info), content_type='text/html')
+    else:
+        raise Http404("Debug only available in production")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('api_urls')),
+    # Debug view
+    path('debug-static/', debug_static_files, name='debug_static'),
     # Serve frontend assets
     re_path(r'^assets/(?P<path>.*)$', serve_frontend_asset, name='frontend_assets'),
     path('vite.svg', serve_vite_svg, name='vite_svg'),
