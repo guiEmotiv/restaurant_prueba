@@ -35,9 +35,9 @@ const Modal = ({ isOpen, onClose, onSubmit, title, initialData = null, columns }
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           <button
             onClick={onClose}
@@ -47,7 +47,7 @@ const Modal = ({ isOpen, onClose, onSubmit, title, initialData = null, columns }
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           {columns.map((column) => {
             // Skip non-editable fields
             if (column.key === 'id' || column.key === 'created_at' || column.key === 'updated_at') {
@@ -111,7 +111,7 @@ const Modal = ({ isOpen, onClose, onSubmit, title, initialData = null, columns }
             );
           })}
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancelar
             </Button>
