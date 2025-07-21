@@ -38,8 +38,7 @@ class TableSerializer(serializers.ModelSerializer):
 
 
 class TableDetailSerializer(TableSerializer):
-    zone = ZoneSerializer(read_only=True)
-    zone_id = serializers.IntegerField(write_only=True)
+    zone_detail = ZoneSerializer(source='zone', read_only=True)
     
     class Meta(TableSerializer.Meta):
-        fields = TableSerializer.Meta.fields + ['zone_id']
+        fields = TableSerializer.Meta.fields + ['zone_detail']
