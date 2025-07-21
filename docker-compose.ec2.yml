@@ -1,5 +1,4 @@
 # Docker Compose for EC2 + SQLite + Docker Production Deployment
-version: '3.8'
 
 services:
   # Main Django Application

@@ -70,19 +70,19 @@ check_requirements() {
     
     # Check Docker
     if ! command -v docker &> /dev/null; then
-        error "Docker is not installed. Please install Docker first."
+        error "Docker is not installed. Run: sudo ./deploy/ec2-setup.sh"
     fi
     docker --version | tee -a "$LOG_FILE"
     
     # Check Docker Compose
     if ! command -v docker-compose &> /dev/null; then
-        error "Docker Compose is not installed. Please install Docker Compose first."
+        error "Docker Compose is not installed. Run: sudo ./deploy/ec2-setup.sh"
     fi
     docker-compose --version | tee -a "$LOG_FILE"
     
     # Check Docker permissions
     if ! docker ps &> /dev/null; then
-        error "Cannot access Docker. Please add your user to docker group: sudo usermod -aG docker $USER"
+        error "Cannot access Docker. Please add your user to docker group and logout/login: sudo usermod -aG docker $USER"
     fi
     
     # Check .env file
@@ -90,6 +90,7 @@ check_requirements() {
         if [[ -f .env.ec2 ]]; then
             warning ".env not found but .env.ec2 exists. Copying .env.ec2 to .env"
             cp .env.ec2 .env
+            warning "Please edit .env file and set DJANGO_SECRET_KEY and EC2_PUBLIC_IP"
         else
             error "Environment file .env not found. Please create it from .env.ec2"
         fi
@@ -98,11 +99,17 @@ check_requirements() {
     # Check required environment variables
     source .env
     if [[ -z "${DJANGO_SECRET_KEY:-}" ]] || [[ "$DJANGO_SECRET_KEY" == "CHANGE_ME_TO_A_SECURE_SECRET_KEY" ]]; then
-        error "DJANGO_SECRET_KEY is not set or using default value. Please update .env file."
+        error "DJANGO_SECRET_KEY is not set or using default value. Generate one with: python3 -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'"
     fi
     
     if [[ -z "${EC2_PUBLIC_IP:-}" ]] || [[ "$EC2_PUBLIC_IP" == "127.0.0.1" ]]; then
         warning "EC2_PUBLIC_IP is not set or using default. Application will only be accessible locally."
+        warning "Get your EC2 IP with: curl -s http://169.254.169.254/latest/meta-data/public-ipv4"
+    fi
+    
+    # Validate Docker Compose file
+    if ! docker-compose -f "$COMPOSE_FILE" config &>/dev/null; then
+        error "Invalid Docker Compose configuration. Check $COMPOSE_FILE"
     fi
     
     log "✓ All requirements met"
@@ -296,6 +303,66 @@ cmd_shell() {
     fi
 }
 
+cmd_validate() {
+    header "Validating Deployment"
+    
+    # Check system requirements
+    info "Checking system requirements..."
+    check_requirements
+    
+    # Check application health
+    if docker ps --format "{{.Names}}" | grep -q "$CONTAINER_NAME"; then
+        info "Container is running ✓"
+        
+        # Test Django management commands
+        if docker exec "$CONTAINER_NAME" python manage.py check --deploy &>/dev/null; then
+            info "Django health check passed ✓"
+        else
+            error "Django health check failed ✗"
+        fi
+        
+        # Test database connection
+        if docker exec "$CONTAINER_NAME" python manage.py showmigrations &>/dev/null; then
+            info "Database connection working ✓"
+        else
+            error "Database connection failed ✗"
+        fi
+        
+        # Test API endpoints
+        source .env
+        local public_ip="${EC2_PUBLIC_IP:-localhost}"
+        
+        if curl -s -f "http://$public_ip:8000/admin/" > /dev/null; then
+            info "Admin panel accessible ✓"
+        else
+            warning "Admin panel not accessible ✗"
+        fi
+        
+        if curl -s -f "http://$public_ip:8000/api/" > /dev/null; then
+            info "API endpoints accessible ✓"
+        else
+            warning "API endpoints not accessible ✗"
+        fi
+        
+    else
+        error "Container $CONTAINER_NAME is not running"
+    fi
+    
+    log "✓ Validation completed"
+}
+
+cmd_test() {
+    header "Running Tests"
+    
+    if docker ps --format "{{.Names}}" | grep -q "$CONTAINER_NAME"; then
+        info "Running Django tests..."
+        docker exec "$CONTAINER_NAME" python manage.py test --verbosity=2
+        log "✓ Tests completed"
+    else
+        error "Container $CONTAINER_NAME is not running. Deploy first with: $0 deploy"
+    fi
+}
+
 # Main command handler
 case "${1:-deploy}" in
     "deploy"|"")
@@ -319,18 +386,26 @@ case "${1:-deploy}" in
     "shell")
         cmd_shell
         ;;
+    "validate")
+        cmd_validate
+        ;;
+    "test")
+        cmd_test
+        ;;
     "help"|"-h"|"--help")
         echo "Usage: $0 [COMMAND]"
         echo ""
         echo "Commands:"
-        echo "  deploy   - Deploy application (default)"
-        echo "  status   - Show application status"
-        echo "  logs     - Show application logs (follow mode)"
-        echo "  restart  - Restart application"
-        echo "  stop     - Stop application"
-        echo "  backup   - Create manual backup"
-        echo "  shell    - Open Django shell"
-        echo "  help     - Show this help message"
+        echo "  deploy    - Deploy application (default)"
+        echo "  status    - Show application status"
+        echo "  logs      - Show application logs (follow mode)"
+        echo "  restart   - Restart application"
+        echo "  stop      - Stop application"
+        echo "  backup    - Create manual backup"
+        echo "  shell     - Open Django shell"
+        echo "  validate  - Validate deployment and run health checks"
+        echo "  test      - Run application tests"
+        echo "  help      - Show this help message"
         ;;
     *)
         error "Unknown command: $1. Use '$0 help' for usage information."
