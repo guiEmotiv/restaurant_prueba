@@ -1,10 +1,19 @@
 # Multi-stage build for EC2 production deployment
 FROM node:18-alpine as frontend-builder
 
+# Accept build-time arguments for API URL
+ARG VITE_API_URL=http://44.248.47.186
+
 WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+
+# Create .env.production file with the API URL
+RUN echo "VITE_API_URL=${VITE_API_URL}" > .env.production
+
+# Set environment variable and build
+ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 
 FROM python:3.12-slim as production
