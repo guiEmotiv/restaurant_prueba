@@ -34,6 +34,11 @@ DATABASES = {
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Frontend static files (React build)
+STATICFILES_DIRS = [
+    BASE_DIR / 'frontend_static',
+] if (BASE_DIR / 'frontend_static').exists() else []
+
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
