@@ -85,6 +85,7 @@ def debug_static_files(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # API routes FIRST
     path('', include('api_urls')),
     # Debug view
     path('debug-static/', debug_static_files, name='debug_static'),
