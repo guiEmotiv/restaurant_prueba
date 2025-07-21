@@ -73,10 +73,17 @@ const Layout = ({ children }) => {
         {/* Sidebar */}
         <div className={`${
           isMenuOpen ? 'block' : 'hidden'
-        } lg:block lg:w-64 bg-white shadow-lg min-h-screen`}>
+        } lg:block fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto w-64 bg-white shadow-lg min-h-screen lg:min-h-auto`}>
           <div className="flex flex-col h-full">
-            <div className="flex items-center px-6 py-4 border-b border-gray-200">
-              <h1 className="text-xl font-bold text-gray-900">El Fogón de Don Soto</h1>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 lg:justify-center">
+              <h1 className="text-xl font-bold text-gray-900 lg:text-center">El Fogón de Don Soto</h1>
+              {/* Close button for mobile */}
+              <button
+                onClick={() => setIsMenuOpen(false)}
+                className="lg:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
             
             <nav className="flex-1 px-4 py-6 space-y-2">
@@ -127,8 +134,8 @@ const Layout = ({ children }) => {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 lg:ml-0">
-          <main className="p-4 lg:p-8">
+        <div className="flex-1 lg:ml-0 min-h-screen">
+          <main className="p-4 lg:p-8 pt-20 lg:pt-8">
             {children}
           </main>
         </div>
@@ -137,7 +144,7 @@ const Layout = ({ children }) => {
       {/* Mobile overlay */}
       {isMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 lg:hidden z-40"
+          className="fixed inset-0 bg-black bg-opacity-50 lg:hidden z-40 transition-opacity duration-300"
           onClick={() => setIsMenuOpen(false)}
         />
       )}

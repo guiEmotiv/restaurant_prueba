@@ -497,12 +497,12 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
               {order ? `Editar Orden #${order.id}` : 'Nueva Orden'}
             </h2>
           </div>
@@ -515,7 +515,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(95vh-120px)] sm:max-h-[calc(90vh-120px)]">
           <div className="space-y-6">
             {/* Información básica */}
             <div className="bg-gray-50 p-4 rounded-lg">
@@ -626,8 +626,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                   </div>
                 ) : (
                   <>
-                    {/* Header de tabla */}
-                    <div className="grid grid-cols-12 gap-3 px-3 py-2 bg-gray-100 rounded-md text-sm font-medium text-gray-700">
+                    {/* Header de tabla - Solo en desktop */}
+                    <div className="hidden lg:grid grid-cols-12 gap-3 px-3 py-2 bg-gray-100 rounded-md text-sm font-medium text-gray-700">
                       <div className="col-span-4">Item</div>
                       <div className="col-span-2 text-center">Precio Unit.</div>
                       <div className="col-span-2 text-center">Estado</div>
@@ -636,8 +636,24 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                     </div>
                     
                     {orderItems.map((item, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-3 p-3 border border-gray-200 rounded-lg bg-white items-center">
-                        <div className="col-span-4">
+                      <div key={index} className="border border-gray-200 rounded-lg bg-white p-3">
+                        {/* Layout móvil - Formato de card */}
+                        <div className="lg:hidden space-y-3">
+                          <div className="flex justify-between items-start">
+                            <span className="font-medium text-sm text-gray-900">Item #{index + 1}</span>
+                            {item.can_delete && (
+                              <button
+                                onClick={() => removeOrderItem(index)}
+                                className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Receta</label>
                           <select
                             value={item.recipe}
                             onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
@@ -659,44 +675,100 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                               </option>
                             ))}
                           </select>
+                          </div>
+                          
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Precio</label>
+                              <div className="text-sm font-semibold text-gray-900">{formatCurrency(item.unit_price)}</div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Estado</label>
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                item.status === 'CREATED' ? 'bg-yellow-100 text-yellow-800' :
+                                item.status === 'SERVED' ? 'bg-green-100 text-green-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {item.status === 'CREATED' && 'Creado'}
+                                {item.status === 'SERVED' && 'Entregado'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Notas</label>
+                            <input
+                              type="text"
+                              value={item.notes}
+                              onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
+                              placeholder="Ej: Sin cebolla"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              disabled={!item.can_delete}
+                            />
+                          </div>
                         </div>
                         
-                        <div className="col-span-2 text-center text-sm font-semibold text-gray-900">
-                          {formatCurrency(item.unit_price)}
-                        </div>
-                        
-                        <div className="col-span-2 text-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            item.status === 'CREATED' ? 'bg-yellow-100 text-yellow-800' :
-                            item.status === 'SERVED' ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {item.status === 'CREATED' && 'Creado'}
-                            {item.status === 'SERVED' && 'Entregado'}
-                          </span>
-                        </div>
-
-                        <div className="col-span-3">
-                          <input
-                            type="text"
-                            value={item.notes}
-                            onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
-                            placeholder="Ej: Sin cebolla"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            disabled={!item.can_delete}
-                          />
-                        </div>
-                        
-                        <div className="col-span-1 text-center">
-                          {item.can_delete && (
-                            <button
-                              onClick={() => removeOrderItem(index)}
-                              className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
-                              title="Eliminar"
+                        {/* Layout desktop - Grid original */}
+                        <div className="hidden lg:grid grid-cols-12 gap-3 items-center">
+                          <div className="col-span-4">
+                            <select
+                              value={item.recipe}
+                              onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                              disabled={!item.can_delete}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
+                              <option value="">
+                                {getFilteredRecipes(!!item.recipe && item.recipe !== '').length === 0 ? 'No hay recetas disponibles' : 'Seleccionar...'}
+                              </option>
+                              {getFilteredRecipes(!!item.recipe && item.recipe !== '').map(recipe => (
+                                <option key={recipe.id} value={recipe.id}>
+                                  {!!item.recipe && item.recipe !== '' ? (
+                                    recipe.name
+                                  ) : (
+                                    `${recipe.name} (${formatCurrency(recipe.base_price)})${!selectedGroupFilter && recipe.group_name ? ` - ${recipe.group_name}` : ''}`
+                                  )}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          <div className="col-span-2 text-center text-sm font-semibold text-gray-900">
+                            {formatCurrency(item.unit_price)}
+                          </div>
+                          
+                          <div className="col-span-2 text-center">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              item.status === 'CREATED' ? 'bg-yellow-100 text-yellow-800' :
+                              item.status === 'SERVED' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {item.status === 'CREATED' && 'Creado'}
+                              {item.status === 'SERVED' && 'Entregado'}
+                            </span>
+                          </div>
+
+                          <div className="col-span-3">
+                            <input
+                              type="text"
+                              value={item.notes}
+                              onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
+                              placeholder="Ej: Sin cebolla"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              disabled={!item.can_delete}
+                            />
+                          </div>
+                          
+                          <div className="col-span-1 text-center">
+                            {item.can_delete && (
+                              <button
+                                onClick={() => removeOrderItem(index)}
+                                className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -709,7 +781,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50">
           <Button
             onClick={onClose}
             variant="secondary"
