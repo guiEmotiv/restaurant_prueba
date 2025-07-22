@@ -185,12 +185,12 @@ const Orders = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Órdenes</h1>
-          <p className="text-gray-600">Gestiona las órdenes del restaurante</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Órdenes</h1>
+          <p className="text-sm md:text-base text-gray-600">Gestiona las órdenes del restaurante</p>
         </div>
-        <Button onClick={handleAdd} className="flex items-center gap-2">
+        <Button onClick={handleAdd} className="flex items-center gap-2 w-full sm:w-auto justify-center">
           <Plus className="h-4 w-4" />
           Nueva Orden
         </Button>
@@ -199,14 +199,14 @@ const Orders = () => {
       {/* Status Filter Tabs */}
       <div className="bg-white rounded-lg shadow">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6">
+          <nav className="-mb-px flex space-x-8 px-4 md:px-6 overflow-x-auto">
             {[
               { key: 'CREATED', label: 'Creadas', count: counts.CREATED }
             ].map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setFilter(tab.key)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                   filter === tab.key
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -218,7 +218,8 @@ const Orders = () => {
           </nav>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -317,6 +318,85 @@ const Orders = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="md:hidden">
+          {filteredOrders.length === 0 ? (
+            <div className="p-6 text-center text-gray-500">
+              <div className="text-4xl mb-2">🍽️</div>
+              <p className="text-lg font-medium">{`No hay órdenes ${getStatusText(filter).toLowerCase()}`}</p>
+              <p className="text-sm">Las nuevas órdenes aparecerán aquí</p>
+            </div>
+          ) : (
+            <div className="space-y-3 p-4">
+              {filteredOrders.map((order) => (
+                <div key={order.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="space-y-3">
+                    {/* Order header */}
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Orden #{order.id}</h3>
+                        <p className="text-sm text-gray-600">Mesa {order.table_number || order.table}</p>
+                      </div>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
+                        {getStatusText(order.status)}
+                      </span>
+                    </div>
+                    
+                    {/* Order details */}
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <dt className="font-medium text-gray-500">Items</dt>
+                        <dd className="text-base font-semibold text-gray-900">{order.items_count || 0}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium text-gray-500">Total</dt>
+                        <dd className="text-base font-bold text-gray-900">{formatCurrency(order.total_amount)}</dd>
+                      </div>
+                    </div>
+                    
+                    {/* Date */}
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Fecha</dt>
+                      <dd className="text-sm text-gray-900">{formatDate(order.created_at)}</dd>
+                    </div>
+                    
+                    {/* Action buttons for mobile */}
+                    <div className="flex gap-3 pt-3 border-t border-gray-200">
+                      <button
+                        onClick={() => handleEdit(order)}
+                        className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center"
+                      >
+                        <Edit className="h-4 w-4 inline mr-2" />
+                        Editar
+                      </button>
+                      
+                      {order.status === 'SERVED' && (
+                        <button
+                          onClick={() => handlePayment(order)}
+                          className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors text-center"
+                        >
+                          <CreditCard className="h-4 w-4 inline mr-2" />
+                          Cobrar
+                        </button>
+                      )}
+                      
+                      {canDeleteOrder(order) && (
+                        <button
+                          onClick={() => handleDelete(order)}
+                          className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors text-center"
+                        >
+                          <Trash2 className="h-4 w-4 inline mr-2" />
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

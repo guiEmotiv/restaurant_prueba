@@ -99,10 +99,10 @@ const Payments = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pagos Pendientes</h1>
-          <p className="text-gray-600">Órdenes entregadas listas para cobrar</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Pagos Pendientes</h1>
+          <p className="text-sm md:text-base text-gray-600">Órdenes entregadas listas para cobrar</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
@@ -129,7 +129,8 @@ const Payments = () => {
 
       {/* Orders Table */}
       <div className="bg-white rounded-lg shadow">
-        <div className="overflow-x-auto">
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -226,6 +227,82 @@ const Payments = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="md:hidden">
+          {filteredOrders.length === 0 ? (
+            <div className="p-6 text-center text-gray-500">
+              <CheckCircle className="h-12 w-12 text-gray-300 mb-4 mx-auto" />
+              <p className="text-lg font-medium">
+                {searchTerm ? 'No se encontraron órdenes' : '¡Excelente! No hay órdenes pendientes de pago'}
+              </p>
+              <p className="text-sm">
+                {searchTerm ? 'Intenta con otros términos de búsqueda' : 'Todas las órdenes han sido cobradas'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 p-4">
+              {filteredOrders.map((order) => (
+                <div key={order.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="space-y-3">
+                    {/* Order header */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                        <CreditCard className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900">Orden #{order.id}</h3>
+                        <p className="text-sm text-green-600">Entregado</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-gray-900">{formatCurrency(order.total_amount)}</div>
+                      </div>
+                    </div>
+                    
+                    {/* Order details */}
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <dt className="font-medium text-gray-500">Mesa</dt>
+                        <dd className="text-base text-gray-900">{order.table_number}</dd>
+                        <dd className="text-sm text-gray-500">{order.zone_name}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium text-gray-500">Items</dt>
+                        <dd className="text-base font-semibold text-gray-900">{order.items_count || 0}</dd>
+                      </div>
+                    </div>
+                    
+                    {/* Time and date */}
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <dt className="font-medium text-gray-500">Tiempo Entregado</dt>
+                        <dd className="flex items-center text-sm text-gray-600">
+                          <Clock className="h-4 w-4 mr-1" />
+                          {getElapsedTime(order.served_at || order.created_at)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium text-gray-500">Fecha</dt>
+                        <dd className="text-sm text-gray-900">{formatDate(order.created_at)}</dd>
+                      </div>
+                    </div>
+                    
+                    {/* Action button for mobile */}
+                    <div className="pt-3 border-t border-gray-200">
+                      <Button
+                        onClick={() => handleProcessPayment(order)}
+                        className="w-full bg-green-600 text-white hover:bg-green-700 font-medium py-3"
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Cobrar Orden
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

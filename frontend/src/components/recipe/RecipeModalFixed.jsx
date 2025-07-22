@@ -254,25 +254,25 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-900">
               {recipe ? 'Editar Receta' : 'Nueva Receta'}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 transition-colors p-2 md:p-0"
           >
             <X className="h-6 w-6" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-4 md:p-6 overflow-y-auto max-h-[calc(95vh-140px)] md:max-h-[calc(90vh-120px)]">
           <div className="space-y-6">
             {/* Información básica */}
             <div className="bg-gray-50 p-4 rounded-lg">
@@ -385,8 +385,8 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                   </div>
                 ) : (
                   <>
-                    {/* Header de tabla */}
-                    <div className="grid grid-cols-12 gap-3 px-3 py-2 bg-gray-100 rounded-md text-sm font-medium text-gray-700">
+                    {/* Desktop Table Header */}
+                    <div className="hidden md:grid grid-cols-12 gap-3 px-3 py-2 bg-gray-100 rounded-md text-sm font-medium text-gray-700">
                       <div className="col-span-5">Ingrediente</div>
                       <div className="col-span-2 text-center">Cantidad</div>
                       <div className="col-span-2 text-center">Unidad</div>
@@ -395,75 +395,161 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                     </div>
                     
                     {recipeItems.map((item, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-3 p-3 border border-gray-200 rounded-lg bg-white items-center">
-                        <div className="col-span-5">
-                          <select
-                            value={item.ingredient}
-                            onChange={(e) => updateRecipeItem(index, 'ingredient', e.target.value)}
-                            className={`w-full px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
-                              errors[`ingredient_${index}`] ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                          >
-                            <option value="">Seleccionar...</option>
-                            {availableIngredients.map(ingredient => {
-                              // Deshabilitar ingredientes ya seleccionados en otros items
-                              const isAlreadySelected = recipeItems.some((otherItem, otherIndex) => 
-                                otherIndex !== index && 
-                                otherItem.ingredient === ingredient.id.toString()
-                              );
-                              return (
-                                <option 
-                                  key={ingredient.id} 
-                                  value={ingredient.id}
-                                  disabled={isAlreadySelected}
-                                  style={isAlreadySelected ? { color: '#999', backgroundColor: '#f5f5f5' } : {}}
-                                >
-                                  {ingredient.name} (S/ {ingredient.unit_price}) {isAlreadySelected ? ' - Ya seleccionado' : ''}
-                                </option>
-                              );
-                            })}
-                          </select>
-                          {errors[`ingredient_${index}`] && (
-                            <p className="mt-1 text-xs text-red-600">{errors[`ingredient_${index}`]}</p>
-                          )}
-                        </div>
-                        
-                        <div className="col-span-2">
-                          <input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => updateRecipeItem(index, 'quantity', e.target.value)}
-                            placeholder="0.0"
-                            step="0.01"
-                            min="0.01"
-                            className={`w-full px-2 py-1 border rounded text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                              errors[`quantity_${index}`] ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                          />
-                          {errors[`quantity_${index}`] && (
-                            <p className="mt-1 text-xs text-red-600">{errors[`quantity_${index}`]}</p>
-                          )}
-                        </div>
-                        
-                        <div className="col-span-2 text-center text-sm text-gray-600 font-medium">
-                          {item.ingredient_unit || '-'}
+                      <div key={index}>
+                        {/* Desktop View */}
+                        <div className="hidden md:grid grid-cols-12 gap-3 p-3 border border-gray-200 rounded-lg bg-white items-center">
+                          <div className="col-span-5">
+                            <select
+                              value={item.ingredient}
+                              onChange={(e) => updateRecipeItem(index, 'ingredient', e.target.value)}
+                              className={`w-full px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
+                                errors[`ingredient_${index}`] ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                            >
+                              <option value="">Seleccionar...</option>
+                              {availableIngredients.map(ingredient => {
+                                const isAlreadySelected = recipeItems.some((otherItem, otherIndex) => 
+                                  otherIndex !== index && 
+                                  otherItem.ingredient === ingredient.id.toString()
+                                );
+                                return (
+                                  <option 
+                                    key={ingredient.id} 
+                                    value={ingredient.id}
+                                    disabled={isAlreadySelected}
+                                    style={isAlreadySelected ? { color: '#999', backgroundColor: '#f5f5f5' } : {}}
+                                  >
+                                    {ingredient.name} (S/ {ingredient.unit_price}) {isAlreadySelected ? ' - Ya seleccionado' : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            {errors[`ingredient_${index}`] && (
+                              <p className="mt-1 text-xs text-red-600">{errors[`ingredient_${index}`]}</p>
+                            )}
+                          </div>
+                          
+                          <div className="col-span-2">
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => updateRecipeItem(index, 'quantity', e.target.value)}
+                              placeholder="0.0"
+                              step="0.01"
+                              min="0.01"
+                              className={`w-full px-2 py-1 border rounded text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                errors[`quantity_${index}`] ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                            />
+                            {errors[`quantity_${index}`] && (
+                              <p className="mt-1 text-xs text-red-600">{errors[`quantity_${index}`]}</p>
+                            )}
+                          </div>
+                          
+                          <div className="col-span-2 text-center text-sm text-gray-600 font-medium">
+                            {item.ingredient_unit || '-'}
+                          </div>
+
+                          <div className="col-span-2 text-center text-sm font-semibold text-gray-900">
+                            {item.ingredient_unit_price && item.quantity ? 
+                              `S/ ${(parseFloat(item.ingredient_unit_price) * parseFloat(item.quantity)).toFixed(2)}` : 
+                              'S/ 0.00'
+                            }
+                          </div>
+                          
+                          <div className="col-span-1 text-center">
+                            <button
+                              onClick={() => removeRecipeItem(index)}
+                              className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
+                              title="Eliminar"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="col-span-2 text-center text-sm font-semibold text-gray-900">
-                          {item.ingredient_unit_price && item.quantity ? 
-                            `S/ ${(parseFloat(item.ingredient_unit_price) * parseFloat(item.quantity)).toFixed(2)}` : 
-                            'S/ 0.00'
-                          }
-                        </div>
-                        
-                        <div className="col-span-1 text-center">
-                          <button
-                            onClick={() => removeRecipeItem(index)}
-                            className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
-                            title="Eliminar"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </button>
+                        {/* Mobile View */}
+                        <div className="md:hidden p-4 border border-gray-200 rounded-lg bg-white space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-700">Ingrediente #{index + 1}</span>
+                            <button
+                              onClick={() => removeRecipeItem(index)}
+                              className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-full"
+                              title="Eliminar ingrediente"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ingrediente</label>
+                            <select
+                              value={item.ingredient}
+                              onChange={(e) => updateRecipeItem(index, 'ingredient', e.target.value)}
+                              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                errors[`ingredient_${index}`] ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                            >
+                              <option value="">Seleccionar ingrediente...</option>
+                              {availableIngredients.map(ingredient => {
+                                const isAlreadySelected = recipeItems.some((otherItem, otherIndex) => 
+                                  otherIndex !== index && 
+                                  otherItem.ingredient === ingredient.id.toString()
+                                );
+                                return (
+                                  <option 
+                                    key={ingredient.id} 
+                                    value={ingredient.id}
+                                    disabled={isAlreadySelected}
+                                  >
+                                    {ingredient.name} - S/ {ingredient.unit_price} {isAlreadySelected ? ' (Ya seleccionado)' : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            {errors[`ingredient_${index}`] && (
+                              <p className="mt-1 text-sm text-red-600">{errors[`ingredient_${index}`]}</p>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => updateRecipeItem(index, 'quantity', e.target.value)}
+                                placeholder="0.0"
+                                step="0.01"
+                                min="0.01"
+                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                  errors[`quantity_${index}`] ? 'border-red-500' : 'border-gray-300'
+                                }`}
+                              />
+                              {errors[`quantity_${index}`] && (
+                                <p className="mt-1 text-sm text-red-600">{errors[`quantity_${index}`]}</p>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Unidad</label>
+                              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
+                                {item.ingredient_unit || '-'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-blue-50 p-3 rounded-md">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium text-blue-700">Subtotal:</span>
+                              <span className="text-lg font-bold text-blue-900">
+                                {item.ingredient_unit_price && item.quantity ? 
+                                  `S/ ${(parseFloat(item.ingredient_unit_price) * parseFloat(item.quantity)).toFixed(2)}` : 
+                                  'S/ 0.00'
+                                }
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -476,18 +562,19 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 md:p-6 border-t border-gray-200 bg-gray-50">
           <Button
             onClick={onClose}
             variant="secondary"
             disabled={loading}
+            className="w-full sm:w-auto"
           >
             Cancelar
           </Button>
           <Button
             onClick={handleSave}
             disabled={loading}
-            className="flex items-center gap-2"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             {loading ? (
               <>
