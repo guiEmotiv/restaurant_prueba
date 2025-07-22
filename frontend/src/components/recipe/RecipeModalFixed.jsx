@@ -255,9 +255,9 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[95vh] md:h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 flex-shrink-0">
           <div>
             <h2 className="text-lg md:text-xl font-semibold text-gray-900">
               {recipe ? 'Editar Receta' : 'Nueva Receta'}
@@ -272,7 +272,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
         </div>
 
         {/* Content */}
-        <div className="p-4 md:p-6 overflow-y-auto max-h-[calc(95vh-140px)] md:max-h-[calc(90vh-120px)]">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="space-y-6">
             {/* Información básica */}
             <div className="bg-gray-50 p-4 rounded-lg">

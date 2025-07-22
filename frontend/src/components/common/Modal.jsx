@@ -36,18 +36,18 @@ const Modal = ({ isOpen, onClose, onSubmit, title, initialData = null, columns }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[95vh] sm:h-auto sm:max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded"
+            className="text-gray-400 hover:text-gray-600 p-2 -m-2 rounded"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {columns.map((column) => {
             // Skip non-editable fields
             if (column.key === 'id' || column.key === 'created_at' || column.key === 'updated_at') {
@@ -111,15 +111,17 @@ const Modal = ({ isOpen, onClose, onSubmit, title, initialData = null, columns }
             );
           })}
 
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button type="submit">
-              {initialData ? 'Actualizar' : 'Crear'}
-            </Button>
-          </div>
         </form>
+        
+        {/* Footer - Sticky on mobile */}
+        <div className="flex flex-col sm:flex-row justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+          <Button type="button" variant="secondary" onClick={onClose} className="w-full sm:w-auto">
+            Cancelar
+          </Button>
+          <Button type="submit" onClick={handleSubmit} className="w-full sm:w-auto">
+            {initialData ? 'Actualizar' : 'Crear'}
+          </Button>
+        </div>
       </div>
     </div>
   );
