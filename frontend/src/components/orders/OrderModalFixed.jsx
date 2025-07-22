@@ -210,17 +210,17 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
     
     // Validar items - al menos uno debe estar completo
     const validItems = orderItems.filter(item => {
-      let hasValidRecipe = false;
+      if (!item.recipe) return false;
       
-      if (item.recipe) {
-        if (typeof item.recipe === 'object' && item.recipe !== null) {
-          hasValidRecipe = item.recipe.id && !isNaN(parseInt(item.recipe.id));
-        } else {
-          hasValidRecipe = item.recipe !== '' && !isNaN(parseInt(item.recipe));
-        }
+      // Extract recipe ID for validation
+      let recipeId = item.recipe;
+      if (typeof recipeId === 'object' && recipeId !== null) {
+        recipeId = recipeId.id || recipeId.value;
       }
       
-      return hasValidRecipe;
+      // Check if it's a valid number
+      const parsedId = parseInt(recipeId);
+      return !isNaN(parsedId) && parsedId > 0;
     });
     
     if (validItems.length === 0) {
@@ -333,25 +333,30 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         const processedItems = validItems.map((item, index) => {
           console.log(`Processing item ${index}:`, JSON.stringify(item, null, 2));
           
-          // Extract recipe ID properly
-          let recipeId;
-          if (typeof item.recipe === 'object' && item.recipe !== null) {
-            recipeId = item.recipe.id || item.recipe;
-          } else {
-            recipeId = item.recipe;
+          // Extract recipe ID properly - ensure it's a number
+          let recipeId = item.recipe;
+          
+          // Handle case where recipe might be an object or string
+          if (typeof recipeId === 'object' && recipeId !== null) {
+            recipeId = recipeId.id || recipeId.value || null;
           }
           
-          console.log(`Extracted recipe ID for item ${index}:`, recipeId);
-          
+          // Convert to number
           const parsedRecipeId = parseInt(recipeId);
+          console.log(`Original recipe:`, item.recipe, 'Parsed ID:', parsedRecipeId);
+          
           if (isNaN(parsedRecipeId) || parsedRecipeId <= 0) {
-            console.error(`Invalid recipe ID for item ${index}:`, item);
-            throw new Error(`Invalid recipe ID: ${recipeId} (from item.recipe: ${JSON.stringify(item.recipe)})`);
+            console.error(`Invalid recipe ID for item ${index}:`, {
+              originalRecipe: item.recipe,
+              extractedId: recipeId,
+              parsedId: parsedRecipeId
+            });
+            throw new Error(`Invalid recipe ID for item ${index + 1}: expected number but got ${typeof recipeId} (${recipeId})`);
           }
           
           const processedItem = {
             recipe: parsedRecipeId,
-            notes: item.notes || ''
+            notes: (item.notes || '').toString()
           };
           
           console.log(`Processed item ${index}:`, JSON.stringify(processedItem, null, 2));
@@ -588,16 +593,14 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1">
                   {/* Add Item Button */}
-                  <Button
+                  <button
                     onClick={addOrderItem}
-                    size="sm"
-                    className="flex items-center gap-1 px-3"
                     disabled={order && order.status !== 'CREATED'}
+                    className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={order && order.status !== 'CREATED' ? 'Solo se pueden agregar items a órdenes creadas' : 'Agregar nuevo item'}
                   >
                     <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Agregar</span>
-                  </Button>
+                  </button>
                   
                   {/* Save Button */}
                   <button
@@ -798,34 +801,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           </div>
         </div>
 
-        {/* Footer - Hidden on mobile, visible on desktop */}
-        <div className="hidden sm:flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-          <Button
-            onClick={onClose}
-            variant="secondary"
-            disabled={loading}
-            className="w-full sm:w-auto"
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={loading}
-            className="flex items-center justify-center gap-2 w-full sm:w-auto"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                {order ? 'Actualizar Orden' : 'Crear Orden'}
-              </>
-            )}
-          </Button>
-        </div>
       </div>
     </div>
   );
