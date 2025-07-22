@@ -142,7 +142,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         notes: '',
         can_delete: true
       };
-      const newItems = [...prev, newItem];
+      // Add new item at the beginning of the array
+      const newItems = [newItem, ...prev];
       console.log('Adding new item:', newItem);
       console.log('New orderItems list:', newItems);
       return newItems;
@@ -565,49 +566,59 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
 
             {/* Items */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Items de la Orden</h3>
-                <Button
-                  onClick={addOrderItem}
-                  size="sm"
-                  className="flex items-center gap-2"
-                  disabled={order && order.status !== 'CREATED'}
-                  title={order && order.status !== 'CREATED' ? 'Solo se pueden agregar items a órdenes creadas' : 'Agregar nuevo item'}
+              <div className="flex items-center justify-between mb-4 gap-2">
+                {/* Group Filter */}
+                <select
+                  value={selectedGroupFilter}
+                  onChange={(e) => setSelectedGroupFilter(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                 >
-                  <Plus className="h-4 w-4" />
-                  Agregar Item
-                </Button>
-              </div>
-
-              {/* Filtro por Grupo */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Filtrar recetas por grupo
-                  </label>
-                  {selectedGroupFilter && (
-                    <button
-                      onClick={() => setSelectedGroupFilter('')}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      Limpiar filtro
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <select
-                    value={selectedGroupFilter}
-                    onChange={(e) => setSelectedGroupFilter(e.target.value)}
-                    className="flex-1 md:flex-none md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  <option value="">Todos ({availableRecipes.length})</option>
+                  {availableGroups.map(group => (
+                    <option key={group.id} value={group.id}>
+                      {group.name} ({availableRecipes.filter(r => r.group === group.id).length})
+                    </option>
+                  ))}
+                  <option value="null">Sin grupo ({availableRecipes.filter(r => !r.group).length})</option>
+                </select>
+                
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1">
+                  {/* Add Item Button */}
+                  <Button
+                    onClick={addOrderItem}
+                    size="sm"
+                    className="flex items-center gap-1 px-3"
+                    disabled={order && order.status !== 'CREATED'}
+                    title={order && order.status !== 'CREATED' ? 'Solo se pueden agregar items a órdenes creadas' : 'Agregar nuevo item'}
                   >
-                    <option value="">Todos los grupos ({availableRecipes.length} recetas)</option>
-                    {availableGroups.map(group => (
-                      <option key={group.id} value={group.id}>
-                        {group.name} ({availableRecipes.filter(r => r.group === group.id).length} recetas)
-                      </option>
-                    ))}
-                    <option value="null">Sin grupo ({availableRecipes.filter(r => !r.group).length} recetas)</option>
-                  </select>
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Agregar</span>
+                  </Button>
+                  
+                  {/* Save Button */}
+                  <button
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={loading ? "Guardando..." : "Guardar orden"}
+                  >
+                    {loading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                  </button>
+                  
+                  {/* Cancel Button */}
+                  <button
+                    onClick={onClose}
+                    disabled={loading}
+                    className="p-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Cancelar"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
 
@@ -780,8 +791,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           </div>
         </div>
 
-        {/* Footer - Sticky */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+        {/* Footer - Hidden on mobile, visible on desktop */}
+        <div className="hidden sm:flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50 flex-shrink-0">
           <Button
             onClick={onClose}
             variant="secondary"
