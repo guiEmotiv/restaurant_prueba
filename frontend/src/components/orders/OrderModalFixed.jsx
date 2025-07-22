@@ -109,7 +109,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         total_price: item.total_price,
         status: item.status,
         notes: item.notes || '',
-        can_delete: item.status === 'CREATED'
+        can_delete: item.status === 'CREATED',
+        tempKey: item.tempKey || (Date.now() + Math.random())
       })));
     } catch (error) {
       console.error('Error loading order items:', error);
@@ -140,7 +141,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         total_price: '',
         status: 'CREATED',
         notes: '',
-        can_delete: true
+        can_delete: true,
+        tempKey: Date.now() + Math.random() // Unique key for React
       };
       // Add new item at the beginning of the array
       const newItems = [newItem, ...prev];
@@ -236,7 +238,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         }
         
         if (!recipeId || isNaN(parseInt(recipeId))) {
-          newErrors[`item_${index}`] = `El item ${index + 1} tiene una receta inválida`;
+          const displayNumber = orderItems.length - index;
+          newErrors[`item_${index}`] = `El item ${displayNumber} tiene una receta inválida`;
         }
       }
     });
@@ -646,12 +649,15 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                       <div className="col-span-1 text-center">Acción</div>
                     </div>
                     
-                    {orderItems.map((item, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg bg-white p-3">
+                    {orderItems.map((item, index) => {
+                      // Calculate display number (reverse of actual index)
+                      const displayNumber = orderItems.length - index;
+                      return (
+                      <div key={item.tempKey || item.id || index} className="border border-gray-200 rounded-lg bg-white p-3">
                         {/* Layout móvil - Formato de card */}
                         <div className="lg:hidden space-y-3">
                           <div className="flex justify-between items-start">
-                            <span className="font-medium text-sm text-gray-900">Item #{index + 1}</span>
+                            <span className="font-medium text-sm text-gray-900">Item #{displayNumber}</span>
                             {item.can_delete && (
                               <button
                                 onClick={() => removeOrderItem(index)}
@@ -782,7 +788,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                           </div>
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </>
                 )}
               </div>
