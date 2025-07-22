@@ -227,9 +227,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       newErrors.items = 'Debe agregar al menos un item válido con receta seleccionada';
     }
     
-    // Validar cada item individual y detectar duplicados
-    const usedRecipeIds = new Set();
-    
+    // Validar cada item individual (permitir duplicados)
     orderItems.forEach((item, index) => {
       if (item.recipe && item.recipe !== '') {
         let recipeId;
@@ -244,13 +242,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         
         if (!recipeId || isNaN(parsedRecipeId)) {
           newErrors[`item_${index}`] = `El item ${displayNumber} tiene una receta inválida`;
-        } else {
-          // Check for duplicates
-          if (usedRecipeIds.has(parsedRecipeId)) {
-            newErrors[`item_${index}`] = `El item ${displayNumber} tiene una receta duplicada`;
-          } else {
-            usedRecipeIds.add(parsedRecipeId);
-          }
         }
       }
     });
@@ -351,13 +342,9 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         console.log('=== PROCESSING ITEMS FOR NEW ORDER ===');
         console.log('Raw validItems:', JSON.stringify(validItems, null, 2));
         
-        // Remove duplicates and process items
-        const uniqueRecipeIds = new Set();
-        const processedItems = [];
-        
-        for (let i = 0; i < validItems.length; i++) {
-          const item = validItems[i];
-          console.log(`Processing item ${i}:`, JSON.stringify(item, null, 2));
+        // Process all items (allowing duplicates)
+        const processedItems = validItems.map((item, index) => {
+          console.log(`Processing item ${index}:`, JSON.stringify(item, null, 2));
           
           // Extract recipe ID properly - ensure it's a number
           let recipeId = item.recipe;
@@ -372,30 +359,22 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           console.log(`Original recipe:`, item.recipe, 'Parsed ID:', parsedRecipeId);
           
           if (isNaN(parsedRecipeId) || parsedRecipeId <= 0) {
-            console.error(`Invalid recipe ID for item ${i}:`, {
+            console.error(`Invalid recipe ID for item ${index}:`, {
               originalRecipe: item.recipe,
               extractedId: recipeId,
               parsedId: parsedRecipeId
             });
-            throw new Error(`Invalid recipe ID for item ${i + 1}: expected number but got ${typeof recipeId} (${recipeId})`);
+            throw new Error(`Invalid recipe ID for item ${index + 1}: expected number but got ${typeof recipeId} (${recipeId})`);
           }
-          
-          // Check for duplicates
-          if (uniqueRecipeIds.has(parsedRecipeId)) {
-            console.warn(`Duplicate recipe ID ${parsedRecipeId} found, skipping...`);
-            continue;
-          }
-          
-          uniqueRecipeIds.add(parsedRecipeId);
           
           const processedItem = {
             recipe: parsedRecipeId,
             notes: (item.notes || '').toString().trim()
           };
           
-          console.log(`Processed item ${i}:`, JSON.stringify(processedItem, null, 2));
-          processedItems.push(processedItem);
-        }
+          console.log(`Processed item ${index}:`, JSON.stringify(processedItem, null, 2));
+          return processedItem;
+        });
         
         console.log('Final processedItems:', JSON.stringify(processedItems, null, 2));
         
