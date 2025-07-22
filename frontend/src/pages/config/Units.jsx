@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import Button from '../../components/common/Button';
+import UnitModal from '../../components/config/UnitModal';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -9,7 +10,8 @@ const Units = () => {
   const { showSuccess, showError } = useToast();
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
-  const crudTableRef = useRef();
+  const [showUnitModal, setShowUnitModal] = useState(false);
+  const [selectedUnit, setSelectedUnit] = useState(null);
 
   const columns = [
     { key: 'id', title: 'ID' },
@@ -38,26 +40,26 @@ const Units = () => {
     }
   };
 
-  const handleAdd = async (formData) => {
-    try {
-      await apiService.units.create(formData);
-      await loadUnits();
-      showSuccess('Unidad creada exitosamente');
-    } catch (error) {
-      console.error('Error creating unit:', error);
-      showError('Error al crear la unidad');
-    }
+  const handleOpenModal = (unit = null) => {
+    setSelectedUnit(unit);
+    setShowUnitModal(true);
   };
 
-  const handleEdit = async (id, formData) => {
-    try {
-      await apiService.units.update(id, formData);
-      await loadUnits();
-      showSuccess('Unidad actualizada exitosamente');
-    } catch (error) {
-      console.error('Error updating unit:', error);
-      showError('Error al actualizar la unidad');
-    }
+  const handleCloseModal = () => {
+    setShowUnitModal(false);
+    setSelectedUnit(null);
+  };
+
+  const handleModalSave = () => {
+    loadUnits();
+  };
+
+  const handleAdd = () => {
+    handleOpenModal();
+  };
+
+  const handleEdit = (unit) => {
+    handleOpenModal(unit);
   };
 
   const handleDelete = async (id) => {
@@ -83,26 +85,30 @@ const Units = () => {
           <p className="text-gray-600">Gestiona las unidades de medida</p>
         </div>
         <Button 
-          onClick={() => crudTableRef.current?.handleAdd()}
+          onClick={handleAdd}
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Agregar Unidad
+          Nueva Unidad
         </Button>
       </div>
 
       <CrudTable
-        ref={crudTableRef}
         title="Unidades"
         data={units}
         columns={columns}
-        onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
         loading={loading}
-        addButtonText="Agregar Unidad"
         hideTitle={true}
         hideAddButton={true}
+      />
+
+      <UnitModal
+        isOpen={showUnitModal}
+        onClose={handleCloseModal}
+        unit={selectedUnit}
+        onSave={handleModalSave}
       />
     </div>
   );

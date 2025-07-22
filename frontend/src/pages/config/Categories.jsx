@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import Button from '../../components/common/Button';
+import CategoryModal from '../../components/config/CategoryModal';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -9,7 +10,8 @@ const Categories = () => {
   const { showSuccess, showError } = useToast();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const crudTableRef = useRef();
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   const columns = [
     { key: 'id', title: 'ID' },
@@ -39,26 +41,26 @@ const Categories = () => {
   };
 
 
-  const handleAdd = async (formData) => {
-    try {
-      await apiService.categories.create(formData);
-      await loadCategories();
-      showSuccess('Categoría creada exitosamente');
-    } catch (error) {
-      console.error('Error creating category:', error);
-      showError('Error al crear la categoría');
-    }
+  const handleOpenModal = (category = null) => {
+    setSelectedCategory(category);
+    setShowCategoryModal(true);
   };
 
-  const handleEdit = async (id, formData) => {
-    try {
-      await apiService.categories.update(id, formData);
-      await loadCategories();
-      showSuccess('Categoría actualizada exitosamente');
-    } catch (error) {
-      console.error('Error updating category:', error);
-      showError('Error al actualizar la categoría');
-    }
+  const handleCloseModal = () => {
+    setShowCategoryModal(false);
+    setSelectedCategory(null);
+  };
+
+  const handleModalSave = () => {
+    loadCategories();
+  };
+
+  const handleAdd = () => {
+    handleOpenModal();
+  };
+
+  const handleEdit = (category) => {
+    handleOpenModal(category);
   };
 
   const handleDelete = async (id) => {
@@ -84,26 +86,30 @@ const Categories = () => {
           <p className="text-gray-600">Gestiona las categorías de ingredientes</p>
         </div>
         <Button 
-          onClick={() => crudTableRef.current?.handleAdd()}
+          onClick={handleAdd}
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Agregar Categoría
+          Nueva Categoría
         </Button>
       </div>
 
       <CrudTable
-        ref={crudTableRef}
         title="Categorías"
         data={categories}
         columns={columns}
-        onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
         loading={loading}
-        addButtonText="Agregar Categoría"
         hideTitle={true}
         hideAddButton={true}
+      />
+
+      <CategoryModal
+        isOpen={showCategoryModal}
+        onClose={handleCloseModal}
+        category={selectedCategory}
+        onSave={handleModalSave}
       />
     </div>
   );

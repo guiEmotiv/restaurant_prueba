@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import Button from '../../components/common/Button';
+import TableModal from '../../components/config/TableModal';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -10,7 +11,8 @@ const Tables = () => {
   const [tables, setTables] = useState([]);
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
-  const crudTableRef = useRef();
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [selectedTable, setSelectedTable] = useState(null);
 
   const columns = [
     { key: 'id', title: 'ID' },
@@ -57,26 +59,26 @@ const Tables = () => {
     }
   };
 
-  const handleAdd = async (formData) => {
-    try {
-      await apiService.tables.create(formData);
-      await loadTables();
-      showSuccess('Mesa creada exitosamente');
-    } catch (error) {
-      console.error('Error creating table:', error);
-      showError('Error al crear la mesa');
-    }
+  const handleOpenModal = (table = null) => {
+    setSelectedTable(table);
+    setShowTableModal(true);
   };
 
-  const handleEdit = async (id, formData) => {
-    try {
-      await apiService.tables.update(id, formData);
-      await loadTables();
-      showSuccess('Mesa actualizada exitosamente');
-    } catch (error) {
-      console.error('Error updating table:', error);
-      showError('Error al actualizar la mesa');
-    }
+  const handleCloseModal = () => {
+    setShowTableModal(false);
+    setSelectedTable(null);
+  };
+
+  const handleModalSave = () => {
+    loadTables();
+  };
+
+  const handleAdd = () => {
+    handleOpenModal();
+  };
+
+  const handleEdit = (table) => {
+    handleOpenModal(table);
   };
 
   const handleDelete = async (id) => {
@@ -112,26 +114,30 @@ const Tables = () => {
           <p className="text-gray-600">Gestiona las mesas del restaurante</p>
         </div>
         <Button 
-          onClick={() => crudTableRef.current?.handleAdd()}
+          onClick={handleAdd}
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Agregar Mesa
+          Nueva Mesa
         </Button>
       </div>
 
       <CrudTable
-        ref={crudTableRef}
         title="Mesas"
         data={tables}
         columns={columnsWithZones}
-        onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
         loading={loading}
-        addButtonText="Agregar Mesa"
         hideTitle={true}
         hideAddButton={true}
+      />
+
+      <TableModal
+        isOpen={showTableModal}
+        onClose={handleCloseModal}
+        table={selectedTable}
+        onSave={handleModalSave}
       />
     </div>
   );

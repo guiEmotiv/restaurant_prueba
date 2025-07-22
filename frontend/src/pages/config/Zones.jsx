@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import Button from '../../components/common/Button';
+import ZoneModal from '../../components/config/ZoneModal';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -9,7 +10,8 @@ const Zones = () => {
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(true);
   const { showSuccess, showError } = useToast();
-  const crudTableRef = useRef();
+  const [showZoneModal, setShowZoneModal] = useState(false);
+  const [selectedZone, setSelectedZone] = useState(null);
 
   const columns = [
     { key: 'id', title: 'ID' },
@@ -38,26 +40,26 @@ const Zones = () => {
     }
   };
 
-  const handleAdd = async (formData) => {
-    try {
-      await apiService.zones.create(formData);
-      await loadZones();
-      showSuccess('Zona creada exitosamente');
-    } catch (error) {
-      console.error('Error creating zone:', error);
-      showError('Error al crear la zona');
-    }
+  const handleOpenModal = (zone = null) => {
+    setSelectedZone(zone);
+    setShowZoneModal(true);
   };
 
-  const handleEdit = async (id, formData) => {
-    try {
-      await apiService.zones.update(id, formData);
-      await loadZones();
-      showSuccess('Zona actualizada exitosamente');
-    } catch (error) {
-      console.error('Error updating zone:', error);
-      showError('Error al actualizar la zona');
-    }
+  const handleCloseModal = () => {
+    setShowZoneModal(false);
+    setSelectedZone(null);
+  };
+
+  const handleModalSave = () => {
+    loadZones();
+  };
+
+  const handleAdd = () => {
+    handleOpenModal();
+  };
+
+  const handleEdit = (zone) => {
+    handleOpenModal(zone);
   };
 
   const handleDelete = async (id) => {
@@ -83,26 +85,30 @@ const Zones = () => {
           <p className="text-gray-600">Gestiona las zonas del restaurante</p>
         </div>
         <Button 
-          onClick={() => crudTableRef.current?.handleAdd()}
+          onClick={handleAdd}
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Agregar Zona
+          Nueva Zona
         </Button>
       </div>
 
       <CrudTable
-        ref={crudTableRef}
         title="Zonas"
         data={zones}
         columns={columns}
-        onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
         loading={loading}
-        addButtonText="Agregar Zona"
         hideTitle={true}
         hideAddButton={true}
+      />
+
+      <ZoneModal
+        isOpen={showZoneModal}
+        onClose={handleCloseModal}
+        zone={selectedZone}
+        onSave={handleModalSave}
       />
     </div>
   );

@@ -1,19 +1,20 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Package, Plus } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import StockUpdateModal from '../../components/inventory/StockUpdateModal';
+import IngredientModal from '../../components/inventory/IngredientModal';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
 const Ingredients = () => {
   const { showSuccess, showError } = useToast();
-  const crudTableRef = useRef();
   const [ingredients, setIngredients] = useState([]);
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showStockModal, setShowStockModal] = useState(false);
+  const [showIngredientModal, setShowIngredientModal] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
 
   const columns = [
@@ -113,26 +114,26 @@ const Ingredients = () => {
     }
   };
 
-  const handleAdd = async (formData) => {
-    try {
-      await apiService.ingredients.create(formData);
-      await loadIngredients();
-      showSuccess('Ingrediente creado exitosamente');
-    } catch (error) {
-      console.error('Error creating ingredient:', error);
-      showError('Error al crear el ingrediente');
-    }
+  const handleOpenIngredientModal = (ingredient = null) => {
+    setSelectedIngredient(ingredient);
+    setShowIngredientModal(true);
   };
 
-  const handleEdit = async (id, formData) => {
-    try {
-      await apiService.ingredients.update(id, formData);
-      await loadIngredients();
-      showSuccess('Ingrediente actualizado exitosamente');
-    } catch (error) {
-      console.error('Error updating ingredient:', error);
-      showError('Error al actualizar el ingrediente');
-    }
+  const handleCloseIngredientModal = () => {
+    setShowIngredientModal(false);
+    setSelectedIngredient(null);
+  };
+
+  const handleIngredientModalSave = () => {
+    loadIngredients();
+  };
+
+  const handleAdd = () => {
+    handleOpenIngredientModal();
+  };
+
+  const handleEdit = (ingredient) => {
+    handleOpenIngredientModal(ingredient);
   };
 
 
@@ -186,26 +187,31 @@ const Ingredients = () => {
           <p className="text-gray-600">Gestiona el inventario de ingredientes</p>
         </div>
         <Button 
-          onClick={() => crudTableRef.current?.handleAdd()} 
+          onClick={handleAdd} 
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Agregar Ingrediente
+          Nuevo Ingrediente
         </Button>
       </div>
 
       <CrudTable
-        ref={crudTableRef}
         title="Ingredientes"
         data={ingredients}
         columns={columnsWithOptions}
-        onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
         loading={loading}
-        addButtonText="Agregar Ingrediente"
         hideAddButton={true}
         hideTitle={true}
+      />
+
+      {/* Ingredient Modal */}
+      <IngredientModal
+        isOpen={showIngredientModal}
+        onClose={handleCloseIngredientModal}
+        ingredient={selectedIngredient}
+        onSave={handleIngredientModalSave}
       />
 
       {/* Stock Update Modal */}

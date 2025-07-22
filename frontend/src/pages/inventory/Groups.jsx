@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import Button from '../../components/common/Button';
+import GroupModal from '../../components/inventory/GroupModal';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -9,7 +10,8 @@ const Groups = () => {
   const { showSuccess, showError } = useToast();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const crudTableRef = useRef();
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState(null);
 
   const columns = [
     { key: 'id', title: 'ID' },
@@ -39,26 +41,26 @@ const Groups = () => {
     }
   };
 
-  const handleAdd = async (formData) => {
-    try {
-      await apiService.groups.create(formData);
-      await loadGroups();
-      showSuccess('Grupo creado exitosamente');
-    } catch (error) {
-      console.error('Error creating group:', error);
-      showError('Error al crear el grupo');
-    }
+  const handleOpenModal = (group = null) => {
+    setSelectedGroup(group);
+    setShowGroupModal(true);
   };
 
-  const handleEdit = async (id, formData) => {
-    try {
-      await apiService.groups.update(id, formData);
-      await loadGroups();
-      showSuccess('Grupo actualizado exitosamente');
-    } catch (error) {
-      console.error('Error updating group:', error);
-      showError('Error al actualizar el grupo');
-    }
+  const handleCloseModal = () => {
+    setShowGroupModal(false);
+    setSelectedGroup(null);
+  };
+
+  const handleModalSave = () => {
+    loadGroups();
+  };
+
+  const handleAdd = () => {
+    handleOpenModal();
+  };
+
+  const handleEdit = (group) => {
+    handleOpenModal(group);
   };
 
   const handleDelete = async (id) => {
@@ -94,27 +96,31 @@ const Groups = () => {
           </p>
         </div>
         <Button 
-          onClick={() => crudTableRef.current?.handleAdd()}
+          onClick={handleAdd}
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Agregar Grupo
+          Nuevo Grupo
         </Button>
       </div>
 
       <CrudTable
-        ref={crudTableRef}
         title="Grupos"
         data={groups}
         columns={columns}
-        onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
         entityName="grupo"
         entityNamePlural="grupos"
-        addButtonText="Agregar Grupo"
         hideTitle={true}
         hideAddButton={true}
+      />
+
+      <GroupModal
+        isOpen={showGroupModal}
+        onClose={handleCloseModal}
+        group={selectedGroup}
+        onSave={handleModalSave}
       />
     </div>
   );
