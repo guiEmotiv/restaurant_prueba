@@ -466,13 +466,21 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                     for (const [itemField, itemFieldError] of Object.entries(itemError)) {
                       console.log(`Item ${index} field ${itemField} error:`, itemFieldError);
                       if (Array.isArray(itemFieldError)) {
-                        itemErrorMessages.push(`${itemField}: ${itemFieldError.join(', ')}`);
+                        // Handle stock errors specifically
+                        if (itemField === 'recipe' && itemFieldError.some(err => err.includes('stock'))) {
+                          itemErrorMessages.push(`Stock insuficiente: ${itemFieldError.join(', ')}`);
+                        } else {
+                          itemErrorMessages.push(`${itemField}: ${itemFieldError.join(', ')}`);
+                        }
                       } else {
                         itemErrorMessages.push(`${itemField}: ${itemFieldError}`);
                       }
                     }
                     if (itemErrorMessages.length > 0) {
-                      itemErrors.push(`Item ${index + 1}: ${itemErrorMessages.join(', ')}`);
+                      // Try to get the recipe name from orderItems to make error more helpful
+                      const orderItem = orderItems[index];
+                      const recipeName = orderItem?.recipe_name || `Item ${index + 1}`;
+                      itemErrors.push(`${recipeName}: ${itemErrorMessages.join(', ')}`);
                     }
                   } else if (typeof itemError === 'string') {
                     itemErrors.push(`Item ${index + 1}: ${itemError}`);
@@ -484,7 +492,13 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                 });
                 
                 if (itemErrors.length > 0) {
-                  errors.push(`${field}: ${itemErrors.join('; ')}`);
+                  // Check if all errors are about stock
+                  const allStockErrors = itemErrors.every(err => err.includes('stock') || err.includes('Stock'));
+                  if (allStockErrors) {
+                    errors.push(`⚠️ No hay suficiente stock en inventario para completar esta orden.\n${itemErrors.join('\n')}`);
+                  } else {
+                    errors.push(`Problemas con items:\n${itemErrors.join('\n')}`);
+                  }
                 } else {
                   // Fallback - try to show raw error data
                   const rawErrorString = JSON.stringify(fieldErrors, null, 2);
