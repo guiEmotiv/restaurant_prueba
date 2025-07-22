@@ -227,7 +227,9 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       newErrors.items = 'Debe agregar al menos un item válido con receta seleccionada';
     }
     
-    // Validar cada item individual
+    // Validar cada item individual y detectar duplicados
+    const usedRecipeIds = new Set();
+    
     orderItems.forEach((item, index) => {
       if (item.recipe && item.recipe !== '') {
         let recipeId;
@@ -237,9 +239,18 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           recipeId = item.recipe;
         }
         
-        if (!recipeId || isNaN(parseInt(recipeId))) {
-          const displayNumber = orderItems.length - index;
+        const parsedRecipeId = parseInt(recipeId);
+        const displayNumber = orderItems.length - index;
+        
+        if (!recipeId || isNaN(parsedRecipeId)) {
           newErrors[`item_${index}`] = `El item ${displayNumber} tiene una receta inválida`;
+        } else {
+          // Check for duplicates
+          if (usedRecipeIds.has(parsedRecipeId)) {
+            newErrors[`item_${index}`] = `El item ${displayNumber} tiene una receta duplicada`;
+          } else {
+            usedRecipeIds.add(parsedRecipeId);
+          }
         }
       }
     });
@@ -262,9 +273,19 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
     setLoading(true);
     try {
       // Preparar items válidos
-      const validItems = orderItems.filter(item => 
-        item.recipe && item.recipe !== ''
-      );
+      const validItems = orderItems.filter(item => {
+        if (!item.recipe) return false;
+        
+        // Extract recipe ID for validation
+        let recipeId = item.recipe;
+        if (typeof recipeId === 'object' && recipeId !== null) {
+          recipeId = recipeId.id || recipeId.value;
+        }
+        
+        // Check if it's a valid number
+        const parsedId = parseInt(recipeId);
+        return !isNaN(parsedId) && parsedId > 0;
+      });
       console.log('Valid items to save:', validItems);
       
       let savedOrder;
@@ -330,8 +351,13 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         console.log('=== PROCESSING ITEMS FOR NEW ORDER ===');
         console.log('Raw validItems:', JSON.stringify(validItems, null, 2));
         
-        const processedItems = validItems.map((item, index) => {
-          console.log(`Processing item ${index}:`, JSON.stringify(item, null, 2));
+        // Remove duplicates and process items
+        const uniqueRecipeIds = new Set();
+        const processedItems = [];
+        
+        for (let i = 0; i < validItems.length; i++) {
+          const item = validItems[i];
+          console.log(`Processing item ${i}:`, JSON.stringify(item, null, 2));
           
           // Extract recipe ID properly - ensure it's a number
           let recipeId = item.recipe;
@@ -346,24 +372,37 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           console.log(`Original recipe:`, item.recipe, 'Parsed ID:', parsedRecipeId);
           
           if (isNaN(parsedRecipeId) || parsedRecipeId <= 0) {
-            console.error(`Invalid recipe ID for item ${index}:`, {
+            console.error(`Invalid recipe ID for item ${i}:`, {
               originalRecipe: item.recipe,
               extractedId: recipeId,
               parsedId: parsedRecipeId
             });
-            throw new Error(`Invalid recipe ID for item ${index + 1}: expected number but got ${typeof recipeId} (${recipeId})`);
+            throw new Error(`Invalid recipe ID for item ${i + 1}: expected number but got ${typeof recipeId} (${recipeId})`);
           }
+          
+          // Check for duplicates
+          if (uniqueRecipeIds.has(parsedRecipeId)) {
+            console.warn(`Duplicate recipe ID ${parsedRecipeId} found, skipping...`);
+            continue;
+          }
+          
+          uniqueRecipeIds.add(parsedRecipeId);
           
           const processedItem = {
             recipe: parsedRecipeId,
-            notes: (item.notes || '').toString()
+            notes: (item.notes || '').toString().trim()
           };
           
-          console.log(`Processed item ${index}:`, JSON.stringify(processedItem, null, 2));
-          return processedItem;
-        });
+          console.log(`Processed item ${i}:`, JSON.stringify(processedItem, null, 2));
+          processedItems.push(processedItem);
+        }
         
         console.log('Final processedItems:', JSON.stringify(processedItems, null, 2));
+        
+        // Final validation before sending
+        if (processedItems.length === 0) {
+          throw new Error('No valid items to create order');
+        }
         
         const orderData = {
           table: parseInt(formData.table),
@@ -375,6 +414,19 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         console.log('Items count:', orderData.items.length);
         console.log('Full order data:', JSON.stringify(orderData, null, 2));
         console.log('Original validItems:', JSON.stringify(validItems, null, 2));
+        
+        // Validate that all items have proper structure
+        const invalidItems = orderData.items.filter(item => 
+          typeof item !== 'object' || 
+          typeof item.recipe !== 'number' || 
+          isNaN(item.recipe) || 
+          item.recipe <= 0
+        );
+        
+        if (invalidItems.length > 0) {
+          console.error('Invalid items found:', invalidItems);
+          throw new Error(`Invalid items detected: ${JSON.stringify(invalidItems)}`);
+        }
         
         // Validate data before sending
         console.log('=== VALIDATION BEFORE SEND ===');
@@ -528,7 +580,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           <div className="space-y-6">
             {/* Información básica */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información Básica</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
