@@ -114,6 +114,7 @@ const Groups = () => {
         entityNamePlural="grupos"
         hideTitle={true}
         hideAddButton={true}
+        useCustomModals={true}
       />
 
       <GroupModal

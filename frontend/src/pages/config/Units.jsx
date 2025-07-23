@@ -102,6 +102,7 @@ const Units = () => {
         loading={loading}
         hideTitle={true}
         hideAddButton={true}
+        useCustomModals={true}
       />
 
       <UnitModal

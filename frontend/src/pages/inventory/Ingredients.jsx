@@ -204,6 +204,7 @@ const Ingredients = () => {
         loading={loading}
         hideAddButton={true}
         hideTitle={true}
+        useCustomModals={true}
       />
 
       {/* Ingredient Modal */}

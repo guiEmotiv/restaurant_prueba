@@ -131,6 +131,7 @@ const Tables = () => {
         loading={loading}
         hideTitle={true}
         hideAddButton={true}
+        useCustomModals={true}
       />
 
       <TableModal

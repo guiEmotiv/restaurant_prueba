@@ -103,6 +103,7 @@ const Categories = () => {
         loading={loading}
         hideTitle={true}
         hideAddButton={true}
+        useCustomModals={true}
       />
 
       <CategoryModal

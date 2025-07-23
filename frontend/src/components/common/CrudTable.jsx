@@ -13,14 +13,21 @@ const CrudTable = forwardRef(({
   loading = false,
   addButtonText = "Agregar",
   hideAddButton = false,
-  hideTitle = false
+  hideTitle = false,
+  useCustomModals = false
 }, ref) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
   const handleAdd = () => {
-    setEditingItem(null);
-    setIsModalOpen(true);
+    if (useCustomModals) {
+      // When using custom modals, delegate to parent
+      onAdd && onAdd();
+    } else {
+      // Use built-in modal
+      setEditingItem(null);
+      setIsModalOpen(true);
+    }
   };
 
   useImperativeHandle(ref, () => ({
@@ -28,8 +35,14 @@ const CrudTable = forwardRef(({
   }));
 
   const handleEdit = (item) => {
-    setEditingItem(item);
-    setIsModalOpen(true);
+    if (useCustomModals) {
+      // When using custom modals, delegate to parent
+      onEdit && onEdit(item);
+    } else {
+      // Use built-in modal
+      setEditingItem(item);
+      setIsModalOpen(true);
+    }
   };
 
   const handleModalSubmit = (formData) => {
@@ -184,7 +197,7 @@ const CrudTable = forwardRef(({
         )}
       </div>
 
-      {isModalOpen && (
+      {!useCustomModals && isModalOpen && (
         <Modal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}

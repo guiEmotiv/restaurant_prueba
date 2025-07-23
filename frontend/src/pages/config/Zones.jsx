@@ -102,6 +102,7 @@ const Zones = () => {
         loading={loading}
         hideTitle={true}
         hideAddButton={true}
+        useCustomModals={true}
       />
 
       <ZoneModal
