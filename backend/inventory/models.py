@@ -114,6 +114,14 @@ class Recipe(models.Model):
         for recipe_item in self.recipeitem_set.all():
             recipe_item.ingredient.update_stock(recipe_item.quantity, 'subtract')
 
+    def delete(self, *args, **kwargs):
+        """Override delete para validar que no haya ordenes asociadas"""
+        # Verificar si hay OrderItems que usan esta receta
+        from operation.models import OrderItem
+        if OrderItem.objects.filter(recipe=self).exists():
+            raise ValidationError("No se puede eliminar una receta que ha sido utilizada en órdenes")
+        super().delete(*args, **kwargs)
+
 
 class RecipeItem(models.Model):
     """Ingredientes que componen una receta"""

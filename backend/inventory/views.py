@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from django.core.exceptions import ValidationError
 from .models import Group, Ingredient, Recipe, RecipeItem
 from .serializers import (
     GroupSerializer,
@@ -23,6 +24,18 @@ class GroupViewSet(viewsets.ModelViewSet):
         from .serializers import RecipeSerializer
         serializer = RecipeSerializer(recipes, many=True)
         return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy para manejar errores de validación"""
+        group = self.get_object()
+        try:
+            self.perform_destroy(group)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class IngredientViewSet(viewsets.ModelViewSet):
@@ -66,6 +79,18 @@ class IngredientViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, 
                           status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy para manejar errores de validación"""
+        ingredient = self.get_object()
+        try:
+            self.perform_destroy(ingredient)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
@@ -150,6 +175,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
         except RecipeItem.DoesNotExist:
             return Response({'error': 'Ingrediente no encontrado en la receta'}, 
                           status=status.HTTP_404_NOT_FOUND)
+
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy para manejar errores de validación"""
+        recipe = self.get_object()
+        try:
+            self.perform_destroy(recipe)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class RecipeItemViewSet(viewsets.ModelViewSet):
