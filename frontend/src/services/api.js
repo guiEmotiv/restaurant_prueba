@@ -22,6 +22,18 @@ const api = axios.create({
   timeout: 30000, // 30 second timeout
 });
 
+// Auth token management
+let authToken = null;
+
+const setAuthToken = (token) => {
+  authToken = token;
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Token ${token}`;
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+  }
+};
+
 // Add request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
@@ -273,6 +285,37 @@ export const apiService = {
       return response.data;
     },
   },
+
+  // Authentication services
+  auth: {
+    login: async (username, password) => {
+      const response = await api.post('/auth/login/', { username, password });
+      return response.data;
+    },
+    logout: async () => {
+      const response = await api.post('/auth/logout/');
+      return response.data;
+    },
+    getCurrentUser: async () => {
+      const response = await api.get('/auth/user/');
+      return response.data;
+    },
+    getUserPermissions: async () => {
+      const response = await api.get('/auth/permissions/');
+      return response.data;
+    },
+    createUser: async (userData) => {
+      const response = await api.post('/auth/users/create/', userData);
+      return response.data;
+    },
+    listUsers: async () => {
+      const response = await api.get('/auth/users/');
+      return response.data;
+    }
+  },
+
+  // Add setAuthToken method
+  setAuthToken,
 };
 
 export default api;

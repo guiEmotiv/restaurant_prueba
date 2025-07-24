@@ -49,6 +49,9 @@ INSTALLED_APPS = [
     "corsheaders",
     "drf_spectacular",
     
+    # Custom authentication
+    "authentication",
+    
     # Restaurant Apps
     "config",
     "inventory", 
@@ -98,6 +101,11 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ──────────────────────────────────────────────────────────────
+# Custom User Model
+# ──────────────────────────────────────────────────────────────
+AUTH_USER_MODEL = 'authentication.RestaurantUser'
+
+# ──────────────────────────────────────────────────────────────
 # Django REST Framework
 # ──────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
@@ -106,7 +114,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.AllowAny",  # Para desarrollo
+        "authentication.permissions.IsAuthenticatedRestaurantUser",
     ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",

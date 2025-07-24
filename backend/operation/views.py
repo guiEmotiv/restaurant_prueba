@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
+from authentication.permissions import RoleBasedPermission, MeseroPermission, CajeroPermission
 from .models import Order, OrderItem, OrderItemIngredient, Payment
 from .serializers import (
     OrderSerializer, OrderDetailSerializer, OrderCreateSerializer,
@@ -13,6 +14,7 @@ from .serializers import (
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all().order_by('-created_at')
+    permission_classes = [MeseroPermission]
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -163,6 +165,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
 
 class OrderItemViewSet(viewsets.ModelViewSet):
+    permission_classes = [MeseroPermission]
     queryset = OrderItem.objects.all().order_by('-created_at')
     serializer_class = OrderItemSerializer
     
@@ -227,6 +230,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
 
 
 class OrderItemIngredientViewSet(viewsets.ModelViewSet):
+    permission_classes = [MeseroPermission]
     queryset = OrderItemIngredient.objects.all().order_by('-created_at')
     serializer_class = OrderItemIngredientSerializer
     
@@ -244,6 +248,7 @@ class OrderItemIngredientViewSet(viewsets.ModelViewSet):
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
+    permission_classes = [CajeroPermission]
     queryset = Payment.objects.all().order_by('-created_at')
     serializer_class = PaymentSerializer
     
