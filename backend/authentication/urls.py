@@ -1,7 +1,15 @@
 from django.urls import path
+from django.http import JsonResponse
 from . import views, aws_views
 
+def test_auth_view(request):
+    """Simple test view to verify auth URLs are loading"""
+    return JsonResponse({"status": "Authentication module loaded successfully"})
+
 urlpatterns = [
+    # Test endpoint to verify routing
+    path('test/', test_auth_view, name='auth_test'),
+    
     # AWS IAM Authentication (Primary)
     path('aws-login/', aws_views.aws_login_view, name='aws_login'),
     path('aws-logout/', aws_views.aws_logout_view, name='aws_logout'),
