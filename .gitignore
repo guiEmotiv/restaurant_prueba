@@ -98,3 +98,7 @@ frontend-deployment.log
 db.sqlite3
 *.db
 *.sqlite
+
+# AWS Specific Credentials (in addition to *credentials* pattern above)
+deploy/aws-credentials.env
+deploy/aws-credentials-*.env
