@@ -12,20 +12,84 @@ from .serializers import (
     LoginResponseSerializer
 )
 from .permissions import AdminOnlyPermission
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema(
     operation_id='user_login',
     request=UserLoginSerializer,
     responses={200: LoginResponseSerializer},
-    description='Login user and get authentication token'
+    description='Login user with AWS IAM credentials (access_key as username, secret_key as password)'
 )
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
     """
-    Login endpoint for restaurant users
+    AWS IAM Login endpoint - Direct integration
+    
+    Expected payload:
+    {
+        "username": "AKIA...",  // AWS Access Key ID
+        "password": "secret..."  // AWS Secret Access Key
+    }
     """
+    try:
+        # Import AWS authenticator
+        from .aws_auth import aws_authenticator
+        
+        # Extract credentials
+        username = request.data.get('username', '').strip()  # Access Key
+        password = request.data.get('password', '').strip()  # Secret Key
+        
+        if not username or not password:
+            return Response({
+                'error': 'Credenciales requeridas',
+                'details': 'Proporcione Access Key ID y Secret Access Key'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Try AWS IAM authentication first
+        success, user_info = aws_authenticator.authenticate_user(username, password)
+        
+        if success and user_info:
+            # Generate token
+            token = aws_authenticator.get_or_create_token(user_info)
+            
+            # Prepare response
+            response_data = {
+                'token': token,
+                'user': {
+                    'id': user_info['id'],
+                    'username': user_info['username'],
+                    'email': user_info['email'],
+                    'first_name': user_info['first_name'],
+                    'last_name': user_info['last_name'],
+                    'role': user_info['role'],
+                    'is_active': user_info['is_active'],
+                    'allowed_views': user_info['allowed_views'],
+                    'allowed_api_endpoints': user_info['allowed_api_endpoints'],
+                    'last_activity': user_info['last_activity'],
+                    'is_active_session': user_info['is_active_session']
+                },
+                'message': f'Login successful. Welcome {user_info["first_name"]}!'
+            }
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+        
+        # If AWS authentication fails, return error
+        return Response({
+            'non_field_errors': ['Unable to log in with provided credentials.']
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        # Log error and return generic failure
+        logger.error(f"Login error: {str(e)}")
+        return Response({
+            'non_field_errors': ['Unable to log in with provided credentials.']
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # This code should never be reached
     serializer = UserLoginSerializer(data=request.data)
     
     if serializer.is_valid():
