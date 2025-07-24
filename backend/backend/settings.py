@@ -65,6 +65,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "authentication.aws_middleware.AWSIAMAuthenticationMiddleware",
+    "authentication.aws_middleware.AWSIAMPermissionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -97,6 +99,24 @@ USE_TZ   = True
 # ──────────────────────────────────────────────────────────────
 STATIC_URL  = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# ──────────────────────────────────────────────────────────────
+# AWS Configuration
+# ──────────────────────────────────────────────────────────────
+AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+
+# Cache configuration (required for AWS token management)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'restaurant-cache',
+        'TIMEOUT': 3600,  # 1 hour
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+            'CULL_FREQUENCY': 3,
+        }
+    }
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
