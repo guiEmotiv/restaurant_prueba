@@ -108,20 +108,13 @@ deploy_on_ec2() {
         exit 1
     fi
     
-    # Step 2: Build frontend if needed
+    # Step 2: Check frontend (skip building on EC2 to save resources)
     log_info "Checking frontend..."
-    if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
-        if [ ! -d "frontend/dist" ] || [ "frontend/package.json" -nt "frontend/dist" ]; then
-            log_info "Building frontend..."
-            cd frontend
-            npm ci
-            npm run build
-            cd ..
-        else
-            log_info "Frontend already built and up to date"
-        fi
+    if [ -d "frontend/dist" ]; then
+        log_success "Frontend build directory found"
     else
-        log_warning "Frontend directory or package.json not found"
+        log_warning "Frontend build not found. You should deploy from local machine first."
+        log_warning "From local: EC2_HOST=$EC2_PUBLIC_IP ./deploy/ec2-deploy.sh deploy"
     fi
     
     # Step 3: Deploy containers
