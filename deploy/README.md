@@ -67,15 +67,14 @@ export EC2_HOST=your-ec2-public-ip.amazonaws.com
 
 ## 🚢 Deployment
 
-### Despliegue inicial
+### **Opción 1: Desde tu máquina local (Recomendado)**
 
 ```bash
 # Desde el directorio raíz del proyecto en tu máquina local
 EC2_HOST=your-ec2-ip.amazonaws.com ./deploy/ec2-deploy.sh deploy
 ```
 
-### Comandos disponibles
-
+**Comandos disponibles desde tu máquina local:**
 ```bash
 # Desplegar aplicación
 EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh deploy
@@ -94,6 +93,24 @@ EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh stop
 
 # Crear backup de base de datos
 EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh backup
+```
+
+### **Opción 2: Desde dentro de EC2**
+
+Si ya estás conectado por SSH a tu EC2, puedes usar comandos locales:
+
+```bash
+# Conectar a EC2
+ssh ubuntu@your-ec2-ip
+cd /opt/restaurant-web
+
+# Comandos disponibles dentro de EC2:
+./deploy/local-commands.sh start     # Construir e iniciar aplicación
+./deploy/local-commands.sh status    # Ver estado
+./deploy/local-commands.sh logs      # Ver logs
+./deploy/local-commands.sh restart   # Reiniciar
+./deploy/local-commands.sh stop      # Parar
+./deploy/local-commands.sh backup    # Crear backup
 ```
 
 ## 📦 Arquitectura de Deployment
