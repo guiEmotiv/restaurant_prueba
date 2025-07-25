@@ -2,7 +2,7 @@
 
 # ============================================================================
 # EC2 Deployment Script - Restaurant Management System
-# Deploy from local machine to EC2 instance
+# Works both from local machine and from within EC2
 # ============================================================================
 
 set -e  # Exit on any error
@@ -11,6 +11,25 @@ set -e  # Exit on any error
 DEPLOY_USER="ubuntu"
 APP_NAME="restaurant-web"
 APP_DIR="/opt/$APP_NAME"
+
+# Detect if running on EC2 vs local machine
+RUNNING_ON_EC2=false
+if [ -d "/opt/restaurant-web" ] && [ -f "/opt/restaurant-web/.env.ec2" ]; then
+    RUNNING_ON_EC2=true
+    cd /opt/restaurant-web
+    
+    # Load .env.ec2 variables when running on EC2
+    set -a  # Export all variables
+    source .env.ec2
+    set +a  # Stop exporting
+    
+    # Set EC2_HOST from .env.ec2 file
+    if [ -n "$EC2_PUBLIC_IP" ]; then
+        EC2_HOST="$EC2_PUBLIC_IP"
+        echo "🔧 Running on EC2 - loaded configuration from .env.ec2"
+        echo "📍 Using EC2_PUBLIC_IP: $EC2_PUBLIC_IP"
+    fi
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -36,11 +55,23 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if EC2_HOST is provided
+# Check if EC2_HOST is provided or can be determined
 check_ec2_host() {
+    if [ "$RUNNING_ON_EC2" = true ]; then
+        if [ -z "$EC2_HOST" ]; then
+            log_warning "EC2_PUBLIC_IP not found in .env.ec2, using localhost"
+            EC2_HOST="localhost"
+        fi
+        return 0
+    fi
+    
     if [ -z "$EC2_HOST" ]; then
-        log_error "EC2_HOST environment variable is required"
-        echo "Usage: EC2_HOST=your-ec2-ip.amazonaws.com $0 [command]"
+        log_error "EC2_HOST environment variable is required when running from local machine"
+        echo "Usage when running from local machine:"
+        echo "  EC2_HOST=your-ec2-ip.amazonaws.com $0 [command]"
+        echo ""
+        echo "Usage when running on EC2 (automatically detects configuration):"
+        echo "  sudo $0 [command]"
         echo ""
         echo "Available commands:"
         echo "  deploy    - Deploy the application"
@@ -56,7 +87,91 @@ check_ec2_host() {
 
 # Deploy application
 deploy() {
-    log_info "Starting deployment to $EC2_HOST..."
+    if [ "$RUNNING_ON_EC2" = true ]; then
+        deploy_on_ec2
+    else
+        deploy_from_local
+    fi
+}
+
+# Deploy when running on EC2
+deploy_on_ec2() {
+    log_info "Deploying locally on EC2..."
+    
+    # Step 1: Verify .env.ec2 configuration
+    log_info "Verifying .env.ec2 configuration..."
+    if [ -f .env.ec2 ]; then
+        log_success "Using .env.ec2 configuration:"
+        grep -E '^[A-Z_]+=.*' .env.ec2 | sed 's/=.*/=***/' | head -5
+    else
+        log_error ".env.ec2 file missing!"
+        exit 1
+    fi
+    
+    # Step 2: Build frontend if needed
+    log_info "Checking frontend..."
+    if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
+        if [ ! -d "frontend/dist" ] || [ "frontend/package.json" -nt "frontend/dist" ]; then
+            log_info "Building frontend..."
+            cd frontend
+            npm ci
+            npm run build
+            cd ..
+        else
+            log_info "Frontend already built and up to date"
+        fi
+    else
+        log_warning "Frontend directory or package.json not found"
+    fi
+    
+    # Step 3: Deploy containers
+    log_info "Deploying Docker containers..."
+    
+    log_info "Stopping existing containers..."
+    docker-compose -f docker-compose.ec2.yml down || true
+    
+    log_info "Building Docker images..."
+    docker-compose -f docker-compose.ec2.yml build --no-cache
+    
+    log_info "Starting containers..."
+    docker-compose -f docker-compose.ec2.yml up -d
+    
+    log_info "Waiting for services to start..."
+    sleep 15
+    
+    log_info "Running database migrations..."
+    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
+    
+    log_info "Collecting static files..."
+    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput
+    
+    # Step 4: Health checks
+    log_info "Checking application health..."
+    sleep 5
+    if curl -f http://localhost:8000/api/v1/categories/ > /dev/null 2>&1; then
+        log_success "Backend API is responding"
+    else
+        log_error "Backend API is not responding"
+        docker-compose -f docker-compose.ec2.yml logs web
+    fi
+    
+    if curl -f http://localhost/ > /dev/null 2>&1; then
+        log_success "Frontend is responding"
+    else
+        log_error "Frontend is not responding"
+        docker-compose -f docker-compose.ec2.yml logs nginx
+    fi
+    
+    log_success "Deployment completed! Application is running at:"
+    log_success "  Local: http://localhost/"
+    if [ -n "$EC2_PUBLIC_IP" ]; then
+        log_success "  Public: http://$EC2_PUBLIC_IP/"
+    fi
+}
+
+# Deploy from local machine
+deploy_from_local() {
+    log_info "Starting deployment from local machine to $EC2_HOST..."
     
     # Step 1: Check if .env.ec2 exists on remote
     log_info "Checking .env.ec2 configuration on EC2..."
@@ -167,6 +282,49 @@ ENDSSH
 
 # Check application status
 status() {
+    if [ "$RUNNING_ON_EC2" = true ]; then
+        status_on_ec2
+    else
+        status_from_local
+    fi
+}
+
+# Check status when running on EC2
+status_on_ec2() {
+    log_info "Checking application status locally on EC2..."
+    
+    echo "🐳 Docker containers status:"
+    docker-compose -f docker-compose.ec2.yml ps
+    
+    echo ""
+    echo "💾 Disk usage:"
+    df -h /opt/restaurant-web
+    
+    echo ""
+    echo "🔍 Application health check:"
+    curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/categories/ || echo "Backend API: FAILED"
+    curl -s -o /dev/null -w "Frontend: %{http_code}\n" http://localhost/ || echo "Frontend: FAILED"
+    
+    if [ -n "$EC2_PUBLIC_IP" ]; then
+        echo ""
+        echo "🌐 External access check (using $EC2_PUBLIC_IP):"
+        curl -s -o /dev/null -w "Public API: %{http_code}\n" http://$EC2_PUBLIC_IP/api/v1/categories/ || echo "Public API: FAILED"
+        curl -s -o /dev/null -w "Public Frontend: %{http_code}\n" http://$EC2_PUBLIC_IP/ || echo "Public Frontend: FAILED"
+    fi
+    
+    echo ""
+    echo "📋 Configuration status:"
+    if [ -f .env.ec2 ]; then
+        log_success ".env.ec2 file exists"
+        echo "Key variables:"
+        grep -E '^[A-Z_]+=.*' .env.ec2 | sed 's/=.*/=***/' | head -5
+    else
+        log_error ".env.ec2 file missing"
+    fi
+}
+
+# Check status from local machine
+status_from_local() {
     log_info "Checking application status on $EC2_HOST..."
     
     ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
@@ -197,21 +355,24 @@ ENDSSH
 
 # View application logs
 logs() {
-    log_info "Viewing application logs on $EC2_HOST..."
-    
-    ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
-        cd /opt/restaurant-web
+    if [ "$RUNNING_ON_EC2" = true ]; then
+        log_info "Viewing application logs locally..."
         echo "📋 Recent container logs:"
         docker-compose -f docker-compose.ec2.yml logs --tail=50
+    else
+        log_info "Viewing application logs on $EC2_HOST..."
+        ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
+            cd /opt/restaurant-web
+            echo "📋 Recent container logs:"
+            docker-compose -f docker-compose.ec2.yml logs --tail=50
 ENDSSH
+    fi
 }
 
 # Restart application
 restart() {
-    log_info "Restarting application on $EC2_HOST..."
-    
-    ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
-        cd /opt/restaurant-web
+    if [ "$RUNNING_ON_EC2" = true ]; then
+        log_info "Restarting application locally..."
         echo "🔄 Restarting containers..."
         docker-compose -f docker-compose.ec2.yml restart
         
@@ -222,14 +383,46 @@ restart() {
         curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/categories/ || echo "Backend API: FAILED"
         curl -s -o /dev/null -w "Frontend: %{http_code}\n" http://localhost/ || echo "Frontend: FAILED"
         
-        echo "✅ Application restarted!"
+        log_success "Application restarted!"
+    else
+        log_info "Restarting application on $EC2_HOST..."
+        ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
+            cd /opt/restaurant-web
+            echo "🔄 Restarting containers..."
+            docker-compose -f docker-compose.ec2.yml restart
+            
+            echo "⏳ Waiting for services to restart..."
+            sleep 10
+            
+            echo "🔍 Checking health after restart..."
+            curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/categories/ || echo "Backend API: FAILED"
+            curl -s -o /dev/null -w "Frontend: %{http_code}\n" http://localhost/ || echo "Frontend: FAILED"
+            
+            echo "✅ Application restarted!"
 ENDSSH
-    
-    log_success "Application restarted successfully!"
+        log_success "Application restarted successfully!"
+    fi
 }
 
 # Stop application
 stop() {
+    if [ "$RUNNING_ON_EC2" = true ]; then
+        stop_on_ec2
+    else
+        stop_from_local
+    fi
+}
+
+# Stop when running on EC2
+stop_on_ec2() {
+    log_info "Stopping application locally on EC2..."
+    echo "🛑 Stopping containers..."
+    docker-compose -f docker-compose.ec2.yml down
+    log_success "Application stopped!"
+}
+
+# Stop from local machine
+stop_from_local() {
     log_info "Stopping application on $EC2_HOST..."
     
     ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
@@ -245,6 +438,42 @@ ENDSSH
 
 # Create database backup
 backup() {
+    if [ "$RUNNING_ON_EC2" = true ]; then
+        backup_on_ec2
+    else
+        backup_from_local
+    fi
+}
+
+# Backup when running on EC2
+backup_on_ec2() {
+    log_info "Creating database backup locally on EC2..."
+    
+    BACKUP_NAME="backup-$(date +%Y%m%d-%H%M%S).sqlite3"
+    
+    echo "📦 Creating database backup..."
+    
+    # Create backup directory if it doesn't exist
+    mkdir -p data/backups
+    
+    # Copy database file
+    if docker-compose -f docker-compose.ec2.yml ps | grep -q web; then
+        docker-compose -f docker-compose.ec2.yml exec -T web cp /app/data/restaurant.sqlite3 /app/data/backups/$BACKUP_NAME || \
+        docker-compose -f docker-compose.ec2.yml exec -T web cp /app/db.sqlite3 /app/data/backups/$BACKUP_NAME
+    else
+        log_error "Web container not running"
+        exit 1
+    fi
+    
+    log_success "Backup created: data/backups/$BACKUP_NAME"
+    
+    # List recent backups
+    echo "📋 Recent backups:"
+    ls -la data/backups/ | tail -5
+}
+
+# Backup from local machine
+backup_from_local() {
     log_info "Creating database backup on $EC2_HOST..."
     
     BACKUP_NAME="backup-$(date +%Y%m%d-%H%M%S).sqlite3"
