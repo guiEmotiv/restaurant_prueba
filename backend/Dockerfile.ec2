@@ -1,14 +1,4 @@
-# Multi-stage build for production deployment
-FROM node:18-alpine AS frontend-build
-
-# Build frontend
-WORKDIR /frontend
-COPY ../frontend/package*.json ./
-RUN npm ci --only=production
-COPY ../frontend/ .
-RUN npm run build
-
-# Python backend stage
+# Production deployment - Django only (frontend served by nginx)
 FROM python:3.12-slim
 
 # Set environment variables
@@ -34,14 +24,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 COPY . .
 
-# Copy built frontend
-COPY --from=frontend-build /frontend/dist ./frontend/dist
-
 # Create data directory for SQLite and uploads
 RUN mkdir -p /app/data
-
-# Collect static files
-RUN python manage.py collectstatic --noinput --settings=backend.settings_ec2
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser

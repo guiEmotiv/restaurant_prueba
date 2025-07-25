@@ -89,11 +89,36 @@ ENDSSH
         --exclude='backend/db.sqlite3' \
         --exclude='backend/__pycache__' \
         --exclude='frontend/dist' \
+        --exclude='frontend_dist' \
         --exclude='data/' \
         --exclude='.env.ec2' \
         ./ $DEPLOY_USER@$EC2_HOST:$APP_DIR/
     
-    # Step 3: Deploy via SSH
+    # Step 3: Build frontend locally (if needed)
+    log_info "Building frontend..."
+    if [ -d "frontend" ]; then
+        cd frontend
+        if [ -f package.json ]; then
+            npm ci
+            npm run build
+            cd ..
+            
+            # Copy built frontend to a location for nginx
+            log_info "Preparing frontend for deployment..."
+            rm -rf frontend_dist
+            cp -r frontend/dist frontend_dist
+        else
+            log_warning "No package.json found in frontend directory"
+        fi
+    else
+        log_warning "Frontend directory not found"
+    fi
+    
+    # Step 4: Upload built frontend to EC2
+    log_info "Uploading built frontend..."
+    rsync -avz --delete frontend_dist/ $DEPLOY_USER@$EC2_HOST:$APP_DIR/frontend_dist/
+    
+    # Step 5: Deploy via SSH
     ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
         set -e
         cd /opt/restaurant-web
