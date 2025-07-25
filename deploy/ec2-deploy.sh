@@ -2,7 +2,7 @@
 
 # ============================================================================
 # EC2 Deployment Script - Restaurant Management System
-# Simple deployment without authentication
+# Deploy from local machine to EC2 instance
 # ============================================================================
 
 set -e  # Exit on any error
@@ -11,7 +11,6 @@ set -e  # Exit on any error
 DEPLOY_USER="ubuntu"
 APP_NAME="restaurant-web"
 APP_DIR="/opt/$APP_NAME"
-DOCKER_COMPOSE_FILE="docker-compose.ec2.yml"
 
 # Colors for output
 RED='\033[0;31m'
@@ -60,15 +59,14 @@ deploy() {
     log_info "Starting deployment to $EC2_HOST..."
     
     # Step 1: Check if .env.ec2 exists on remote
-    log_info "Checking .env.ec2 configuration..."
+    log_info "Checking .env.ec2 configuration on EC2..."
     ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
         if [ ! -f /opt/restaurant-web/.env.ec2 ]; then
             echo "❌ ERROR: .env.ec2 file not found in /opt/restaurant-web/"
             echo "Please create your .env.ec2 file with the required environment variables"
             echo "Example variables needed:"
             echo "  DJANGO_SECRET_KEY=your-secret-key"
-            echo "  DEBUG=False"
-            echo "  ALLOWED_HOSTS=your-domain.com,your-ec2-ip"
+            echo "  DEBUG=0"
             echo "  EC2_PUBLIC_IP=your-ec2-ip"
             exit 1
         else
@@ -81,64 +79,62 @@ ENDSSH
         exit 1
     fi
     
-    # Step 2: Upload files (preserve .env.ec2)
+    # Step 2: Build frontend locally
+    log_info "Building frontend locally..."
+    if [ -d "frontend" ]; then
+        cd frontend
+        if [ -f package.json ]; then
+            log_info "Installing frontend dependencies..."
+            npm ci
+            log_info "Building frontend for production..."
+            npm run build
+            cd ..
+        else
+            log_error "No package.json found in frontend directory"
+            exit 1
+        fi
+    else
+        log_error "Frontend directory not found"
+        exit 1
+    fi
+    
+    # Step 3: Upload application files (excluding .env.ec2 to preserve it)
     log_info "Uploading application files..."
     rsync -avz --delete \
         --exclude='.git' \
         --exclude='node_modules' \
         --exclude='backend/db.sqlite3' \
         --exclude='backend/__pycache__' \
-        --exclude='frontend/dist' \
-        --exclude='frontend_dist' \
         --exclude='data/' \
         --exclude='.env.ec2' \
         ./ $DEPLOY_USER@$EC2_HOST:$APP_DIR/
     
-    # Step 3: Build frontend locally (if needed)
-    log_info "Building frontend..."
-    if [ -d "frontend" ]; then
-        cd frontend
-        if [ -f package.json ]; then
-            npm ci
-            npm run build
-            cd ..
-            
-            # Copy built frontend to a location for nginx
-            log_info "Preparing frontend for deployment..."
-            rm -rf frontend_dist
-            cp -r frontend/dist frontend_dist
-        else
-            log_warning "No package.json found in frontend directory"
-        fi
-    else
-        log_warning "Frontend directory not found"
-    fi
-    
-    # Step 4: Upload built frontend to EC2
-    log_info "Uploading built frontend..."
-    rsync -avz --delete frontend_dist/ $DEPLOY_USER@$EC2_HOST:$APP_DIR/frontend_dist/
-    
-    # Step 5: Deploy via SSH
+    # Step 4: Deploy via SSH
+    log_info "Deploying on EC2..."
     ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
         set -e
         cd /opt/restaurant-web
         
-        echo "📋 Checking .env.ec2 configuration..."
+        echo "📋 Verifying .env.ec2 configuration..."
         if [ -f .env.ec2 ]; then
             echo "✅ Using .env.ec2 configuration:"
-            echo "$(grep -E '^[A-Z_]+=.*' .env.ec2 | sed 's/=.*/=***/' | head -5)"
+            grep -E '^[A-Z_]+=.*' .env.ec2 | sed 's/=.*/=***/' | head -5
         else
             echo "❌ .env.ec2 file missing!"
             exit 1
         fi
         
-        echo "🐳 Building and starting containers..."
+        echo "🐳 Stopping existing containers..."
         docker-compose -f docker-compose.ec2.yml down || true
+        
+        echo "🔨 Building Docker images..."
         docker-compose -f docker-compose.ec2.yml build --no-cache
+        
+        echo "🚀 Starting containers..."
         docker-compose -f docker-compose.ec2.yml up -d
         
         echo "⏳ Waiting for services to start..."
-        sleep 10
+        sleep 15
         
         echo "🗄️ Running database migrations..."
         docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
@@ -146,10 +142,27 @@ ENDSSH
         echo "📊 Collecting static files..."
         docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput
         
+        echo "🔍 Checking application health..."
+        sleep 5
+        if curl -f http://localhost:8000/api/v1/categories/ > /dev/null 2>&1; then
+            echo "✅ Backend API is responding"
+        else
+            echo "❌ Backend API is not responding"
+            docker-compose -f docker-compose.ec2.yml logs web
+        fi
+        
+        if curl -f http://localhost/ > /dev/null 2>&1; then
+            echo "✅ Frontend is responding"
+        else
+            echo "❌ Frontend is not responding"
+            docker-compose -f docker-compose.ec2.yml logs nginx
+        fi
+        
         echo "✅ Deployment completed successfully!"
 ENDSSH
     
     log_success "Deployment completed! Application is running at http://$EC2_HOST"
+    log_info "You can also check status with: EC2_HOST=$EC2_HOST $0 status"
 }
 
 # Check application status
@@ -169,6 +182,16 @@ status() {
         echo "🔍 Application health check:"
         curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/categories/ || echo "Backend API: FAILED"
         curl -s -o /dev/null -w "Frontend: %{http_code}\n" http://localhost/ || echo "Frontend: FAILED"
+        
+        echo ""
+        echo "📋 Configuration status:"
+        if [ -f .env.ec2 ]; then
+            echo "✅ .env.ec2 file exists"
+            echo "Key variables:"
+            grep -E '^[A-Z_]+=.*' .env.ec2 | sed 's/=.*/=***/' | head -5
+        else
+            echo "❌ .env.ec2 file missing"
+        fi
 ENDSSH
 }
 
@@ -193,7 +216,11 @@ restart() {
         docker-compose -f docker-compose.ec2.yml restart
         
         echo "⏳ Waiting for services to restart..."
-        sleep 5
+        sleep 10
+        
+        echo "🔍 Checking health after restart..."
+        curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/categories/ || echo "Backend API: FAILED"
+        curl -s -o /dev/null -w "Frontend: %{http_code}\n" http://localhost/ || echo "Frontend: FAILED"
         
         echo "✅ Application restarted!"
 ENDSSH
@@ -230,7 +257,13 @@ backup() {
         mkdir -p data/backups
         
         # Copy database file
-        docker-compose -f docker-compose.ec2.yml exec -T web cp /app/db.sqlite3 /app/data/backups/$BACKUP_NAME
+        if docker-compose -f docker-compose.ec2.yml ps | grep -q web; then
+            docker-compose -f docker-compose.ec2.yml exec -T web cp /app/data/restaurant.sqlite3 /app/data/backups/$BACKUP_NAME || \
+            docker-compose -f docker-compose.ec2.yml exec -T web cp /app/db.sqlite3 /app/data/backups/$BACKUP_NAME
+        else
+            echo "❌ Web container not running"
+            exit 1
+        fi
         
         echo "✅ Backup created: data/backups/$BACKUP_NAME"
         
