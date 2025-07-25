@@ -98,6 +98,17 @@ deploy() {
 deploy_on_ec2() {
     log_info "Deploying locally on EC2..."
     
+    # Step 0: Check disk space and clean if needed
+    AVAILABLE_SPACE=$(df / | tail -1 | awk '{print $4}' | sed 's/[^0-9]//g')
+    if [ "$AVAILABLE_SPACE" -lt 1000000 ]; then  # Less than 1GB
+        log_warning "Low disk space detected. Running cleanup..."
+        if [ -f "./deploy/ec2-cleanup.sh" ]; then
+            ./deploy/ec2-cleanup.sh force
+        else
+            log_warning "Cleanup script not found, continuing..."
+        fi
+    fi
+    
     # Step 1: Verify .env.ec2 configuration
     log_info "Verifying .env.ec2 configuration..."
     if [ -f .env.ec2 ]; then
@@ -108,13 +119,51 @@ deploy_on_ec2() {
         exit 1
     fi
     
-    # Step 2: Check frontend (skip building on EC2 to save resources)
-    log_info "Checking frontend..."
-    if [ -d "frontend/dist" ]; then
-        log_success "Frontend build directory found"
+    # Step 2: Build frontend on EC2 (optimized for low resources)
+    log_info "Building frontend..."
+    
+    if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
+        cd frontend
+        
+        # Check if Node.js is available and adequate version
+        if ! command -v node >/dev/null 2>&1; then
+            log_error "Node.js not found. Installing Node.js 18..."
+            
+            # Install Node.js 18 quickly
+            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+            
+            log_success "Node.js installed: $(node --version)"
+        fi
+        
+        NODE_VERSION=$(node --version | sed 's/v//' | cut -d. -f1)
+        if [ "$NODE_VERSION" -lt "16" ]; then
+            log_error "Node.js version too old. Please run: sudo ./deploy/ec2-cleanup.sh force"
+            exit 1
+        fi
+        
+        # Clean previous build and node_modules to save space
+        log_info "Cleaning previous build..."
+        rm -rf dist build node_modules package-lock.json
+        
+        # Install dependencies with memory optimization
+        log_info "Installing dependencies with memory optimization..."
+        export NODE_OPTIONS="--max-old-space-size=512"
+        npm install --no-package-lock --no-audit --no-fund --prefer-offline
+        
+        # Build with memory optimization
+        log_info "Building frontend with memory optimization..."
+        npm run build
+        
+        # Clean node_modules after build to save space
+        log_info "Cleaning node_modules to save space..."
+        rm -rf node_modules
+        
+        cd ..
+        log_success "Frontend built successfully"
     else
-        log_warning "Frontend build not found. You should deploy from local machine first."
-        log_warning "From local: EC2_HOST=$EC2_PUBLIC_IP ./deploy/ec2-deploy.sh deploy"
+        log_error "Frontend directory or package.json not found"
+        exit 1
     fi
     
     # Step 3: Deploy containers
