@@ -1,6 +1,17 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/v1` : 'http://localhost:8000/api/v1';
+// Determine API URL based on environment
+let API_BASE_URL;
+if (import.meta.env.VITE_API_URL) {
+  // Use explicit environment variable if set
+  API_BASE_URL = `${import.meta.env.VITE_API_URL}/api/v1`;
+} else if (import.meta.env.MODE === 'production') {
+  // In production, assume API is on same host
+  API_BASE_URL = `${window.location.origin}/api/v1`;
+} else {
+  // Development mode - use localhost
+  API_BASE_URL = 'http://localhost:8000/api/v1';
+}
 
 // Debug log to see what URL is being used
 console.log('🔍 API Configuration Debug:');
