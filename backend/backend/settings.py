@@ -45,12 +45,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "rest_framework.authtoken",  # <– token auth
     "corsheaders",
     "drf_spectacular",
-    
-    # Custom authentication
-    "authentication",
     
     # Restaurant Apps
     "config",
@@ -65,8 +61,6 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "authentication.aws_middleware.AWSIAMAuthenticationMiddleware",
-    "authentication.aws_middleware.AWSIAMPermissionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -100,41 +94,16 @@ USE_TZ   = True
 STATIC_URL  = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# ──────────────────────────────────────────────────────────────
-# AWS Configuration
-# ──────────────────────────────────────────────────────────────
-AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
-
-# Cache configuration (required for AWS token management)
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'restaurant-cache',
-        'TIMEOUT': 3600,  # 1 hour
-        'OPTIONS': {
-            'MAX_ENTRIES': 1000,
-            'CULL_FREQUENCY': 3,
-        }
-    }
-}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ──────────────────────────────────────────────────────────────
-# Custom User Model
-# ──────────────────────────────────────────────────────────────
-AUTH_USER_MODEL = 'authentication.RestaurantUser'
 
 # ──────────────────────────────────────────────────────────────
 # Django REST Framework
 # ──────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-    ),
     "DEFAULT_PERMISSION_CLASSES": (
-        "authentication.permissions.AWSIAMPermission",
+        "rest_framework.permissions.AllowAny",
     ),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
@@ -151,41 +120,6 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-# ──────────────────────────────────────────────────────────────
-# Logging Configuration
-# ──────────────────────────────────────────────────────────────
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose'
-        },
-    },
-    'loggers': {
-        'authentication.aws_auth': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'authentication.aws_views': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-    },
-}
 
 # ──────────────────────────────────────────────────────────────
 # API Documentation (drf-spectacular)

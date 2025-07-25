@@ -1,7 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from authentication.permissions import AdminOnlyPermission
 from .models import Category, Unit, Zone, Table
 from .serializers import (
     CategorySerializer, UnitSerializer, ZoneSerializer, 
@@ -10,7 +9,6 @@ from .serializers import (
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
-    permission_classes = [AdminOnlyPermission]
     queryset = Category.objects.all().order_by('name')
     serializer_class = CategorySerializer
     
@@ -25,7 +23,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class UnitViewSet(viewsets.ModelViewSet):
-    permission_classes = [AdminOnlyPermission]
     queryset = Unit.objects.all().order_by('name')
     serializer_class = UnitSerializer
     
@@ -40,7 +37,6 @@ class UnitViewSet(viewsets.ModelViewSet):
 
 
 class ZoneViewSet(viewsets.ModelViewSet):
-    permission_classes = [AdminOnlyPermission]
     queryset = Zone.objects.all().order_by('name')
     serializer_class = ZoneSerializer
     
@@ -54,7 +50,6 @@ class ZoneViewSet(viewsets.ModelViewSet):
 
 
 class TableViewSet(viewsets.ModelViewSet):
-    permission_classes = [AdminOnlyPermission]
     queryset = Table.objects.all().order_by('zone__name', 'table_number')
     
     def get_serializer_class(self):

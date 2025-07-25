@@ -2,7 +2,6 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.core.exceptions import ValidationError
-from authentication.permissions import AdminOnlyPermission, AWSIAMPermission
 from .models import Group, Ingredient, Recipe, RecipeItem
 from .serializers import (
     GroupSerializer,
@@ -13,7 +12,6 @@ from .serializers import (
 
 
 class GroupViewSet(viewsets.ModelViewSet):
-    permission_classes = [AdminOnlyPermission]
     queryset = Group.objects.all().order_by('name')
     serializer_class = GroupSerializer
     
@@ -41,7 +39,6 @@ class GroupViewSet(viewsets.ModelViewSet):
 
 
 class IngredientViewSet(viewsets.ModelViewSet):
-    permission_classes = [AWSIAMPermission]
     queryset = Ingredient.objects.all().order_by('name')
     
     def get_serializer_class(self):
@@ -97,7 +94,6 @@ class IngredientViewSet(viewsets.ModelViewSet):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    permission_classes = [AWSIAMPermission]
     queryset = Recipe.objects.all().order_by('name')
     
     def get_serializer_class(self):
@@ -194,7 +190,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
 
 class RecipeItemViewSet(viewsets.ModelViewSet):
-    permission_classes = [AdminOnlyPermission]
     queryset = RecipeItem.objects.all().order_by('recipe__name', 'ingredient__name')
     serializer_class = RecipeItemSerializer
     
