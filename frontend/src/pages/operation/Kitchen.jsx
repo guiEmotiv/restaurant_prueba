@@ -202,25 +202,25 @@ const Kitchen = () => {
                               </div>
 
                               {/* Zona y mesa */}
-                              <div className="text-xs font-bold text-center py-2 px-3 rounded-lg bg-gray-100 text-gray-900">
+                              <div className="text-xs font-bold text-center py-2 px-3 rounded-lg bg-yellow-50 text-gray-900">
                                 {item.order_zone} - {item.order_table}
                               </div>
 
                               {/* Tiempo transcurrido */}
-                              <div className="text-xs font-bold text-center py-2 px-3 rounded-lg bg-gray-100 text-gray-900">
+                              <div className="text-xs font-bold text-center py-2 px-3 rounded-lg bg-yellow-50 text-gray-900">
                                 {formatTime(item.elapsed_time_minutes)}
                               </div>
 
                               {/* Personalizaciones */}
                               {item.customizations_count > 0 && (
-                                <div className="text-xs bg-gray-100 text-gray-900 px-3 py-2 rounded-lg text-center font-medium">
+                                <div className="text-xs font-bold text-center py-2 px-3 rounded-lg bg-yellow-50 text-gray-900">
                                   +{item.customizations_count} extra{item.customizations_count > 1 ? 's' : ''}
                                 </div>
                               )}
 
-                              {/* Notas (solo visualización) - Campo más grande */}
+                              {/* Notas (solo visualización) - Campo más grande y flexible */}
                               {(item.notes && item.notes.trim()) && (
-                                <div className="text-xs text-center py-3 px-3 rounded-lg bg-gray-100 text-gray-900 min-h-[60px] flex items-center justify-center">
+                                <div className="text-xs font-bold py-3 px-3 rounded-lg bg-yellow-50 text-gray-900 min-h-[80px] break-words whitespace-pre-wrap leading-relaxed">
                                   {item.notes}
                                 </div>
                               )}
