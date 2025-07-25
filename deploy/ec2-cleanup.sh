@@ -74,22 +74,26 @@ clean_system() {
 clean_docker() {
     log_info "Cleaning Docker..."
     
-    # Stop all containers
-    docker stop $(docker ps -aq) 2>/dev/null || true
-    
-    # Remove all containers
-    docker rm $(docker ps -aq) 2>/dev/null || true
-    
-    # Remove all images
-    docker rmi $(docker images -q) 2>/dev/null || true
-    
-    # Clean docker system
-    docker system prune -af
-    
-    # Clean volumes
-    docker volume prune -f
-    
-    log_success "Docker cleaned"
+    if command -v docker >/dev/null 2>&1; then
+        log_info "Stopping all containers..."
+        docker stop $(docker ps -aq) 2>/dev/null || true
+        
+        log_info "Removing all containers..."
+        docker rm $(docker ps -aq) 2>/dev/null || true
+        
+        log_info "Removing all images..."
+        docker rmi $(docker images -q) 2>/dev/null || true
+        
+        log_info "Cleaning Docker system..."
+        docker system prune -af 2>/dev/null || true
+        
+        log_info "Cleaning Docker volumes..."
+        docker volume prune -f 2>/dev/null || true
+        
+        log_success "Docker cleaned"
+    else
+        log_warning "Docker not found, skipping Docker cleanup"
+    fi
 }
 
 # Update Node.js to version 18
@@ -123,27 +127,29 @@ install_dependencies() {
     log_info "Installing required system dependencies..."
     
     # Update package lists
-    sudo apt-get update
+    apt-get update -qq
     
-    # Install essential packages
-    sudo apt-get install -y \
-        curl \
-        wget \
-        git \
-        build-essential \
-        python3 \
-        python3-pip \
-        docker.io \
-        docker-compose \
-        bc \
-        net-tools
+    # Install essential packages one by one to avoid failures
+    log_info "Installing curl, wget, git..."
+    apt-get install -y curl wget git
+    
+    log_info "Installing build tools..."
+    apt-get install -y build-essential python3 python3-pip
+    
+    log_info "Installing Docker if needed..."
+    if ! command -v docker >/dev/null 2>&1; then
+        apt-get install -y docker.io docker-compose
+    fi
+    
+    log_info "Installing utilities..."
+    apt-get install -y bc net-tools
     
     # Ensure Docker is running
-    sudo systemctl enable docker
-    sudo systemctl start docker
+    systemctl enable docker >/dev/null 2>&1 || true
+    systemctl start docker >/dev/null 2>&1 || true
     
     # Add current user to docker group
-    sudo usermod -aG docker $USER
+    usermod -aG docker ubuntu >/dev/null 2>&1 || true
     
     log_success "System dependencies installed"
 }
@@ -244,47 +250,60 @@ main() {
         exit 1
     fi
     
-    # Always check disk space first
+    # Check disk space and decide
     check_disk_space
     NEED_CLEANUP=$?
     
+    # Always perform cleanup when forced or when low space
     if [ $NEED_CLEANUP -eq 1 ] || [ "${1:-}" = "force" ]; then
         log_info "Performing full cleanup and setup..."
+        echo ""
         
         log_info "Step 1/7: Installing dependencies..."
         install_dependencies
+        echo ""
         
         log_info "Step 2/7: Cleaning system..."
         clean_system
+        echo ""
         
         log_info "Step 3/7: Cleaning Docker..."
         clean_docker
+        echo ""
         
         log_info "Step 4/7: Cleaning application files..."
         clean_app
+        echo ""
         
         log_info "Step 5/7: Cleaning npm cache..."
         clean_npm
+        echo ""
         
         log_info "Step 6/7: Setting up swap..."
         setup_swap
+        echo ""
         
         log_info "Step 7/7: Updating Node.js..."
         update_nodejs
+        echo ""
         
-        log_success "Cleanup and setup completed!"
+        log_success "✅ ALL CLEANUP STEPS COMPLETED!"
     else
         log_info "System looks healthy. Use '$0 force' to force cleanup."
-        install_dependencies  # Always ensure dependencies
-        update_nodejs  # Always check Node.js version
+        echo ""
+        
+        log_info "Ensuring basic dependencies..."
+        install_dependencies
+        update_nodejs
     fi
     
     echo ""
+    log_info "📊 Final system status:"
     show_status
     
     echo ""
-    log_success "EC2 is ready for deployment!"
-    log_info "Run: sudo ./deploy/ec2-deploy.sh deploy"
+    log_success "🚀 EC2 is ready for deployment!"
+    log_info "Next step: sudo ./deploy/ec2-deploy.sh deploy"
 }
 
 # Show usage
