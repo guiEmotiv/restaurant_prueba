@@ -284,9 +284,6 @@ show_application_info() {
     echo "  Backup:  ./deploy/ec2-deploy.sh backup"
     echo "  Clean:   ./deploy/ec2-deploy.sh clean"
     echo ""
-    echo "👥 Create Users:"
-    echo "  docker-compose -f docker-compose.ec2.yml exec web python manage.py create_restaurant_users"
-    echo ""
 }
 
 # Main script logic
