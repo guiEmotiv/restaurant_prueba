@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create data directory for SQLite and uploads
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data /app/data/logs /app/data/backups /app/data/media
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser

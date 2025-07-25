@@ -207,7 +207,11 @@ LOGGING = {
 }
 
 # Create logs directory
-os.makedirs(BASE_DIR / 'data' / 'logs', exist_ok=True)
+try:
+    os.makedirs(BASE_DIR / 'data' / 'logs', exist_ok=True)
+except PermissionError:
+    # In case of permission issues, use a fallback directory
+    LOGGING['handlers']['file']['filename'] = '/tmp/django.log'
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # API DOCUMENTATION
