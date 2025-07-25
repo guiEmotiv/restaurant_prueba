@@ -111,6 +111,29 @@ cd /opt/restaurant-web
 ./deploy/local-commands.sh restart   # Reiniciar
 ./deploy/local-commands.sh stop      # Parar
 ./deploy/local-commands.sh backup    # Crear backup
+
+# Comandos adicionales usando .env.ec2:
+./deploy/local-commands.sh info      # Mostrar configuración actual del sistema
+./deploy/local-commands.sh urls      # Mostrar URLs de acceso (usando EC2_PUBLIC_IP)
+./deploy/local-commands.sh test      # Probar conectividad a todos los endpoints
+```
+
+### **Comandos avanzados con .env.ec2**
+
+Los nuevos comandos `info`, `urls` y `test` aprovechan las variables configuradas en tu archivo `.env.ec2`:
+
+```bash
+# Ver configuración completa del sistema
+./deploy/local-commands.sh info
+# Muestra: DEBUG, ALLOWED_HOSTS, EC2_PUBLIC_IP, DOMAIN_NAME, etc.
+
+# Obtener URLs de acceso usando tu IP configurada
+./deploy/local-commands.sh urls
+# Muestra: Frontend, Backend API, Admin URLs usando EC2_PUBLIC_IP
+
+# Probar conectividad completa
+./deploy/local-commands.sh test
+# Prueba: Docker containers, localhost, IP pública, dominio (si está configurado)
 ```
 
 ## 📦 Arquitectura de Deployment
