@@ -197,7 +197,8 @@ deploy_on_ec2() {
     docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
     
     log_info "Collecting static files..."
-    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput
+    # Collectstatic without external volumes - all internal to container
+    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput --clear
     
     # Step 4: Health checks
     log_info "Checking application health..."

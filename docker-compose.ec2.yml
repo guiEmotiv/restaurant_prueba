@@ -9,7 +9,6 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
-      - static_volume:/app/staticfiles
       - ./.env.ec2:/app/.env.ec2:ro
     environment:
       - DJANGO_SETTINGS_MODULE=backend.settings_ec2
@@ -26,16 +25,12 @@ services:
       - "443:443"
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf
-      - static_volume:/var/www/static
       - ./frontend/dist:/var/www/html
     depends_on:
       - web
     restart: unless-stopped
     networks:
       - restaurant_network
-
-volumes:
-  static_volume:
 
 networks:
   restaurant_network:
