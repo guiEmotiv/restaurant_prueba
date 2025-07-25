@@ -74,6 +74,14 @@ class AWSIAMAuthenticator:
             'email': 'cajero2@restaurant.com',
             'allowed_views': ['payments', 'payment-history'],
             'allowed_api_endpoints': ['payments', 'orders']
+        },
+        'restaurant-cocinero-miguel': {
+            'role': 'cocinero',
+            'first_name': 'Miguel',
+            'last_name': 'Cocinero',
+            'email': 'cocinero@restaurant.com',
+            'allowed_views': ['kitchen', 'orders'],
+            'allowed_api_endpoints': ['orders', 'order-items', 'recipes', 'ingredients']
         }
     }
     
