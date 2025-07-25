@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, AlertTriangle, ChefHat, Flame } from 'lucide-react';
+import { Clock, AlertTriangle, ChefHat, Flame, Check } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -201,13 +201,27 @@ const Kitchen = () => {
                               />
                             </div>
 
+                            {/* Botón de entregar en superior izquierdo */}
+                            <button
+                              onClick={() => updateItemStatus(item.id, 'SERVED')}
+                              className={`
+                                absolute top-2 left-2 p-2 rounded-full transition-all duration-200 z-10
+                                ${
+                                  isOverdue ? 'bg-red-600 hover:bg-red-700 text-white' : 
+                                  isWarning ? 'bg-orange-600 hover:bg-orange-700 text-white' : 
+                                  'bg-green-600 hover:bg-green-700 text-white'
+                                }
+                                hover:shadow-lg transform hover:scale-110 active:scale-95
+                              `}
+                              title="Marcar como entregado"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+
                             {/* Contenido de la tarjeta */}
-                            <div className="p-3 space-y-2">
-                              {/* Primera línea: Zona - Mesa y orden */}
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-sm text-gray-900">
-                                  {item.order_zone} - Mesa {item.order_table}
-                                </span>
+                            <div className="p-3 pl-12 space-y-2">
+                              {/* Primera línea: Orden */}
+                              <div className="flex items-center justify-end">
                                 <span className="text-xs text-gray-500 font-medium">
                                   #{item.order_id}
                                 </span>
@@ -251,21 +265,12 @@ const Kitchen = () => {
                                 />
                               </div>
 
-                              {/* Botón de entregar */}
-                              <button
-                                onClick={() => updateItemStatus(item.id, 'SERVED')}
-                                className={`
-                                  w-full py-2 px-4 rounded-lg font-bold text-sm transition-all duration-200
-                                  ${
-                                    isOverdue ? 'bg-red-600 hover:bg-red-700 text-white' : 
-                                    isWarning ? 'bg-orange-600 hover:bg-orange-700 text-white' : 
-                                    'bg-green-600 hover:bg-green-700 text-white'
-                                  }
-                                  hover:shadow-lg transform hover:scale-105 active:scale-95
-                                `}
-                              >
-                                ✓ ENTREGAR
-                              </button>
+                              {/* Zona y mesa en el espacio del botón anterior */}
+                              <div className="bg-gray-100 py-2 px-3 rounded-lg text-center">
+                                <span className="font-bold text-sm text-gray-900">
+                                  {item.order_zone} - Mesa {item.order_table}
+                                </span>
+                              </div>
                             </div>
 
                             {/* Badge de urgencia */}
