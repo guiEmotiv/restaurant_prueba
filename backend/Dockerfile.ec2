@@ -28,7 +28,7 @@ COPY . .
 RUN adduser --disabled-password --gecos '' appuser
 
 # Create data directory for SQLite and uploads with correct ownership
-RUN mkdir -p /app/data /app/data/logs /app/data/backups /app/data/media
+RUN mkdir -p /app/data /app/data/logs /app/data/backups /app/data/media /app/staticfiles
 RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
