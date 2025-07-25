@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.db import transaction
-from config.models import Category, Unit, Zone, Table
+from config.models import Unit, Zone, Table
 from inventory.models import Group, Ingredient, Recipe, RecipeItem
 from operation.models import Order, OrderItem, Payment
 
@@ -43,7 +43,6 @@ class Command(BaseCommand):
         Table.objects.all().delete()
         Zone.objects.all().delete()
         Unit.objects.all().delete()
-        Category.objects.all().delete()
         
         # Keep superuser but clean other users
         User.objects.filter(is_superuser=False).delete()
@@ -59,25 +58,6 @@ class Command(BaseCommand):
             User.objects.create_superuser('admin', 'admin@restaurante.com', 'admin123')
             self.stdout.write(self.style.SUCCESS('👤 Created superuser: admin/admin123'))
         
-        # Create categories
-        self.stdout.write('📂 Creating categories...')
-        categories_data = [
-            'Carnes',
-            'Aves', 
-            'Pescados y Mariscos',
-            'Verduras',
-            'Frutas',
-            'Lácteos',
-            'Granos y Cereales',
-            'Condimentos y Especias',
-            'Bebidas',
-            'Aceites y Vinagres'
-        ]
-        
-        created_categories = {}
-        for name in categories_data:
-            category, _ = Category.objects.get_or_create(name=name)
-            created_categories[name] = category
         
         # Create units
         self.stdout.write('⚖️ Creating units...')
@@ -211,7 +191,6 @@ class Command(BaseCommand):
             ingredient, _ = Ingredient.objects.get_or_create(
                 name=name,
                 defaults={
-                    'category': created_categories[category_name],
                     'unit': created_units[unit_name],
                     'unit_price': price,
                     'current_stock': stock,

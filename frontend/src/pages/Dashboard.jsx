@@ -44,11 +44,10 @@ const Dashboard = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [lowStockIngredients, setLowStockIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState('today');
 
   useEffect(() => {
     loadDashboardData();
-  }, [selectedPeriod]);
+  }, []);
 
   const loadDashboardData = async () => {
     try {
@@ -176,24 +175,6 @@ const Dashboard = () => {
       const hourlyOrders = generateHourlyOrders(todaysOrders);
       const topTables = generateTopTables(allOrdersList, tables);
 
-      // Datos de prueba para verificar que el renderizado funciona
-      const testRecipeGroups = [
-        {
-          category: "Entradas",
-          totalCount: 8,
-          recipes: [
-            { name: "Ensalada César", count: 8 }
-          ]
-        },
-        {
-          category: "Platos Principales", 
-          totalCount: 11,
-          recipes: [
-            { name: "Hamburguesa Clásica", count: 9 },
-            { name: "Pescado al Vapor", count: 2 }
-          ]
-        }
-      ];
 
       setStats({
         totalOrders: allOrdersList.length,
@@ -204,7 +185,7 @@ const Dashboard = () => {
         todayOrders: todaysOrders.length,
         averageOrderValue,
         avgServiceTime: calculateAvgServiceTime(validOrders),
-        recipeGroups: recipeGroups.length > 0 ? recipeGroups : testRecipeGroups,
+        recipeGroups: recipeGroups,
         revenueGrowth,
         tableOccupancy: calculateTableOccupancy(activeOrders, tables),
         weeklyRevenue,
@@ -363,20 +344,6 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard Administrativo</h1>
           <p className="text-gray-600">Indicadores clave y métricas de rendimiento</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <select 
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="today">Hoy</option>
-            <option value="week">Esta semana</option>
-            <option value="month">Este mes</option>
-          </select>
-          <div className="text-sm text-gray-500">
-            Actualizado: {new Date().toLocaleTimeString('es-PE')}
-          </div>
         </div>
       </div>
 

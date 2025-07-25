@@ -11,7 +11,7 @@ from decimal import Decimal
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
-from config.models import Category, Unit, Zone, Table
+from config.models import Unit, Zone, Table
 from inventory.models import Ingredient, Recipe, RecipeItem
 from operation.models import Order, OrderItem
 
@@ -26,17 +26,7 @@ def create_sample_data():
     Table.objects.all().delete()
     Zone.objects.all().delete()
     Unit.objects.all().delete()
-    Category.objects.all().delete()
     
-    # Crear categorías
-    categories = [
-        Category.objects.create(name="Verduras"),
-        Category.objects.create(name="Proteínas"),
-        Category.objects.create(name="Lácteos"),
-        Category.objects.create(name="Condimentos"),
-        Category.objects.create(name="Bebidas"),
-    ]
-    print(f"✅ Creadas {len(categories)} categorías")
     
     # Crear unidades
     units = [
@@ -71,26 +61,25 @@ def create_sample_data():
     
     # Crear ingredientes
     ingredients_data = [
-        ("Tomate", categories[0], units[0], "4.50", "15.00"),
-        ("Cebolla", categories[0], units[0], "3.20", "12.00"),
-        ("Lechuga", categories[0], units[0], "2.80", "8.00"),
-        ("Pimiento", categories[0], units[0], "5.00", "6.00"),
-        ("Pollo", categories[1], units[0], "18.00", "10.00"),
-        ("Carne de Res", categories[1], units[0], "25.00", "8.00"),
-        ("Pescado", categories[1], units[0], "22.00", "5.00"),
-        ("Queso", categories[2], units[0], "15.00", "3.00"),
-        ("Leche", categories[2], units[1], "4.00", "10.00"),
-        ("Sal", categories[3], units[3], "0.05", "1000.00"),
-        ("Pimienta", categories[3], units[3], "0.15", "500.00"),
-        ("Aceite", categories[3], units[1], "8.00", "5.00"),
-        ("Coca Cola", categories[4], units[2], "2.50", "50.00"),
-        ("Agua", categories[4], units[2], "1.50", "100.00"),
+        ("Tomate", units[0], "4.50", "15.00"),
+        ("Cebolla", units[0], "3.20", "12.00"),
+        ("Lechuga", units[0], "2.80", "8.00"),
+        ("Pimiento", units[0], "5.00", "6.00"),
+        ("Pollo", units[0], "18.00", "10.00"),
+        ("Carne de Res", units[0], "25.00", "8.00"),
+        ("Pescado", units[0], "22.00", "5.00"),
+        ("Queso", units[0], "15.00", "3.00"),
+        ("Leche", units[1], "4.00", "10.00"),
+        ("Sal", units[3], "0.05", "1000.00"),
+        ("Pimienta", units[3], "0.15", "500.00"),
+        ("Aceite", units[1], "8.00", "5.00"),
+        ("Coca Cola", units[2], "2.50", "50.00"),
+        ("Agua", units[2], "1.50", "100.00"),
     ]
     
     ingredients = []
-    for name, category, unit, price, stock in ingredients_data:
+    for name, unit, price, stock in ingredients_data:
         ingredient = Ingredient.objects.create(
-            category=category,
             unit=unit,
             name=name,
             unit_price=Decimal(price),
