@@ -42,14 +42,25 @@ echo "  • Reset auto-increment counters"
 echo "  • Preserve database structure (tables, indexes, etc.)"
 echo ""
 
+# Detectar comando Python disponible
+PYTHON_CMD="python"
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON_CMD="python3"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_CMD="python"
+else
+    echo -e "${RED}❌ Error: Neither python nor python3 found${NC}"
+    exit 1
+fi
+
 # Ejecutar el comando de Django con los argumentos pasados
 echo -e "${GREEN}🚀 Running database cleanup...${NC}"
-python manage.py clean_database "$@"
+$PYTHON_CMD manage.py clean_database "$@"
 
 echo ""
 echo -e "${GREEN}✅ Cleanup completed!${NC}"
 echo ""
 echo -e "${BLUE}Next steps:${NC}"
-echo "  • Run: python manage.py populate_test_data (to add sample data)"
+echo "  • Run: $PYTHON_CMD manage.py populate_test_data (to add sample data)"
 echo "  • Or start fresh with your own data"
 echo ""
