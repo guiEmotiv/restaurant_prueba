@@ -40,6 +40,17 @@ const Kitchen = () => {
     }
   };
 
+  const updateItemNotes = async (itemId, notes) => {
+    try {
+      await apiService.orderItems.updateNotes(itemId, notes);
+      await loadKitchenBoard();
+    } catch (error) {
+      console.error('Error updating item notes:', error);
+      const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
+      showError('Error al actualizar las notas: ' + errorMessage);
+    }
+  };
+
   const formatTime = (minutes) => {
     if (minutes < 60) {
       return `${minutes}m`;
@@ -172,15 +183,14 @@ const Kitchen = () => {
                         const isWarning = timeStatus.status === 'warning';
                         
                         return (
-                          <button
+                          <div
                             key={item.id}
-                            onClick={() => updateItemStatus(item.id, 'SERVED')}
                             className={`
-                              relative flex-shrink-0 w-40 p-3 rounded-lg border-2 transition-all duration-200
-                              ${isOverdue ? 'border-red-300 bg-red-50 hover:bg-red-100 shadow-red-200' : 
-                                isWarning ? 'border-orange-300 bg-orange-50 hover:bg-orange-100 shadow-orange-200' : 
-                                'border-gray-300 bg-white hover:bg-blue-50 hover:border-blue-300'}
-                              hover:shadow-lg transform hover:scale-105 cursor-pointer
+                              relative flex-shrink-0 w-52 rounded-lg border-2 transition-all duration-200
+                              ${isOverdue ? 'border-red-300 bg-red-50 shadow-red-200' : 
+                                isWarning ? 'border-orange-300 bg-orange-50 shadow-orange-200' : 
+                                'border-gray-300 bg-white'}
+                              shadow-lg
                             `}
                           >
                             {/* Barra de progreso de tiempo */}
@@ -191,24 +201,19 @@ const Kitchen = () => {
                               />
                             </div>
 
-                            {/* Contenido del botón */}
-                            <div className="space-y-1.5">
-                              {/* Primera línea: Mesa y orden */}
+                            {/* Contenido de la tarjeta */}
+                            <div className="p-3 space-y-2">
+                              {/* Primera línea: Zona - Mesa y orden */}
                               <div className="flex items-center justify-between">
                                 <span className="font-bold text-sm text-gray-900">
-                                  Mesa {item.order_table}
+                                  {item.order_zone} - Mesa {item.order_table}
                                 </span>
                                 <span className="text-xs text-gray-500 font-medium">
                                   #{item.order_id}
                                 </span>
                               </div>
 
-                              {/* Segunda línea: Zona */}
-                              <div className="text-xs text-gray-600 text-center bg-gray-50 py-1 rounded">
-                                {item.order_zone}
-                              </div>
-
-                              {/* Tercera línea: Tiempo */}
+                              {/* Segunda línea: Tiempo */}
                               <div className={`text-xs font-bold text-center py-1 rounded ${
                                 isOverdue ? 'bg-red-100 text-red-700' : 
                                 isWarning ? 'bg-orange-100 text-orange-700' : 
@@ -217,19 +222,50 @@ const Kitchen = () => {
                                 {formatTime(item.elapsed_time_minutes)}
                               </div>
 
-                              {/* Cuarta línea: Personalizaciones */}
+                              {/* Tercera línea: Personalizaciones */}
                               {item.customizations_count > 0 && (
                                 <div className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded text-center font-medium">
                                   +{item.customizations_count} extra{item.customizations_count > 1 ? 's' : ''}
                                 </div>
                               )}
 
-                              {/* Última línea: Notas (si existen) */}
-                              {item.notes && (
-                                <div className="text-xs text-gray-700 bg-yellow-100 px-2 py-1 rounded border border-yellow-300 mt-2">
-                                  {item.notes}
-                                </div>
-                              )}
+                              {/* Campo de notas (siempre presente) */}
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-gray-600">Notas:</label>
+                                <textarea
+                                  className="w-full text-xs p-2 border border-gray-300 rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  rows={2}
+                                  placeholder="Agregar notas de cocina..."
+                                  defaultValue={item.notes || ''}
+                                  onBlur={(e) => {
+                                    const newNotes = e.target.value.trim();
+                                    if (newNotes !== (item.notes || '')) {
+                                      updateItemNotes(item.id, newNotes);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && e.ctrlKey) {
+                                      e.target.blur();
+                                    }
+                                  }}
+                                />
+                              </div>
+
+                              {/* Botón de entregar */}
+                              <button
+                                onClick={() => updateItemStatus(item.id, 'SERVED')}
+                                className={`
+                                  w-full py-2 px-4 rounded-lg font-bold text-sm transition-all duration-200
+                                  ${
+                                    isOverdue ? 'bg-red-600 hover:bg-red-700 text-white' : 
+                                    isWarning ? 'bg-orange-600 hover:bg-orange-700 text-white' : 
+                                    'bg-green-600 hover:bg-green-700 text-white'
+                                  }
+                                  hover:shadow-lg transform hover:scale-105 active:scale-95
+                                `}
+                              >
+                                ✓ ENTREGAR
+                              </button>
                             </div>
 
                             {/* Badge de urgencia */}
@@ -240,7 +276,7 @@ const Kitchen = () => {
                                 </div>
                               </div>
                             )}
-                          </button>
+                          </div>
                         );
                       })}
                     </div>

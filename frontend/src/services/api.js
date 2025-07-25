@@ -249,6 +249,10 @@ export const apiService = {
       const response = await api.post(`/order-items/${id}/update_status/`, { status });
       return response.data;
     },
+    updateNotes: async (id, notes) => {
+      const response = await api.patch(`/order-items/${id}/`, { notes });
+      return response.data;
+    },
     addIngredient: async (id, ingredient, quantity) => {
       const response = await api.post(`/order-items/${id}/add_ingredient/`, { ingredient, quantity });
       return response.data;
