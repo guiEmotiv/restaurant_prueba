@@ -99,14 +99,20 @@ deploy_on_ec2() {
     log_info "Deploying locally on EC2..."
     
     # Step 0: Check disk space and clean if needed
-    AVAILABLE_SPACE=$(df / | tail -1 | awk '{print $4}' | sed 's/[^0-9]//g')
-    if [ "$AVAILABLE_SPACE" -lt 1000000 ]; then  # Less than 1GB
-        log_warning "Low disk space detected. Running cleanup..."
+    AVAILABLE_KB=$(df / | tail -1 | awk '{print $4}')
+    AVAILABLE_MB=$((AVAILABLE_KB / 1024))
+    
+    log_info "Available disk space: ${AVAILABLE_MB}MB"
+    
+    if [ "$AVAILABLE_MB" -lt 1024 ]; then  # Less than 1GB
+        log_warning "Low disk space detected (${AVAILABLE_MB}MB). Running cleanup..."
         if [ -f "./deploy/ec2-cleanup.sh" ]; then
-            ./deploy/ec2-cleanup.sh force
+            sudo ./deploy/ec2-cleanup.sh force
         else
             log_warning "Cleanup script not found, continuing..."
         fi
+    else
+        log_success "Sufficient disk space (${AVAILABLE_MB}MB)"
     fi
     
     # Step 1: Verify .env.ec2 configuration

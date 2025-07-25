@@ -36,15 +36,18 @@ check_disk_space() {
     df -h /
     echo ""
     
-    # Get available space in KB and convert to GB
+    # Get available space and convert to MB for better precision
     AVAILABLE_KB=$(df / | tail -1 | awk '{print $4}')
-    AVAILABLE_GB=$((AVAILABLE_KB / 1024 / 1024))
+    AVAILABLE_MB=$((AVAILABLE_KB / 1024))
+    AVAILABLE_GB=$((AVAILABLE_MB / 1024))
     
-    if [ "$AVAILABLE_GB" -lt 2 ]; then
-        log_warning "Low disk space detected (${AVAILABLE_GB}GB available). Running cleanup..."
+    log_info "Available space: ${AVAILABLE_MB}MB (${AVAILABLE_GB}GB)"
+    
+    if [ "$AVAILABLE_MB" -lt 1024 ]; then  # Less than 1GB
+        log_warning "Low disk space detected (${AVAILABLE_MB}MB available). Running cleanup..."
         return 1
     else
-        log_success "Sufficient disk space available (${AVAILABLE_GB}GB)"
+        log_success "Sufficient disk space available (${AVAILABLE_MB}MB)"
         return 0
     fi
 }
@@ -248,12 +251,25 @@ main() {
     if [ $NEED_CLEANUP -eq 1 ] || [ "${1:-}" = "force" ]; then
         log_info "Performing full cleanup and setup..."
         
+        log_info "Step 1/7: Installing dependencies..."
         install_dependencies
+        
+        log_info "Step 2/7: Cleaning system..."
         clean_system
+        
+        log_info "Step 3/7: Cleaning Docker..."
         clean_docker
+        
+        log_info "Step 4/7: Cleaning application files..."
         clean_app
+        
+        log_info "Step 5/7: Cleaning npm cache..."
         clean_npm
+        
+        log_info "Step 6/7: Setting up swap..."
         setup_swap
+        
+        log_info "Step 7/7: Updating Node.js..."
         update_nodejs
         
         log_success "Cleanup and setup completed!"
