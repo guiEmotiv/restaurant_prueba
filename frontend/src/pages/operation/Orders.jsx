@@ -53,7 +53,7 @@ const Orders = () => {
       setOrders(ordersWithItems);
     } catch (error) {
       console.error('Error loading orders:', error);
-      showError('Error al cargar las órdenes');
+      showError('Error al cargar los pedidos');
     } finally {
       setLoading(false);
     }
@@ -85,7 +85,7 @@ const Orders = () => {
     } catch (error) {
       console.error('Error updating order status:', error);
       const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
-      showError('Error al actualizar el estado de la orden: ' + errorMessage);
+      showError('Error al actualizar el estado del pedido: ' + errorMessage);
     }
   };
 
@@ -102,19 +102,19 @@ const Orders = () => {
   const handleDelete = async (order) => {
     // Verificar si se puede eliminar
     if (!canDeleteOrder(order)) {
-      showError('No se puede eliminar esta orden porque tiene items que ya fueron entregados');
+      showError('No se puede eliminar este pedido porque tiene items que ya fueron entregados');
       return;
     }
 
-    if (window.confirm('¿Estás seguro de que deseas eliminar esta orden?')) {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este pedido?')) {
       try {
         await apiService.orders.delete(order.id);
         await loadOrders();
-        showSuccess('Orden eliminada exitosamente');
+        showSuccess('Pedido eliminado exitosamente');
       } catch (error) {
         console.error('Error deleting order:', error);
         const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
-        showError('Error al eliminar la orden: ' + errorMessage);
+        showError('Error al eliminar el pedido: ' + errorMessage);
       }
     }
   };
@@ -187,12 +187,12 @@ const Orders = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Órdenes</h1>
-          <p className="text-sm md:text-base text-gray-600">Gestiona las órdenes del restaurante</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Pedidos</h1>
+          <p className="text-sm md:text-base text-gray-600">Gestiona los pedidos del restaurante</p>
         </div>
         <Button onClick={handleAdd} className="flex items-center gap-2 w-full sm:w-auto justify-center">
           <Plus className="h-4 w-4" />
-          Nueva Orden
+          Nuevo Pedido
         </Button>
       </div>
 
@@ -224,7 +224,7 @@ const Orders = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Orden
+                  Pedido
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Mesa
@@ -250,7 +250,7 @@ const Orders = () => {
               {filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                    {`No hay órdenes ${getStatusText(filter).toLowerCase()}`}
+                    {`No hay pedidos ${getStatusText(filter).toLowerCase()}`}
                   </td>
                 </tr>
               ) : (
@@ -258,7 +258,7 @@ const Orders = () => {
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="text-sm font-medium text-gray-900">
-                        Orden #{order.id}
+                        Pedido #{order.id}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -287,7 +287,7 @@ const Orders = () => {
                         <button
                           onClick={() => handleEdit(order)}
                           className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                          title="Editar orden"
+                          title="Editar pedido"
                         >
                           <Edit className="h-4 w-4" />
                         </button>
@@ -306,7 +306,7 @@ const Orders = () => {
                           <button
                             onClick={() => handleDelete(order)}
                             className="text-red-600 hover:text-red-900 p-1 rounded"
-                            title="Eliminar orden"
+                            title="Eliminar pedido"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -325,8 +325,8 @@ const Orders = () => {
           {filteredOrders.length === 0 ? (
             <div className="p-6 text-center text-gray-500">
               <div className="text-4xl mb-2">🍽️</div>
-              <p className="text-lg font-medium">{`No hay órdenes ${getStatusText(filter).toLowerCase()}`}</p>
-              <p className="text-sm">Las nuevas órdenes aparecerán aquí</p>
+              <p className="text-lg font-medium">{`No hay pedidos ${getStatusText(filter).toLowerCase()}`}</p>
+              <p className="text-sm">Los nuevos pedidos aparecerán aquí</p>
             </div>
           ) : (
             <div className="space-y-3 p-4">
@@ -336,7 +336,7 @@ const Orders = () => {
                     {/* Order header */}
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">Orden #{order.id}</h3>
+                        <h3 className="text-lg font-bold text-gray-900">Pedido #{order.id}</h3>
                         <p className="text-sm text-gray-600">Mesa {order.table_number || order.table}</p>
                       </div>
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>

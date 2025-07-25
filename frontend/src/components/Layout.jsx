@@ -43,7 +43,7 @@ const Layout = ({ children }) => {
         { name: 'Recetas', href: '/recipes', icon: ChefHat },
       ]
     },
-    { name: 'Órdenes', href: '/orders', icon: ShoppingCart },
+    { name: 'Pedidos', href: '/orders', icon: ShoppingCart },
     { name: 'Cocina', href: '/kitchen', icon: Utensils },
     { name: 'Pagos', href: '/payments', icon: CreditCard },
     { name: 'Historial', href: '/payment-history', icon: History },

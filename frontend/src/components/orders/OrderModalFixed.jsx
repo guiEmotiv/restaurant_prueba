@@ -62,8 +62,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
     let filtered;
     if (!selectedGroupFilter) {
       filtered = availableRecipes;
-    } else if (selectedGroupFilter === 'null') {
-      filtered = availableRecipes.filter(recipe => !recipe.group || recipe.group === null);
     } else {
       filtered = availableRecipes.filter(recipe => recipe.group === parseInt(selectedGroupFilter));
     }
@@ -75,7 +73,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   // Obtener el nombre del grupo seleccionado
   const getSelectedGroupName = () => {
     if (!selectedGroupFilter) return 'Todos los grupos';
-    if (selectedGroupFilter === 'null') return 'Sin grupo';
     const group = availableGroups.find(g => g.id === parseInt(selectedGroupFilter));
     return group ? group.name : 'Grupo desconocido';
   };
@@ -281,12 +278,12 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       
       let savedOrder;
       if (order?.id) {
-        // Actualizar orden existente - table requerido por serializer (UI deshabilitada)
+        // Actualizar pedido existente - table requerido por serializer (UI deshabilitada)
         const orderData = {
           table: parseInt(formData.table),
           status: formData.status
         };
-        console.log('Actualizando orden:', orderData);
+        console.log('Actualizando pedido:', orderData);
         savedOrder = await apiService.orders.update(order.id, orderData);
         console.log('Order updated successfully');
         
@@ -338,7 +335,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           console.log('No new items to create');
         }
       } else {
-        // Crear nueva orden con items incluidos según OrderCreateSerializer
+        // Crear nuevo pedido con items incluidos según OrderCreateSerializer
         console.log('=== PROCESSING ITEMS FOR NEW ORDER ===');
         console.log('Raw validItems:', JSON.stringify(validItems, null, 2));
         
@@ -427,7 +424,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       
       onSave();
       onClose();
-      showSuccess(order ? 'Orden actualizada exitosamente' : 'Orden creada exitosamente');
+      showSuccess(order ? 'Pedido actualizado exitosamente' : 'Pedido creado exitosamente');
     } catch (error) {
       console.error('=== ERROR SAVING ORDER ===');
       console.error('Full error object:', error);
@@ -495,7 +492,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                   // Check if all errors are about stock
                   const allStockErrors = itemErrors.every(err => err.includes('stock') || err.includes('Stock'));
                   if (allStockErrors) {
-                    errors.push(`⚠️ No hay suficiente stock en inventario para completar esta orden.\n${itemErrors.join('\n')}`);
+                    errors.push(`⚠️ No hay suficiente stock en inventario para completar este pedido.\n${itemErrors.join('\n')}`);
                   } else {
                     errors.push(`Problemas con items:\n${itemErrors.join('\n')}`);
                   }
@@ -534,7 +531,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         errorMessage = error.message;
       }
       
-      showError('Error al guardar la orden: ' + errorMessage);
+      showError('Error al guardar el pedido: ' + errorMessage);
       console.error('Final error message shown to user:', errorMessage);
     } finally {
       setLoading(false);
@@ -557,7 +554,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-              {order ? `Editar Orden #${order.id}` : 'Nueva Orden'}
+              {order ? `Editar Pedido #${order.id}` : 'Nuevo Pedido'}
             </h2>
           </div>
           <button
@@ -631,7 +628,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                       {group.name} ({availableRecipes.filter(r => r.group === group.id).length})
                     </option>
                   ))}
-                  <option value="null">Sin grupo ({availableRecipes.filter(r => !r.group).length})</option>
                 </select>
                 
                 {/* Action Buttons */}
@@ -651,7 +647,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                     onClick={handleSave}
                     disabled={loading}
                     className="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={loading ? "Guardando..." : "Guardar orden"}
+                    title={loading ? "Guardando..." : "Guardar pedido"}
                   >
                     {loading ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
