@@ -36,12 +36,15 @@ check_disk_space() {
     df -h /
     echo ""
     
-    AVAILABLE=$(df / | tail -1 | awk '{print $4}' | sed 's/G//')
-    if [ $(echo "$AVAILABLE < 2" | bc -l 2>/dev/null || echo "1") -eq 1 ]; then
-        log_warning "Low disk space detected. Running cleanup..."
+    # Get available space in KB and convert to GB
+    AVAILABLE_KB=$(df / | tail -1 | awk '{print $4}')
+    AVAILABLE_GB=$((AVAILABLE_KB / 1024 / 1024))
+    
+    if [ "$AVAILABLE_GB" -lt 2 ]; then
+        log_warning "Low disk space detected (${AVAILABLE_GB}GB available). Running cleanup..."
         return 1
     else
-        log_success "Sufficient disk space available"
+        log_success "Sufficient disk space available (${AVAILABLE_GB}GB)"
         return 0
     fi
 }
@@ -96,7 +99,7 @@ update_nodejs() {
         log_warning "Node.js version $CURRENT_NODE detected. Updating to Node.js 18..."
         
         # Remove old Node.js
-        sudo apt-get remove -y nodejs npm
+        sudo apt-get remove -y nodejs npm 2>/dev/null || true
         
         # Install Node.js 18 LTS
         curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
@@ -110,6 +113,36 @@ update_nodejs() {
     else
         log_success "Node.js version $(node --version) is adequate"
     fi
+}
+
+# Ensure all required system dependencies
+install_dependencies() {
+    log_info "Installing required system dependencies..."
+    
+    # Update package lists
+    sudo apt-get update
+    
+    # Install essential packages
+    sudo apt-get install -y \
+        curl \
+        wget \
+        git \
+        build-essential \
+        python3 \
+        python3-pip \
+        docker.io \
+        docker-compose \
+        bc \
+        net-tools
+    
+    # Ensure Docker is running
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    
+    # Add current user to docker group
+    sudo usermod -aG docker $USER
+    
+    log_success "System dependencies installed"
 }
 
 # Clean npm cache
@@ -213,8 +246,9 @@ main() {
     NEED_CLEANUP=$?
     
     if [ $NEED_CLEANUP -eq 1 ] || [ "${1:-}" = "force" ]; then
-        log_info "Performing full cleanup..."
+        log_info "Performing full cleanup and setup..."
         
+        install_dependencies
         clean_system
         clean_docker
         clean_app
@@ -222,9 +256,10 @@ main() {
         setup_swap
         update_nodejs
         
-        log_success "Cleanup completed!"
+        log_success "Cleanup and setup completed!"
     else
         log_info "System looks healthy. Use '$0 force' to force cleanup."
+        install_dependencies  # Always ensure dependencies
         update_nodejs  # Always check Node.js version
     fi
     

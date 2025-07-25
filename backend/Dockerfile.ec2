@@ -24,12 +24,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 COPY . .
 
-# Create data directory for SQLite and uploads
-RUN mkdir -p /app/data /app/data/logs /app/data/backups /app/data/media
-
-# Create non-root user
+# Create non-root user first
 RUN adduser --disabled-password --gecos '' appuser
+
+# Create data directory for SQLite and uploads with correct ownership
+RUN mkdir -p /app/data /app/data/logs /app/data/backups /app/data/media
 RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
 USER appuser
 
 # Expose port

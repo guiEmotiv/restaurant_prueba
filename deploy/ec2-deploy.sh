@@ -166,7 +166,16 @@ deploy_on_ec2() {
         exit 1
     fi
     
-    # Step 3: Deploy containers
+    # Step 3: Prepare data directory
+    log_info "Preparing data directories..."
+    
+    # Create data directory structure if it doesn't exist
+    mkdir -p data/logs data/backups data/media
+    
+    # Ensure proper ownership (1000:1000 is typically the appuser UID:GID in Docker)
+    sudo chown -R 1000:1000 data/ 2>/dev/null || true
+    
+    # Step 4: Deploy containers
     log_info "Deploying Docker containers..."
     
     log_info "Stopping existing containers..."
