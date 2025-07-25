@@ -10,12 +10,11 @@ services:
     volumes:
       - ./data:/app/data
       - static_volume:/app/staticfiles
+      - ./.env.ec2:/app/.env.ec2:ro
     environment:
       - DJANGO_SETTINGS_MODULE=backend.settings_ec2
-      - DEBUG=0
-      - ALLOWED_HOSTS=*
-    depends_on:
-      - nginx
+    env_file:
+      - .env.ec2
     restart: unless-stopped
     networks:
       - restaurant_network

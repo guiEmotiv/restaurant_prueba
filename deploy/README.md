@@ -35,7 +35,30 @@ sudo mkdir -p /opt/restaurant-web
 sudo chown ubuntu:ubuntu /opt/restaurant-web
 ```
 
-### 2. Configurar variables de entorno
+### 2. Configurar archivo .env.ec2
+
+**IMPORTANTE**: El sistema ahora usa un archivo `.env.ec2` en tu EC2 para las configuraciones.
+
+```bash
+# 1. Copiar template desde tu máquina local
+scp .env.ec2.example ubuntu@your-ec2-ip:/opt/restaurant-web/.env.ec2
+
+# 2. Editar configuración en EC2
+ssh ubuntu@your-ec2-ip
+nano /opt/restaurant-web/.env.ec2
+```
+
+**Configuración mínima requerida en .env.ec2:**
+```bash
+DJANGO_SECRET_KEY=tu-clave-secreta-muy-segura
+DEBUG=False
+ALLOWED_HOSTS=tu-dominio.com,tu-ip-ec2
+EC2_PUBLIC_IP=tu-ip-ec2-publica
+TIME_ZONE=America/Lima
+LANGUAGE_CODE=es-pe
+```
+
+### 3. Configurar variables locales
 
 ```bash
 # En tu máquina local, exportar la IP de EC2
@@ -101,10 +124,11 @@ EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh backup
 
 ### Persistencia de datos:
 
-- Base de datos SQLite: `/opt/restaurant-web/data/restaurant.sqlite3`
-- Archivos media: `/opt/restaurant-web/data/media/`
-- Logs: `/opt/restaurant-web/data/logs/`
-- Backups: `/opt/restaurant-web/data/backups/`
+- **Base de datos SQLite**: `/opt/restaurant-web/data/restaurant.sqlite3`
+- **Archivos media**: `/opt/restaurant-web/data/media/`
+- **Logs**: `/opt/restaurant-web/data/logs/`
+- **Backups**: `/opt/restaurant-web/data/backups/`
+- **Configuración**: `/opt/restaurant-web/.env.ec2` (mantenido entre deployments)
 
 ## 🌐 Acceso
 
@@ -126,6 +150,15 @@ Para uso en producción, considera:
 - Configurar firewall apropiado
 
 ## 🔍 Troubleshooting
+
+### Problemas con .env.ec2:
+```bash
+# Verificar que existe el archivo
+ssh ubuntu@your-ec2-ip "ls -la /opt/restaurant-web/.env.ec2"
+
+# Ver contenido (sin mostrar valores secretos)
+ssh ubuntu@your-ec2-ip "grep -E '^[A-Z_]+=' /opt/restaurant-web/.env.ec2 | sed 's/=.*/=***/' "
+```
 
 ### Verificar estado de contenedores:
 ```bash
@@ -152,6 +185,14 @@ docker-compose -f docker-compose.ec2.yml restart
 ```bash
 # Desde tu máquina local
 curl http://your-ec2-ip/api/v1/categories/
+```
+
+### Error común: ".env.ec2 file not found"
+```bash
+# Crear archivo desde template
+scp .env.ec2.example ubuntu@your-ec2-ip:/opt/restaurant-web/.env.ec2
+ssh ubuntu@your-ec2-ip
+nano /opt/restaurant-web/.env.ec2  # Editar configuración
 ```
 
 ## 📊 Monitoreo

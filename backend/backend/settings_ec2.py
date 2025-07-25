@@ -4,16 +4,25 @@ Simplified configuration without authentication
 """
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env.ec2 file
+env_file = BASE_DIR.parent / '.env.ec2'
+if env_file.exists():
+    load_dotenv(env_file)
+    print(f"✅ Loaded environment from {env_file}")
+else:
+    print(f"⚠️  .env.ec2 file not found at {env_file}, using system environment variables")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SECURITY SETTINGS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'your-production-secret-key-change-this')
-DEBUG = False
-ALLOWED_HOSTS = ['*']  # Configure with your specific domain/IP
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # APPLICATIONS

@@ -59,7 +59,29 @@ check_ec2_host() {
 deploy() {
     log_info "Starting deployment to $EC2_HOST..."
     
-    # Step 1: Upload files
+    # Step 1: Check if .env.ec2 exists on remote
+    log_info "Checking .env.ec2 configuration..."
+    ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
+        if [ ! -f /opt/restaurant-web/.env.ec2 ]; then
+            echo "❌ ERROR: .env.ec2 file not found in /opt/restaurant-web/"
+            echo "Please create your .env.ec2 file with the required environment variables"
+            echo "Example variables needed:"
+            echo "  DJANGO_SECRET_KEY=your-secret-key"
+            echo "  DEBUG=False"
+            echo "  ALLOWED_HOSTS=your-domain.com,your-ec2-ip"
+            echo "  EC2_PUBLIC_IP=your-ec2-ip"
+            exit 1
+        else
+            echo "✅ .env.ec2 configuration found"
+        fi
+ENDSSH
+    
+    if [ $? -ne 0 ]; then
+        log_error "Deployment aborted. Please configure .env.ec2 file on EC2 first."
+        exit 1
+    fi
+    
+    # Step 2: Upload files (preserve .env.ec2)
     log_info "Uploading application files..."
     rsync -avz --delete \
         --exclude='.git' \
@@ -68,12 +90,22 @@ deploy() {
         --exclude='backend/__pycache__' \
         --exclude='frontend/dist' \
         --exclude='data/' \
+        --exclude='.env.ec2' \
         ./ $DEPLOY_USER@$EC2_HOST:$APP_DIR/
     
-    # Step 2: Deploy via SSH
+    # Step 3: Deploy via SSH
     ssh $DEPLOY_USER@$EC2_HOST << 'ENDSSH'
         set -e
         cd /opt/restaurant-web
+        
+        echo "📋 Checking .env.ec2 configuration..."
+        if [ -f .env.ec2 ]; then
+            echo "✅ Using .env.ec2 configuration:"
+            echo "$(grep -E '^[A-Z_]+=.*' .env.ec2 | sed 's/=.*/=***/' | head -5)"
+        else
+            echo "❌ .env.ec2 file missing!"
+            exit 1
+        fi
         
         echo "🐳 Building and starting containers..."
         docker-compose -f docker-compose.ec2.yml down || true
