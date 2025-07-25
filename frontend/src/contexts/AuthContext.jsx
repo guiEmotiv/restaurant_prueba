@@ -46,26 +46,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (accessKey, secretKey) => {
+  const login = async (username, password) => {
     try {
-      // For AWS IAM authentication, send access key as username and secret key as password
-      const response = await apiService.auth.login(accessKey, secretKey);
+      const response = await apiService.auth.login(username, password);
       const { token, user: userData, message } = response;
 
-      // Store AWS token
+      // Store token
       localStorage.setItem('authToken', token);
       apiService.setAuthToken(token);
 
-      // Update state with AWS IAM user data
+      // Update state
       setUser(userData);
       setIsAuthenticated(true);
 
       return { success: true, message, user: userData };
     } catch (error) {
-      console.error('AWS IAM Login failed:', error);
+      console.error('Login failed:', error);
       return { 
         success: false, 
-        message: error.response?.data?.message || 'Error de autenticación con AWS IAM' 
+        message: error.response?.data?.message || 'Error de autenticación' 
       };
     }
   };

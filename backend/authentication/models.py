@@ -9,6 +9,7 @@ class RestaurantUser(AbstractUser):
         ('admin', 'Administrador'),
         ('mesero', 'Mesero'),
         ('cajero', 'Cajero'),
+        ('cocinero', 'Cocinero'),
     ]
     
     role = models.CharField(
@@ -54,7 +55,8 @@ class RestaurantUser(AbstractUser):
                 'payments', 'payment-history'
             ],
             'mesero': ['orders', 'kitchen'],
-            'cajero': ['payments', 'payment-history']
+            'cajero': ['payments', 'payment-history'],
+            'cocinero': ['kitchen', 'orders']
         }
         return view_permissions.get(self.role, [])
     
@@ -69,6 +71,9 @@ class RestaurantUser(AbstractUser):
             ],
             'cajero': [
                 'payments', 'orders'  # Solo lectura para órdenes, escritura para pagos
+            ],
+            'cocinero': [
+                'orders', 'order-items', 'recipes', 'ingredients'  # Para gestionar cocina
             ]
         }
         return api_permissions.get(self.role, [])
