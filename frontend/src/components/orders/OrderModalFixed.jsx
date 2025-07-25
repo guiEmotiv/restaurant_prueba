@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Plus, Minus, Save, Trash2, ShoppingCart } from 'lucide-react';
 import Button from '../common/Button';
 import { apiService } from '../../services/api';
@@ -6,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 
 const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const { showSuccess, showError } = useToast();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     table: '',
     status: 'CREATED'
@@ -346,6 +348,35 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         }
         
         savedOrder = await apiService.orders.create(orderData);
+      }
+      
+      // Verificar si después de la actualización todos los items están SERVED (solo para edición)
+      if (order?.id) {
+        // Recargar el pedido actualizado para verificar el estado de los items
+        const updatedOrder = await apiService.orders.getById(order.id);
+        const remainingItems = updatedOrder.items || [];
+        
+        // Si hay items y todos están SERVED, cambiar estatus del pedido a SERVED
+        if (remainingItems.length > 0 && remainingItems.every(item => item.status === 'SERVED')) {
+          try {
+            await apiService.orders.updateStatus(order.id, 'SERVED');
+            
+            // Cerrar modal y mostrar mensaje de éxito con redirección
+            onSave();
+            onClose();
+            showSuccess('Pedido actualizado. Todos los items están listos para cobrar.');
+            
+            // Redireccionar a vista de pagos después de un breve delay
+            setTimeout(() => {
+              navigate(`/orders/${order.id}/payment`);
+            }, 1500);
+            
+            return; // Salir temprano para evitar el flujo normal
+          } catch (statusError) {
+            console.error('Error updating order status to SERVED:', statusError);
+            // Continuar con el flujo normal si falla el cambio de estatus
+          }
+        }
       }
       
       onSave();
