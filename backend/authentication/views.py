@@ -12,6 +12,7 @@ from .serializers import (
     LoginResponseSerializer
 )
 from .permissions import AdminOnlyPermission
+from .aws_auth import aws_authenticator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,85 +22,116 @@ logger = logging.getLogger(__name__)
     operation_id='user_login',
     request=UserLoginSerializer,
     responses={200: LoginResponseSerializer},
-    description='Login user and get authentication token'
+    description='Login user with AWS IAM credentials'
 )
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
     """
-    Login endpoint for restaurant users
+    Login endpoint using AWS IAM authentication
     """
-    serializer = UserLoginSerializer(data=request.data)
+    # Get credentials from request
+    access_key = request.data.get('username')  # Frontend sends as username
+    secret_key = request.data.get('password')  # Frontend sends as password
     
-    if serializer.is_valid():
-        user = serializer.validated_data['user']
-        
-        # Update user session info
-        user.last_activity = timezone.now()
-        user.is_active_session = True
-        user.save(update_fields=['last_activity', 'is_active_session'])
-        
-        # Get or create token
-        token, created = Token.objects.get_or_create(user=user)
-        
-        # Serialize user data
-        user_serializer = UserSerializer(user)
-        
+    if not access_key or not secret_key:
         return Response({
-            'token': token.key,
-            'user': user_serializer.data,
-            'message': f'Login successful. Welcome {user.get_role_display()}!'
-        }, status=status.HTTP_200_OK)
+            'message': 'AWS Access Key y Secret Key son requeridos'
+        }, status=status.HTTP_400_BAD_REQUEST)
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Authenticate with AWS IAM
+    success, user_info = aws_authenticator.authenticate_user(access_key, secret_key)
+    
+    if not success or not user_info:
+        return Response({
+            'message': 'Credenciales AWS IAM inválidas'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+    
+    # Generate authentication token
+    token = aws_authenticator.get_or_create_token(user_info)
+    
+    # Format role display names
+    role_display_map = {
+        'admin': 'Administrador',
+        'mesero': 'Mesero', 
+        'cajero': 'Cajero',
+        'cocinero': 'Cocinero'
+    }
+    
+    return Response({
+        'token': token,
+        'user': {
+            'id': user_info['id'],
+            'username': user_info['username'],
+            'first_name': user_info['first_name'],
+            'last_name': user_info['last_name'],
+            'email': user_info['email'],
+            'role': user_info['role'],
+            'allowed_views': user_info['allowed_views'],
+            'allowed_api_endpoints': user_info['allowed_api_endpoints'],
+            'is_active': user_info['is_active'],
+            'last_activity': user_info['last_activity'],
+            'is_active_session': user_info['is_active_session'],
+        },
+        'message': f'Login exitoso. Bienvenido {role_display_map.get(user_info["role"], "Usuario")}!'
+    }, status=status.HTTP_200_OK)
 
 
 @extend_schema(
     operation_id='user_logout',
     responses={200: {'description': 'Logout successful'}},
-    description='Logout user and invalidate token'
+    description='Logout user and invalidate AWS IAM token'
 )
 @api_view(['POST'])
 def logout_view(request):
     """
-    Logout endpoint for restaurant users
+    Logout endpoint for AWS IAM users
     """
-    if request.user.is_authenticated:
-        # Update user session info
-        request.user.is_active_session = False
-        request.user.save(update_fields=['is_active_session'])
-        
-        # Delete the token
-        try:
-            token = Token.objects.get(user=request.user)
-            token.delete()
-        except Token.DoesNotExist:
-            pass
+    # Get token from request headers
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if auth_header.startswith('Token '):
+        token = auth_header[6:]  # Remove 'Token ' prefix
+        aws_authenticator.logout_user(token)
     
     return Response({
-        'message': 'Logout successful'
+        'message': 'Logout exitoso'
     }, status=status.HTTP_200_OK)
 
 
 @extend_schema(
     operation_id='current_user',
     responses={200: UserSerializer},
-    description='Get current user information'
+    description='Get current AWS IAM user information'
 )
 @api_view(['GET'])
 def current_user_view(request):
     """
-    Get current user information
+    Get current AWS IAM user information
     """
-    if request.user.is_authenticated:
-        # Update last activity
-        request.user.last_activity = timezone.now()
-        request.user.save(update_fields=['last_activity'])
-        
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
+    # Get token from request headers
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Token '):
+        return Response({'detail': 'Token de autenticación requerido'}, status=status.HTTP_401_UNAUTHORIZED)
     
-    return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+    token = auth_header[6:]  # Remove 'Token ' prefix
+    user_info = aws_authenticator.validate_token(token)
+    
+    if not user_info:
+        return Response({'detail': 'Token inválido o expirado'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    return Response({
+        'id': user_info['id'],
+        'username': user_info['username'],
+        'first_name': user_info['first_name'],
+        'last_name': user_info['last_name'],
+        'email': user_info['email'],
+        'role': user_info['role'],
+        'allowed_views': user_info['allowed_views'],
+        'allowed_api_endpoints': user_info['allowed_api_endpoints'],
+        'is_active': user_info['is_active'],
+        'last_activity': user_info['last_activity'],
+        'is_active_session': user_info['is_active_session'],
+    })
 
 
 @extend_schema(
@@ -147,22 +179,51 @@ def list_users_view(request):
 @extend_schema(
     operation_id='user_permissions',
     responses={200: {'description': 'User permissions and role info'}},
-    description='Get current user permissions and role information'
+    description='Get current AWS IAM user permissions and role information'
 )
 @api_view(['GET'])
 def user_permissions_view(request):
     """
-    Get current user permissions and role information
+    Get current AWS IAM user permissions and role information
     """
-    if not request.user.is_authenticated:
-        return Response({'detail': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+    # Get token from request headers
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Token '):
+        return Response({'detail': 'Token de autenticación requerido'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    token = auth_header[6:]  # Remove 'Token ' prefix
+    user_info = aws_authenticator.validate_token(token)
+    
+    if not user_info:
+        return Response({'detail': 'Token inválido o expirado'}, status=status.HTTP_401_UNAUTHORIZED)
     
     return Response({
-        'role': request.user.role,
-        'role_display': request.user.get_role_display(),
-        'allowed_views': request.user.allowed_views,
-        'allowed_api_endpoints': request.user.allowed_api_endpoints,
-        'is_admin': request.user.role == 'admin',
-        'is_mesero': request.user.role == 'mesero',
-        'is_cajero': request.user.role == 'cajero',
+        'role': user_info['role'],
+        'role_display': user_info['role'].title(),
+        'allowed_views': user_info['allowed_views'],
+        'allowed_api_endpoints': user_info['allowed_api_endpoints'],
+        'is_admin': user_info['role'] == 'admin',
+        'is_mesero': user_info['role'] == 'mesero',
+        'is_cajero': user_info['role'] == 'cajero',
+        'is_cocinero': user_info['role'] == 'cocinero',
+    })
+
+
+@extend_schema(
+    operation_id='password_reset_instructions',
+    responses={200: {'description': 'Password reset instructions'}},
+    description='Get password reset instructions for AWS IAM users'
+)
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def password_reset_instructions_view(request):
+    """
+    Get password reset instructions for AWS IAM users
+    """
+    instructions = aws_authenticator.get_password_reset_instructions()
+    
+    return Response({
+        'instructions': instructions,
+        'simple_users': list(aws_authenticator.SIMPLE_USER_MAPPING.keys()),
+        'default_password': 'simple123'
     })

@@ -46,9 +46,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (username, password) => {
+  const login = async (accessKey, secretKey) => {
     try {
-      const response = await apiService.auth.login(username, password);
+      // Para AWS IAM, el accessKey es el username y secretKey es el password
+      const response = await apiService.auth.login(accessKey, secretKey);
       const { token, user: userData, message } = response;
 
       // Store token
@@ -61,10 +62,10 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true, message, user: userData };
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('AWS IAM Login failed:', error);
       return { 
         success: false, 
-        message: error.response?.data?.message || 'Error de autenticación' 
+        message: error.response?.data?.message || 'Error de autenticación AWS IAM' 
       };
     }
   };
@@ -94,6 +95,7 @@ export const AuthProvider = ({ children }) => {
   const isAdmin = () => hasRole('admin');
   const isMesero = () => hasRole('mesero');
   const isCajero = () => hasRole('cajero');
+  const isCocinero = () => hasRole('cocinero');
 
   const value = {
     user,
@@ -106,6 +108,7 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     isMesero,
     isCajero,
+    isCocinero,
     checkAuthStatus
   };
 
