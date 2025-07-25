@@ -9,12 +9,20 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env.ec2 file
-env_file = BASE_DIR.parent / '.env.ec2'
-if env_file.exists():
-    load_dotenv(env_file)
-    print(f"✅ Loaded environment from {env_file}")
+# Try multiple locations for .env.ec2 file
+env_files = [
+    Path('/app/.env.ec2'),           # Docker mounted location
+    BASE_DIR.parent / '.env.ec2',    # Project root location
+    Path('/.env.ec2'),               # Container root location
+]
+
+for env_file in env_files:
+    if env_file.exists():
+        load_dotenv(env_file)
+        print(f"✅ Loaded .env.ec2 from {env_file}")
+        break
 else:
-    print(f"⚠️  .env.ec2 file not found at {env_file}, using system environment variables")
+    print("⚠️  .env.ec2 file not found in any location, using system environment variables")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SECURITY SETTINGS
@@ -73,7 +81,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'data' / 'restaurant.sqlite3',
+        'NAME': '/app/data/restaurant.sqlite3',
     }
 }
 
