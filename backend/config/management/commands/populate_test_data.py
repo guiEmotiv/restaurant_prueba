@@ -289,7 +289,6 @@ class Command(BaseCommand):
         # Print detailed summary
         self.stdout.write(self.style.SUCCESS('\n📊 Database Summary:'))
         self.stdout.write(f'👤 Users: {User.objects.count()}')
-        self.stdout.write(f'📂 Categories: {Category.objects.count()}')
         self.stdout.write(f'⚖️  Units: {Unit.objects.count()}')  
         self.stdout.write(f'🏢 Zones: {Zone.objects.count()}')
         self.stdout.write(f'🪑 Tables: {Table.objects.count()}')

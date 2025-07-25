@@ -15,6 +15,8 @@ This is a full-stack restaurant management system with Django REST Framework bac
 - **Create superuser**: `python manage.py createsuperuser` or `make createsuperuser`
 - **Django shell**: `make shell`
 - **Run tests**: `make test` or `pytest -q`
+- **Clean database**: `./clean_db.sh` or `python manage.py clean_database --confirm`
+- **Populate test data**: `python manage.py populate_test_data`
 
 ### Frontend (React + Vite)
 - **Start development server**: `npm run dev` (runs on port 5173)
@@ -81,6 +83,18 @@ This is a full-stack restaurant management system with Django REST Framework bac
 - **EC2 compose**: `docker-compose.ec2.yml`
 - **Simple template**: `.env.ec2`
 - **Setup guide**: `deploy/EC2-DEPLOYMENT-GUIDE.md`
+
+### Database Management
+- **Clean all data**: `./clean_db.sh` (interactive with confirmation)
+- **Clean keeping superusers**: `./clean_db.sh --keep-superuser`
+- **Clean without confirmation**: `./clean_db.sh --confirm` (use with caution)
+- **Django command**: `python manage.py clean_database [options]`
+
+The clean database script will:
+- Delete ALL data from all tables
+- Reset auto-increment counters (SQLite sequences)
+- Preserve database structure (tables, indexes, etc.)
+- Optionally keep superuser accounts
 
 ### Environment Variables (Required)
 Minimal configuration in `.env`:

@@ -201,7 +201,6 @@ def create_sample_data():
     
     print("\n🎉 ¡Datos de prueba creados exitosamente!")
     print("\n📊 Resumen:")
-    print(f"  • {Category.objects.count()} categorías")
     print(f"  • {Unit.objects.count()} unidades")
     print(f"  • {Zone.objects.count()} zonas")
     print(f"  • {Table.objects.count()} mesas")
