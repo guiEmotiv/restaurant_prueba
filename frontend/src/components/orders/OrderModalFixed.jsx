@@ -22,11 +22,9 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
 
   useEffect(() => {
     if (isOpen) {
-      console.log('Modal opened with order:', order);
       loadAvailableData();
       if (order) {
         // Modo edición
-        console.log('Editing order with status:', order.status);
         setFormData({
           table: order.table?.id || order.table || '',
           status: order.status || 'CREATED'
@@ -34,7 +32,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         loadOrderItems();
       } else {
         // Modo creación
-        console.log('Creating new order');
         resetForm();
       }
     }
@@ -128,7 +125,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   };
 
   const addOrderItem = () => {
-    console.log('addOrderItem called - current orderItems:', orderItems);
     setOrderItems(prev => {
       const newItem = {
         id: null,
@@ -142,10 +138,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         tempKey: Date.now() + Math.random() // Unique key for React
       };
       // Add new item at the beginning of the array
-      const newItems = [newItem, ...prev];
-      console.log('Adding new item:', newItem);
-      console.log('New orderItems list:', newItems);
-      return newItems;
+      return [newItem, ...prev];
     });
   };
 
@@ -166,14 +159,11 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   };
 
   const updateOrderItem = (index, field, value) => {
-    console.log('updateOrderItem called:', { index, field, value });
-    
     setOrderItems(prev => {
-      const newItems = prev.map((item, i) => {
+      return prev.map((item, i) => {
         if (i === index) {
           if (field === 'recipe') {
             const selectedRecipe = availableRecipes.find(recipe => recipe.id === parseInt(value));
-            console.log('Selected recipe:', selectedRecipe);
             return {
               ...item,
               recipe: value,
@@ -186,9 +176,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         }
         return item;
       });
-      
-      console.log('New orderItems:', newItems);
-      return newItems;
     });
   };
 
@@ -244,17 +231,11 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
     });
     
     setErrors(newErrors);
-    console.log('Form validation errors:', newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSave = async () => {
-    console.log('=== SAVE PROCESS STARTED ===');
-    console.log('Current orderItems:', orderItems);
-    console.log('Order being edited:', order);
-    
     if (!validateForm()) {
-      console.log('Validation failed, stopping save');
       return;
     }
     
@@ -274,7 +255,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         const parsedId = parseInt(recipeId);
         return !isNaN(parsedId) && parsedId > 0;
       });
-      console.log('Valid items to save:', validItems);
       
       let savedOrder;
       if (order?.id) {
@@ -283,38 +263,26 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           table: parseInt(formData.table),
           status: formData.status
         };
-        console.log('Actualizando pedido:', orderData);
         savedOrder = await apiService.orders.update(order.id, orderData);
-        console.log('Order updated successfully');
         
         // Manejar actualización de items - COMPLETO
-        console.log('=== PROCESSING ITEMS ===');
-        console.log('Current deletedItemIds:', deletedItemIds);
         
         // 1. Eliminar items que fueron removidos
         if (deletedItemIds.length > 0) {
-          console.log(`Deleting ${deletedItemIds.length} items...`);
           for (const itemId of deletedItemIds) {
             try {
-              console.log('Deleting item with ID:', itemId);
               await apiService.orderItems.delete(itemId);
-              console.log('Item deleted successfully:', itemId);
             } catch (error) {
               console.error('Error deleting item:', itemId, error);
-              console.error('Error details:', error.response?.data);
               throw error;
             }
           }
-        } else {
-          console.log('No items to delete');
         }
         
         // 2. Crear nuevos items (los que no tienen id)
         const newItems = orderItems.filter(item => !item.id && item.recipe);
-        console.log('New items to create:', newItems);
         
         if (newItems.length > 0) {
-          console.log(`Creating ${newItems.length} new items...`);
           for (const item of newItems) {
             try {
               const createData = {
@@ -322,27 +290,18 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                 recipe: parseInt(item.recipe),
                 notes: item.notes || ''
               };
-              console.log('Creating new item with data:', createData);
-              const createdItem = await apiService.orderItems.create(createData);
-              console.log('New item created successfully:', createdItem);
+              await apiService.orderItems.create(createData);
             } catch (error) {
               console.error('Error creating new item:', error);
-              console.error('Error details:', error.response?.data);
-              throw error; // Re-lanzar el error para que sea capturado arriba
+              throw error;
             }
           }
-        } else {
-          console.log('No new items to create');
         }
       } else {
         // Crear nuevo pedido con items incluidos según OrderCreateSerializer
-        console.log('=== PROCESSING ITEMS FOR NEW ORDER ===');
-        console.log('Raw validItems:', JSON.stringify(validItems, null, 2));
         
-        // Process all items (allowing duplicates)
+        // Process all items (allowing duplicates) 
         const processedItems = validItems.map((item, index) => {
-          console.log(`Processing item ${index}:`, JSON.stringify(item, null, 2));
-          
           // Extract recipe ID properly - ensure it's a number
           let recipeId = item.recipe;
           
@@ -353,43 +312,26 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           
           // Convert to number
           const parsedRecipeId = parseInt(recipeId);
-          console.log(`Original recipe:`, item.recipe, 'Parsed ID:', parsedRecipeId);
           
           if (isNaN(parsedRecipeId) || parsedRecipeId <= 0) {
-            console.error(`Invalid recipe ID for item ${index}:`, {
-              originalRecipe: item.recipe,
-              extractedId: recipeId,
-              parsedId: parsedRecipeId
-            });
-            throw new Error(`Invalid recipe ID for item ${index + 1}: expected number but got ${typeof recipeId} (${recipeId})`);
+            throw new Error(`Receta inválida en el item ${index + 1}`);
           }
           
-          const processedItem = {
+          return {
             recipe: parsedRecipeId,
             notes: (item.notes || '').toString().trim()
           };
-          
-          console.log(`Processed item ${index}:`, JSON.stringify(processedItem, null, 2));
-          return processedItem;
         });
-        
-        console.log('Final processedItems:', JSON.stringify(processedItems, null, 2));
         
         // Final validation before sending
         if (processedItems.length === 0) {
-          throw new Error('No valid items to create order');
+          throw new Error('Debes agregar al menos un item al pedido');
         }
         
         const orderData = {
           table: parseInt(formData.table),
           items: processedItems
         };
-        
-        console.log('=== FINAL ORDER DATA TO SEND ===');
-        console.log('Table ID:', orderData.table, 'Type:', typeof orderData.table);
-        console.log('Items count:', orderData.items.length);
-        console.log('Full order data:', JSON.stringify(orderData, null, 2));
-        console.log('Original validItems:', JSON.stringify(validItems, null, 2));
         
         // Validate that all items have proper structure
         const invalidItems = orderData.items.filter(item => 
@@ -400,43 +342,22 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         );
         
         if (invalidItems.length > 0) {
-          console.error('Invalid items found:', invalidItems);
-          throw new Error(`Invalid items detected: ${JSON.stringify(invalidItems)}`);
+          throw new Error('Algunos items tienen datos inválidos');
         }
         
-        // Validate data before sending
-        console.log('=== VALIDATION BEFORE SEND ===');
-        orderData.items.forEach((item, index) => {
-          console.log(`Item ${index}:`, {
-            recipe: item.recipe,
-            recipe_type: typeof item.recipe,
-            recipe_valid: !isNaN(parseInt(item.recipe)) && parseInt(item.recipe) > 0,
-            notes: item.notes,
-            notes_type: typeof item.notes
-          });
-        });
-        
-        console.log('About to call apiService.orders.create...');
-        
         savedOrder = await apiService.orders.create(orderData);
-        console.log('Order creation successful:', savedOrder);
       }
       
       onSave();
       onClose();
       showSuccess(order ? 'Pedido actualizado exitosamente' : 'Pedido creado exitosamente');
     } catch (error) {
-      console.error('=== ERROR SAVING ORDER ===');
-      console.error('Full error object:', error);
-      console.error('Error response status:', error.response?.status);
-      console.error('Error response data:', error.response?.data);
-      console.error('Type of response data:', typeof error.response?.data);
-      if (error.response?.data) {
-        console.error('Response data JSON:', JSON.stringify(error.response.data, null, 2));
-      }
       let errorMessage = 'Error desconocido';
       
-      if (error.response?.data) {
+      // Si es un error de validación personalizado (del try/catch anterior)
+      if (error.message && !error.response) {
+        errorMessage = error.message;
+      } else if (error.response?.data) {
         if (typeof error.response.data === 'string') {
           errorMessage = error.response.data;
         } else if (error.response.data.detail) {
@@ -444,95 +365,37 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         } else if (error.response.data.error) {
           errorMessage = error.response.data.error;
         } else {
-          // Si es un objeto con errores de validación
+          // Simplificar el manejo de errores de validación
           const errors = [];
           for (const [field, fieldErrors] of Object.entries(error.response.data)) {
-            if (Array.isArray(fieldErrors)) {
-              errors.push(`${field}: ${fieldErrors.join(', ')}`);
-            } else if (typeof fieldErrors === 'object' && fieldErrors !== null) {
-              // Handle nested validation errors for items array
-              if (field === 'items' && Array.isArray(fieldErrors)) {
-                const itemErrors = [];
-                console.log('Processing items array errors:', fieldErrors);
-                
-                fieldErrors.forEach((itemError, index) => {
-                  console.log(`Processing item error ${index}:`, itemError);
-                  
-                  if (typeof itemError === 'object' && itemError !== null) {
-                    const itemErrorMessages = [];
-                    for (const [itemField, itemFieldError] of Object.entries(itemError)) {
-                      console.log(`Item ${index} field ${itemField} error:`, itemFieldError);
-                      if (Array.isArray(itemFieldError)) {
-                        // Handle stock errors specifically
-                        if (itemField === 'recipe' && itemFieldError.some(err => err.includes('stock'))) {
-                          itemErrorMessages.push(`Stock insuficiente: ${itemFieldError.join(', ')}`);
-                        } else {
-                          itemErrorMessages.push(`${itemField}: ${itemFieldError.join(', ')}`);
-                        }
-                      } else {
-                        itemErrorMessages.push(`${itemField}: ${itemFieldError}`);
-                      }
+            if (field === 'items' && Array.isArray(fieldErrors)) {
+              // Manejo especial para errores de items
+              fieldErrors.forEach((itemError, index) => {
+                if (typeof itemError === 'object' && itemError !== null) {
+                  for (const [itemField, itemFieldError] of Object.entries(itemError)) {
+                    if (Array.isArray(itemFieldError)) {
+                      errors.push(`Item ${index + 1} - ${itemField}: ${itemFieldError.join(', ')}`);
+                    } else {
+                      errors.push(`Item ${index + 1} - ${itemField}: ${itemFieldError}`);
                     }
-                    if (itemErrorMessages.length > 0) {
-                      // Try to get the recipe name from orderItems to make error more helpful
-                      const orderItem = orderItems[index];
-                      const recipeName = orderItem?.recipe_name || `Item ${index + 1}`;
-                      itemErrors.push(`${recipeName}: ${itemErrorMessages.join(', ')}`);
-                    }
-                  } else if (typeof itemError === 'string') {
-                    itemErrors.push(`Item ${index + 1}: ${itemError}`);
-                  } else {
-                    // Handle other types of item errors
-                    const errorString = String(itemError);
-                    itemErrors.push(`Item ${index + 1}: ${errorString}`);
-                  }
-                });
-                
-                if (itemErrors.length > 0) {
-                  // Check if all errors are about stock
-                  const allStockErrors = itemErrors.every(err => err.includes('stock') || err.includes('Stock'));
-                  if (allStockErrors) {
-                    errors.push(`⚠️ No hay suficiente stock en inventario para completar este pedido.\n${itemErrors.join('\n')}`);
-                  } else {
-                    errors.push(`Problemas con items:\n${itemErrors.join('\n')}`);
                   }
                 } else {
-                  // Fallback - try to show raw error data
-                  const rawErrorString = JSON.stringify(fieldErrors, null, 2);
-                  errors.push(`${field}: ${rawErrorString}`);
+                  errors.push(`Item ${index + 1}: ${itemError}`);
                 }
-              } else {
-                // Better handling for non-items nested objects
-                try {
-                  if (typeof fieldErrors === 'object' && fieldErrors !== null) {
-                    const objErrors = [];
-                    for (const [subField, subValue] of Object.entries(fieldErrors)) {
-                      if (Array.isArray(subValue)) {
-                        objErrors.push(`${subField}: ${subValue.join(', ')}`);
-                      } else {
-                        objErrors.push(`${subField}: ${subValue}`);
-                      }
-                    }
-                    errors.push(`${field}: ${objErrors.join('; ')}`);
-                  } else {
-                    errors.push(`${field}: ${fieldErrors}`);
-                  }
-                } catch (parseError) {
-                  errors.push(`${field}: Error parsing validation data`);
-                }
-              }
+              });
+            } else if (Array.isArray(fieldErrors)) {
+              errors.push(`${field}: ${fieldErrors.join(', ')}`);
             } else {
               errors.push(`${field}: ${fieldErrors}`);
             }
           }
-          errorMessage = errors.length > 0 ? errors.join('; ') : JSON.stringify(error.response.data);
+          errorMessage = errors.length > 0 ? errors.join('\n') : 'Error de validación';
         }
       } else if (error.message) {
         errorMessage = error.message;
       }
       
       showError('Error al guardar el pedido: ' + errorMessage);
-      console.error('Final error message shown to user:', errorMessage);
     } finally {
       setLoading(false);
     }
