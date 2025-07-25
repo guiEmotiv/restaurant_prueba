@@ -2,24 +2,6 @@ from django.db import models
 from django.core.exceptions import ValidationError
 
 
-class Category(models.Model):
-    """Categorías para ingredientes"""
-    name = models.CharField(max_length=100, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'category'
-        verbose_name = 'Categoría'
-        verbose_name_plural = 'Categorías'
-
-    def __str__(self):
-        return self.name
-
-    def delete(self, *args, **kwargs):
-        if self.ingredient_set.exists():
-            raise ValidationError("No se puede eliminar una categoría que tiene ingredientes asociados")
-        super().delete(*args, **kwargs)
-
 
 class Unit(models.Model):
     """Unidades de medida para ingredientes"""

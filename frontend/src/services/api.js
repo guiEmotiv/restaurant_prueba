@@ -102,17 +102,6 @@ export const apiService = {
   },
 
   // Config endpoints
-  categories: {
-    getAll: () => apiService.getAll('categories'),
-    getById: (id) => apiService.getById('categories', id),
-    create: (data) => apiService.create('categories', data),
-    update: (id, data) => apiService.update('categories', id, data),
-    delete: (id) => apiService.delete('categories', id),
-    getIngredients: async (id) => {
-      const response = await api.get(`/categories/${id}/ingredients/`);
-      return response.data;
-    },
-  },
 
   units: {
     getAll: () => apiService.getAll('units'),

@@ -1,25 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import Category, Unit, Zone, Table
+from .models import Unit, Zone, Table
 from .serializers import (
-    CategorySerializer, UnitSerializer, ZoneSerializer, 
+    UnitSerializer, ZoneSerializer, 
     TableSerializer, TableDetailSerializer
 )
-
-
-class CategoryViewSet(viewsets.ModelViewSet):
-    queryset = Category.objects.all().order_by('name')
-    serializer_class = CategorySerializer
-    
-    @action(detail=True, methods=['get'])
-    def ingredients(self, request, pk=None):
-        """Obtener todos los ingredientes de una categoría"""
-        category = self.get_object()
-        ingredients = category.ingredient_set.filter(is_active=True)
-        from inventory.serializers import IngredientSerializer
-        serializer = IngredientSerializer(ingredients, many=True)
-        return Response(serializer.data)
 
 
 class UnitViewSet(viewsets.ModelViewSet):

@@ -35,7 +35,7 @@ class OrderItemAdmin(admin.ModelAdmin):
 @admin.register(OrderItemIngredient)
 class OrderItemIngredientAdmin(admin.ModelAdmin):
     list_display = ['order_item', 'ingredient', 'quantity', 'unit_price', 'total_price']
-    list_filter = ['ingredient__category']
+    list_filter = []
     search_fields = ['order_item__order__id', 'ingredient__name']
     readonly_fields = ['unit_price', 'total_price', 'created_at']
 

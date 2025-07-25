@@ -7,7 +7,6 @@ import {
   Settings, 
   Package, 
   ShoppingCart,
-  Tag,
   Ruler,
   MapPin,
   Table,
@@ -30,7 +29,6 @@ const Layout = ({ children }) => {
       name: 'Configuración', 
       icon: Settings,
       children: [
-        { name: 'Categorías', href: '/categories', icon: Tag },
         { name: 'Unidades', href: '/units', icon: Ruler },
         { name: 'Zonas', href: '/zones', icon: MapPin },
         { name: 'Mesas', href: '/tables', icon: Table },

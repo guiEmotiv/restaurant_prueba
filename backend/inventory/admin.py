@@ -17,8 +17,8 @@ class GroupAdmin(admin.ModelAdmin):
 
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'unit', 'unit_price', 'current_stock', 'is_active']
-    list_filter = ['category', 'unit', 'is_active']
+    list_display = ['name', 'unit', 'unit_price', 'current_stock', 'is_active']
+    list_filter = ['unit', 'is_active']
     search_fields = ['name']
     readonly_fields = ['created_at', 'updated_at']
     list_editable = ['unit_price', 'current_stock', 'is_active']
@@ -37,6 +37,6 @@ class RecipeAdmin(admin.ModelAdmin):
 @admin.register(RecipeItem)
 class RecipeItemAdmin(admin.ModelAdmin):
     list_display = ['recipe', 'ingredient', 'quantity']
-    list_filter = ['recipe', 'ingredient__category']
+    list_filter = ['recipe']
     search_fields = ['recipe__name', 'ingredient__name']
     readonly_fields = ['created_at']

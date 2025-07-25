@@ -107,7 +107,6 @@ def api_root_test(request):
     return JsonResponse({
         "status": "API v1 root is working", 
         "endpoints": [
-            "/api/v1/categories/",
             "/api/v1/units/", 
             "/api/v1/zones/",
             "/api/v1/tables/",

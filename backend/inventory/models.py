@@ -2,7 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from decimal import Decimal
-from config.models import Category, Unit
+from config.models import Unit
 
 
 class Group(models.Model):
@@ -26,7 +26,6 @@ class Group(models.Model):
 
 class Ingredient(models.Model):
     """Ingredientes del inventario"""
-    category = models.ForeignKey(Category, on_delete=models.PROTECT)
     unit = models.ForeignKey(Unit, on_delete=models.PROTECT)
     name = models.CharField(max_length=100, unique=True)
     unit_price = models.DecimalField(

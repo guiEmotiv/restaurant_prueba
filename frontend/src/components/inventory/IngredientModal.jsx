@@ -8,13 +8,11 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
   const { showSuccess, showError } = useToast();
   const [formData, setFormData] = useState({
     name: '',
-    category: '',
     unit: '',
     unit_price: '',
     current_stock: '',
     is_active: true
   });
-  const [availableCategories, setAvailableCategories] = useState([]);
   const [availableUnits, setAvailableUnits] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -26,7 +24,6 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
         // Modo edición
         setFormData({
           name: ingredient.name || '',
-          category: ingredient.category?.id || ingredient.category || '',
           unit: ingredient.unit?.id || ingredient.unit || '',
           unit_price: ingredient.unit_price || '',
           current_stock: ingredient.current_stock || '',
@@ -42,7 +39,6 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
   const resetForm = () => {
     setFormData({
       name: '',
-      category: '',
       unit: '',
       unit_price: '',
       current_stock: '',
@@ -53,11 +49,7 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
 
   const loadAvailableData = async () => {
     try {
-      const [categoriesData, unitsData] = await Promise.all([
-        apiService.categories.getAll(),
-        apiService.units.getAll()
-      ]);
-      setAvailableCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      const unitsData = await apiService.units.getAll();
       setAvailableUnits(Array.isArray(unitsData) ? unitsData : []);
     } catch (error) {
       console.error('Error loading available data:', error);
@@ -83,14 +75,6 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
       newErrors.name = 'El nombre es requerido';
     }
 
-    if (!formData.category || formData.category === '') {
-      newErrors.category = 'La categoría es requerida';
-    } else {
-      const categoryId = parseInt(formData.category);
-      if (isNaN(categoryId) || categoryId <= 0) {
-        newErrors.category = 'Debe seleccionar una categoría válida';
-      }
-    }
 
     if (!formData.unit || formData.unit === '') {
       newErrors.unit = 'La unidad es requerida';
@@ -132,7 +116,6 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
     try {
       const ingredientData = {
         name: formData.name.trim(),
-        category: parseInt(formData.category),
         unit: parseInt(formData.unit),
         unit_price: parseFloat(formData.unit_price),
         current_stock: parseFloat(formData.current_stock),
@@ -227,34 +210,7 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Categoría *
-                </label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                    errors.category ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  disabled={loading}
-                >
-                  <option value="">Seleccionar categoría...</option>
-                  {availableCategories.map(category => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.category && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errors.category}
-                  </p>
-                )}
-              </div>
-
+            <div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Unidad *

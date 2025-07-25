@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ToastProvider } from './contexts/ToastContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
-import Categories from './pages/config/Categories';
 import Units from './pages/config/Units';
 import Zones from './pages/config/Zones';
 import Tables from './pages/config/Tables';
@@ -25,7 +24,6 @@ const AppContent = () => {
         <Route path="/" element={<Dashboard />} />
 
         {/* Configuration routes */}
-        <Route path="/categories" element={<Categories />} />
         <Route path="/units" element={<Units />} />
         <Route path="/zones" element={<Zones />} />
         <Route path="/tables" element={<Tables />} />

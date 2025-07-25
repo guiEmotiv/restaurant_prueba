@@ -100,12 +100,12 @@ const CrudTable = forwardRef(({
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-center text-sm font-medium text-gray-500 uppercase tracking-wider"
                 >
                   {column.title}
                 </th>
               ))}
-              <th className="px-6 py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-sm font-medium text-gray-500 uppercase tracking-wider">
                 Acciones
               </th>
             </tr>
@@ -121,12 +121,12 @@ const CrudTable = forwardRef(({
               data.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   {columns.map((column) => (
-                    <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
                       {column.render ? column.render(item[column.key], item) : item[column.key]}
                     </td>
                   ))}
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end gap-2">
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                    <div className="flex justify-center gap-2">
                       <button
                         onClick={() => handleEdit(item)}
                         className="text-blue-600 hover:text-blue-900 p-3 rounded-md hover:bg-blue-50"

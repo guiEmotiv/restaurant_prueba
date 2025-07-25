@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Group, Ingredient, Recipe, RecipeItem
-from config.serializers import CategorySerializer, UnitSerializer
+from config.serializers import UnitSerializer
 
 
 class GroupSerializer(serializers.ModelSerializer):
@@ -18,13 +18,12 @@ class GroupSerializer(serializers.ModelSerializer):
 
 
 class IngredientSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source='category.name', read_only=True)
     unit_name = serializers.CharField(source='unit.name', read_only=True)
     
     class Meta:
         model = Ingredient
         fields = [
-            'id', 'category', 'category_name', 'unit', 'unit_name', 
+            'id', 'unit', 'unit_name', 
             'name', 'unit_price', 'current_stock', 'is_active', 
             'created_at', 'updated_at'
         ]
@@ -32,18 +31,16 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 
 class IngredientDetailSerializer(IngredientSerializer):
-    category_detail = CategorySerializer(source='category', read_only=True)
     unit_detail = UnitSerializer(source='unit', read_only=True)
     
     class Meta(IngredientSerializer.Meta):
-        fields = IngredientSerializer.Meta.fields + ['category_detail', 'unit_detail']
+        fields = IngredientSerializer.Meta.fields + ['unit_detail']
 
 
 class RecipeItemSerializer(serializers.ModelSerializer):
     ingredient_name = serializers.CharField(source='ingredient.name', read_only=True)
     ingredient_unit = serializers.CharField(source='ingredient.unit.name', read_only=True)
     ingredient_unit_name = serializers.CharField(source='ingredient.unit.name', read_only=True)
-    ingredient_category_name = serializers.CharField(source='ingredient.category.name', read_only=True)
     ingredient_unit_price = serializers.DecimalField(source='ingredient.unit_price', max_digits=10, decimal_places=2, read_only=True)
     total_cost = serializers.SerializerMethodField()
     
@@ -51,7 +48,7 @@ class RecipeItemSerializer(serializers.ModelSerializer):
         model = RecipeItem
         fields = [
             'id', 'recipe', 'ingredient', 'ingredient_name', 'ingredient_unit', 
-            'ingredient_unit_name', 'ingredient_category_name', 'ingredient_unit_price', 
+            'ingredient_unit_name', 'ingredient_unit_price', 
             'quantity', 'total_cost', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']

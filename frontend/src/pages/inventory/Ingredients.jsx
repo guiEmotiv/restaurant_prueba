@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Package, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
-import StockUpdateModal from '../../components/inventory/StockUpdateModal';
 import IngredientModal from '../../components/inventory/IngredientModal';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
@@ -10,24 +9,14 @@ import { useToast } from '../../contexts/ToastContext';
 const Ingredients = () => {
   const { showSuccess, showError } = useToast();
   const [ingredients, setIngredients] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showStockModal, setShowStockModal] = useState(false);
   const [showIngredientModal, setShowIngredientModal] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
 
   const columns = [
     { key: 'id', title: 'ID' },
     { key: 'name', title: 'Nombre', required: true },
-    { 
-      key: 'category', 
-      title: 'Categoría', 
-      type: 'select',
-      required: true,
-      options: categories.map(cat => ({ value: cat.id, label: cat.name })),
-      render: (value, item) => item.category_name || categories.find(c => c.id === value)?.name || value
-    },
     { 
       key: 'unit', 
       title: 'Unidad', 
@@ -53,20 +42,9 @@ const Ingredients = () => {
       min: '0',
       required: true,
       render: (value, item) => (
-        <div className="flex items-center justify-between">
-          <span className={`${parseFloat(value) <= 5 ? 'text-red-600 font-semibold' : ''}`}>
-            {parseFloat(value).toFixed(2)} {item.unit_name || ''}
-          </span>
-          <Button
-            onClick={() => handleStockUpdate(item)}
-            size="sm"
-            variant="secondary"
-            className="ml-2 flex items-center gap-1"
-          >
-            <Package className="h-3 w-3" />
-            Stock
-          </Button>
-        </div>
+        <span className={`${parseFloat(value) <= 5 ? 'text-red-600 font-semibold' : ''}`}>
+          {parseFloat(value).toFixed(2)} {item.unit_name || ''}
+        </span>
       )
     },
     { 
@@ -79,7 +57,6 @@ const Ingredients = () => {
 
   useEffect(() => {
     loadIngredients();
-    loadCategories();
     loadUnits();
   }, []);
 
@@ -96,14 +73,6 @@ const Ingredients = () => {
     }
   };
 
-  const loadCategories = async () => {
-    try {
-      const data = await apiService.categories.getAll();
-      setCategories(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
 
   const loadUnits = async () => {
     try {
@@ -152,24 +121,8 @@ const Ingredients = () => {
     }
   };
 
-  const handleStockUpdate = (ingredient) => {
-    setSelectedIngredient(ingredient);
-    setShowStockModal(true);
-  };
-
-  const handleStockUpdated = () => {
-    loadIngredients();
-    setShowStockModal(false);
-    setSelectedIngredient(null);
-  };
 
   const columnsWithOptions = columns.map(column => {
-    if (column.key === 'category') {
-      return {
-        ...column,
-        options: categories.map(cat => ({ value: cat.id, label: cat.name }))
-      };
-    }
     if (column.key === 'unit') {
       return {
         ...column,
@@ -215,13 +168,6 @@ const Ingredients = () => {
         onSave={handleIngredientModalSave}
       />
 
-      {/* Stock Update Modal */}
-      <StockUpdateModal
-        isOpen={showStockModal}
-        onClose={() => setShowStockModal(false)}
-        ingredient={selectedIngredient}
-        onSuccess={handleStockUpdated}
-      />
     </div>
   );
 };
