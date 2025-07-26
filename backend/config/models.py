@@ -128,7 +128,9 @@ class RestaurantOperationalConfig(models.Model):
         if dt is None:
             dt = timezone.now()
         
-        current_time = dt.time()
+        # Convertir a hora local para comparar con horarios configurados
+        local_dt = timezone.localtime(dt)
+        current_time = local_dt.time()
         
         # Caso normal: apertura y cierre el mismo día
         if self.opening_time <= self.closing_time:

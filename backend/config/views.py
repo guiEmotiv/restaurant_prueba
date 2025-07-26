@@ -96,17 +96,19 @@ class RestaurantOperationalConfigViewSet(viewsets.ModelViewSet):
         
         config = RestaurantOperationalConfig.get_active_config()
         now = timezone.now()
+        local_now = timezone.localtime(now)
         operational_date = RestaurantOperationalConfig.get_operational_date()
         
         data = {
             'current_datetime': now,
+            'current_local_datetime': local_now,
             'operational_date': operational_date,
             'has_config': bool(config)
         }
         
         if config:
             data.update({
-                'is_currently_open': config.is_currently_open(),
+                'is_currently_open': config.is_currently_open(now),
                 'business_hours': config.get_business_hours_text(),
                 'opening_time': config.opening_time,
                 'closing_time': config.closing_time,
