@@ -21,23 +21,29 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
 
   useEffect(() => {
     if (isOpen) {
-      loadAvailableIngredients();
-      loadAvailableGroups();
-      if (recipe) {
-        // Modo edición
-        setFormData({
-          name: recipe.name || '',
-          group: recipe.group || '',
-          preparation_time: recipe.preparation_time || '',
-          profit_percentage: recipe.profit_percentage || '0.00'
-        });
-        loadRecipeItems();
-      } else {
-        // Modo creación
-        resetForm();
-      }
+      loadData();
     }
   }, [isOpen, recipe]);
+
+  const loadData = async () => {
+    await loadAvailableIngredients();
+    await loadAvailableGroups();
+    
+    if (recipe) {
+      // Modo edición
+      setFormData({
+        name: recipe.name || '',
+        group: recipe.group || '',
+        preparation_time: recipe.preparation_time || '',
+        profit_percentage: recipe.profit_percentage || '0.00'
+      });
+      // Cargar items después de que los ingredientes estén disponibles
+      await loadRecipeItems();
+    } else {
+      // Modo creación
+      resetForm();
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -52,7 +58,8 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
 
   const loadAvailableIngredients = async () => {
     try {
-      const data = await apiService.ingredients.getAll();
+      // Cargar TODOS los ingredientes (incluyendo inactivos) para mostrar completa la receta
+      const data = await apiService.ingredients.getAll({ show_all: true });
       setAvailableIngredients(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading ingredients:', error);
@@ -74,14 +81,19 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     try {
       const response = await apiService.recipeItems.getByRecipe(recipe.id);
       const items = Array.isArray(response) ? response : [];
-      setRecipeItems(items.map(item => ({
-        id: item.id,
-        ingredient: item.ingredient,
-        ingredient_name: item.ingredient_name,
-        ingredient_unit: item.ingredient_unit,
-        ingredient_unit_price: item.ingredient_unit_price,
-        quantity: item.quantity
-      })));
+      setRecipeItems(items.map(item => {
+        // Buscar el stock actual del ingrediente
+        const ingredient = availableIngredients.find(ing => ing.id === item.ingredient);
+        return {
+          id: item.id,
+          ingredient: item.ingredient,
+          ingredient_name: item.ingredient_name,
+          ingredient_unit: item.ingredient_unit,
+          ingredient_unit_price: item.ingredient_unit_price,
+          ingredient_current_stock: ingredient?.current_stock || 0,
+          quantity: item.quantity
+        };
+      }));
     } catch (error) {
       console.error('Error loading recipe items:', error);
       setRecipeItems([]);
@@ -127,13 +139,22 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
             ingredient: value,
             ingredient_name: selectedIngredient?.name || '',
             ingredient_unit: selectedIngredient?.unit_name || '',
-            ingredient_unit_price: selectedIngredient?.unit_price || 0
+            ingredient_unit_price: selectedIngredient?.unit_price || 0,
+            ingredient_current_stock: selectedIngredient?.current_stock || 0
           };
         }
         return { ...item, [field]: value };
       }
       return item;
     }));
+  };
+
+  // Función para verificar si un ingrediente tiene stock insuficiente
+  const hasInsufficientStock = (item) => {
+    if (!item.ingredient || !item.quantity) return false;
+    const ingredient = availableIngredients.find(ing => ing.id === parseInt(item.ingredient));
+    if (!ingredient) return false;
+    return parseFloat(ingredient.current_stock) < parseFloat(item.quantity);
   };
 
   const validateForm = () => {
@@ -427,7 +448,9 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                     {recipeItems.map((item, index) => (
                       <div key={index}>
                         {/* Desktop View */}
-                        <div className="hidden md:grid grid-cols-12 gap-3 p-3 border border-gray-200 rounded-lg bg-white items-center">
+                        <div className={`hidden md:grid grid-cols-12 gap-3 p-3 border border-gray-200 rounded-lg items-center ${
+                          hasInsufficientStock(item) ? 'bg-red-50 border-red-300' : 'bg-white'
+                        }`}>
                           <div className="col-span-5">
                             <select
                               value={item.ingredient}
@@ -477,7 +500,17 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                           </div>
                           
                           <div className="col-span-2 text-center text-sm text-gray-600 font-medium">
-                            {item.ingredient_unit || '-'}
+                            <div>{item.ingredient_unit || '-'}</div>
+                            {item.ingredient && (
+                              <div className={`text-xs mt-1 ${
+                                hasInsufficientStock(item) ? 'text-red-600 font-semibold' : 'text-gray-500'
+                              }`}>
+                                Stock: {availableIngredients.find(ing => ing.id === parseInt(item.ingredient))?.current_stock || 0}
+                                {hasInsufficientStock(item) && (
+                                  <div className="text-red-600 font-bold">¡Sin stock suficiente!</div>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           <div className="col-span-2 text-center text-sm font-semibold text-gray-900">
@@ -499,7 +532,9 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                         </div>
 
                         {/* Mobile View */}
-                        <div className="md:hidden p-4 border border-gray-200 rounded-lg bg-white space-y-3">
+                        <div className={`md:hidden p-4 border border-gray-200 rounded-lg space-y-3 ${
+                          hasInsufficientStock(item) ? 'bg-red-50 border-red-300' : 'bg-white'
+                        }`}>
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-700">Ingrediente #{index + 1}</span>
                             <button
@@ -564,7 +599,17 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Unidad</label>
                               <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
-                                {item.ingredient_unit || '-'}
+                                <div>{item.ingredient_unit || '-'}</div>
+                                {item.ingredient && (
+                                  <div className={`text-xs mt-1 ${
+                                    hasInsufficientStock(item) ? 'text-red-600 font-semibold' : 'text-gray-500'
+                                  }`}>
+                                    Stock disponible: {availableIngredients.find(ing => ing.id === parseInt(item.ingredient))?.current_stock || 0}
+                                    {hasInsufficientStock(item) && (
+                                      <div className="text-red-600 font-bold">¡Sin stock suficiente!</div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
