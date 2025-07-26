@@ -39,7 +39,7 @@ class GroupViewSet(viewsets.ModelViewSet):
 
 
 class IngredientViewSet(viewsets.ModelViewSet):
-    queryset = Ingredient.objects.all().order_by('name')
+    queryset = Ingredient.objects.all().order_by('id')
     
     def get_serializer_class(self):
         if self.action in ['retrieve', 'create', 'update', 'partial_update']:
@@ -47,7 +47,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
         return IngredientSerializer
     
     def get_queryset(self):
-        queryset = Ingredient.objects.all().order_by('name')
+        queryset = Ingredient.objects.all().order_by('id')
         category = self.request.query_params.get('category')
         unit = self.request.query_params.get('unit')
         is_active = self.request.query_params.get('is_active')
@@ -58,6 +58,12 @@ class IngredientViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(unit_id=unit)
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        
+        # Para creación de recetas, solo mostrar ingredientes activos
+        if self.request.path.endswith('/ingredients/') and self.request.method == 'GET':
+            show_all = self.request.query_params.get('show_all')
+            if not show_all:
+                queryset = queryset.filter(is_active=True)
             
         return queryset
     
@@ -112,6 +118,17 @@ class RecipeViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_available=is_available.lower() == 'true')
         if group:
             queryset = queryset.filter(group_id=group)
+        
+        # Para creación de pedidos, solo mostrar recetas disponibles
+        if self.request.path.endswith('/recipes/') and self.request.method == 'GET':
+            show_all = self.request.query_params.get('show_all')
+            if not show_all:
+                # Filtrar por recetas que están disponibles Y tienen stock
+                available_recipes = []
+                for recipe in queryset:
+                    if recipe.is_available and recipe.check_availability():
+                        available_recipes.append(recipe.id)
+                queryset = queryset.filter(id__in=available_recipes)
             
         return queryset
     

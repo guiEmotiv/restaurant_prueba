@@ -63,6 +63,9 @@ class Ingredient(models.Model):
             self.current_stock -= quantity
         elif operation == 'add':
             self.current_stock += quantity
+        
+        # Actualizar is_active basado en el stock
+        self.is_active = self.current_stock > 0
         self.save()
 
 
@@ -118,10 +121,18 @@ class Recipe(models.Model):
 
     def check_availability(self):
         """Verifica si la receta está disponible según el stock"""
+        if not self.is_available:
+            return False
         for recipe_item in self.recipeitem_set.all():
-            if recipe_item.ingredient.current_stock < recipe_item.quantity:
+            if not recipe_item.ingredient.is_active or recipe_item.ingredient.current_stock < recipe_item.quantity:
                 return False
         return True
+    
+    def save(self, *args, **kwargs):
+        # Verificar disponibilidad automáticamente al guardar
+        if self.pk:  # Solo si ya existe la receta
+            self.is_available = self.check_availability()
+        super().save(*args, **kwargs)
 
     def consume_ingredients(self):
         """Consume los ingredientes del stock cuando se prepara la receta"""

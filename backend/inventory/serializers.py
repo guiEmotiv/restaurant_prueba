@@ -27,7 +27,7 @@ class IngredientSerializer(serializers.ModelSerializer):
             'name', 'unit_price', 'current_stock', 'is_active', 
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'is_active', 'created_at', 'updated_at']
 
 
 class IngredientDetailSerializer(IngredientSerializer):
