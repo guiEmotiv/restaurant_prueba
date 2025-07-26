@@ -80,7 +80,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'table', 'table_number', 'zone_name', 'status',
             'total_amount', 'items_count', 'created_at',
-            'served_at', 'paid_at'
+            'served_at', 'paid_at', 'operational_date'
         ]
         read_only_fields = [
             'id', 'total_amount', 'created_at',
@@ -186,7 +186,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = [
             'id', 'order', 'order_table', 'order_total', 'payment_method',
-            'tax_amount', 'amount', 'notes', 'created_at'
+            'tax_amount', 'amount', 'notes', 'created_at', 'operational_date'
         ]
         read_only_fields = ['id', 'created_at']
     

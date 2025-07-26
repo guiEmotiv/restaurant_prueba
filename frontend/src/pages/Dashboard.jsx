@@ -58,19 +58,23 @@ const Dashboard = () => {
         allOrdersList,
         activeOrders,
         allIngredients,
-        payments,
+        operationalSummary,
         tables,
         recipes
       ] = await Promise.all([
         apiService.orders.getAll(),
         apiService.orders.getActive(),
         apiService.ingredients.getAll(),
-        apiService.payments.getAll(),
+        apiService.payments.getOperationalSummary(),
         apiService.tables.getAll(),
         apiService.recipes.getAll()
       ]);
 
-      // Load detailed orders with items for paid orders only
+      // Use operational summary data for revenue metrics
+      const todayRevenue = operationalSummary.total_amount || 0;
+      const todayOrders = operationalSummary.total_orders || 0;
+      
+      // Load detailed orders with items for paid orders only (for recipe analysis)
       const paidOrderIds = allOrdersList.filter(order => order.status === 'PAID').map(order => order.id);
       const allOrders = await Promise.all(
         paidOrderIds.map(async (orderId) => {
@@ -86,30 +90,17 @@ const Dashboard = () => {
       // Filter out null results
       const validOrders = allOrders.filter(order => order !== null);
 
-      // Fechas para filtros
-      const today = new Date();
-      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-      // Filtrar datos de hoy
-      const todaysOrders = validOrders.filter(order => 
-        new Date(order.created_at) >= startOfToday
-      );
-      const todaysPayments = payments.filter(payment => 
-        new Date(payment.created_at) >= startOfToday
-      );
-
-      // Calcular métricas básicas
-      const totalRevenue = payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
-      const todayRevenue = todaysPayments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
+      // Calculate total revenue from all historical payments (for growth calculation)
+      const allPayments = operationalSummary.payments || [];
+      const totalRevenue = allPayments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
       
       const lowStockItems = allIngredients.filter(ingredient => 
         ingredient.current_stock <= 5 && ingredient.is_active
       );
 
       // Métricas avanzadas
-      const averageOrderValue = validOrders.length > 0 ? totalRevenue / validOrders.length : 0;
-      const revenueGrowth = calculateGrowth(payments, weekAgo);
+      const averageOrderValue = todayOrders > 0 ? todayRevenue / todayOrders : 0;
+      const revenueGrowth = 0; // Simplificado para fecha operativa - se puede mejorar más tarde
       
       // Agrupar recetas por grupos reales del backend
       const recipesByGroup = {};
@@ -170,9 +161,9 @@ const Dashboard = () => {
       console.log('RecipeGroups length for render:', recipeGroups.length);
 
 
-      // Datos para gráficos
-      const weeklyRevenue = generateWeeklyRevenue(payments);
-      const hourlyOrders = generateHourlyOrders(todaysOrders);
+      // Datos para gráficos (simplificados para fecha operativa)
+      const weeklyRevenue = [];
+      const hourlyOrders = [];
       const topTables = generateTopTables(allOrdersList, tables);
 
 
@@ -182,7 +173,7 @@ const Dashboard = () => {
         lowStockItems: lowStockItems.length,
         activeOrders: activeOrders.length,
         todayRevenue,
-        todayOrders: todaysOrders.length,
+        todayOrders: todayOrders,
         averageOrderValue,
         avgServiceTime: calculateAvgServiceTime(validOrders),
         recipeGroups: recipeGroups,

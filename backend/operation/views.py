@@ -281,3 +281,45 @@ class PaymentViewSet(viewsets.ModelViewSet):
             'total_card': total_card,
             'payments': PaymentSerializer(payments, many=True).data
         })
+    
+    @action(detail=False, methods=['get'])
+    def operational_summary(self, request):
+        """Resumen de pagos por fecha operativa"""
+        # Obtener fecha operativa actual
+        operational_date = Order.get_operational_date()
+        
+        # Filtrar pagos por fecha operativa
+        payments = Payment.objects.filter(operational_date=operational_date)
+        
+        # Calcular totales por método de pago
+        from django.db.models import Sum, Count
+        
+        summary_by_method = payments.values('payment_method').annotate(
+            count=Count('id'),
+            total=Sum('amount')
+        )
+        
+        # Totales generales
+        total_amount = payments.aggregate(Sum('amount'))['amount__sum'] or 0
+        total_orders = payments.count()
+        
+        # Desglose por método
+        method_totals = {
+            'CASH': 0,
+            'CARD': 0,
+            'TRANSFER': 0,
+            'YAPE_PLIN': 0,
+            'OTHER': 0
+        }
+        
+        for item in summary_by_method:
+            method_totals[item['payment_method']] = float(item['total'] or 0)
+        
+        return Response({
+            'operational_date': operational_date,
+            'system_date': timezone.now().date(),
+            'total_orders': total_orders,
+            'total_amount': float(total_amount),
+            'method_breakdown': method_totals,
+            'payments': PaymentSerializer(payments, many=True).data
+        })

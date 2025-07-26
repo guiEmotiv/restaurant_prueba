@@ -25,6 +25,8 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     served_at = models.DateTimeField(null=True, blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
+    # Fecha operativa: fecha de negocio (ej: si abre 8pm hoy hasta 3am mañana, toda la operación es fecha de hoy)
+    operational_date = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = 'order'
@@ -35,7 +37,24 @@ class Order(models.Model):
         return f"Orden #{self.id} - Mesa {self.table.table_number}"
 
     def save(self, *args, **kwargs):
+        # Establecer fecha operativa si no existe
+        if not self.operational_date:
+            self.operational_date = self.get_operational_date()
         super().save(*args, **kwargs)
+    
+    @staticmethod
+    def get_operational_date():
+        """Obtiene la fecha operativa actual (corte a las 5am)"""
+        from django.utils import timezone
+        import datetime
+        
+        now = timezone.now()
+        # Si es después de las 5am, usar fecha actual
+        if now.hour >= 5:
+            return now.date()
+        # Si es antes de las 5am, usar fecha del día anterior
+        else:
+            return (now - datetime.timedelta(days=1)).date()
 
     def calculate_total(self):
         """Calcula el total de la orden"""
@@ -230,6 +249,7 @@ class Payment(models.Model):
         ('CASH', 'Efectivo'),
         ('CARD', 'Tarjeta'),
         ('TRANSFER', 'Transferencia'),
+        ('YAPE_PLIN', 'Yape/Plin'),
         ('OTHER', 'Otro'),
     ]
 
@@ -247,6 +267,8 @@ class Payment(models.Model):
     )
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Fecha operativa heredada de la orden
+    operational_date = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = 'payment'
@@ -257,6 +279,9 @@ class Payment(models.Model):
         return f"Pago {self.order} - {self.payment_method}"
 
     def save(self, *args, **kwargs):
+        # Heredar fecha operativa de la orden
+        if not self.operational_date and self.order:
+            self.operational_date = self.order.operational_date
         super().save(*args, **kwargs)
         # Actualizar estado de la orden a PAID
         self.order.update_status('PAID')

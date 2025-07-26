@@ -287,6 +287,10 @@ export const apiService = {
       const response = await api.get('/payments/daily_summary/');
       return response.data;
     },
+    getOperationalSummary: async () => {
+      const response = await api.get('/payments/operational_summary/');
+      return response.data;
+    },
   },
 
 };

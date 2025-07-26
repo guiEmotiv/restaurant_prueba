@@ -288,6 +288,7 @@ const Payment = () => {
                 <option value="CASH">Efectivo</option>
                 <option value="CARD">Tarjeta</option>
                 <option value="TRANSFER">Transferencia</option>
+                <option value="YAPE_PLIN">Yape/Plin</option>
                 <option value="OTHER">Otro</option>
               </select>
             </div>
