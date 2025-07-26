@@ -409,16 +409,44 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
 
             {/* Ingredientes */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 gap-2">
                 <h3 className="text-lg font-medium text-gray-900">Ingredientes *</h3>
-                <Button
-                  onClick={addRecipeItem}
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Agregar
-                </Button>
+                
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1">
+                  {/* Add Ingredient Button */}
+                  <button
+                    onClick={addRecipeItem}
+                    className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    title="Agregar ingrediente"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  
+                  {/* Save Button */}
+                  <button
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={loading ? "Guardando..." : (recipe ? "Actualizar receta" : "Crear receta")}
+                  >
+                    {loading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                  </button>
+                  
+                  {/* Cancel Button */}
+                  <button
+                    onClick={onClose}
+                    disabled={loading}
+                    className="p-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Cancelar"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               {errors.ingredients && (
@@ -674,34 +702,6 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 md:p-6 border-t border-gray-200 bg-gray-50">
-          <Button
-            onClick={onClose}
-            variant="secondary"
-            disabled={loading}
-            className="w-full sm:w-auto"
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={loading}
-            className="flex items-center justify-center gap-2 w-full sm:w-auto"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                {recipe ? 'Actualizar Receta' : 'Crear Receta'}
-              </>
-            )}
-          </Button>
-        </div>
       </div>
     </div>
   );

@@ -115,7 +115,8 @@ const Recipes = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow">
-        <div className="overflow-x-auto">
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -235,6 +236,111 @@ const Recipes = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="md:hidden">
+          {recipes.length === 0 ? (
+            <div className="p-6 text-center text-gray-500">
+              <div className="text-4xl mb-2">🍳</div>
+              <p className="text-lg font-medium">No hay recetas disponibles</p>
+              <p className="text-sm">Las nuevas recetas aparecerán aquí</p>
+            </div>
+          ) : (
+            <div className="space-y-3 p-4">
+              {recipes.map((recipe) => (
+                <div key={recipe.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="space-y-3">
+                    {/* Recipe header */}
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
+                          <ChefHat className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">{recipe.name}</h3>
+                          <p className="text-sm text-gray-600">Receta #{recipe.id}</p>
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                        recipe.is_available_calculated 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {recipe.is_available_calculated ? 'Disponible' : 'Falta de stock'}
+                      </span>
+                    </div>
+                    
+                    {/* Recipe details */}
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <dt className="font-medium text-gray-500">Grupo</dt>
+                        <dd className="text-base font-semibold text-gray-900">
+                          {recipe.group_name ? (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {recipe.group_name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">Sin grupo</span>
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium text-gray-500">Precio</dt>
+                        <dd className="text-base font-bold text-gray-900">{formatCurrency(recipe.base_price)}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium text-gray-500">Ganancia</dt>
+                        <dd className="text-base font-semibold text-gray-900">
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                            {recipe.profit_percentage}%
+                          </span>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium text-gray-500">Tiempo</dt>
+                        <dd className="text-base font-semibold text-gray-900">{recipe.preparation_time} min</dd>
+                      </div>
+                    </div>
+                    
+                    {/* Ingredients count */}
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Ingredientes</dt>
+                      <dd className="text-sm text-gray-900 flex items-center">
+                        <Package className="h-4 w-4 text-gray-400 mr-1" />
+                        <span>{recipe.ingredients_count || 0} ingredientes</span>
+                      </dd>
+                    </div>
+                    
+                    {/* Date */}
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Fecha de creación</dt>
+                      <dd className="text-sm text-gray-900">{new Date(recipe.created_at).toLocaleDateString('es-PE')}</dd>
+                    </div>
+                    
+                    {/* Action buttons for mobile */}
+                    <div className="flex gap-3 pt-3 border-t border-gray-200">
+                      <button
+                        onClick={() => handleEdit(recipe)}
+                        className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center flex items-center justify-center gap-2"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Editar
+                      </button>
+                      
+                      <button
+                        onClick={() => handleDelete(recipe)}
+                        className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors text-center flex items-center justify-center gap-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       
