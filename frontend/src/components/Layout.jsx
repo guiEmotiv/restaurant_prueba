@@ -46,6 +46,7 @@ const Layout = ({ children }) => {
     },
     { name: 'Pedidos', href: '/orders', icon: ShoppingCart },
     { name: 'Cocina', href: '/kitchen', icon: Utensils },
+    { name: 'Estado Mesas', href: '/table-status', icon: Table },
     { name: 'Pagos', href: '/payments', icon: CreditCard },
     { name: 'Historial', href: '/payment-history', icon: History },
   ];

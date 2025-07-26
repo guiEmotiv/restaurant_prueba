@@ -15,6 +15,7 @@ import Payments from './pages/operation/Payments';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
+import TableStatus from './pages/operation/TableStatus';
 
 const AppContent = () => {
   return (
@@ -39,6 +40,7 @@ const AppContent = () => {
         <Route path="/orders/:id/payment" element={<Payment />} />
         <Route path="/orders/:id/receipt" element={<OrderReceipt />} />
         <Route path="/kitchen" element={<Kitchen />} />
+        <Route path="/table-status" element={<TableStatus />} />
 
         {/* Payment routes */}
         <Route path="/payments" element={<Payments />} />
