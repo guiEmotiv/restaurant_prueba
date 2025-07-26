@@ -60,6 +60,7 @@ const Dashboard = () => {
     closing_time: '03:00'
   });
   const [configLoading, setConfigLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     loadDashboardData();
@@ -67,6 +68,35 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadOperationalConfig();
+  }, []);
+
+  // Actualizar información operacional cada minuto
+  useEffect(() => {
+    const updateOperationalInfo = async () => {
+      try {
+        const operationalInfoData = await apiService.restaurantConfig.getOperationalInfo();
+        setOperationalInfo(operationalInfoData);
+      } catch (error) {
+        console.error('Error updating operational info:', error);
+      }
+    };
+
+    // Actualizar inmediatamente
+    updateOperationalInfo();
+    
+    // Configurar intervalo para actualizar cada minuto
+    const interval = setInterval(updateOperationalInfo, 60000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Actualizar hora actual cada segundo
+  useEffect(() => {
+    const timeInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    
+    return () => clearInterval(timeInterval);
   }, []);
 
   const loadOperationalConfig = async () => {
@@ -722,9 +752,13 @@ const Dashboard = () => {
                 <h4 className="font-medium text-blue-900 mb-2">Configuración Actual:</h4>
                 <div className="text-sm text-blue-800 space-y-1">
                   <p>• Apertura: {operationalConfig.opening_time}</p>
-                  <p>• Cierre: {operationalConfig.closing_time}</p>
+                  <p>• Cierre: {operationalConfig.closing_time} {operationalConfig.opening_time > operationalConfig.closing_time ? '(día siguiente)' : ''}</p>
+                  <p>• Hora actual: {currentTime.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
                   <p className="text-xs text-blue-600 mt-2">
-                    El restaurante estará "Abierto" cuando la hora actual esté entre estos horarios.
+                    {operationalConfig.opening_time > operationalConfig.closing_time 
+                      ? `Horario nocturno: abierto desde las ${operationalConfig.opening_time} hasta las ${operationalConfig.closing_time} del día siguiente.`
+                      : `Horario diurno: abierto desde las ${operationalConfig.opening_time} hasta las ${operationalConfig.closing_time} del mismo día.`
+                    }
                   </p>
                 </div>
               </div>
