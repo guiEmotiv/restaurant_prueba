@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Unit, Zone, Table
+from .models import Unit, Zone, Table, RestaurantOperationalConfig
 
 
 class UnitSerializer(serializers.ModelSerializer):
@@ -35,3 +35,20 @@ class TableDetailSerializer(TableSerializer):
     
     class Meta(TableSerializer.Meta):
         fields = TableSerializer.Meta.fields + ['zone_detail']
+
+
+class RestaurantOperationalConfigSerializer(serializers.ModelSerializer):
+    business_hours_text = serializers.CharField(source='get_business_hours_text', read_only=True)
+    is_currently_open = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RestaurantOperationalConfig
+        fields = [
+            'id', 'name', 'opening_time', 'closing_time', 'operational_cutoff_time',
+            'is_active', 'business_hours_text', 'is_currently_open',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_is_currently_open(self, obj):
+        return obj.is_currently_open()

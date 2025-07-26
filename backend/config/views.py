@@ -1,10 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import Unit, Zone, Table
+from .models import Unit, Zone, Table, RestaurantOperationalConfig
 from .serializers import (
     UnitSerializer, ZoneSerializer, 
-    TableSerializer, TableDetailSerializer
+    TableSerializer, TableDetailSerializer,
+    RestaurantOperationalConfigSerializer
 )
 
 
@@ -63,3 +64,53 @@ class TableViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         return Response({'message': 'No hay orden activa para esta mesa'}, 
                        status=status.HTTP_404_NOT_FOUND)
+
+
+class RestaurantOperationalConfigViewSet(viewsets.ModelViewSet):
+    queryset = RestaurantOperationalConfig.objects.all().order_by('-created_at')
+    serializer_class = RestaurantOperationalConfigSerializer
+    
+    @action(detail=False, methods=['get'])
+    def active(self, request):
+        """Obtener la configuración operativa activa"""
+        config = RestaurantOperationalConfig.get_active_config()
+        if config:
+            serializer = self.get_serializer(config)
+            return Response(serializer.data)
+        return Response({'message': 'No hay configuración activa'}, 
+                       status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None):
+        """Activar una configuración específica"""
+        config = self.get_object()
+        config.is_active = True
+        config.save()  # El save() automáticamente desactiva las otras
+        serializer = self.get_serializer(config)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def operational_info(self, request):
+        """Información operativa actual del restaurante"""
+        from django.utils import timezone
+        
+        config = RestaurantOperationalConfig.get_active_config()
+        now = timezone.now()
+        operational_date = RestaurantOperationalConfig.get_operational_date()
+        
+        data = {
+            'current_datetime': now,
+            'operational_date': operational_date,
+            'has_config': bool(config)
+        }
+        
+        if config:
+            data.update({
+                'is_currently_open': config.is_currently_open(),
+                'business_hours': config.get_business_hours_text(),
+                'opening_time': config.opening_time,
+                'closing_time': config.closing_time,
+                'operational_cutoff_time': config.operational_cutoff_time
+            })
+        
+        return Response(data)

@@ -50,6 +50,7 @@ const Dashboard = () => {
     return today.toISOString().split('T')[0];
   });
   const [operationalDate, setOperationalDate] = useState(null);
+  const [operationalInfo, setOperationalInfo] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -66,22 +67,25 @@ const Dashboard = () => {
         allIngredients,
         operationalSummary,
         tables,
-        recipes
+        recipes,
+        operationalInfoData
       ] = await Promise.all([
         apiService.orders.getAll(),
         apiService.orders.getActive(),
         apiService.ingredients.getAll(),
         apiService.payments.getOperationalSummary(selectedDate),
         apiService.tables.getAll(),
-        apiService.recipes.getAll()
+        apiService.recipes.getAll(),
+        apiService.restaurantConfig.getOperationalInfo()
       ]);
 
       // Use operational summary data for revenue metrics
       const todayRevenue = operationalSummary.total_amount || 0;
       const todayOrders = operationalSummary.total_orders || 0;
       
-      // Actualizar fecha operativa mostrada
+      // Actualizar fecha operativa mostrada e información operacional
       setOperationalDate(operationalSummary.operational_date);
+      setOperationalInfo(operationalInfoData);
       
       // Load detailed orders with items for paid orders only (for recipe analysis)
       const paidOrderIds = allOrdersList.filter(order => order.status === 'PAID').map(order => order.id);
@@ -345,12 +349,33 @@ const Dashboard = () => {
           <h1 className="text-3xl font-bold text-gray-900">Dashboard Administrativo</h1>
           <p className="text-gray-600">
             Indicadores clave y métricas de rendimiento
+          </p>
+          <div className="flex flex-wrap items-center gap-4 mt-2">
             {operationalDate && (
-              <span className="ml-2 text-sm font-medium text-blue-600">
-                (Fecha operativa: {new Date(operationalDate).toLocaleDateString('es-PE')})
+              <span className="text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                📅 Fecha operativa: {new Date(operationalDate).toLocaleDateString('es-PE')}
               </span>
             )}
-          </p>
+            {operationalInfo?.has_config && (
+              <>
+                <span className={`text-sm font-medium px-2 py-1 rounded ${
+                  operationalInfo.is_currently_open 
+                    ? 'text-green-700 bg-green-50' 
+                    : 'text-red-700 bg-red-50'
+                }`}>
+                  {operationalInfo.is_currently_open ? '🟢 Abierto' : '🔴 Cerrado'}
+                </span>
+                <span className="text-sm text-gray-500">
+                  🕐 {operationalInfo.business_hours}
+                </span>
+              </>
+            )}
+            {!operationalInfo?.has_config && (
+              <span className="text-sm text-yellow-700 bg-yellow-50 px-2 py-1 rounded">
+                ⚠️ Sin configuración operativa
+              </span>
+            )}
+          </div>
         </div>
         
         {/* Filtro de Fecha Operativa */}

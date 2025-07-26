@@ -3,7 +3,7 @@ from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # Import ViewSets
-from config.views import UnitViewSet, ZoneViewSet, TableViewSet
+from config.views import UnitViewSet, ZoneViewSet, TableViewSet, RestaurantOperationalConfigViewSet
 from inventory.views import GroupViewSet, IngredientViewSet, RecipeViewSet, RecipeItemViewSet
 from operation.views import (
     OrderViewSet, OrderItemViewSet, OrderItemIngredientViewSet, PaymentViewSet
@@ -16,6 +16,7 @@ router = DefaultRouter()
 router.register(r'units', UnitViewSet, basename='unit')
 router.register(r'zones', ZoneViewSet, basename='zone')
 router.register(r'tables', TableViewSet, basename='table')
+router.register(r'restaurant-config', RestaurantOperationalConfigViewSet, basename='restaurant-config')
 
 # Inventory app routes
 router.register(r'groups', GroupViewSet, basename='group')

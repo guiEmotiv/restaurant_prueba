@@ -294,6 +294,27 @@ export const apiService = {
     },
   },
 
+  // Restaurant config endpoints
+  restaurantConfig: {
+    getAll: () => apiService.getAll('restaurant-config'),
+    getById: (id) => apiService.getById('restaurant-config', id),
+    create: (data) => apiService.create('restaurant-config', data),
+    update: (id, data) => apiService.update('restaurant-config', id, data),
+    delete: (id) => apiService.delete('restaurant-config', id),
+    getActive: async () => {
+      const response = await api.get('/restaurant-config/active/');
+      return response.data;
+    },
+    activate: async (id) => {
+      const response = await api.post(`/restaurant-config/${id}/activate/`);
+      return response.data;
+    },
+    getOperationalInfo: async () => {
+      const response = await api.get('/restaurant-config/operational_info/');
+      return response.data;
+    },
+  },
+
 };
 
 export default api;

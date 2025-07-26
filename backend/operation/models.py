@@ -44,17 +44,9 @@ class Order(models.Model):
     
     @staticmethod
     def get_operational_date():
-        """Obtiene la fecha operativa actual (corte a las 5am)"""
-        from django.utils import timezone
-        import datetime
-        
-        now = timezone.now()
-        # Si es después de las 5am, usar fecha actual
-        if now.hour >= 5:
-            return now.date()
-        # Si es antes de las 5am, usar fecha del día anterior
-        else:
-            return (now - datetime.timedelta(days=1)).date()
+        """Obtiene la fecha operativa actual basada en configuración del restaurante"""
+        from config.models import RestaurantOperationalConfig
+        return RestaurantOperationalConfig.get_operational_date()
 
     def calculate_total(self):
         """Calcula el total de la orden"""
