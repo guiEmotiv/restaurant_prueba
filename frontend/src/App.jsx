@@ -1,6 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Amplify } from 'aws-amplify';
 import { ToastProvider } from './contexts/ToastContext';
+import { AuthProvider } from './contexts/AuthContext';
+import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
+import LoginForm from './components/auth/LoginForm';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Units from './pages/config/Units';
 import Zones from './pages/config/Zones';
@@ -17,48 +22,119 @@ import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
 import TableStatus from './pages/operation/TableStatus';
 
+// Configure Amplify
+Amplify.configure(amplifyConfig);
+
 const AppContent = () => {
   return (
-    <Layout>
-      <Routes>
-        {/* Dashboard */}
-        <Route path="/" element={<Dashboard />} />
+    <LoginForm>
+      <Layout>
+        <Routes>
+          {/* Dashboard */}
+          <Route path="/" element={
+            <ProtectedRoute requiredPermission="canViewDashboard">
+              <Dashboard />
+            </ProtectedRoute>
+          } />
 
-        {/* Configuration routes */}
-        <Route path="/units" element={<Units />} />
-        <Route path="/zones" element={<Zones />} />
-        <Route path="/tables" element={<Tables />} />
+          {/* Configuration routes */}
+          <Route path="/units" element={
+            <ProtectedRoute requiredPermission="canManageConfig">
+              <Units />
+            </ProtectedRoute>
+          } />
+          <Route path="/zones" element={
+            <ProtectedRoute requiredPermission="canManageConfig">
+              <Zones />
+            </ProtectedRoute>
+          } />
+          <Route path="/tables" element={
+            <ProtectedRoute requiredPermission="canManageConfig">
+              <Tables />
+            </ProtectedRoute>
+          } />
 
-        {/* Inventory routes */}
-        <Route path="/groups" element={<Groups />} />
-        <Route path="/ingredients" element={<Ingredients />} />
-        <Route path="/recipes" element={<Recipes />} />
+          {/* Inventory routes */}
+          <Route path="/groups" element={
+            <ProtectedRoute requiredPermission="canManageInventory">
+              <Groups />
+            </ProtectedRoute>
+          } />
+          <Route path="/ingredients" element={
+            <ProtectedRoute requiredPermission="canManageInventory">
+              <Ingredients />
+            </ProtectedRoute>
+          } />
+          <Route path="/recipes" element={
+            <ProtectedRoute requiredPermission="canManageInventory">
+              <Recipes />
+            </ProtectedRoute>
+          } />
 
-        {/* Operation routes */}
-        <Route path="/orders" element={<Orders />} />
-        <Route path="/orders/:id" element={<OrderDetail />} />
-        <Route path="/orders/:id/payment" element={<Payment />} />
-        <Route path="/orders/:id/receipt" element={<OrderReceipt />} />
-        <Route path="/kitchen" element={<Kitchen />} />
-        <Route path="/table-status" element={<TableStatus />} />
+          {/* Operation routes */}
+          <Route path="/orders" element={
+            <ProtectedRoute requiredPermission="canManageOrders">
+              <Orders />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders/:id" element={
+            <ProtectedRoute requiredPermission="canManageOrders">
+              <OrderDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders/:id/payment" element={
+            <ProtectedRoute requiredPermission="canManagePayments">
+              <Payment />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders/:id/receipt" element={
+            <ProtectedRoute requiredPermission="canManagePayments">
+              <OrderReceipt />
+            </ProtectedRoute>
+          } />
+          <Route path="/kitchen" element={
+            <ProtectedRoute requiredPermission="canViewKitchen">
+              <Kitchen />
+            </ProtectedRoute>
+          } />
+          <Route path="/table-status" element={
+            <ProtectedRoute requiredPermission="canViewTableStatus">
+              <TableStatus />
+            </ProtectedRoute>
+          } />
 
-        {/* Payment routes */}
-        <Route path="/payments" element={<Payments />} />
-        <Route path="/payment-history" element={<PaymentHistory />} />
+          {/* Payment routes */}
+          <Route path="/payments" element={
+            <ProtectedRoute requiredPermission="canManagePayments">
+              <Payments />
+            </ProtectedRoute>
+          } />
+          <Route path="/payment-history" element={
+            <ProtectedRoute requiredPermission="canViewHistory">
+              <PaymentHistory />  
+            </ProtectedRoute>
+          } />
 
-        {/* Redirect to dashboard */}
-        <Route path="*" element={<Dashboard />} />
-      </Routes>
-    </Layout>
+          {/* Redirect to orders for unauthorized access */}
+          <Route path="*" element={
+            <ProtectedRoute requiredPermission="canManageOrders">
+              <Orders />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </Layout>
+    </LoginForm>
   );
 };
 
 function App() {
   return (
     <ToastProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <AuthProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </AuthProvider>
     </ToastProvider>
   );
 }

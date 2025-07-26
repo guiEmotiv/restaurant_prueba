@@ -15,41 +15,63 @@ import {
   Utensils,
   CreditCard,
   Layers,
-  History
+  History,
+  User,
+  LogOut
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const Layout = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
+  const { user, userRole, logout, hasPermission } = useAuth();
 
-  // Define navigation items - accessible to all
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: Home },
+  // Define navigation items with permissions
+  const allNavigation = [
+    { name: 'Dashboard', href: '/', icon: Home, permission: 'canViewDashboard' },
     { 
       name: 'Configuración', 
       icon: Settings,
+      permission: 'canManageConfig',
       children: [
-        { name: 'Unidades', href: '/units', icon: Ruler },
-        { name: 'Zonas', href: '/zones', icon: MapPin },
-        { name: 'Mesas', href: '/tables', icon: Table },
+        { name: 'Unidades', href: '/units', icon: Ruler, permission: 'canManageConfig' },
+        { name: 'Zonas', href: '/zones', icon: MapPin, permission: 'canManageConfig' },
+        { name: 'Mesas', href: '/tables', icon: Table, permission: 'canManageConfig' },
       ]
     },
     { 
       name: 'Inventario', 
       icon: Package,
+      permission: 'canManageInventory',
       children: [
-        { name: 'Grupos', href: '/groups', icon: Layers },
-        { name: 'Ingredientes', href: '/ingredients', icon: Apple },
-        { name: 'Recetas', href: '/recipes', icon: ChefHat },
+        { name: 'Grupos', href: '/groups', icon: Layers, permission: 'canManageInventory' },
+        { name: 'Ingredientes', href: '/ingredients', icon: Apple, permission: 'canManageInventory' },
+        { name: 'Recetas', href: '/recipes', icon: ChefHat, permission: 'canManageInventory' },
       ]
     },
-    { name: 'Pedidos', href: '/orders', icon: ShoppingCart },
-    { name: 'Cocina', href: '/kitchen', icon: Utensils },
-    { name: 'Estado Mesas', href: '/table-status', icon: Table },
-    { name: 'Pagos', href: '/payments', icon: CreditCard },
-    { name: 'Historial', href: '/payment-history', icon: History },
+    { name: 'Pedidos', href: '/orders', icon: ShoppingCart, permission: 'canManageOrders' },
+    { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
+    { name: 'Estado Mesas', href: '/table-status', icon: Table, permission: 'canViewTableStatus' },
+    { name: 'Pagos', href: '/payments', icon: CreditCard, permission: 'canManagePayments' },
+    { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
   ];
+
+  // Filter navigation based on user permissions
+  const navigation = allNavigation.filter(item => {
+    if (!item.permission) return true; // No permission required
+    if (!hasPermission(item.permission)) return false;
+    
+    // If item has children, filter them too
+    if (item.children) {
+      item.children = item.children.filter(child => 
+        !child.permission || hasPermission(child.permission)
+      );
+      return item.children.length > 0; // Only show parent if it has visible children
+    }
+    
+    return true;
+  });
 
   const isActive = (href) => location.pathname === href;
 
@@ -156,6 +178,27 @@ const Layout = ({ children }) => {
                 </div>
               ))}
             </nav>
+            
+            {/* User info and logout */}
+            <div className="px-4 py-4 border-t border-gray-200">
+              <div className="flex items-center px-3 py-2 text-sm text-gray-700">
+                <User className="mr-3 h-5 w-5" />
+                <div className="flex-1">
+                  <div className="font-medium">{user?.username || 'Usuario'}</div>
+                  <div className="text-xs text-gray-500 capitalize">
+                    {userRole === 'administradores' ? 'Administrador' : 
+                     userRole === 'meseros' ? 'Mesero' : 'Sin rol'}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md transition-colors"
+              >
+                <LogOut className="mr-3 h-5 w-5" />
+                Cerrar Sesión
+              </button>
+            </div>
             
           </div>
         </div>
