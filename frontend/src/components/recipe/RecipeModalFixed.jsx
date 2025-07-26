@@ -10,8 +10,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     name: '',
     group: '',
     preparation_time: '',
-    profit_percentage: '0.00',
-    is_available: true
+    profit_percentage: '0.00'
   });
   
   const [recipeItems, setRecipeItems] = useState([]);
@@ -30,8 +29,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
           name: recipe.name || '',
           group: recipe.group || '',
           preparation_time: recipe.preparation_time || '',
-          profit_percentage: recipe.profit_percentage || '0.00',
-          is_available: recipe.is_available !== undefined ? recipe.is_available : true
+          profit_percentage: recipe.profit_percentage || '0.00'
         });
         loadRecipeItems();
       } else {
@@ -46,8 +44,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       name: '',
       group: '',
       preparation_time: '',
-      profit_percentage: '0.00',
-      is_available: true
+      profit_percentage: '0.00'
     });
     setRecipeItems([]);
     setErrors({});
@@ -229,7 +226,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
         base_price: finalPrice > 0 ? finalPrice.toFixed(2) : "0.01", // Backend requiere precio mínimo como string
         profit_percentage: parseFloat(formData.profit_percentage) || 0,
         preparation_time: parseInt(formData.preparation_time),
-        is_available: formData.is_available,
+        is_available: true, // Por defecto siempre disponible
         recipe_items: validItems.map(item => ({
           ingredient: parseInt(item.ingredient),
           quantity: parseFloat(item.quantity)
@@ -294,104 +291,97 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
             {/* Información básica */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Información Básica</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="md:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nombre de la Receta *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                      errors.name ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Ej: Arroz con Pollo"
-                  />
-                  {errors.name && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.name}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Grupo
-                  </label>
-                  <select
-                    name="group"
-                    value={formData.group}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="">Sin grupo</option>
-                    {availableGroups.map(group => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tiempo de Preparación (min) *
-                  </label>
-                  <input
-                    type="number"
-                    name="preparation_time"
-                    value={formData.preparation_time}
-                    onChange={handleInputChange}
-                    min="1"
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                      errors.preparation_time ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="25"
-                  />
-                  {errors.preparation_time && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.preparation_time}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Porcentaje de Ganancia (%)
-                  </label>
-                  <input
-                    type="number"
-                    name="profit_percentage"
-                    value={formData.profit_percentage}
-                    onChange={handleInputChange}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                      errors.profit_percentage ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="25.00"
-                  />
-                  {errors.profit_percentage && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.profit_percentage}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center pt-6">
-                  <label className="flex items-center">
+              <div className="space-y-4">
+                {/* Primera fila: Nombre y Grupo */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nombre de la Receta *
+                    </label>
                     <input
-                      type="checkbox"
-                      name="is_available"
-                      checked={formData.is_available}
+                      type="text"
+                      name="name"
+                      value={formData.name}
                       onChange={handleInputChange}
-                      className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                        errors.name ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Ej: Arroz con Pollo"
                     />
-                    <span className="text-sm font-medium text-gray-700">Disponible en el menú</span>
-                  </label>
+                    {errors.name && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.name}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Grupo
+                    </label>
+                    <select
+                      name="group"
+                      value={formData.group}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Sin grupo</option>
+                      {availableGroups.map(group => (
+                        <option key={group.id} value={group.id}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Segunda fila: Tiempo de Preparación y Porcentaje de Ganancia */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tiempo de Preparación (min) *
+                    </label>
+                    <input
+                      type="number"
+                      name="preparation_time"
+                      value={formData.preparation_time}
+                      onChange={handleInputChange}
+                      min="1"
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                        errors.preparation_time ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="25"
+                    />
+                    {errors.preparation_time && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.preparation_time}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Porcentaje de Ganancia (%)
+                    </label>
+                    <input
+                      type="number"
+                      name="profit_percentage"
+                      value={formData.profit_percentage}
+                      onChange={handleInputChange}
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                        errors.profit_percentage ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="25.00"
+                    />
+                    {errors.profit_percentage && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.profit_percentage}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
