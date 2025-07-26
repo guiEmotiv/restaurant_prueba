@@ -169,15 +169,15 @@ const Dashboard = () => {
       // Filter out null results
       const validOrders = allOrders.filter(order => order !== null);
 
-      // Calculate total revenue from all historical payments (for growth calculation)
+      // Calculate total revenue from operational summary (ya filtrado por fecha)
       const allPayments = operationalSummary.payments || [];
-      const totalRevenue = allPayments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0);
+      const totalRevenue = todayRevenue; // Usar el revenue de la fecha operativa seleccionada
       
       const lowStockItems = allIngredients.filter(ingredient => 
         ingredient.current_stock <= 5 && ingredient.is_active
       );
 
-      // Métricas avanzadas
+      // Métricas avanzadas - todas basadas en fecha operativa seleccionada
       const averageOrderValue = todayOrders > 0 ? todayRevenue / todayOrders : 0;
       const revenueGrowth = 0; // Simplificado para fecha operativa - se puede mejorar más tarde
       
@@ -240,27 +240,30 @@ const Dashboard = () => {
       console.log('RecipeGroups length for render:', recipeGroups.length);
 
 
-      // Datos para gráficos (simplificados para fecha operativa)
-      const weeklyRevenue = [];
-      const hourlyOrders = [];
-      const topTables = generateTopTables(allOrdersList, tables);
+      // Datos para gráficos basados en fecha operativa seleccionada
+      const weeklyRevenue = generateWeeklyRevenue(allPayments);
+      const hourlyOrders = generateHourlyOrders(filteredOrdersList);
+      const topTables = generateTopTables(filteredOrdersList, tables);
 
+
+      // Filtrar órdenes activas por fecha operativa
+      const activeOrdersFiltered = filteredOrdersList.filter(order => order.status !== 'PAID');
 
       setStats({
         totalOrders: filteredOrdersList.length,
         totalRevenue,
         lowStockItems: lowStockItems.length,
-        activeOrders: activeOrders.length,
+        activeOrders: activeOrdersFiltered.length,
         todayRevenue,
         todayOrders: todayOrders,
         averageOrderValue,
         avgServiceTime: calculateAvgServiceTime(validOrders),
         recipeGroups: recipeGroups,
         revenueGrowth,
-        tableOccupancy: calculateTableOccupancy(activeOrders, tables),
+        tableOccupancy: calculateTableOccupancy(activeOrdersFiltered, tables),
         weeklyRevenue,
         hourlyOrders,
-        topTables: generateTopTables(filteredOrdersList, tables)
+        topTables
       });
 
       // Set recent orders (last 5) - usar órdenes filtradas por fecha operativa
