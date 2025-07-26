@@ -20,6 +20,7 @@ import {
 
 const Layout = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
 
   // Define navigation items - accessible to all
@@ -52,9 +53,20 @@ const Layout = ({ children }) => {
   const isActive = (href) => location.pathname === href;
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Desktop sidebar toggle button */}
+      <div className="hidden lg:fixed lg:top-4 lg:left-4 lg:z-50 lg:block">
+        <button
+          onClick={toggleSidebar}
+          className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-white shadow-sm bg-white border border-gray-200"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </div>
+
       {/* Mobile menu button */}
       <div className="lg:hidden">
         <div className="flex items-center justify-between bg-white px-4 py-3 shadow-sm">
@@ -72,14 +84,19 @@ const Layout = ({ children }) => {
         {/* Sidebar */}
         <div className={`${
           isMenuOpen ? 'block' : 'hidden'
-        } lg:block fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto w-64 bg-white shadow-lg min-h-screen lg:min-h-auto`}>
+        } ${
+          isSidebarOpen ? 'lg:block' : 'lg:hidden'
+        } fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto w-64 bg-white shadow-lg min-h-screen lg:min-h-auto`}>
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 lg:justify-center">
               <h1 className="text-xl font-bold text-gray-900 lg:text-center">El Fogón de Don Soto</h1>
-              {/* Close button for mobile */}
+              {/* Close button for mobile and desktop */}
               <button
-                onClick={() => setIsMenuOpen(false)}
-                className="lg:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setIsSidebarOpen(false);
+                }}
+                className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -100,7 +117,10 @@ const Layout = ({ children }) => {
                           <Link
                             key={child.name}
                             to={child.href}
-                            onClick={() => setIsMenuOpen(false)}
+                            onClick={() => {
+                              setIsMenuOpen(false);
+                              setIsSidebarOpen(false);
+                            }}
                             className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                               isActive(child.href)
                                 ? 'bg-blue-100 text-blue-700'
@@ -116,7 +136,10 @@ const Layout = ({ children }) => {
                   ) : (
                     <Link
                       to={item.href}
-                      onClick={() => setIsMenuOpen(false)}
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        setIsSidebarOpen(false);
+                      }}
                       className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive(item.href)
                           ? 'bg-blue-100 text-blue-700'
@@ -136,7 +159,9 @@ const Layout = ({ children }) => {
 
         {/* Main content */}
         <div className="flex-1 lg:ml-0 min-h-screen">
-          <main className="p-4 lg:p-8 pt-20 lg:pt-8">
+          <main className={`p-4 lg:p-8 pt-20 lg:pt-16 transition-all duration-300 ${
+            isSidebarOpen ? 'lg:ml-0' : 'lg:ml-0'
+          }`}>
             {children}
           </main>
         </div>
@@ -147,6 +172,14 @@ const Layout = ({ children }) => {
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 lg:hidden z-40 transition-opacity duration-300"
           onClick={() => setIsMenuOpen(false)}
+        />
+      )}
+      
+      {/* Desktop overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="hidden lg:fixed lg:inset-0 lg:bg-black lg:bg-opacity-25 lg:z-40 lg:transition-opacity lg:duration-300 lg:block"
+          onClick={() => setIsSidebarOpen(false)}
         />
       )}
     </div>
