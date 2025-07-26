@@ -14,7 +14,10 @@ import {
   Star,
   ChefHat,
   Utensils,
-  Activity
+  Activity,
+  Settings,
+  Save,
+  X
 } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -51,10 +54,67 @@ const Dashboard = () => {
   });
   const [operationalDate, setOperationalDate] = useState(null);
   const [operationalInfo, setOperationalInfo] = useState(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [operationalConfig, setOperationalConfig] = useState({
+    opening_time: '20:00',
+    closing_time: '03:00',
+    operational_cutoff_time: '05:00',
+    name: 'Configuración Operativa'
+  });
+  const [configLoading, setConfigLoading] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
   }, [selectedDate]);
+
+  useEffect(() => {
+    loadOperationalConfig();
+  }, []);
+
+  const loadOperationalConfig = async () => {
+    try {
+      const activeConfig = await apiService.restaurantConfig.getActive();
+      if (activeConfig) {
+        setOperationalConfig({
+          opening_time: activeConfig.opening_time,
+          closing_time: activeConfig.closing_time,
+          operational_cutoff_time: activeConfig.operational_cutoff_time,
+          name: activeConfig.name
+        });
+      }
+    } catch (error) {
+      console.log('No hay configuración activa, usando valores por defecto');
+    }
+  };
+
+  const handleSaveOperationalConfig = async () => {
+    setConfigLoading(true);
+    try {
+      // Intentar actualizar configuración existente o crear nueva
+      try {
+        const activeConfig = await apiService.restaurantConfig.getActive();
+        await apiService.restaurantConfig.update(activeConfig.id, {
+          ...operationalConfig,
+          is_active: true
+        });
+      } catch {
+        // Si no existe configuración activa, crear una nueva
+        await apiService.restaurantConfig.create({
+          ...operationalConfig,
+          is_active: true
+        });
+      }
+      
+      setShowConfigModal(false);
+      // Recargar datos con nueva configuración
+      await loadDashboardData();
+      await loadOperationalConfig();
+    } catch (error) {
+      console.error('Error saving operational config:', error);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -87,8 +147,16 @@ const Dashboard = () => {
       setOperationalDate(operationalSummary.operational_date);
       setOperationalInfo(operationalInfoData);
       
+      // Filtrar órdenes por fecha operativa seleccionada
+      const selectedOperationalDate = selectedDate;
+      const filteredOrdersList = allOrdersList.filter(order => {
+        // Comparar con la fecha operativa de la orden si existe, o usar la fecha de creación
+        const orderOperationalDate = order.operational_date || order.created_at.split('T')[0];
+        return orderOperationalDate === selectedOperationalDate;
+      });
+
       // Load detailed orders with items for paid orders only (for recipe analysis)
-      const paidOrderIds = allOrdersList.filter(order => order.status === 'PAID').map(order => order.id);
+      const paidOrderIds = filteredOrdersList.filter(order => order.status === 'PAID').map(order => order.id);
       const allOrders = await Promise.all(
         paidOrderIds.map(async (orderId) => {
           try {
@@ -181,7 +249,7 @@ const Dashboard = () => {
 
 
       setStats({
-        totalOrders: allOrdersList.length,
+        totalOrders: filteredOrdersList.length,
         totalRevenue,
         lowStockItems: lowStockItems.length,
         activeOrders: activeOrders.length,
@@ -194,11 +262,11 @@ const Dashboard = () => {
         tableOccupancy: calculateTableOccupancy(activeOrders, tables),
         weeklyRevenue,
         hourlyOrders,
-        topTables
+        topTables: generateTopTables(filteredOrdersList, tables)
       });
 
-      // Set recent orders (last 5)
-      const sortedOrders = allOrdersList
+      // Set recent orders (last 5) - usar órdenes filtradas por fecha operativa
+      const sortedOrders = filteredOrdersList
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 5);
       setRecentOrders(sortedOrders);
@@ -378,19 +446,31 @@ const Dashboard = () => {
           </div>
         </div>
         
-        {/* Filtro de Fecha Operativa */}
+        {/* Configuración y Filtro de Fecha Operativa */}
         <div className="flex items-center gap-3">
-          <Calendar className="h-5 w-5 text-gray-400" />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha Operativa
-            </label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-            />
+          {/* Botón de Configuración de Horarios */}
+          <button
+            onClick={() => setShowConfigModal(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+          >
+            <Settings className="h-4 w-4" />
+            Configurar Horarios
+          </button>
+          
+          {/* Filtro de Fecha Operativa */}
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-gray-400" />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fecha Operativa
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -400,9 +480,9 @@ const Dashboard = () => {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600">Ingresos Hoy</p>
+              <p className="text-gray-600">Ingresos Fecha Operativa</p>
               <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.todayRevenue)}</p>
-              <p className="text-xs text-gray-500">{stats.todayOrders} órdenes</p>
+              <p className="text-xs text-gray-500">{stats.todayOrders} órdenes - {new Date(selectedDate).toLocaleDateString('es-PE')}</p>
             </div>
             <DollarSign className="h-8 w-8 text-green-500" />
           </div>
@@ -444,11 +524,11 @@ const Dashboard = () => {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600">Stock Bajo</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.lowStockItems}</p>
-              <p className="text-xs text-gray-500">Ingredientes</p>
+              <p className="text-gray-600">Total Órdenes</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
+              <p className="text-xs text-gray-500">Fecha operativa seleccionada</p>
             </div>
-            <AlertTriangle className="h-8 w-8 text-red-500" />
+            <ShoppingCart className="h-8 w-8 text-blue-500" />
           </div>
         </div>
       </div>
@@ -456,7 +536,12 @@ const Dashboard = () => {
       {/* Gráficas de Pie por Grupo de Recetas */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Distribución de Ventas por Grupo de Recetas</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Distribución de Ventas por Grupo de Recetas
+            <span className="text-sm font-normal text-blue-600 ml-2">
+              ({new Date(selectedDate).toLocaleDateString('es-PE')})
+            </span>
+          </h2>
           <div className="text-sm text-gray-500">
             {stats.recipeGroups ? `${stats.recipeGroups.length} grupos con ventas` : 'Cargando datos...'}
           </div>
@@ -596,7 +681,124 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Modal de Configuración Operativa */}
+      {showConfigModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Configuración de Horarios Operativos
+              </h3>
+              <button
+                onClick={() => setShowConfigModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
 
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre de la Configuración
+                </label>
+                <input
+                  type="text"
+                  value={operationalConfig.name}
+                  onChange={(e) => setOperationalConfig(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Ej: Turno Nocturno"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hora de Apertura
+                </label>
+                <input
+                  type="time"
+                  value={operationalConfig.opening_time}
+                  onChange={(e) => setOperationalConfig(prev => ({ ...prev, opening_time: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hora de Cierre
+                </label>
+                <input
+                  type="time"
+                  value={operationalConfig.closing_time}
+                  onChange={(e) => setOperationalConfig(prev => ({ ...prev, closing_time: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Si cierra al día siguiente (ej: 3:00 AM), se manejará automáticamente
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hora de Corte Operativo
+                </label>
+                <input
+                  type="time"
+                  value={operationalConfig.operational_cutoff_time}
+                  onChange={(e) => setOperationalConfig(prev => ({ ...prev, operational_cutoff_time: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Hora después de la cual el sistema considera un nuevo día operativo
+                </p>
+              </div>
+
+              {/* Ejemplo visual */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">Ejemplo de Configuración:</h4>
+                <div className="text-sm text-blue-800 space-y-1">
+                  <p>• Apertura: {operationalConfig.opening_time}</p>
+                  <p>• Cierre: {operationalConfig.closing_time}</p>
+                  <p>• Corte operativo: {operationalConfig.operational_cutoff_time}</p>
+                  <p className="text-xs text-blue-600 mt-2">
+                    Todo lo que suceda entre {operationalConfig.opening_time} y {operationalConfig.closing_time} 
+                    se considerará como parte del mismo día operativo.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowConfigModal(false)}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveOperationalConfig}
+                disabled={configLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {configLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Guardar Configuración
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
