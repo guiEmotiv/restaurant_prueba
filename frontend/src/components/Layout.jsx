@@ -58,14 +58,16 @@ const Layout = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Desktop sidebar toggle button */}
-      <div className="hidden lg:fixed lg:top-4 lg:left-4 lg:z-50 lg:block">
-        <button
-          onClick={toggleSidebar}
-          className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-white shadow-sm bg-white border border-gray-200"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-      </div>
+      {!isSidebarOpen && (
+        <div className="hidden lg:fixed lg:top-4 lg:left-4 lg:z-50 lg:block">
+          <button
+            onClick={toggleSidebar}
+            className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-white shadow-sm bg-white border border-gray-200"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
+      )}
 
       {/* Mobile menu button */}
       <div className="lg:hidden">
@@ -86,7 +88,7 @@ const Layout = ({ children }) => {
           isMenuOpen ? 'block' : 'hidden'
         } ${
           isSidebarOpen ? 'lg:block' : 'lg:hidden'
-        } fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto w-64 bg-white shadow-lg min-h-screen lg:min-h-auto`}>
+        } fixed lg:fixed inset-y-0 left-0 z-50 lg:z-50 w-64 bg-white shadow-lg min-h-screen lg:min-h-auto`}>
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 lg:justify-center">
               <h1 className="text-xl font-bold text-gray-900 lg:text-center">El Fogón de Don Soto</h1>
@@ -175,13 +177,6 @@ const Layout = ({ children }) => {
         />
       )}
       
-      {/* Desktop overlay */}
-      {isSidebarOpen && (
-        <div 
-          className="hidden lg:fixed lg:inset-0 lg:bg-black lg:bg-opacity-25 lg:z-40 lg:transition-opacity lg:duration-300 lg:block"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
     </div>
   );
 };
