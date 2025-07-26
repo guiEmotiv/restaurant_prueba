@@ -57,9 +57,7 @@ const Dashboard = () => {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [operationalConfig, setOperationalConfig] = useState({
     opening_time: '20:00',
-    closing_time: '03:00',
-    operational_cutoff_time: '05:00',
-    name: 'Configuración Operativa'
+    closing_time: '03:00'
   });
   const [configLoading, setConfigLoading] = useState(false);
 
@@ -77,9 +75,7 @@ const Dashboard = () => {
       if (activeConfig) {
         setOperationalConfig({
           opening_time: activeConfig.opening_time,
-          closing_time: activeConfig.closing_time,
-          operational_cutoff_time: activeConfig.operational_cutoff_time,
-          name: activeConfig.name
+          closing_time: activeConfig.closing_time
         });
       }
     } catch (error) {
@@ -90,19 +86,21 @@ const Dashboard = () => {
   const handleSaveOperationalConfig = async () => {
     setConfigLoading(true);
     try {
+      // Preparar datos con valores por defecto para campos no visibles
+      const configData = {
+        ...operationalConfig,
+        name: 'Configuración Operativa',
+        operational_cutoff_time: '05:00',
+        is_active: true
+      };
+      
       // Intentar actualizar configuración existente o crear nueva
       try {
         const activeConfig = await apiService.restaurantConfig.getActive();
-        await apiService.restaurantConfig.update(activeConfig.id, {
-          ...operationalConfig,
-          is_active: true
-        });
+        await apiService.restaurantConfig.update(activeConfig.id, configData);
       } catch {
         // Si no existe configuración activa, crear una nueva
-        await apiService.restaurantConfig.create({
-          ...operationalConfig,
-          is_active: true
-        });
+        await apiService.restaurantConfig.create(configData);
       }
       
       setShowConfigModal(false);
@@ -419,11 +417,6 @@ const Dashboard = () => {
             Indicadores clave y métricas de rendimiento
           </p>
           <div className="flex flex-wrap items-center gap-4 mt-2">
-            {operationalDate && (
-              <span className="text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                📅 Fecha operativa: {new Date(operationalDate).toLocaleDateString('es-PE')}
-              </span>
-            )}
             {operationalInfo?.has_config && (
               <>
                 <span className={`text-sm font-medium px-2 py-1 rounded ${
@@ -451,26 +444,23 @@ const Dashboard = () => {
           {/* Botón de Configuración de Horarios */}
           <button
             onClick={() => setShowConfigModal(true)}
-            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+            className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            title="Configurar Horarios"
           >
-            <Settings className="h-4 w-4" />
-            Configurar Horarios
+            <Settings className="h-5 w-5" />
           </button>
           
           {/* Filtro de Fecha Operativa */}
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-gray-400" />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha Operativa
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fecha Operativa
+            </label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+            />
           </div>
         </div>
       </div>
@@ -482,7 +472,7 @@ const Dashboard = () => {
             <div>
               <p className="text-gray-600">Ingresos Fecha Operativa</p>
               <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.todayRevenue)}</p>
-              <p className="text-xs text-gray-500">{stats.todayOrders} órdenes - {new Date(selectedDate).toLocaleDateString('es-PE')}</p>
+              <p className="text-xs text-gray-500">{stats.todayOrders} órdenes</p>
             </div>
             <DollarSign className="h-8 w-8 text-green-500" />
           </div>
@@ -538,9 +528,6 @@ const Dashboard = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
             Distribución de Ventas por Grupo de Recetas
-            <span className="text-sm font-normal text-blue-600 ml-2">
-              ({new Date(selectedDate).toLocaleDateString('es-PE')})
-            </span>
           </h2>
           <div className="text-sm text-gray-500">
             {stats.recipeGroups ? `${stats.recipeGroups.length} grupos con ventas` : 'Cargando datos...'}
@@ -702,19 +689,6 @@ const Dashboard = () => {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre de la Configuración
-                </label>
-                <input
-                  type="text"
-                  value={operationalConfig.name}
-                  onChange={(e) => setOperationalConfig(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="Ej: Turno Nocturno"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Hora de Apertura
                 </label>
                 <input
@@ -740,31 +714,14 @@ const Dashboard = () => {
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Hora de Corte Operativo
-                </label>
-                <input
-                  type="time"
-                  value={operationalConfig.operational_cutoff_time}
-                  onChange={(e) => setOperationalConfig(prev => ({ ...prev, operational_cutoff_time: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Hora después de la cual el sistema considera un nuevo día operativo
-                </p>
-              </div>
-
               {/* Ejemplo visual */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-900 mb-2">Ejemplo de Configuración:</h4>
+                <h4 className="font-medium text-blue-900 mb-2">Configuración Actual:</h4>
                 <div className="text-sm text-blue-800 space-y-1">
                   <p>• Apertura: {operationalConfig.opening_time}</p>
                   <p>• Cierre: {operationalConfig.closing_time}</p>
-                  <p>• Corte operativo: {operationalConfig.operational_cutoff_time}</p>
                   <p className="text-xs text-blue-600 mt-2">
-                    Todo lo que suceda entre {operationalConfig.opening_time} y {operationalConfig.closing_time} 
-                    se considerará como parte del mismo día operativo.
+                    El restaurante estará "Abierto" cuando la hora actual esté entre estos horarios.
                   </p>
                 </div>
               </div>
