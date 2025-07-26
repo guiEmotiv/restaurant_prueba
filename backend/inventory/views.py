@@ -39,7 +39,7 @@ class GroupViewSet(viewsets.ModelViewSet):
 
 
 class IngredientViewSet(viewsets.ModelViewSet):
-    queryset = Ingredient.objects.all().order_by('id')
+    queryset = Ingredient.objects.all().order_by('-id')
     
     def get_serializer_class(self):
         if self.action in ['retrieve', 'create', 'update', 'partial_update']:
@@ -47,7 +47,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
         return IngredientSerializer
     
     def get_queryset(self):
-        queryset = Ingredient.objects.all().order_by('id')
+        queryset = Ingredient.objects.all().order_by('-id')
         category = self.request.query_params.get('category')
         unit = self.request.query_params.get('unit')
         is_active = self.request.query_params.get('is_active')
