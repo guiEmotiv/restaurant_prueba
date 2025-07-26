@@ -5,7 +5,7 @@ import { OptionalAuthProvider } from './contexts/OptionalAuthContext';
 import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
-import OptionalOptionalProtectedRoute from './components/auth/OptionalOptionalProtectedRoute';
+import OptionalProtectedRoute from './components/auth/OptionalProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Units from './pages/config/Units';
 import Zones from './pages/config/Zones';
