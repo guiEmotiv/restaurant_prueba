@@ -206,6 +206,15 @@ const Kitchen = () => {
                                 {item.order_zone} - {item.order_table}
                               </div>
 
+                              {/* Tipo de pedido */}
+                              <div className={`text-xs font-bold text-center py-1 px-2 rounded-lg ${
+                                item.order_type === 'DELIVERY' 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {item.order_type === 'DELIVERY' ? 'DELIVERY' : 'RESTAURANTE'}
+                              </div>
+
                               {/* Tiempo transcurrido */}
                               <div className="text-xs font-bold text-center py-2 px-3 rounded-lg bg-yellow-50 text-gray-900">
                                 {formatTime(item.elapsed_time_minutes)}

@@ -203,7 +203,7 @@ deploy_on_ec2() {
     # Step 4: Health checks
     log_info "Checking application health..."
     sleep 5
-    if curl -f http://localhost:8000/api/v1/categories/ > /dev/null 2>&1; then
+    if curl -f http://localhost:8000/api/v1/units/ > /dev/null 2>&1; then
         log_success "Backend API is responding"
     else
         log_error "Backend API is not responding"
@@ -314,7 +314,7 @@ ENDSSH
         
         echo "🔍 Checking application health..."
         sleep 5
-        if curl -f http://localhost:8000/api/v1/categories/ > /dev/null 2>&1; then
+        if curl -f http://localhost:8000/api/v1/units/ > /dev/null 2>&1; then
             echo "✅ Backend API is responding"
         else
             echo "❌ Backend API is not responding"
@@ -357,13 +357,13 @@ status_on_ec2() {
     
     echo ""
     echo "🔍 Application health check:"
-    curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/categories/ || echo "Backend API: FAILED"
+    curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/units/ || echo "Backend API: FAILED"
     curl -s -o /dev/null -w "Frontend: %{http_code}\n" http://localhost/ || echo "Frontend: FAILED"
     
     if [ -n "$EC2_PUBLIC_IP" ]; then
         echo ""
         echo "🌐 External access check (using $EC2_PUBLIC_IP):"
-        curl -s -o /dev/null -w "Public API: %{http_code}\n" http://$EC2_PUBLIC_IP/api/v1/categories/ || echo "Public API: FAILED"
+        curl -s -o /dev/null -w "Public API: %{http_code}\n" http://$EC2_PUBLIC_IP/api/v1/units/ || echo "Public API: FAILED"
         curl -s -o /dev/null -w "Public Frontend: %{http_code}\n" http://$EC2_PUBLIC_IP/ || echo "Public Frontend: FAILED"
     fi
     
@@ -393,7 +393,7 @@ status_from_local() {
         
         echo ""
         echo "🔍 Application health check:"
-        curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/categories/ || echo "Backend API: FAILED"
+        curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/units/ || echo "Backend API: FAILED"
         curl -s -o /dev/null -w "Frontend: %{http_code}\n" http://localhost/ || echo "Frontend: FAILED"
         
         echo ""
@@ -435,7 +435,7 @@ restart() {
         sleep 10
         
         echo "🔍 Checking health after restart..."
-        curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/categories/ || echo "Backend API: FAILED"
+        curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/units/ || echo "Backend API: FAILED"
         curl -s -o /dev/null -w "Frontend: %{http_code}\n" http://localhost/ || echo "Frontend: FAILED"
         
         log_success "Application restarted!"
@@ -450,7 +450,7 @@ restart() {
             sleep 10
             
             echo "🔍 Checking health after restart..."
-            curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/categories/ || echo "Backend API: FAILED"
+            curl -s -o /dev/null -w "Backend API: %{http_code}\n" http://localhost:8000/api/v1/units/ || echo "Backend API: FAILED"
             curl -s -o /dev/null -w "Frontend: %{http_code}\n" http://localhost/ || echo "Frontend: FAILED"
             
             echo "✅ Application restarted!"

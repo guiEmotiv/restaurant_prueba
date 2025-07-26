@@ -19,13 +19,13 @@ import {
   User,
   LogOut
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useOptionalAuth } from '../contexts/OptionalAuthContext';
 
 const Layout = ({ children }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
-  const { user, userRole, logout, hasPermission } = useAuth();
+  const { user, userRole, logout, hasPermission } = useOptionalAuth();
 
   // Define navigation items with permissions
   const allNavigation = [

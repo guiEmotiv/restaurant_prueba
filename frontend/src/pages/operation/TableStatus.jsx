@@ -168,7 +168,7 @@ const TableStatus = () => {
                       </div>
                       
                       <div className={`text-lg font-bold ${tableStatus.textColor} mb-1`}>
-                        Mesa {table.number}
+                        {table.table_number}
                       </div>
                       
                       <div className={`text-sm ${tableStatus.textColor} opacity-90 mb-2`}>
