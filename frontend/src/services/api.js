@@ -287,8 +287,9 @@ export const apiService = {
       const response = await api.get('/payments/daily_summary/');
       return response.data;
     },
-    getOperationalSummary: async () => {
-      const response = await api.get('/payments/operational_summary/');
+    getOperationalSummary: async (date = null) => {
+      const url = date ? `/payments/operational_summary/?date=${date}` : '/payments/operational_summary/';
+      const response = await api.get(url);
       return response.data;
     },
   },

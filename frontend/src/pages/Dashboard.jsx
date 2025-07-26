@@ -44,10 +44,16 @@ const Dashboard = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [lowStockIngredients, setLowStockIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    // Usar fecha actual como default
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [operationalDate, setOperationalDate] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [selectedDate]);
 
   const loadDashboardData = async () => {
     try {
@@ -65,7 +71,7 @@ const Dashboard = () => {
         apiService.orders.getAll(),
         apiService.orders.getActive(),
         apiService.ingredients.getAll(),
-        apiService.payments.getOperationalSummary(),
+        apiService.payments.getOperationalSummary(selectedDate),
         apiService.tables.getAll(),
         apiService.recipes.getAll()
       ]);
@@ -73,6 +79,9 @@ const Dashboard = () => {
       // Use operational summary data for revenue metrics
       const todayRevenue = operationalSummary.total_amount || 0;
       const todayOrders = operationalSummary.total_orders || 0;
+      
+      // Actualizar fecha operativa mostrada
+      setOperationalDate(operationalSummary.operational_date);
       
       // Load detailed orders with items for paid orders only (for recipe analysis)
       const paidOrderIds = allOrdersList.filter(order => order.status === 'PAID').map(order => order.id);
@@ -334,7 +343,30 @@ const Dashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard Administrativo</h1>
-          <p className="text-gray-600">Indicadores clave y métricas de rendimiento</p>
+          <p className="text-gray-600">
+            Indicadores clave y métricas de rendimiento
+            {operationalDate && (
+              <span className="ml-2 text-sm font-medium text-blue-600">
+                (Fecha operativa: {new Date(operationalDate).toLocaleDateString('es-PE')})
+              </span>
+            )}
+          </p>
+        </div>
+        
+        {/* Filtro de Fecha Operativa */}
+        <div className="flex items-center gap-3">
+          <Calendar className="h-5 w-5 text-gray-400" />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fecha Operativa
+            </label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+            />
+          </div>
         </div>
       </div>
 

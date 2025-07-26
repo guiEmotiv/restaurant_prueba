@@ -285,8 +285,16 @@ class PaymentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def operational_summary(self, request):
         """Resumen de pagos por fecha operativa"""
-        # Obtener fecha operativa actual
-        operational_date = Order.get_operational_date()
+        # Obtener fecha operativa desde parámetro o usar la actual
+        date_param = request.query_params.get('date')
+        if date_param:
+            try:
+                from datetime import datetime
+                operational_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+            except ValueError:
+                operational_date = Order.get_operational_date()
+        else:
+            operational_date = Order.get_operational_date()
         
         # Filtrar pagos por fecha operativa
         payments = Payment.objects.filter(operational_date=operational_date)
