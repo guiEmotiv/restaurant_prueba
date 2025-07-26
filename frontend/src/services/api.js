@@ -157,7 +157,12 @@ export const apiService = {
   },
 
   ingredients: {
-    getAll: () => apiService.getAll('ingredients'),
+    getAll: async (params = {}) => {
+      const queryParams = new URLSearchParams(params).toString();
+      const url = queryParams ? `/ingredients/?${queryParams}` : '/ingredients/';
+      const response = await api.get(url);
+      return response.data;
+    },
     getById: (id) => apiService.getById('ingredients', id),
     create: (data) => apiService.create('ingredients', data),
     update: (id, data) => apiService.update('ingredients', id, data),
@@ -169,7 +174,12 @@ export const apiService = {
   },
 
   recipes: {
-    getAll: () => apiService.getAll('recipes'),
+    getAll: async (params = {}) => {
+      const queryParams = new URLSearchParams(params).toString();
+      const url = queryParams ? `/recipes/?${queryParams}` : '/recipes/';
+      const response = await api.get(url);
+      return response.data;
+    },
     getById: (id) => apiService.getById('recipes', id),
     create: (data) => apiService.create('recipes', data),
     update: (id, data) => apiService.update('recipes', id, data),

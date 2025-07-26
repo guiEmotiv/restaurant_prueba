@@ -18,14 +18,6 @@ const Ingredients = () => {
     { key: 'id', title: 'ID' },
     { key: 'name', title: 'Nombre', required: true },
     { 
-      key: 'unit', 
-      title: 'Unidad', 
-      type: 'select',
-      required: true,
-      options: units.map(unit => ({ value: unit.id, label: unit.name })),
-      render: (value, item) => item.unit_name || units.find(u => u.id === value)?.name || value
-    },
-    { 
       key: 'unit_price', 
       title: 'Precio Unitario', 
       type: 'number',
@@ -33,6 +25,14 @@ const Ingredients = () => {
       min: '0.01',
       required: true,
       render: (value) => `S/ ${parseFloat(value).toFixed(2)}`
+    },
+    { 
+      key: 'unit', 
+      title: 'Unidad', 
+      type: 'select',
+      required: true,
+      options: units.map(unit => ({ value: unit.id, label: unit.name })),
+      render: (value, item) => item.unit_name || units.find(u => u.id === value)?.name || value
     },
     { 
       key: 'current_stock', 
@@ -43,7 +43,7 @@ const Ingredients = () => {
       required: true,
       render: (value, item) => (
         <span className={`${parseFloat(value) <= 5 ? 'text-red-600 font-semibold' : ''}`}>
-          {parseFloat(value).toFixed(2)} {item.unit_name || ''}
+          {parseFloat(value).toFixed(2)}
         </span>
       )
     },
@@ -63,8 +63,11 @@ const Ingredients = () => {
   const loadIngredients = async () => {
     try {
       setLoading(true);
-      const data = await apiService.ingredients.getAll();
-      setIngredients(Array.isArray(data) ? data : []);
+      // Agregar parámetro para mostrar todos los ingredientes (incluyendo inactivos) en vista de administración
+      const data = await apiService.ingredients.getAll({ show_all: true });
+      // Ordenar por ID para mantener consistencia con backend
+      const sortedData = Array.isArray(data) ? data.sort((a, b) => a.id - b.id) : [];
+      setIngredients(sortedData);
     } catch (error) {
       console.error('Error loading ingredients:', error);
       showError('Error al cargar los ingredientes');
