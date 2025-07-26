@@ -61,11 +61,14 @@ class RecipeSerializer(serializers.ModelSerializer):
     group_name = serializers.SerializerMethodField()
     ingredients_count = serializers.SerializerMethodField()
     is_available_calculated = serializers.SerializerMethodField()
+    ingredients_cost = serializers.SerializerMethodField()
+    profit_amount = serializers.SerializerMethodField()
     
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'name', 'base_price', 'is_available', 'is_available_calculated',
+            'id', 'group', 'group_name', 'name', 'base_price', 'profit_percentage', 
+            'ingredients_cost', 'profit_amount', 'is_available', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -78,6 +81,24 @@ class RecipeSerializer(serializers.ModelSerializer):
     
     def get_is_available_calculated(self, obj):
         return obj.check_availability()
+    
+    def get_ingredients_cost(self, obj):
+        return obj.calculate_ingredients_cost()
+    
+    def get_profit_amount(self, obj):
+        ingredients_cost = obj.calculate_ingredients_cost()
+        if obj.profit_percentage > 0:
+            return ingredients_cost * (obj.profit_percentage / 100)
+        return 0
+    
+    def get_ingredients_cost(self, obj):
+        return obj.calculate_ingredients_cost()
+    
+    def get_profit_amount(self, obj):
+        ingredients_cost = obj.calculate_ingredients_cost()
+        if obj.profit_percentage > 0:
+            return ingredients_cost * (obj.profit_percentage / 100)
+        return 0
 
 
 class RecipeDetailSerializer(RecipeSerializer):
@@ -119,11 +140,14 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     group_name = serializers.SerializerMethodField()
     ingredients_count = serializers.SerializerMethodField()
     is_available_calculated = serializers.SerializerMethodField()
+    ingredients_cost = serializers.SerializerMethodField()
+    profit_amount = serializers.SerializerMethodField()
     
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'name', 'base_price', 'is_available', 'is_available_calculated',
+            'id', 'group', 'group_name', 'name', 'base_price', 'profit_percentage',
+            'ingredients_cost', 'profit_amount', 'is_available', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'created_at', 'updated_at', 
             'recipe_items'
         ]
@@ -183,3 +207,12 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     
     def get_is_available_calculated(self, obj):
         return obj.check_availability()
+    
+    def get_ingredients_cost(self, obj):
+        return obj.calculate_ingredients_cost()
+    
+    def get_profit_amount(self, obj):
+        ingredients_cost = obj.calculate_ingredients_cost()
+        if obj.profit_percentage > 0:
+            return ingredients_cost * (obj.profit_percentage / 100)
+        return 0

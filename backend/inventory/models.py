@@ -75,6 +75,13 @@ class Recipe(models.Model):
         decimal_places=2, 
         validators=[MinValueValidator(Decimal('0.01'))]
     )
+    profit_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Porcentaje de ganancia sobre el costo de ingredientes"
+    )
     is_available = models.BooleanField(default=True)
     preparation_time = models.PositiveIntegerField(help_text="Tiempo en minutos")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -88,16 +95,24 @@ class Recipe(models.Model):
     def __str__(self):
         return self.name
 
-    def calculate_base_price(self):
-        """Calcula el precio base basado en los ingredientes"""
+    def calculate_ingredients_cost(self):
+        """Calcula el costo total de los ingredientes"""
         total_cost = Decimal('0.00')
         for recipe_item in self.recipeitem_set.all():
             ingredient_cost = recipe_item.ingredient.unit_price * recipe_item.quantity
             total_cost += ingredient_cost
         return total_cost
 
+    def calculate_base_price(self):
+        """Calcula el precio base basado en los ingredientes y el porcentaje de ganancia"""
+        ingredients_cost = self.calculate_ingredients_cost()
+        if self.profit_percentage > 0:
+            profit_amount = ingredients_cost * (self.profit_percentage / Decimal('100.00'))
+            return ingredients_cost + profit_amount
+        return ingredients_cost
+
     def update_base_price(self):
-        """Actualiza el precio base cuando cambian los precios de ingredientes"""
+        """Actualiza el precio base cuando cambian los precios de ingredientes o porcentaje de ganancia"""
         self.base_price = self.calculate_base_price()
         self.save()
 
