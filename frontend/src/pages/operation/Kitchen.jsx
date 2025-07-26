@@ -211,10 +211,6 @@ const Kitchen = () => {
                                 {formatTime(item.elapsed_time_minutes)}
                               </div>
 
-                              {/* Tipo de pedido */}
-                              <div className="text-xs font-bold text-center py-1 px-2 bg-yellow-200 text-gray-900 rounded-lg">
-                                {item.order_type === 'DELIVERY' ? 'DELIVERY' : 'RESTAURANTE'}
-                              </div>
 
                               {/* Personalizaciones */}
                               {item.customizations_count > 0 && (

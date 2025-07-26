@@ -20,7 +20,6 @@ class OrderItemIngredientSerializer(serializers.ModelSerializer):
 class OrderItemSerializer(serializers.ModelSerializer):
     recipe_name = serializers.CharField(source='recipe.name', read_only=True)
     recipe_preparation_time = serializers.IntegerField(source='recipe.preparation_time', read_only=True)
-    order_type = serializers.CharField(source='order.order_type', read_only=True)
     order_zone = serializers.CharField(source='order.table.zone.name', read_only=True)
     order_table = serializers.CharField(source='order.table.table_number', read_only=True)
     order_id = serializers.IntegerField(source='order.id', read_only=True)
@@ -33,7 +32,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = [
             'id', 'recipe', 'recipe_name', 'recipe_preparation_time', 'unit_price', 'total_price',
-            'status', 'notes', 'order_type', 'order_zone', 'order_table', 'order_id',
+            'status', 'notes', 'order_zone', 'order_table', 'order_id',
             'customizations', 'customizations_count',
             'elapsed_time_minutes', 'is_overdue',
             'created_at', 'served_at'
@@ -75,12 +74,11 @@ class OrderSerializer(serializers.ModelSerializer):
     table_number = serializers.CharField(source='table.table_number', read_only=True)
     zone_name = serializers.CharField(source='table.zone.name', read_only=True)
     items_count = serializers.SerializerMethodField()
-    order_type_display = serializers.CharField(source='get_order_type_display', read_only=True)
     
     class Meta:
         model = Order
         fields = [
-            'id', 'table', 'table_number', 'zone_name', 'status', 'order_type', 'order_type_display',
+            'id', 'table', 'table_number', 'zone_name', 'status',
             'total_amount', 'items_count', 'created_at',
             'served_at', 'paid_at'
         ]
@@ -89,11 +87,6 @@ class OrderSerializer(serializers.ModelSerializer):
             'served_at', 'paid_at'
         ]
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Si es una actualización (instance existe), hacer order_type read-only
-        if self.instance:
-            self.fields['order_type'].read_only = True
     
     def get_items_count(self, obj):
         return obj.orderitem_set.count()
@@ -143,7 +136,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Order
-        fields = ['table', 'order_type', 'items']
+        fields = ['table', 'items']
     
     def create(self, validated_data):
         items_data = validated_data.pop('items')

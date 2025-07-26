@@ -10,7 +10,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     table: '',
-    order_type: 'RESTAURANT',
     status: 'CREATED'
   });
   
@@ -30,7 +29,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         // Modo edición
         setFormData({
           table: order.table?.id || order.table || '',
-          order_type: order.order_type || 'RESTAURANT',
           status: order.status || 'CREATED'
         });
         loadOrderItems();
@@ -44,7 +42,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const resetForm = () => {
     setFormData({
       table: '',
-      order_type: 'RESTAURANT',
       status: 'CREATED'
     });
     setOrderItems([]);
@@ -335,7 +332,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         
         const orderData = {
           table: parseInt(formData.table),
-          order_type: formData.order_type,
           items: processedItems
         };
         
@@ -496,28 +492,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo de Pedido *
-                  </label>
-                  <select
-                    name="order_type"
-                    value={formData.order_type}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                      errors.order_type ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    disabled={!!order} // No cambiar tipo en edición
-                  >
-                    <option value="RESTAURANT">Restaurante</option>
-                    <option value="DELIVERY">Delivery</option>
-                  </select>
-                  {errors.order_type && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.order_type}
-                    </p>
-                  )}
-                </div>
 
                 {order && (
                   <div>

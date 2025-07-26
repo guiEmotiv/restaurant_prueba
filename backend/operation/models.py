@@ -13,20 +13,9 @@ class Order(models.Model):
         ('SERVED', 'Entregado'),
         ('PAID', 'Pagado'),
     ]
-    
-    ORDER_TYPE_CHOICES = [
-        ('RESTAURANT', 'Restaurante'),
-        ('DELIVERY', 'Delivery'),
-    ]
 
     table = models.ForeignKey(Table, on_delete=models.PROTECT)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='CREATED')
-    order_type = models.CharField(
-        max_length=10, 
-        choices=ORDER_TYPE_CHOICES, 
-        default='RESTAURANT',
-        help_text="Tipo de pedido: para consumo en restaurante o delivery"
-    )
     total_amount = models.DecimalField(
         max_digits=10, 
         decimal_places=2, 
@@ -43,8 +32,7 @@ class Order(models.Model):
         verbose_name_plural = 'Órdenes'
 
     def __str__(self):
-        order_type_display = "Delivery" if self.order_type == 'DELIVERY' else f"Mesa {self.table.table_number}"
-        return f"Orden #{self.id} - {order_type_display}"
+        return f"Orden #{self.id} - Mesa {self.table.table_number}"
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
