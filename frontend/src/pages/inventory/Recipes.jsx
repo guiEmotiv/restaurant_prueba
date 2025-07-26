@@ -19,7 +19,8 @@ const Recipes = () => {
   const loadRecipes = async () => {
     try {
       setLoading(true);
-      const data = await apiService.recipes.getAll();
+      // Agregar parámetro para mostrar todas las recetas (incluyendo las sin stock)
+      const data = await apiService.recipes.getAll({ show_all: true });
       setRecipes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading recipes:', error);
@@ -137,7 +138,7 @@ const Recipes = () => {
                   Ingredientes
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Disponible
+                  Estado
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Fecha de Creación
@@ -204,7 +205,7 @@ const Recipes = () => {
                         </span>
                       ) : (
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                          Falta stock
+                          Falta de stock
                         </span>
                       )}
                     </td>
