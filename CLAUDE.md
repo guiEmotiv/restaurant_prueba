@@ -17,6 +17,7 @@ This is a full-stack restaurant management system with Django REST Framework bac
 - **Run tests**: `make test` or `pytest -q`
 - **Clean database**: `./clean_db.sh` or `python manage.py clean_database --confirm`
 - **Populate test data**: `python manage.py populate_test_data`
+- **EC2 commands**: Use `python3` instead of `python` on Ubuntu servers
 
 ### Frontend (React + Vite)
 - **Start development server**: `npm run dev` (runs on port 5173)
@@ -76,6 +77,7 @@ This is a full-stack restaurant management system with Django REST Framework bac
 - **View logs**: `./deploy/ec2-deploy.sh logs`
 - **Create backup**: `./deploy/ec2-deploy.sh backup`
 - **Restart app**: `./deploy/ec2-deploy.sh restart`
+- **Clean database**: `./deploy/clean-db.sh`
 
 ### Configuration Files
 - **EC2 settings**: `backend/backend/settings_ec2.py`
@@ -85,16 +87,24 @@ This is a full-stack restaurant management system with Django REST Framework bac
 - **Setup guide**: `deploy/EC2-DEPLOYMENT-GUIDE.md`
 
 ### Database Management
+
+#### Local Development
 - **Clean all data**: `./clean_db.sh` (interactive with confirmation)
 - **Clean keeping superusers**: `./clean_db.sh --keep-superuser`
 - **Clean without confirmation**: `./clean_db.sh --confirm` (use with caution)
 - **Django command**: `python manage.py clean_database [options]`
 
-The clean database script will:
+#### EC2 Production (Docker)
+- **Clean database**: `./deploy/clean-db.sh` (from project root)
+- **Skip confirmation**: `./deploy/clean-db.sh --confirm`
+- **Docker command**: `docker-compose -f docker-compose.ec2.yml exec web python manage.py clean_database --confirm`
+- **Populate test data**: `docker-compose -f docker-compose.ec2.yml exec web python manage.py populate_test_data`
+
+The clean database scripts will:
 - Delete ALL data from all tables
 - Reset auto-increment counters (SQLite sequences)
 - Preserve database structure (tables, indexes, etc.)
-- Optionally keep superuser accounts
+- Work in both local and Docker environments
 
 ### Environment Variables (Required)
 Minimal configuration in `.env`:
