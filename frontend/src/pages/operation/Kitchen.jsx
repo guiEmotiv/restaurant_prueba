@@ -202,37 +202,31 @@ const Kitchen = () => {
                               </div>
 
                               {/* Zona y mesa */}
-                              <div className="text-xs font-bold text-center py-2 px-3 rounded-lg bg-yellow-50 text-gray-900">
+                              <div className="text-xs font-bold text-center py-2 px-3 text-gray-900">
                                 {item.order_zone} - {item.order_table}
                               </div>
 
-                              {/* Tipo de pedido */}
-                              <div className={`text-xs font-bold text-center py-1 px-2 rounded-lg ${
-                                item.order_type === 'DELIVERY' 
-                                  ? 'bg-blue-100 text-blue-800' 
-                                  : 'bg-green-100 text-green-800'
-                              }`}>
-                                {item.order_type === 'DELIVERY' ? 'DELIVERY' : 'RESTAURANTE'}
+                              {/* Tiempo transcurrido */}
+                              <div className="text-xs font-bold text-center py-2 px-3 text-gray-900">
+                                {formatTime(item.elapsed_time_minutes)}
                               </div>
 
-                              {/* Tiempo transcurrido */}
-                              <div className="text-xs font-bold text-center py-2 px-3 rounded-lg bg-yellow-50 text-gray-900">
-                                {formatTime(item.elapsed_time_minutes)}
+                              {/* Tipo de pedido */}
+                              <div className="text-xs font-bold text-center py-1 px-2 bg-yellow-200 text-gray-900 rounded-lg">
+                                {item.order_type === 'DELIVERY' ? 'DELIVERY' : 'RESTAURANTE'}
                               </div>
 
                               {/* Personalizaciones */}
                               {item.customizations_count > 0 && (
-                                <div className="text-xs font-bold text-center py-2 px-3 rounded-lg bg-yellow-50 text-gray-900">
+                                <div className="text-xs font-bold text-center py-2 px-3 text-gray-900">
                                   +{item.customizations_count} extra{item.customizations_count > 1 ? 's' : ''}
                                 </div>
                               )}
 
-                              {/* Notas (solo visualización) - Campo más grande y flexible */}
-                              {(item.notes && item.notes.trim()) && (
-                                <div className="text-xs font-bold py-3 px-3 rounded-lg bg-yellow-50 text-gray-900 min-h-[80px] break-words whitespace-pre-wrap leading-relaxed">
-                                  {item.notes}
-                                </div>
-                              )}
+                              {/* Notas (siempre mostrar campo) - Campo más grande y flexible */}
+                              <div className="text-xs font-bold py-3 px-3 text-gray-900 min-h-[80px] break-words whitespace-pre-wrap leading-relaxed">
+                                {(item.notes && item.notes.trim()) ? item.notes : ''}
+                              </div>
                             </div>
 
                             {/* Badge de urgencia */}
