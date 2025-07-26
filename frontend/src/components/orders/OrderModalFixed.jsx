@@ -16,7 +16,9 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const [orderItems, setOrderItems] = useState([]);
   const [availableRecipes, setAvailableRecipes] = useState([]);
   const [availableTables, setAvailableTables] = useState([]);
+  const [availableZones, setAvailableZones] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
+  const [selectedZoneFilter, setSelectedZoneFilter] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState('');
   const [deletedItemIds, setDeletedItemIds] = useState([]); // Llevar registro de items eliminados
   const [loading, setLoading] = useState(false);
@@ -45,6 +47,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       status: 'CREATED'
     });
     setOrderItems([]);
+    setSelectedZoneFilter('');
     setSelectedGroupFilter('');
     setDeletedItemIds([]);
     setErrors({});
@@ -69,6 +72,16 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
   };
 
+  // Filtrar mesas según la zona seleccionada
+  const getFilteredTables = () => {
+    if (!selectedZoneFilter) {
+      return availableTables.sort((a, b) => a.table_number.localeCompare(b.table_number));
+    }
+    return availableTables
+      .filter(table => table.zone === parseInt(selectedZoneFilter))
+      .sort((a, b) => a.table_number.localeCompare(b.table_number));
+  };
+
   // Obtener el nombre del grupo seleccionado
   const getSelectedGroupName = () => {
     if (!selectedGroupFilter) return 'Todos los grupos';
@@ -76,15 +89,24 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
     return group ? group.name : 'Grupo desconocido';
   };
 
+  // Obtener el nombre de la zona seleccionada
+  const getSelectedZoneName = () => {
+    if (!selectedZoneFilter) return 'Todas las zonas';
+    const zone = availableZones.find(z => z.id === parseInt(selectedZoneFilter));
+    return zone ? zone.name : 'Zona desconocida';
+  };
+
   const loadAvailableData = async () => {
     try {
-      const [recipesData, tablesData, groupsData] = await Promise.all([
+      const [recipesData, tablesData, zonesData, groupsData] = await Promise.all([
         apiService.recipes.getAll(),
         apiService.tables.getAll(),
+        apiService.zones.getAll(),
         apiService.groups.getAll()
       ]);
       setAvailableRecipes(Array.isArray(recipesData) ? recipesData.filter(r => r.is_available) : []);
       setAvailableTables(Array.isArray(tablesData) ? tablesData : []);
+      setAvailableZones(Array.isArray(zonesData) ? zonesData : []);
       setAvailableGroups(Array.isArray(groupsData) ? groupsData : []);
     } catch (error) {
       console.error('Error loading available data:', error);
@@ -464,7 +486,34 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           <div className="space-y-6">
             {/* Información básica */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Filtro de Zona */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Zona {!order && '*'}
+                  </label>
+                  <select
+                    value={selectedZoneFilter}
+                    onChange={(e) => {
+                      setSelectedZoneFilter(e.target.value);
+                      // Limpiar mesa seleccionada si cambia la zona
+                      if (formData.table) {
+                        setFormData(prev => ({ ...prev, table: '' }));
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    disabled={!!order} // No cambiar en edición
+                  >
+                    <option value="">Todas las zonas ({availableTables.length})</option>
+                    {availableZones.map(zone => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.name} ({availableTables.filter(t => t.zone === zone.id).length})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Selector de Mesa */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Mesa *
@@ -478,10 +527,16 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                     }`}
                     disabled={!!order} // No cambiar mesa en edición para evitar confusión operativa
                   >
-                    <option value="">Seleccionar mesa...</option>
-                    {availableTables.map(table => (
+                    <option value="">
+                      {getFilteredTables().length === 0 
+                        ? (selectedZoneFilter ? `No hay mesas en ${getSelectedZoneName()}` : 'Seleccionar mesa...')
+                        : `Seleccionar mesa... (${getFilteredTables().length})`
+                      }
+                    </option>
+                    {getFilteredTables().map(table => (
                       <option key={table.id} value={table.id}>
-                        {table.table_number} - {table.zone_name}
+                        Mesa {table.table_number}
+                        {!selectedZoneFilter && ` - ${table.zone_name}`}
                       </option>
                     ))}
                   </select>
@@ -493,6 +548,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                 </div>
 
 
+                {/* Estado Actual (solo en edición) */}
                 {order && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

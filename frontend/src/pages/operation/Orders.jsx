@@ -227,6 +227,9 @@ const Orders = () => {
                   Pedido
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Zona
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Mesa
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -249,7 +252,7 @@ const Orders = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                     {`No hay pedidos ${getStatusText(filter).toLowerCase()}`}
                   </td>
                 </tr>
@@ -258,16 +261,21 @@ const Orders = () => {
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="text-sm font-medium text-gray-900">
-                        Pedido #{order.id}
+                        #{order.id}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="text-sm text-gray-900">
-                        Mesa {order.table_number || order.table}
+                      <div className="text-sm font-medium text-gray-900">
+                        {order.zone_name}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm font-medium text-gray-900">
+                        {order.table_number || order.table}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="text-sm font-medium text-gray-900">
                         {order.items_count || 0}
                       </div>
                     </td>
@@ -276,14 +284,14 @@ const Orders = () => {
                         {getStatusText(order.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-900">
                       {formatCurrency(order.total_amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
                       {formatDate(order.created_at)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-center gap-2">
                         <button
                           onClick={() => handleEdit(order)}
                           className="text-blue-600 hover:text-blue-900 p-1 rounded"
@@ -337,7 +345,7 @@ const Orders = () => {
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="text-lg font-bold text-gray-900">Pedido #{order.id}</h3>
-                        <p className="text-sm text-gray-600">Mesa {order.table_number || order.table}</p>
+                        <p className="text-sm text-gray-600">{order.zone_name} - Mesa {order.table_number || order.table}</p>
                       </div>
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
                         {getStatusText(order.status)}
