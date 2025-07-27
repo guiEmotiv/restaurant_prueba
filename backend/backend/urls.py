@@ -127,8 +127,18 @@ def debug_all_requests(get_response):
         return response
     return middleware
 
+def health_check(request):
+    """Simple health check endpoint that doesn't require authentication"""
+    from django.http import JsonResponse
+    return JsonResponse({
+        'status': 'ok',
+        'message': 'Restaurant API is running'
+    })
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Health check - MUST come before api/v1/ include to bypass authentication
+    path('api/v1/health/', health_check, name='health_check'),
     # Debug views
     path('debug-static/', debug_static_files, name='debug_static'), 
     path('test-endpoint/', simple_api_test, name='test_endpoint'),

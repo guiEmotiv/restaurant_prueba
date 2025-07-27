@@ -67,10 +67,13 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'backend.cognito_auth.CognitoAuthenticationMiddleware',  # AWS Cognito Authentication
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Add Cognito middleware only if authentication is enabled
+if os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true':
+    MIDDLEWARE.insert(6, 'backend.cognito_auth.CognitoAuthenticationMiddleware')
 
 ROOT_URLCONF = 'backend.urls'
 WSGI_APPLICATION = 'backend.wsgi.application'
@@ -133,10 +136,14 @@ MEDIA_ROOT = BASE_DIR / 'data' / 'media'
 # REST FRAMEWORK
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+# Determine permission classes based on authentication mode
+if os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true':
+    DEFAULT_PERMISSION_CLASSES = ['rest_framework.permissions.IsAuthenticated']
+else:
+    DEFAULT_PERMISSION_CLASSES = ['rest_framework.permissions.AllowAny']
+
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
+    'DEFAULT_PERMISSION_CLASSES': DEFAULT_PERMISSION_CLASSES,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -237,6 +244,9 @@ SPECTACULAR_SETTINGS = {
 # AWS COGNITO SETTINGS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+# Authentication Mode
+USE_COGNITO_AUTH = os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true'
+
 # AWS Configuration
 AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
 
@@ -244,11 +254,14 @@ AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
 COGNITO_USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID', '')
 COGNITO_APP_CLIENT_ID = os.getenv('COGNITO_APP_CLIENT_ID', '')
 
-# Validate required Cognito settings
-if not COGNITO_USER_POOL_ID:
-    print("⚠️  COGNITO_USER_POOL_ID not set. Authentication will fail.")
-if not COGNITO_APP_CLIENT_ID:
-    print("⚠️  COGNITO_APP_CLIENT_ID not set. Authentication will fail.")
+# Validate required Cognito settings only if authentication is enabled
+if USE_COGNITO_AUTH:
+    if not COGNITO_USER_POOL_ID:
+        print("⚠️  COGNITO_USER_POOL_ID not set. Authentication will fail.")
+    if not COGNITO_APP_CLIENT_ID:
+        print("⚠️  COGNITO_APP_CLIENT_ID not set. Authentication will fail.")
+else:
+    print("ℹ️  Running without AWS Cognito authentication (USE_COGNITO_AUTH=False)")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # OTHER SETTINGS

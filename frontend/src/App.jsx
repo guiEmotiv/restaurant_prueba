@@ -23,15 +23,19 @@ import Kitchen from './pages/operation/Kitchen';
 import TableStatus from './pages/operation/TableStatus';
 
 // Configure Amplify only if Cognito is configured
-const isCognitoConfigured = import.meta.env.VITE_COGNITO_USER_POOL_ID || 
-                           process.env.REACT_APP_COGNITO_USER_POOL_ID;
+// In Vite, we use import.meta.env and environment variables must start with VITE_
+const isCognitoConfigured = import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID || 
+                           import.meta.env.VITE_COGNITO_USER_POOL_ID;
 
 if (isCognitoConfigured) {
   try {
     Amplify.configure(amplifyConfig);
+    console.log('✅ AWS Amplify configured successfully');
   } catch (error) {
-    console.warn('Amplify configuration skipped:', error.message);
+    console.warn('⚠️ Amplify configuration skipped:', error.message);
   }
+} else {
+  console.log('ℹ️ Running without AWS Cognito authentication');
 }
 
 const AppContent = () => {
