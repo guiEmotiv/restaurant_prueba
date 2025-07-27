@@ -154,6 +154,20 @@ deploy_on_ec2() {
         export NODE_OPTIONS="--max-old-space-size=512"
         npm install --no-package-lock --no-audit --no-fund --prefer-offline
         
+        # Load .env.production variables before build
+        log_info "Loading .env.production variables..."
+        if [ -f ".env.production" ]; then
+            set -a  # Export all variables
+            source .env.production
+            set +a  # Stop exporting
+            log_success "Loaded .env.production variables:"
+            echo "  VITE_AWS_REGION: ${VITE_AWS_REGION:-not set}"
+            echo "  VITE_AWS_COGNITO_USER_POOL_ID: ${VITE_AWS_COGNITO_USER_POOL_ID:-not set}"
+            echo "  VITE_AWS_COGNITO_APP_CLIENT_ID: ${VITE_AWS_COGNITO_APP_CLIENT_ID:0:10}..."
+        else
+            log_warning ".env.production not found, using default values"
+        fi
+        
         # Build with memory optimization
         log_info "Building frontend with memory optimization..."
         npm run build
@@ -256,6 +270,21 @@ ENDSSH
         if [ -f package.json ]; then
             log_info "Installing frontend dependencies..."
             npm ci
+            
+            # Load .env.production variables before build
+            log_info "Loading .env.production variables..."
+            if [ -f ".env.production" ]; then
+                set -a  # Export all variables
+                source .env.production
+                set +a  # Stop exporting
+                log_success "Loaded .env.production variables:"
+                echo "  VITE_AWS_REGION: ${VITE_AWS_REGION:-not set}"
+                echo "  VITE_AWS_COGNITO_USER_POOL_ID: ${VITE_AWS_COGNITO_USER_POOL_ID:-not set}"
+                echo "  VITE_AWS_COGNITO_APP_CLIENT_ID: ${VITE_AWS_COGNITO_APP_CLIENT_ID:0:10}..."
+            else
+                log_warning ".env.production not found, using default values"
+            fi
+            
             log_info "Building frontend for production..."
             npm run build
             cd ..
