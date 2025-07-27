@@ -10,13 +10,25 @@ Por defecto, la aplicación está configurada para funcionar **SIN autenticació
 
 ## 📋 Pasos para Activar la Autenticación
 
-### 1. Configurar Variables de Entorno en EC2
+### Opción A: Script Automático (RECOMENDADO)
+
+Ejecuta en tu servidor EC2:
+
+```bash
+cd /opt/restaurant-web
+./configure-cognito-ec2.sh <USER_POOL_ID> <APP_CLIENT_ID>
+
+# Ejemplo:
+./configure-cognito-ec2.sh us-east-1_abc123XYZ 4n6k2jd8l9m3o2p1q5r7s9t2u6v8w1x3
+```
+
+### Opción B: Configuración Manual
 
 Edita el archivo `.env.ec2` con tus credenciales reales de AWS Cognito:
 
 ```bash
 # En tu servidor EC2
-nano /path/to/your/project/.env.ec2
+nano /opt/restaurant-web/.env.ec2
 
 # Actualiza estos valores:
 USE_COGNITO_AUTH=True  # Activar autenticación
