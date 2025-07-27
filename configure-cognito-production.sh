@@ -59,10 +59,8 @@ VITE_AWS_REGION=$REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$APP_CLIENT_ID
 
-# Optional: Cognito Domain for hosted UI
-VITE_AWS_COGNITO_DOMAIN=your-domain.auth.$REGION.amazoncognito.com
-VITE_REDIRECT_SIGN_IN=http://$EC2_IP
-VITE_REDIRECT_SIGN_OUT=http://$EC2_IP
+# Note: OAuth/Hosted UI variables removed to fix Amplify configuration issues
+# We're using the Authenticator component for login, not hosted UI
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # NOTA IMPORTANTE
