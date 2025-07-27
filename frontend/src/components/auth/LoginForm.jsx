@@ -1,9 +1,33 @@
 import React from 'react';
-import { Authenticator } from '@aws-amplify/ui-react';
+import { Authenticator, translations } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import { ChefHat } from 'lucide-react';
 
 const LoginForm = ({ children }) => {
+  // Configurar traducciones en español
+  translations.es = {
+    'Sign In': 'Iniciar Sesión',
+    'Sign Up': 'Registrarse', 
+    'Sign Out': 'Cerrar Sesión',
+    'Username': 'Usuario',
+    'Password': 'Contraseña',
+    'Enter your username': 'Ingresa tu usuario',
+    'Enter your password': 'Ingresa tu contraseña',
+    'Confirm': 'Confirmar',
+    'Change Password': 'Cambiar Contraseña',
+    'New Password': 'Nueva Contraseña',
+    'Confirm Password': 'Confirmar Contraseña',
+    'Enter your new password': 'Ingresa tu nueva contraseña',
+    'Please confirm your password': 'Por favor confirma tu contraseña',
+    'Your password must be changed before continuing': 'Debes cambiar tu contraseña antes de continuar',
+    'Change password': 'Cambiar contraseña',
+    // Textos específicos para NEW_PASSWORD_REQUIRED
+    'Force New Password': 'Cambio de Contraseña Requerido',
+    'You are required to change your password': 'Se requiere que cambies tu contraseña',
+    'Please set a new password to continue': 'Por favor establece una nueva contraseña para continuar',
+    'Set new password': 'Establecer nueva contraseña',
+    'Your administrator requires that you change your password before continuing': 'Tu administrador requiere que cambies tu contraseña antes de continuar'
+  };
   const customComponents = {
     Header() {
       return (
@@ -30,32 +54,15 @@ const LoginForm = ({ children }) => {
         placeholder: 'Ingresa tu contraseña',
         label: 'Contraseña'
       }
+    },
+    forceNewPassword: {
+      password: {
+        placeholder: 'Ingresa tu nueva contraseña',
+        label: 'Nueva Contraseña'
+      }
     }
   };
 
-  const customTexts = {
-    'Sign In': 'Iniciar Sesión',
-    'Sign Up': 'Registrarse',
-    'Sign Out': 'Cerrar Sesión',
-    'Forgot Password': '¿Olvidaste tu contraseña?',
-    'Reset Password': 'Restablecer Contraseña',
-    'New Password': 'Nueva Contraseña',
-    'Username': 'Usuario',
-    'Password': 'Contraseña',
-    'Email': 'Correo electrónico',
-    'Phone Number': 'Número de teléfono',
-    'Confirm Password': 'Confirmar Contraseña',
-    'Enter your username': 'Ingresa tu usuario',
-    'Enter your password': 'Ingresa tu contraseña',
-    'We Emailed You': 'Te enviamos un correo',
-    'Your code is on the way. To log in, enter the code we emailed to': 'Tu código está en camino. Para iniciar sesión, ingresa el código que enviamos a',
-    'Lost your code?': '¿Perdiste tu código?',
-    'Resend Code': 'Reenviar código',
-    'Submit': 'Enviar',
-    'Skip': 'Omitir',
-    'Back to Sign In': 'Volver a Iniciar Sesión',
-    'Confirm': 'Confirmar'
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
