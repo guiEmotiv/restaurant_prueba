@@ -67,6 +67,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'backend.cognito_auth.CognitoAuthenticationMiddleware',  # AWS Cognito Authentication
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -134,7 +135,7 @@ MEDIA_ROOT = BASE_DIR / 'data' / 'media'
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -231,6 +232,23 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# AWS COGNITO SETTINGS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# AWS Configuration
+AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+
+# Cognito Configuration
+COGNITO_USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID', '')
+COGNITO_APP_CLIENT_ID = os.getenv('COGNITO_APP_CLIENT_ID', '')
+
+# Validate required Cognito settings
+if not COGNITO_USER_POOL_ID:
+    print("⚠️  COGNITO_USER_POOL_ID not set. Authentication will fail.")
+if not COGNITO_APP_CLIENT_ID:
+    print("⚠️  COGNITO_APP_CLIENT_ID not set. Authentication will fail.")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # OTHER SETTINGS
