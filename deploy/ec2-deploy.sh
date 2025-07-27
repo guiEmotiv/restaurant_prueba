@@ -154,9 +154,24 @@ deploy_on_ec2() {
         export NODE_OPTIONS="--max-old-space-size=512"
         npm install --no-package-lock --no-audit --no-fund --prefer-offline
         
-        # Load .env.production variables before build
+        # Validate and load .env.production variables before build
         log_info "Loading .env.production variables..."
         if [ -f ".env.production" ]; then
+            # Validate .env.production format first
+            log_info "Validating .env.production format..."
+            if grep -E '^[A-Z_]+=.*' .env.production | grep -v '^#' | while IFS= read -r line; do
+                if [[ ! "$line" =~ ^[A-Z_]+=[^[:space:]]*$ ]]; then
+                    echo "❌ Invalid line format: $line"
+                    return 1
+                fi
+            done; then
+                log_success ".env.production format is valid"
+            else
+                log_error ".env.production has invalid format. Please check for syntax errors."
+                echo "Expected format: VARIABLE_NAME=value (no spaces around =)"
+                exit 1
+            fi
+            
             set -a  # Export all variables
             source .env.production
             set +a  # Stop exporting
