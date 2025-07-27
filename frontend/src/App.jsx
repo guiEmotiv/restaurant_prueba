@@ -22,10 +22,37 @@ import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
 import TableStatus from './pages/operation/TableStatus';
 
+// Debug environment variables
+console.log('API Configuration Debug:');
+console.log('  VITE_API_URL:', import.meta.env.VITE_API_URL);
+console.log('  API_BASE_URL:', import.meta.env.VITE_API_URL || 'http://44.248.47.186/api/v1');
+console.log('  MODE:', import.meta.env.MODE);
+console.log('  PROD:', import.meta.env.PROD);
+console.log('  Timestamp:', new Date().toISOString());
+
+// Debug Cognito environment variables
+console.log('Cognito Configuration Debug:');
+console.log('  VITE_AWS_REGION:', import.meta.env.VITE_AWS_REGION);
+console.log('  VITE_AWS_COGNITO_USER_POOL_ID:', import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID);
+console.log('  VITE_AWS_COGNITO_APP_CLIENT_ID:', import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID);
+
 // Configure Amplify only if Cognito is configured
-// In Vite, we use import.meta.env and environment variables must start with VITE_
-const isCognitoConfigured = import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID || 
-                           import.meta.env.VITE_COGNITO_USER_POOL_ID;
+// Check for real values, not default placeholders
+const userPoolId = import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID;
+const appClientId = import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID;
+
+const isCognitoConfigured = userPoolId && 
+                           appClientId && 
+                           userPoolId !== 'us-east-1_XXXXXXXXX' && 
+                           appClientId !== 'xxxxxxxxxxxxxxxxxxxxxxxxxx' &&
+                           userPoolId.length > 10 &&
+                           appClientId.length > 10;
+
+console.log('Cognito Configuration Status:', {
+  userPoolId: userPoolId ? `${userPoolId.substring(0, 10)}...` : 'undefined',
+  appClientId: appClientId ? `${appClientId.substring(0, 10)}...` : 'undefined',
+  isConfigured: isCognitoConfigured
+});
 
 if (isCognitoConfigured) {
   try {
@@ -36,6 +63,7 @@ if (isCognitoConfigured) {
   }
 } else {
   console.log('ℹ️ Running without AWS Cognito authentication');
+  console.log('💡 To enable authentication, configure VITE_AWS_COGNITO_* variables');
 }
 
 const AppContent = () => {
