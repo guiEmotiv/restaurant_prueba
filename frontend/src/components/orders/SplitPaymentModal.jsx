@@ -8,6 +8,8 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
   const [paymentMode, setPaymentMode] = useState('full'); // 'full' or 'split'
   const [splits, setSplits] = useState([]);
   const [selectedItems, setSelectedItems] = useState({});
+  const [paidItems, setPaidItems] = useState(new Set()); // Items ya pagados
+  const [splitStarted, setSplitStarted] = useState(false); // Si ya se inició división
   const [currentSplit, setCurrentSplit] = useState({
     payer_name: '',
     payment_method: 'CASH',
@@ -18,12 +20,23 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
 
   useEffect(() => {
     if (isOpen && order?.items) {
-      // Inicializar con todos los items sin asignar
+      // Resetear estados cuando se abre el modal
       const itemsMap = {};
       order.items.forEach(item => {
         itemsMap[item.id] = null; // null = no asignado
       });
       setSelectedItems(itemsMap);
+      setSplits([]);
+      setSplitStarted(false);
+      setPaidItems(new Set());
+      setPaymentMode('full');
+      setCurrentSplit({
+        payer_name: '',
+        payment_method: 'CASH',
+        items: [],
+        amount: 0,
+        notes: ''
+      });
     }
   }, [isOpen, order]);
 
@@ -34,10 +47,16 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
       return;
     }
 
+    // Verificar que no haya items ya pagados
+    if (paidItems.size > 0) {
+      showError('No se puede procesar pago completo si ya hay items pagados parcialmente');
+      return;
+    }
+
     const paymentData = {
       payment_method: currentSplit.payment_method,
       amount: orderTotal,
-      payer_name: currentSplit.payer_name || 'Cliente',
+      payer_name: currentSplit.payer_name || '',
       notes: currentSplit.notes,
       tax_amount: 0
     };
@@ -80,6 +99,12 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
   };
 
   const toggleItemSelection = (itemId) => {
+    // Verificar si el item ya está pagado
+    if (paidItems.has(itemId)) {
+      showError('Este item ya ha sido pagado');
+      return;
+    }
+
     if (selectedItems[itemId] !== null) {
       // Si ya está asignado a un split, no hacer nada
       return;
@@ -111,10 +136,9 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
       showError('Debe seleccionar al menos un item');
       return;
     }
-    if (!currentSplit.payer_name.trim()) {
-      showError('Debe ingresar el nombre del pagador');
-      return;
-    }
+
+    // Marcar que se inició la división de cuenta
+    setSplitStarted(true);
 
     // Marcar items como asignados
     const newSelectedItems = { ...selectedItems };
@@ -232,15 +256,20 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
           <div className="flex gap-4 mb-6">
             <button
               onClick={() => setPaymentMode('full')}
+              disabled={splitStarted}
               className={`flex-1 p-4 rounded-lg border-2 transition-colors ${
-                paymentMode === 'full'
+                splitStarted
+                  ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                  : paymentMode === 'full'
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
-              <CreditCard className="h-6 w-6 mx-auto mb-2 text-gray-700" />
-              <div className="font-medium">Pago Completo</div>
-              <div className="text-sm text-gray-600">Pagar toda la cuenta</div>
+              <CreditCard className={`h-6 w-6 mx-auto mb-2 ${splitStarted ? 'text-gray-400' : 'text-gray-700'}`} />
+              <div className={`font-medium ${splitStarted ? 'text-gray-400' : ''}`}>Pago Completo</div>
+              <div className={`text-sm ${splitStarted ? 'text-gray-400' : 'text-gray-600'}`}>
+                {splitStarted ? 'No disponible' : 'Pagar toda la cuenta'}
+              </div>
             </button>
             
             <button
@@ -320,17 +349,20 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
                   {order.items.map(item => {
                     const isAssigned = selectedItems[item.id] !== null;
                     const isSelected = currentSplit.items.some(i => i.id === item.id);
+                    const isPaid = paidItems.has(item.id);
                     
                     return (
                       <div
                         key={item.id}
-                        onClick={() => !isAssigned && toggleItemSelection(item.id)}
-                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                          isAssigned
+                        onClick={() => !isAssigned && !isPaid && toggleItemSelection(item.id)}
+                        className={`p-3 rounded-lg border transition-colors ${
+                          isPaid
+                            ? 'bg-green-100 border-green-300 cursor-not-allowed opacity-60'
+                            : isAssigned
                             ? 'bg-gray-100 border-gray-300 cursor-not-allowed opacity-60'
                             : isSelected
-                            ? 'bg-blue-50 border-blue-500'
-                            : 'hover:bg-gray-50 border-gray-200'
+                            ? 'bg-blue-50 border-blue-500 cursor-pointer'
+                            : 'hover:bg-gray-50 border-gray-200 cursor-pointer'
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -342,9 +374,14 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
                           </div>
                           <div className="text-right">
                             <div className="font-medium">{formatCurrency(item.total_price)}</div>
-                            {isAssigned && (
+                            {isPaid && (
+                              <div className="text-xs text-green-600 font-medium">
+                                ✓ Pagado
+                              </div>
+                            )}
+                            {isAssigned && !isPaid && (
                               <div className="text-xs text-gray-500">
-                                Asignado a: {splits[selectedItems[item.id]]?.payer_name}
+                                Asignado a: {splits[selectedItems[item.id]]?.payer_name || 'Sin nombre'}
                               </div>
                             )}
                           </div>
@@ -361,14 +398,14 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nombre del Pagador *
+                      Nombre del Pagador (Opcional)
                     </label>
                     <input
                       type="text"
                       value={currentSplit.payer_name}
                       onChange={(e) => setCurrentSplit({ ...currentSplit, payer_name: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Ej: Juan"
+                      placeholder="Ej: Juan (opcional)"
                     />
                   </div>
 
@@ -416,7 +453,7 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
 
                   <Button
                     onClick={addSplit}
-                    disabled={currentSplit.items.length === 0 || !currentSplit.payer_name.trim()}
+                    disabled={currentSplit.items.length === 0}
                     className="w-full"
                   >
                     Agregar Pago
