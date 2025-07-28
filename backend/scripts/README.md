@@ -102,17 +102,22 @@ Orden ID, Fecha Creación, Fecha Servido, Fecha Pagado, Mesa, Zona, Item, Grupo,
 
 En el entorno de producción EC2, los scripts deben ejecutarse dentro del contenedor Docker:
 
-### Método 1: Usando el script wrapper (RECOMENDADO)
+### Método 1: Usando Management Commands (RECOMENDADO)
 ```bash
-# Conectar al servidor EC2
+# Conecter al servidor EC2
 ssh -i your-key.pem ubuntu@your-ec2-ip
 
 # Navegar al directorio del proyecto
 cd /opt/restaurant-web
 
-# Ejecutar scripts usando el wrapper
-./backend/scripts/run_in_docker.sh clean_orders_data.py
-./backend/scripts/run_in_docker.sh sales_report.py
+# Ejecutar limpieza de datos
+./backend/scripts/run_in_docker.sh clean_orders_data
+./backend/scripts/run_in_docker.sh clean_orders_data --force  # Sin confirmación
+
+# Ejecutar reportes de ventas
+./backend/scripts/run_in_docker.sh sales_report --today
+./backend/scripts/run_in_docker.sh sales_report --month
+./backend/scripts/run_in_docker.sh sales_report --export-csv
 ```
 
 ### Método 2: Comando directo con -T flag
