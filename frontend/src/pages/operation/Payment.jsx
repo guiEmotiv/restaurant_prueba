@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Split, Receipt, DollarSign } from 'lucide-react';
+import { ArrowLeft, CreditCard, Split, Receipt, CheckCircle, X } from 'lucide-react';
 import Button from '../../components/common/Button';
-import SplitPaymentModal from '../../components/orders/SplitPaymentModal';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -13,7 +12,21 @@ const Payment = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentMode, setPaymentMode] = useState(null); // null, 'full', 'split'
+  const [paymentData, setPaymentData] = useState({
+    payment_method: 'CASH',
+    payer_name: '',
+    notes: ''
+  });
+  const [splits, setSplits] = useState([]);
+  const [selectedItems, setSelectedItems] = useState({});
+  const [currentSplit, setCurrentSplit] = useState({
+    payer_name: '',
+    payment_method: 'CASH',
+    items: [],
+    amount: 0,
+    notes: ''
+  });
 
   useEffect(() => {
     loadOrder();
@@ -41,28 +54,35 @@ const Payment = () => {
   };
 
 
-  const handlePayment = async (splits, isSplit) => {
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setPaymentData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleFullPayment = async () => {
+    const orderTotal = parseFloat(order?.total_amount) || 0;
+    
+    if (orderTotal <= 0) {
+      showError('El total de la orden debe ser mayor a 0');
+      return;
+    }
+
     setProcessing(true);
     try {
-      if (isSplit) {
-        // Usar el endpoint de pagos divididos
-        await apiService.orders.splitPayment(order.id, { splits });
-        showSuccess(`Pagos divididos procesados exitosamente (${splits.length} pagos)`);
-      } else {
-        // Pago completo
-        const paymentPayload = {
-          order: order.id,
-          payment_method: splits[0].payment_method,
-          tax_amount: splits[0].tax_amount || '0.00',
-          amount: splits[0].amount.toFixed(2),
-          payer_name: splits[0].payer_name || '',
-          notes: splits[0].notes || ''
-        };
-        await apiService.payments.create(paymentPayload);
-        showSuccess('Pago procesado exitosamente');
-      }
-      
-      setShowPaymentModal(false);
+      const paymentPayload = {
+        order: order.id,
+        payment_method: paymentData.payment_method,
+        tax_amount: '0.00',
+        amount: orderTotal.toFixed(2),
+        payer_name: paymentData.payer_name || '',
+        notes: paymentData.notes || ''
+      };
+
+      await apiService.payments.create(paymentPayload);
+      showSuccess('Pago procesado exitosamente');
       navigate('/payment-history');
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -73,6 +93,99 @@ const Payment = () => {
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleSplitPayment = async () => {
+    if (splits.length === 0) {
+      showError('Debe agregar al menos un pago dividido');
+      return;
+    }
+
+    const formattedSplits = splits.map(split => ({
+      items: split.items.map(item => item.id),
+      payment_method: split.payment_method,
+      amount: parseFloat(split.amount) || 0,
+      payer_name: split.payer_name || '',
+      notes: split.notes
+    }));
+
+    setProcessing(true);
+    try {
+      await apiService.orders.splitPayment(order.id, { splits: formattedSplits });
+      showSuccess(`Pagos divididos procesados exitosamente (${splits.length} pagos)`);
+      navigate('/payment-history');
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.error || 
+                          error.message;
+      showError('Error al procesar el pago: ' + errorMessage);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const toggleItemSelection = (itemId) => {
+    if (selectedItems[itemId] !== null) {
+      return;
+    }
+
+    const item = order.items.find(i => i.id === itemId);
+    if (!item) return;
+    
+    const isSelected = currentSplit.items.some(i => i.id === itemId);
+    const itemPrice = parseFloat(item.total_price) || 0;
+    
+    if (isSelected) {
+      setCurrentSplit(prev => ({
+        ...prev,
+        items: prev.items.filter(i => i.id !== itemId),
+        amount: Math.max(0, prev.amount - itemPrice)
+      }));
+    } else {
+      setCurrentSplit(prev => ({
+        ...prev,
+        items: [...prev.items, item],
+        amount: prev.amount + itemPrice
+      }));
+    }
+  };
+
+  const addSplit = () => {
+    if (currentSplit.items.length === 0) {
+      showError('Debe seleccionar al menos un item');
+      return;
+    }
+
+    const newSelectedItems = { ...selectedItems };
+    currentSplit.items.forEach(item => {
+      newSelectedItems[item.id] = splits.length;
+    });
+    setSelectedItems(newSelectedItems);
+
+    setSplits([...splits, { ...currentSplit, id: Date.now() }]);
+    
+    setCurrentSplit({
+      payer_name: '',
+      payment_method: 'CASH',
+      items: [],
+      amount: 0,
+      notes: ''
+    });
+  };
+
+  const removeSplit = (splitIndex) => {
+    const newSelectedItems = { ...selectedItems };
+    Object.entries(selectedItems).forEach(([itemId, assignedSplit]) => {
+      if (assignedSplit === splitIndex) {
+        newSelectedItems[itemId] = null;
+      } else if (assignedSplit > splitIndex) {
+        newSelectedItems[itemId] = assignedSplit - 1;
+      }
+    });
+    setSelectedItems(newSelectedItems);
+
+    setSplits(splits.filter((_, idx) => idx !== splitIndex));
   };
 
   const formatCurrency = (amount) => {
@@ -174,50 +287,318 @@ const Payment = () => {
         </div>
       </div>
 
-      {/* Opciones de Pago */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6 text-center">
-          Seleccione una opción de pago
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Pago Completo */}
-          <Button
-            onClick={() => setShowPaymentModal(true)}
-            className="h-24 flex flex-col items-center justify-center gap-2 text-lg"
-            disabled={processing}
-          >
-            <CreditCard className="h-8 w-8" />
-            <div className="text-center">
-              <div className="font-semibold">Pago Completo</div>
-              <div className="text-sm opacity-90">{formatCurrency(order.total_amount)}</div>
-            </div>
-          </Button>
+      {/* Selección de tipo de pago */}
+      {!paymentMode && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6 text-center">
+            Seleccione una opción de pago
+          </h2>
           
-          {/* Dividir Cuenta */}
-          <Button
-            onClick={() => setShowPaymentModal(true)}
-            variant="secondary"
-            className="h-24 flex flex-col items-center justify-center gap-2 text-lg"
-            disabled={processing}
-          >
-            <Split className="h-8 w-8" />
-            <div className="text-center">
-              <div className="font-semibold">Dividir Cuenta</div>
-              <div className="text-sm opacity-75">Pagos parciales</div>
-            </div>
-          </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Pago Completo */}
+            <Button
+              onClick={() => setPaymentMode('full')}
+              className="h-24 flex flex-col items-center justify-center gap-2 text-lg"
+              disabled={processing}
+            >
+              <CreditCard className="h-8 w-8" />
+              <div className="text-center">
+                <div className="font-semibold">Pago Completo</div>
+                <div className="text-sm opacity-90">{formatCurrency(order.total_amount)}</div>
+              </div>
+            </Button>
+            
+            {/* Dividir Cuenta */}
+            <Button
+              onClick={() => setPaymentMode('split')}
+              variant="secondary"
+              className="h-24 flex flex-col items-center justify-center gap-2 text-lg"
+              disabled={processing}
+            >
+              <Split className="h-8 w-8" />
+              <div className="text-center">
+                <div className="font-semibold">Dividir Cuenta</div>
+                <div className="text-sm opacity-75">Pagos parciales</div>
+              </div>
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Modal unificado de pagos */}
-      <SplitPaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onSubmit={handlePayment}
-        order={order}
-        processing={processing}
-      />
+      {/* Formulario de Pago Completo */}
+      {paymentMode === 'full' && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Pago Completo - {formatCurrency(order.total_amount)}
+            </h2>
+            <Button
+              onClick={() => setPaymentMode(null)}
+              variant="secondary"
+              size="sm"
+              className="flex items-center gap-1"
+            >
+              <X className="h-4 w-4" />
+              Cambiar
+            </Button>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Método de Pago
+              </label>
+              <select
+                name="payment_method"
+                value={paymentData.payment_method}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="CASH">Efectivo</option>
+                <option value="CARD">Tarjeta</option>
+                <option value="TRANSFER">Transferencia</option>
+                <option value="YAPE_PLIN">Yape/Plin</option>
+                <option value="OTHER">Otro</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nombre del Cliente (Opcional)
+              </label>
+              <input
+                type="text"
+                name="payer_name"
+                value={paymentData.payer_name}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Nombre del cliente (opcional)"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notas (Opcional)
+              </label>
+              <textarea
+                name="notes"
+                value={paymentData.notes}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Ej: Cliente pagó con billete de 100"
+              />
+            </div>
+
+            <div className="pt-4">
+              <Button
+                onClick={handleFullPayment}
+                disabled={processing}
+                className="w-full flex items-center justify-center gap-2"
+              >
+                {processing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    Procesar Pago - {formatCurrency(order.total_amount)}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Formulario de División de Cuenta */}
+      {paymentMode === 'split' && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Split className="h-5 w-5" />
+              Dividir Cuenta - {formatCurrency(order.total_amount)}
+            </h2>
+            <Button
+              onClick={() => setPaymentMode(null)}
+              variant="secondary"
+              size="sm"
+              className="flex items-center gap-1"
+            >
+              <X className="h-4 w-4" />
+              Cambiar
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Items del pedido */}
+            <div>
+              <h4 className="font-medium text-gray-900 mb-3">Items del Pedido</h4>
+              <div className="space-y-2 max-h-96 overflow-y-auto border rounded-lg p-3">
+                {order.items?.map(item => {
+                  const isAssigned = selectedItems[item.id] !== null;
+                  const isSelected = currentSplit.items.some(i => i.id === item.id);
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => !isAssigned && toggleItemSelection(item.id)}
+                      className={`p-3 rounded-lg border transition-colors ${
+                        isAssigned
+                          ? 'bg-gray-100 border-gray-300 cursor-not-allowed opacity-60'
+                          : isSelected
+                          ? 'bg-blue-50 border-blue-500 cursor-pointer'
+                          : 'hover:bg-gray-50 border-gray-200 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{item.recipe_name}</div>
+                          {item.notes && (
+                            <div className="text-sm text-gray-600 italic">{item.notes}</div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium">{formatCurrency(item.total_price)}</div>
+                          {isAssigned && (
+                            <div className="text-xs text-gray-500">
+                              Asignado a: {splits[selectedItems[item.id]]?.payer_name || 'Sin nombre'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Formulario de split actual */}
+            <div>
+              <h4 className="font-medium text-gray-900 mb-3">Nuevo Pago Dividido</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre del Pagador (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={currentSplit.payer_name}
+                    onChange={(e) => setCurrentSplit({ ...currentSplit, payer_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Ej: Juan (opcional)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Método de Pago
+                  </label>
+                  <select
+                    value={currentSplit.payment_method}
+                    onChange={(e) => setCurrentSplit({ ...currentSplit, payment_method: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="CASH">Efectivo</option>
+                    <option value="CARD">Tarjeta</option>
+                    <option value="YAPE_PLIN">Yape/Plin</option>
+                    <option value="TRANSFER">Transferencia</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Items Seleccionados
+                  </label>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    {currentSplit.items.length === 0 ? (
+                      <p className="text-sm text-gray-500">Seleccione items del lado izquierdo</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {currentSplit.items.map(item => (
+                          <div key={item.id} className="flex justify-between text-sm">
+                            <span>{item.recipe_name}</span>
+                            <span className="font-medium">{formatCurrency(item.total_price)}</span>
+                          </div>
+                        ))}
+                        <div className="border-t pt-1 mt-2">
+                          <div className="flex justify-between font-medium">
+                            <span>Total:</span>
+                            <span>{formatCurrency(currentSplit.amount)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <Button
+                  onClick={addSplit}
+                  disabled={currentSplit.items.length === 0}
+                  className="w-full"
+                >
+                  Agregar Pago
+                </Button>
+              </div>
+
+              {/* Pagos agregados */}
+              {splits.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Pagos Agregados</h4>
+                  <div className="space-y-2">
+                    {splits.map((split, idx) => (
+                      <div key={split.id} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{split.payer_name || `Pago ${idx + 1}`}</span>
+                              <span className="text-sm text-gray-600">
+                                ({split.payment_method})
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              {split.items.length} item(s) - {formatCurrency(split.amount)}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removeSplit(idx)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t">
+                    <Button
+                      onClick={handleSplitPayment}
+                      disabled={processing || splits.length === 0}
+                      className="w-full"
+                    >
+                      {processing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Procesando...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Procesar {splits.length} Pagos Divididos
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
