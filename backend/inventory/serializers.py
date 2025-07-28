@@ -80,7 +80,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         return obj.recipeitem_set.count()
     
     def get_is_available_calculated(self, obj):
-        return obj.check_availability()
+        return obj.has_sufficient_stock()
     
     def get_ingredients_cost(self, obj):
         return obj.calculate_ingredients_cost()
@@ -206,7 +206,7 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
         return obj.recipeitem_set.count()
     
     def get_is_available_calculated(self, obj):
-        return obj.check_availability()
+        return obj.has_sufficient_stock()
     
     def get_ingredients_cost(self, obj):
         return obj.calculate_ingredients_cost()

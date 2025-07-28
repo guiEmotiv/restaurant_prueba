@@ -62,13 +62,20 @@ const Recipes = () => {
 
   const handleToggleActive = async (recipe) => {
     try {
-      const updatedRecipe = {
-        ...recipe,
-        is_active: !recipe.is_active
+      // Solo enviar los campos necesarios para evitar efectos secundarios
+      const updatedData = {
+        name: recipe.name,
+        version: recipe.version,
+        group: recipe.group,
+        base_price: recipe.base_price,
+        profit_percentage: recipe.profit_percentage,
+        preparation_time: recipe.preparation_time,
+        is_available: recipe.is_available, // Mantener el valor actual
+        is_active: !recipe.is_active // Solo cambiar este campo
       };
-      await apiService.recipes.update(recipe.id, updatedRecipe);
+      await apiService.recipes.update(recipe.id, updatedData);
       await loadRecipes();
-      showSuccess(`Receta ${updatedRecipe.is_active ? 'activada' : 'desactivada'} exitosamente`);
+      showSuccess(`Receta ${updatedData.is_active ? 'activada' : 'desactivada'} exitosamente`);
     } catch (error) {
       console.error('Error updating recipe active status:', error);
       showError('Error al actualizar el estado activo de la receta');

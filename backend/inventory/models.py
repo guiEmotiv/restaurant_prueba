@@ -130,18 +130,23 @@ class Recipe(models.Model):
         self.save()
 
     def check_availability(self):
-        """Verifica si la receta está disponible según el stock"""
-        if not self.is_available or not self.is_active:
+        """Verifica si la receta está disponible según el stock (independiente de is_active)"""
+        if not self.is_available:
             return False
         for recipe_item in self.recipeitem_set.all():
             if not recipe_item.ingredient.is_active or recipe_item.ingredient.current_stock < recipe_item.quantity:
                 return False
         return True
     
+    def has_sufficient_stock(self):
+        """Verifica si hay stock suficiente para preparar la receta (solo chequeo de stock)"""
+        for recipe_item in self.recipeitem_set.all():
+            if not recipe_item.ingredient.is_active or recipe_item.ingredient.current_stock < recipe_item.quantity:
+                return False
+        return True
+    
     def save(self, *args, **kwargs):
-        # Verificar disponibilidad automáticamente al guardar
-        if self.pk:  # Solo si ya existe la receta
-            self.is_available = self.check_availability()
+        # No modificar automáticamente is_available, debe ser controlado manualmente
         super().save(*args, **kwargs)
 
     def consume_ingredients(self):
