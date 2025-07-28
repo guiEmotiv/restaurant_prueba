@@ -8,9 +8,11 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
   const { showSuccess, showError } = useToast();
   const [formData, setFormData] = useState({
     name: '',
+    version: '1.0',
     group: '',
     preparation_time: '',
-    profit_percentage: '0.00'
+    profit_percentage: '0.00',
+    is_active: true
   });
   
   const [recipeItems, setRecipeItems] = useState([]);
@@ -33,9 +35,11 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       // Modo edición
       setFormData({
         name: recipe.name || '',
+        version: recipe.version || '1.0',
         group: recipe.group || '',
         preparation_time: recipe.preparation_time || '',
-        profit_percentage: recipe.profit_percentage || '0.00'
+        profit_percentage: recipe.profit_percentage || '0.00',
+        is_active: recipe.is_active !== undefined ? recipe.is_active : true
       });
       // Cargar items después de que los ingredientes estén disponibles
       await loadRecipeItems();
@@ -48,9 +52,11 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
   const resetForm = () => {
     setFormData({
       name: '',
+      version: '1.0',
       group: '',
       preparation_time: '',
-      profit_percentage: '0.00'
+      profit_percentage: '0.00',
+      is_active: true
     });
     setRecipeItems([]);
     setErrors({});
@@ -164,6 +170,10 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       newErrors.name = 'El nombre es requerido';
     }
     
+    if (!formData.version.trim()) {
+      newErrors.version = 'La versión es obligatoria';
+    }
+    
     if (!formData.preparation_time || parseInt(formData.preparation_time) <= 0) {
       newErrors.preparation_time = 'El tiempo de preparación debe ser mayor a 0';
     }
@@ -243,11 +253,13 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       
       const recipeData = {
         name: formData.name.trim(),
+        version: formData.version || '1.0',
         group: formData.group || null,
         base_price: finalPrice > 0 ? finalPrice.toFixed(2) : "0.01", // Backend requiere precio mínimo como string
         profit_percentage: parseFloat(formData.profit_percentage) || 0,
         preparation_time: parseInt(formData.preparation_time),
         is_available: true, // Por defecto siempre disponible
+        is_active: formData.is_active !== undefined ? formData.is_active : true,
         recipe_items: validItems.map(item => ({
           ingredient: parseInt(item.ingredient),
           quantity: parseFloat(item.quantity)
@@ -356,8 +368,29 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                   </div>
                 </div>
 
-                {/* Segunda fila: Tiempo de Preparación y Porcentaje de Ganancia */}
+                {/* Segunda fila: Versión y Tiempo de Preparación */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Versión *
+                    </label>
+                    <input
+                      type="text"
+                      name="version"
+                      value={formData.version}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                        errors.version ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="1.0"
+                    />
+                    {errors.version && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.version}
+                      </p>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Tiempo de Preparación (min) *
@@ -379,7 +412,10 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                       </p>
                     )}
                   </div>
+                </div>
 
+                {/* Tercera fila: Porcentaje de Ganancia y Estado Activo */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Porcentaje de Ganancia (%)
@@ -402,6 +438,29 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                         {errors.profit_percentage}
                       </p>
                     )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Estado
+                    </label>
+                    <div className="flex items-center space-x-4">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          name="is_active"
+                          checked={formData.is_active}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">
+                          Activa (se muestra en pedidos)
+                        </span>
+                      </label>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Solo las recetas activas aparecen al crear pedidos
+                    </p>
                   </div>
                 </div>
               </div>

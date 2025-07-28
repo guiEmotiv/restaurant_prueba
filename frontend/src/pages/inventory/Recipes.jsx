@@ -60,6 +60,21 @@ const Recipes = () => {
     }
   };
 
+  const handleToggleActive = async (recipe) => {
+    try {
+      const updatedRecipe = {
+        ...recipe,
+        is_active: !recipe.is_active
+      };
+      await apiService.recipes.update(recipe.id, updatedRecipe);
+      await loadRecipes();
+      showSuccess(`Receta ${updatedRecipe.is_active ? 'activada' : 'desactivada'} exitosamente`);
+    } catch (error) {
+      console.error('Error updating recipe active status:', error);
+      showError('Error al actualizar el estado activo de la receta');
+    }
+  };
+
   const handleDelete = async (recipe) => {
     if (window.confirm('¿Estás seguro de que deseas eliminar esta receta?')) {
       try {
@@ -124,6 +139,9 @@ const Recipes = () => {
                   Nombre
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Versión
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Grupo
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -133,16 +151,13 @@ const Recipes = () => {
                   % Ganancia
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tiempo de Preparación
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ingredientes
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Estado
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fecha de Creación
+                  Activa
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
@@ -152,7 +167,7 @@ const Recipes = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {recipes.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
                     No hay recetas disponibles
                   </td>
                 </tr>
@@ -169,6 +184,11 @@ const Recipes = () => {
                           <div className="text-sm text-gray-500">Receta #{recipe.id}</div>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                        v{recipe.version}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
                       {recipe.group_name ? (
@@ -189,12 +209,6 @@ const Recipes = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
                       <div className="flex items-center justify-center">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                        {recipe.preparation_time} min
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      <div className="flex items-center justify-center">
                         <Package className="h-4 w-4 text-gray-400 mr-1" />
                         <span className="text-gray-600">{recipe.ingredients_count || 0} ingredientes</span>
                       </div>
@@ -210,8 +224,18 @@ const Recipes = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                      {new Date(recipe.created_at).toLocaleDateString('es-PE')}
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <button
+                        onClick={() => handleToggleActive(recipe)}
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          recipe.is_active 
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        } transition-colors cursor-pointer`}
+                        title={`Click para ${recipe.is_active ? 'desactivar' : 'activar'}`}
+                      >
+                        {recipe.is_active ? 'Activa' : 'Inactiva'}
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
                       <div className="flex justify-center gap-2">

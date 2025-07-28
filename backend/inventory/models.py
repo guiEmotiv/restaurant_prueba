@@ -72,7 +72,12 @@ class Ingredient(models.Model):
 class Recipe(models.Model):
     """Recetas del menú"""
     group = models.ForeignKey(Group, on_delete=models.PROTECT, null=True, blank=True)
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
+    version = models.CharField(
+        max_length=10, 
+        default='1.0',
+        help_text="Versión de la receta (ej: 1.0, 1.1, 2.0)"
+    )
     base_price = models.DecimalField(
         max_digits=10, 
         decimal_places=2, 
@@ -86,6 +91,10 @@ class Recipe(models.Model):
         help_text="Porcentaje de ganancia sobre el costo de ingredientes"
     )
     is_available = models.BooleanField(default=True)
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Solo las versiones activas se muestran al crear pedidos"
+    )
     preparation_time = models.PositiveIntegerField(help_text="Tiempo en minutos")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -94,9 +103,10 @@ class Recipe(models.Model):
         db_table = 'recipe'
         verbose_name = 'Receta'
         verbose_name_plural = 'Recetas'
+        unique_together = ['name', 'version']
 
     def __str__(self):
-        return self.name
+        return f"{self.name} v{self.version}"
 
     def calculate_ingredients_cost(self):
         """Calcula el costo total de los ingredientes"""
@@ -121,7 +131,7 @@ class Recipe(models.Model):
 
     def check_availability(self):
         """Verifica si la receta está disponible según el stock"""
-        if not self.is_available:
+        if not self.is_available or not self.is_active:
             return False
         for recipe_item in self.recipeitem_set.all():
             if not recipe_item.ingredient.is_active or recipe_item.ingredient.current_stock < recipe_item.quantity:

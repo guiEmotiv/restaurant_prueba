@@ -67,8 +67,8 @@ class RecipeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'name', 'base_price', 'profit_percentage', 
-            'ingredients_cost', 'profit_amount', 'is_available', 'is_available_calculated',
+            'id', 'group', 'group_name', 'name', 'version', 'base_price', 'profit_percentage', 
+            'ingredients_cost', 'profit_amount', 'is_available', 'is_active', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -146,8 +146,8 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'name', 'base_price', 'profit_percentage',
-            'ingredients_cost', 'profit_amount', 'is_available', 'is_available_calculated',
+            'id', 'group', 'group_name', 'name', 'version', 'base_price', 'profit_percentage',
+            'ingredients_cost', 'profit_amount', 'is_available', 'is_active', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'created_at', 'updated_at', 
             'recipe_items'
         ]

@@ -110,23 +110,26 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return RecipeSerializer
     
     def get_queryset(self):
-        queryset = Recipe.objects.all().order_by('name')
+        queryset = Recipe.objects.all().order_by('name', '-version')
         is_available = self.request.query_params.get('is_available')
+        is_active = self.request.query_params.get('is_active')
         group = self.request.query_params.get('group')
         
         if is_available is not None:
             queryset = queryset.filter(is_available=is_available.lower() == 'true')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
         if group:
             queryset = queryset.filter(group_id=group)
         
-        # Para creación de pedidos, solo mostrar recetas disponibles
+        # Para creación de pedidos, solo mostrar recetas activas y disponibles
         if self.request.path.endswith('/recipes/') and self.request.method == 'GET':
             show_all = self.request.query_params.get('show_all')
             if not show_all:
-                # Filtrar por recetas que están disponibles Y tienen stock
+                # Filtrar por recetas que están activas, disponibles Y tienen stock
                 available_recipes = []
                 for recipe in queryset:
-                    if recipe.is_available and recipe.check_availability():
+                    if recipe.is_active and recipe.is_available and recipe.check_availability():
                         available_recipes.append(recipe.id)
                 queryset = queryset.filter(id__in=available_recipes)
             
