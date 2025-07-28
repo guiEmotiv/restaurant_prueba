@@ -285,10 +285,14 @@ success = restore_database_backup()
 sys.exit(0 if success else 1)
 "
 
+# Convertir booleanos de bash a Python
+IS_COMPRESSED_PY=$([ "$IS_COMPRESSED" = true ] && echo "True" || echo "False")
+CLEAN_FIRST_PY=$([ "$CLEAN_FIRST" = true ] && echo "True" || echo "False")
+
 # Reemplazar variables en el script Python
 PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s|\$BACKUP_FILE|$BACKUP_FILE|g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$IS_COMPRESSED/$IS_COMPRESSED/g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$CLEAN_FIRST/$CLEAN_FIRST/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$IS_COMPRESSED/$IS_COMPRESSED_PY/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$CLEAN_FIRST/$CLEAN_FIRST_PY/g")
 
 # Ejecutar en el contenedor
 docker-compose -f $COMPOSE_FILE exec -T web python -c "$PYTHON_SCRIPT"

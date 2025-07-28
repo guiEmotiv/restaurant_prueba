@@ -265,11 +265,16 @@ success = create_database_backup()
 sys.exit(0 if success else 1)
 "
 
+# Convertir booleanos de bash a Python
+COMPRESS_PY=$([ "$COMPRESS" = true ] && echo "True" || echo "False")
+DATA_ONLY_PY=$([ "$DATA_ONLY" = true ] && echo "True" || echo "False")
+SCHEMA_ONLY_PY=$([ "$SCHEMA_ONLY" = true ] && echo "True" || echo "False")
+
 # Reemplazar variables en el script Python
 PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$BACKUP_NAME/$BACKUP_NAME/g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$COMPRESS/$COMPRESS/g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$DATA_ONLY/$DATA_ONLY/g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$SCHEMA_ONLY/$SCHEMA_ONLY/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$COMPRESS/$COMPRESS_PY/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$DATA_ONLY/$DATA_ONLY_PY/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$SCHEMA_ONLY/$SCHEMA_ONLY_PY/g")
 
 # Ejecutar en el contenedor
 docker-compose -f $COMPOSE_FILE exec -T web python -c "$PYTHON_SCRIPT"
