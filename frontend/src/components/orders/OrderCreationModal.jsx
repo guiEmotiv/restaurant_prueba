@@ -50,31 +50,20 @@ const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
 
   const loadRecipes = async () => {
     try {
+      // No incluir show_all para que el backend filtre solo recetas activas con stock
       const recipesData = await apiService.recipes.getAll();
-      const availableRecipes = [];
       
-      // Check recipe availability
-      for (const recipe of recipesData) {
-        try {
-          const availability = await apiService.recipes.checkAvailability(recipe.id);
-          if (availability.available) {
-            availableRecipes.push({ ...recipe, available: true });
-          } else {
-            availableRecipes.push({ 
-              ...recipe, 
-              available: false, 
-              missing_ingredients: availability.missing_ingredients || []
-            });
-          }
-        } catch (error) {
-          // If error checking availability, assume not available
-          availableRecipes.push({ ...recipe, available: false });
-        }
-      }
+      // Todas las recetas devueltas ya están filtradas por el backend
+      // (activas Y con stock suficiente)
+      const availableRecipes = recipesData.map(recipe => ({
+        ...recipe,
+        available: true // El backend ya filtró, todas son disponibles
+      }));
       
       setRecipes(availableRecipes);
     } catch (error) {
       console.error('Error loading recipes:', error);
+      showError('Error al cargar las recetas disponibles');
     }
   };
 

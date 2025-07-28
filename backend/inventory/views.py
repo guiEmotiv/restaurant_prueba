@@ -126,10 +126,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if self.request.path.endswith('/recipes/') and self.request.method == 'GET':
             show_all = self.request.query_params.get('show_all')
             if not show_all:
-                # Filtrar por recetas que están activas, disponibles Y tienen stock
+                # Filtrar por recetas que están activas Y tienen stock suficiente
                 available_recipes = []
                 for recipe in queryset:
-                    if recipe.is_active and recipe.is_available and recipe.check_availability():
+                    if recipe.is_active and recipe.has_sufficient_stock():
                         available_recipes.append(recipe.id)
                 queryset = queryset.filter(id__in=available_recipes)
             

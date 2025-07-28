@@ -99,12 +99,13 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const loadAvailableData = async () => {
     try {
       const [recipesData, tablesData, zonesData, groupsData] = await Promise.all([
-        apiService.recipes.getAll(),
+        apiService.recipes.getAll(), // Sin show_all, el backend filtra automáticamente
         apiService.tables.getAll(),
         apiService.zones.getAll(),
         apiService.groups.getAll()
       ]);
-      setAvailableRecipes(Array.isArray(recipesData) ? recipesData.filter(r => r.is_available) : []);
+      // El backend ya filtra recetas activas con stock suficiente
+      setAvailableRecipes(Array.isArray(recipesData) ? recipesData : []);
       setAvailableTables(Array.isArray(tablesData) ? tablesData : []);
       setAvailableZones(Array.isArray(zonesData) ? zonesData : []);
       setAvailableGroups(Array.isArray(groupsData) ? groupsData : []);
