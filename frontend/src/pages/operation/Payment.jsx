@@ -33,15 +33,45 @@ const Payment = () => {
 
   // Cargar items ya pagados cuando se carga la orden
   useEffect(() => {
-    if (order && order.payments) {
+    if (order) {
+      console.log('Order loaded:', order);
+      
+      // Inicializar selectedItems con todos los items como null (no asignados)
+      const itemsMap = {};
+      if (order.items) {
+        order.items.forEach(item => {
+          itemsMap[item.id] = null;
+        });
+        console.log('Initialized selectedItems:', itemsMap);
+      }
+      setSelectedItems(itemsMap);
+      
+      // Verificar items pagados
       const paidItemIds = new Set();
-      order.payments.forEach(payment => {
-        if (payment.payment_items) {
-          payment.payment_items.forEach(paymentItem => {
-            paidItemIds.add(paymentItem.order_item);
+      if (order.payments && Array.isArray(order.payments)) {
+        console.log('Payments found:', order.payments.length, 'payments');
+        order.payments.forEach((payment, paymentIndex) => {
+          console.log(`Payment ${paymentIndex}:`, {
+            id: payment.id,
+            amount: payment.amount,
+            payment_items_count: payment.payment_items?.length || 0
           });
-        }
-      });
+          if (payment.payment_items && Array.isArray(payment.payment_items)) {
+            payment.payment_items.forEach((paymentItem, itemIndex) => {
+              console.log(`  PaymentItem ${itemIndex}:`, {
+                order_item: paymentItem.order_item,
+                amount: paymentItem.amount
+              });
+              // paymentItem.order_item es el ID del order item
+              paidItemIds.add(paymentItem.order_item);
+            });
+          }
+        });
+      } else {
+        console.log('No payments found or payments is not an array');
+      }
+      
+      console.log('Paid items:', Array.from(paidItemIds));
       setPaidItems(paidItemIds);
     }
   }, [order]);
@@ -227,8 +257,13 @@ const Payment = () => {
         <div className="space-y-2">
           {order.items?.map((item) => {
             const isPaid = paidItems.has(item.id);
-            const isAssigned = selectedItems[item.id] !== null;
+            const isAssigned = selectedItems[item.id] !== null && selectedItems[item.id] !== undefined;
             const isSelected = currentSplit.items.some(i => i.id === item.id);
+            
+            // Debug logging solo si hay problemas
+            if (paymentMode === 'split' && isAssigned && selectedItems[item.id] === null) {
+              console.warn(`Inconsistent state for item ${item.id}: isAssigned=${isAssigned} but selectedItems[item.id]=${selectedItems[item.id]}`);
+            }
             
             return (
               <div
@@ -267,7 +302,7 @@ const Payment = () => {
                     )}
                     {isAssigned && !isPaid && paymentMode === 'split' && (
                       <div className="text-xs text-gray-500">
-                        Asignado a pago {selectedItems[item.id] + 1}
+                        Asignado a pago {(selectedItems[item.id] ?? -1) + 1}
                       </div>
                     )}
                   </div>
