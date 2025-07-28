@@ -138,10 +138,10 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         fields = ['order', 'recipe', 'notes']
     
     def validate_recipe(self, value):
-        if not value.is_available:
+        if not value.is_active:
             raise serializers.ValidationError("Esta receta no está disponible")
         
-        if not value.check_availability():
+        if not value.has_sufficient_stock():
             raise serializers.ValidationError("No hay suficiente stock para esta receta")
         
         return value
@@ -154,10 +154,10 @@ class OrderItemForCreateSerializer(serializers.ModelSerializer):
         fields = ['recipe', 'notes']
     
     def validate_recipe(self, value):
-        if not value.is_available:
+        if not value.is_active:
             raise serializers.ValidationError("Esta receta no está disponible")
         
-        if not value.check_availability():
+        if not value.has_sufficient_stock():
             raise serializers.ValidationError("No hay suficiente stock para esta receta")
         
         return value
