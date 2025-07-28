@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Script para eliminar datos de pedidos (órdenes) de la base de datos.
 Esto permite modificar recetas sin restricciones de integridad referencial.

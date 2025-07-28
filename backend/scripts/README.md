@@ -18,11 +18,14 @@ Este directorio contiene scripts útiles para la administración y mantenimiento
 **Uso**:
 ```bash
 # Desde el directorio backend/
-python manage.py shell < scripts/clean_orders_data.py
+python3 manage.py shell < scripts/clean_orders_data.py
 
 # O ejecutar directamente
 cd backend/
-python scripts/clean_orders_data.py
+python3 scripts/clean_orders_data.py
+
+# En EC2 con Docker:
+docker-compose exec web python manage.py shell < scripts/clean_orders_data.py
 ```
 
 **Características**:
@@ -38,11 +41,14 @@ python scripts/clean_orders_data.py
 **Uso**:
 ```bash
 # Desde el directorio backend/
-python manage.py shell < scripts/sales_report.py
+python3 manage.py shell < scripts/sales_report.py
 
 # O ejecutar directamente
 cd backend/
-python scripts/sales_report.py
+python3 scripts/sales_report.py
+
+# En EC2 con Docker:
+docker-compose exec web python manage.py shell < scripts/sales_report.py
 ```
 
 **Opciones de Reporte**:
@@ -92,6 +98,31 @@ Orden ID, Fecha Creación, Fecha Servido, Fecha Pagado, Mesa, Zona, Item, Grupo,
 - Acceso a la base de datos
 - Permisos de escritura para exportar CSV (para sales_report.py)
 
+## 🖥️ Uso en EC2 con Docker
+
+En el entorno de producción EC2, los scripts deben ejecutarse dentro del contenedor Docker:
+
+```bash
+# Conectar al servidor EC2
+ssh -i your-key.pem ubuntu@your-ec2-ip
+
+# Navegar al directorio del proyecto
+cd /opt/restaurant-web
+
+# Ejecutar script de limpieza
+docker-compose -f docker-compose.ec2.yml exec web python manage.py shell < backend/scripts/clean_orders_data.py
+
+# Ejecutar reporte de ventas
+docker-compose -f docker-compose.ec2.yml exec web python manage.py shell < backend/scripts/sales_report.py
+
+# O entrar al contenedor y ejecutar directamente
+docker-compose -f docker-compose.ec2.yml exec web bash
+cd /app
+python manage.py shell < scripts/clean_orders_data.py
+```
+
+**Nota**: En EC2, use `python3` si ejecuta fuera del contenedor Docker.
+
 ## 💡 Consejos de Uso
 
 ### Para Limpieza de Datos:
@@ -119,8 +150,11 @@ Los scripts generan salidas detalladas en consola. Se recomienda redirigir la sa
 
 ```bash
 # Ejemplo de ejecución con log
-python scripts/clean_orders_data.py > logs/clean_$(date +%Y%m%d_%H%M%S).log 2>&1
-python scripts/sales_report.py > logs/report_$(date +%Y%m%d_%H%M%S).log 2>&1
+python3 scripts/clean_orders_data.py > logs/clean_$(date +%Y%m%d_%H%M%S).log 2>&1
+python3 scripts/sales_report.py > logs/report_$(date +%Y%m%d_%H%M%S).log 2>&1
+
+# En EC2 con Docker
+docker-compose -f docker-compose.ec2.yml exec web python manage.py shell < backend/scripts/clean_orders_data.py > logs/clean_$(date +%Y%m%d_%H%M%S).log 2>&1
 ```
 
 ## 🆘 Soporte

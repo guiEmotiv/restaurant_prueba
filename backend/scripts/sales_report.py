@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Script para generar reportes detallados de ventas (pedidos pagados).
 Incluye información consolidada y completa de todas las transacciones.
