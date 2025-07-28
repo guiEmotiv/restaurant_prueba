@@ -4,7 +4,51 @@ Este directorio contiene scripts útiles para la administración y mantenimiento
 
 ## 📋 Scripts Disponibles
 
-### 1. clean_orders_data.py - Limpieza de Datos de Órdenes
+### 1. backup_ec2.sh - Backup Completo de Base de Datos
+
+**Propósito**: Crea un backup completo de toda la base de datos incluyendo estructura y datos. Útil para migrar datos o crear copias de seguridad antes de operaciones críticas.
+
+**Características**:
+- Backup completo (estructura + datos) por defecto
+- Opción de solo datos (`--data-only`) o solo estructura (`--schema-only`)
+- Compresión opcional con gzip (`--compress`)
+- Nombres automáticos con timestamp o personalizados
+- Compatible con formato JSON de Django para restauración
+
+**Uso en EC2**:
+```bash
+# Backup completo
+./backend/scripts/backup_ec2.sh
+
+# Backup comprimido con nombre personalizado
+./backend/scripts/backup_ec2.sh --backup-name mi_backup.sql --compress
+
+# Solo datos
+./backend/scripts/backup_ec2.sh --data-only --compress
+
+# Solo estructura
+./backend/scripts/backup_ec2.sh --schema-only
+```
+
+### 2. restore_ec2.sh - Restaurar Backup de Base de Datos
+
+**Propósito**: Restaura un backup creado con `backup_ec2.sh` o cualquier archivo compatible con Django loaddata.
+
+**⚠️ ADVERTENCIA**: Puede sobrescribir datos existentes. Siempre hacer backup antes de restaurar.
+
+**Uso en EC2**:
+```bash
+# Restaurar backup
+./backend/scripts/restore_ec2.sh backup_full_20240128_140530.sql
+
+# Restaurar sin confirmación
+./backend/scripts/restore_ec2.sh backup_data_20240128_140530.sql.gz --force
+
+# Limpiar BD y restaurar
+./backend/scripts/restore_ec2.sh backup_full_20240128_140530.sql --clean-first
+```
+
+### 3. clean_orders_data.py - Limpieza de Datos de Órdenes
 
 **Propósito**: Elimina todos los datos de pedidos (órdenes) de la base de datos. Útil cuando necesitas modificar recetas que tienen restricciones de integridad referencial.
 
@@ -34,7 +78,7 @@ docker-compose exec web python manage.py shell < scripts/clean_orders_data.py
 - Usa transacciones para asegurar integridad
 - Muestra un reporte detallado de lo eliminado
 
-### 2. sales_report.py - Reportes de Ventas Detallados
+### 4. sales_report.py - Reportes de Ventas Detallados
 
 **Propósito**: Genera reportes completos y detallados de ventas (pedidos pagados) con toda la información consolidada.
 
@@ -172,6 +216,10 @@ python3 scripts/sales_report.py > logs/report_$(date +%Y%m%d_%H%M%S).log 2>&1
 
 # En EC2 con Docker
 docker-compose -f docker-compose.ec2.yml exec web python manage.py shell < backend/scripts/clean_orders_data.py > logs/clean_$(date +%Y%m%d_%H%M%S).log 2>&1
+
+# Scripts de backup/restore
+./backend/scripts/backup_ec2.sh > logs/backup_$(date +%Y%m%d_%H%M%S).log 2>&1
+./backend/scripts/restore_ec2.sh backup_file.sql > logs/restore_$(date +%Y%m%d_%H%M%S).log 2>&1
 ```
 
 ## 🆘 Soporte
