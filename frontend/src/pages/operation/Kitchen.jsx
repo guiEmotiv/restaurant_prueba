@@ -65,13 +65,14 @@ const Kitchen = () => {
   const formatCreationTime = (isoDateString) => {
     try {
       const date = new Date(isoDateString);
-      return date.toLocaleTimeString('es-PE', { 
+      const time = date.toLocaleTimeString('es-PE', { 
         hour: '2-digit', 
         minute: '2-digit',
         hour12: false 
       });
+      return `${time}hr`;
     } catch (error) {
-      return '--:--';
+      return '--:--hr';
     }
   };
 
@@ -85,7 +86,6 @@ const Kitchen = () => {
   // Filtrar y agrupar items por receta
   const filteredKitchenBoard = kitchenBoard.filter(recipe => {
     if (selectedGroupId === 'all') return true;
-    if (selectedGroupId === 'no-group') return !recipe.recipe_group_id;
     return recipe.recipe_group_id === selectedGroupId;
   });
 
@@ -120,6 +120,22 @@ const Kitchen = () => {
   const totalPending = filteredKitchenBoard.reduce((sum, recipe) => sum + recipe.pending_items, 0);
   const totalOverdue = filteredKitchenBoard.reduce((sum, recipe) => sum + recipe.overdue_items, 0);
   const activeRecipes = groupedByRecipe.length;
+  
+  // Calcular grupos activos con conteo de items pendientes
+  const activeGroupsWithCount = groups.reduce((acc, group) => {
+    const recipesInGroup = kitchenBoard.filter(recipe => 
+      recipe.recipe_group_id === group.id && recipe.pending_items > 0
+    );
+    const totalItemsInGroup = recipesInGroup.reduce((sum, recipe) => sum + recipe.pending_items, 0);
+    
+    if (totalItemsInGroup > 0) {
+      acc.push({
+        ...group,
+        itemCount: totalItemsInGroup
+      });
+    }
+    return acc;
+  }, []);
 
   if (loading) {
     return (
@@ -153,16 +169,15 @@ const Kitchen = () => {
             <Filter className="h-4 w-4 text-gray-600" />
             <select
               value={selectedGroupId}
-              onChange={(e) => setSelectedGroupId(e.target.value === 'all' ? 'all' : parseInt(e.target.value) || 'no-group')}
+              onChange={(e) => setSelectedGroupId(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
               className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="all">Todos los grupos</option>
-              {groups.map((group) => (
+              {activeGroupsWithCount.map((group) => (
                 <option key={group.id} value={group.id}>
-                  {group.name}
+                  {group.name} ({group.itemCount})
                 </option>
               ))}
-              <option value="no-group">Sin grupo</option>
             </select>
           </div>
           
