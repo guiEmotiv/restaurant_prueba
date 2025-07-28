@@ -3,7 +3,7 @@ import { X, CreditCard, DollarSign, Users, Split, Check, Smartphone } from 'luci
 import Button from '../common/Button';
 import { useToast } from '../../contexts/ToastContext';
 
-const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
+const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = false }) => {
   const { showError } = useToast();
   const [paymentMode, setPaymentMode] = useState('full'); // 'full' or 'split'
   const [splits, setSplits] = useState([]);
@@ -28,9 +28,15 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
   }, [isOpen, order]);
 
   const handleFullPayment = () => {
+    const orderTotal = parseFloat(order.total_amount) || 0;
+    if (orderTotal <= 0) {
+      showError('El total de la orden debe ser mayor a 0');
+      return;
+    }
+
     const paymentData = {
       payment_method: currentSplit.payment_method,
-      amount: order.total_amount,
+      amount: orderTotal,
       payer_name: currentSplit.payer_name || 'Cliente',
       notes: currentSplit.notes,
       tax_amount: 0
@@ -51,11 +57,21 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
       return;
     }
 
+    // Verificar que el monto total coincida
+    const orderTotal = parseFloat(order.total_amount) || 0;
+    const totalAssigned = getTotalAssigned();
+    const difference = Math.abs(orderTotal - totalAssigned);
+    
+    if (difference > 0.01) { // Tolerancia de 1 centavo
+      showError(`El total de los pagos (${formatCurrency(totalAssigned)}) no coincide con el total de la orden (${formatCurrency(orderTotal)})`);
+      return;
+    }
+
     // Transformar splits al formato esperado por el backend
     const formattedSplits = splits.map(split => ({
       items: split.items.map(item => item.id),
       payment_method: split.payment_method,
-      amount: split.amount,
+      amount: parseFloat(split.amount) || 0,
       payer_name: split.payer_name,
       notes: split.notes
     }));
@@ -70,19 +86,22 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
     }
 
     const item = order.items.find(i => i.id === itemId);
+    if (!item) return;
+    
     const isSelected = currentSplit.items.some(i => i.id === itemId);
+    const itemPrice = parseFloat(item.total_price) || 0;
     
     if (isSelected) {
       setCurrentSplit(prev => ({
         ...prev,
         items: prev.items.filter(i => i.id !== itemId),
-        amount: prev.amount - item.total_price
+        amount: Math.max(0, prev.amount - itemPrice)
       }));
     } else {
       setCurrentSplit(prev => ({
         ...prev,
         items: [...prev.items, item],
-        amount: prev.amount + item.total_price
+        amount: prev.amount + itemPrice
       }));
     }
   };
@@ -135,10 +154,13 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
   };
 
   const formatCurrency = (amount) => {
+    const value = parseFloat(amount) || 0;
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
-      currency: 'PEN'
-    }).format(amount);
+      currency: 'PEN',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
   };
 
   const getPaymentMethodIcon = (method) => {
@@ -170,11 +192,17 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
   };
 
   const getTotalAssigned = () => {
-    return splits.reduce((sum, split) => sum + split.amount, 0);
+    return splits.reduce((sum, split) => {
+      const splitAmount = parseFloat(split.amount) || 0;
+      return sum + splitAmount;
+    }, 0);
   };
 
   const getPendingAmount = () => {
-    return order.total_amount - getTotalAssigned() - currentSplit.amount;
+    const orderTotal = parseFloat(order.total_amount) || 0;
+    const totalAssigned = getTotalAssigned();
+    const currentAmount = parseFloat(currentSplit.amount) || 0;
+    return Math.max(0, orderTotal - totalAssigned - currentAmount);
   };
 
   if (!isOpen || !order) return null;
@@ -468,20 +496,39 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
             <Button 
               variant="success" 
               onClick={handleFullPayment}
+              disabled={processing}
               className="flex items-center gap-2"
             >
-              <Check className="h-4 w-4" />
-              Procesar Pago Completo
+              {processing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4" />
+                  Procesar Pago Completo
+                </>
+              )}
             </Button>
           ) : (
             <Button 
               variant="success" 
               onClick={handleSplitPayment}
-              disabled={splits.length === 0 || getPendingAmount() !== 0}
+              disabled={processing || splits.length === 0 || getPendingAmount() !== 0}
               className="flex items-center gap-2"
             >
-              <Check className="h-4 w-4" />
-              Procesar Pagos Divididos ({splits.length})
+              {processing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4" />
+                  Procesar Pagos Divididos ({splits.length})
+                </>
+              )}
             </Button>
           )}
         </div>
