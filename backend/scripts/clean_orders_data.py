@@ -21,12 +21,14 @@ from django.db import transaction
 from datetime import datetime
 
 # Configurar Django si se ejecuta como script independiente
-if __name__ == "__main__":
+try:
+    from operation.models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
+except ImportError:
+    # Solo configurar Django si no está ya configurado
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
     django.setup()
-
-from operation.models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
+    from operation.models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
 
 
 def clean_orders_data():

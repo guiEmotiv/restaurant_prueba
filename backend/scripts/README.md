@@ -102,6 +102,7 @@ Orden ID, Fecha Creación, Fecha Servido, Fecha Pagado, Mesa, Zona, Item, Grupo,
 
 En el entorno de producción EC2, los scripts deben ejecutarse dentro del contenedor Docker:
 
+### Método 1: Usando el script wrapper (RECOMENDADO)
 ```bash
 # Conectar al servidor EC2
 ssh -i your-key.pem ubuntu@your-ec2-ip
@@ -109,19 +110,30 @@ ssh -i your-key.pem ubuntu@your-ec2-ip
 # Navegar al directorio del proyecto
 cd /opt/restaurant-web
 
-# Ejecutar script de limpieza
-docker-compose -f docker-compose.ec2.yml exec web python manage.py shell < backend/scripts/clean_orders_data.py
-
-# Ejecutar reporte de ventas
-docker-compose -f docker-compose.ec2.yml exec web python manage.py shell < backend/scripts/sales_report.py
-
-# O entrar al contenedor y ejecutar directamente
-docker-compose -f docker-compose.ec2.yml exec web bash
-cd /app
-python manage.py shell < scripts/clean_orders_data.py
+# Ejecutar scripts usando el wrapper
+./backend/scripts/run_in_docker.sh clean_orders_data.py
+./backend/scripts/run_in_docker.sh sales_report.py
 ```
 
-**Nota**: En EC2, use `python3` si ejecuta fuera del contenedor Docker.
+### Método 2: Comando directo con -T flag
+```bash
+# La flag -T es importante para evitar errores de TTY
+docker-compose -f docker-compose.ec2.yml exec -T web python manage.py shell < backend/scripts/clean_orders_data.py
+docker-compose -f docker-compose.ec2.yml exec -T web python manage.py shell < backend/scripts/sales_report.py
+```
+
+### Método 3: Entrando al contenedor
+```bash
+# Entrar al contenedor
+docker-compose -f docker-compose.ec2.yml exec web bash
+
+# Dentro del contenedor
+cd /app
+python manage.py shell < scripts/clean_orders_data.py
+python manage.py shell < scripts/sales_report.py
+```
+
+**Nota**: Los scripts detectan automáticamente si Django está configurado o no.
 
 ## 💡 Consejos de Uso
 
