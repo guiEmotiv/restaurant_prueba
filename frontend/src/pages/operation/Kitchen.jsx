@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Clock, AlertTriangle, ChefHat, Flame } from 'lucide-react';
+import { Clock, AlertTriangle, ChefHat, Flame, Filter } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
 const Kitchen = () => {
   const [kitchenBoard, setKitchenBoard] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState([]);
+  const [selectedGroupId, setSelectedGroupId] = useState('all');
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     loadKitchenBoard();
+    loadGroups();
     
     // Auto-refresh en tiempo real cada 5 segundos
     const interval = setInterval(loadKitchenBoard, 5000);
@@ -25,6 +28,15 @@ const Kitchen = () => {
     } catch (error) {
       console.error('Error loading kitchen board:', error);
       setLoading(false);
+    }
+  };
+
+  const loadGroups = async () => {
+    try {
+      const data = await apiService.groups.getAll();
+      setGroups(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error loading groups:', error);
     }
   };
 
@@ -50,6 +62,19 @@ const Kitchen = () => {
     return `${hours}h ${remainingMinutes}m`;
   };
 
+  const formatCreationTime = (isoDateString) => {
+    try {
+      const date = new Date(isoDateString);
+      return date.toLocaleTimeString('es-PE', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+    } catch (error) {
+      return '--:--';
+    }
+  };
+
   const getTimeStatus = (elapsedMinutes, preparationTime) => {
     const percentage = (elapsedMinutes / preparationTime) * 100;
     if (percentage > 100) return { color: 'bg-red-500', textColor: 'text-red-600', status: 'overdue' };
@@ -57,21 +82,43 @@ const Kitchen = () => {
     return { color: 'bg-green-500', textColor: 'text-green-600', status: 'normal' };
   };
 
-  // Agrupar items por receta
-  const groupedByRecipe = kitchenBoard.reduce((acc, recipe) => {
+  // Filtrar y agrupar items por receta
+  const filteredKitchenBoard = kitchenBoard.filter(recipe => {
+    if (selectedGroupId === 'all') return true;
+    if (selectedGroupId === 'no-group') return !recipe.recipe_group_id;
+    return recipe.recipe_group_id === selectedGroupId;
+  });
+
+  const groupedByRecipe = filteredKitchenBoard.reduce((acc, recipe) => {
     const pendingItems = recipe.items.filter(item => item.status === 'CREATED');
     if (pendingItems.length > 0) {
+      // Mantener orden estable: ordenar items por created_at para evitar movimiento
+      const sortedItems = [...pendingItems].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       acc.push({
         ...recipe,
-        items: pendingItems
+        items: sortedItems
       });
     }
     return acc;
-  }, []);
+  }, [])
+  
+  // Ordenar recetas de forma estable: primero por urgencia, luego por nombre para consistencia
+  .sort((a, b) => {
+    // Primero por items overdue (descendente)
+    if (a.overdue_items !== b.overdue_items) {
+      return b.overdue_items - a.overdue_items;
+    }
+    // Luego por items pendientes (descendente)  
+    if (a.pending_items !== b.pending_items) {
+      return b.pending_items - a.pending_items;
+    }
+    // Finalmente por nombre de receta (ascendente) para orden estable
+    return a.recipe_name.localeCompare(b.recipe_name);
+  });
 
-  // Calcular estadísticas
-  const totalPending = kitchenBoard.reduce((sum, recipe) => sum + recipe.pending_items, 0);
-  const totalOverdue = kitchenBoard.reduce((sum, recipe) => sum + recipe.overdue_items, 0);
+  // Calcular estadísticas (basadas en datos filtrados)
+  const totalPending = filteredKitchenBoard.reduce((sum, recipe) => sum + recipe.pending_items, 0);
+  const totalOverdue = filteredKitchenBoard.reduce((sum, recipe) => sum + recipe.overdue_items, 0);
   const activeRecipes = groupedByRecipe.length;
 
   if (loading) {
@@ -99,6 +146,24 @@ const Kitchen = () => {
               <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-xs text-gray-600">En vivo</span>
             </div>
+          </div>
+
+          {/* Filtro de grupos en el centro */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-600" />
+            <select
+              value={selectedGroupId}
+              onChange={(e) => setSelectedGroupId(e.target.value === 'all' ? 'all' : parseInt(e.target.value) || 'no-group')}
+              className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="all">Todos los grupos</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+              <option value="no-group">Sin grupo</option>
+            </select>
           </div>
           
           {/* Estadísticas compactas */}
@@ -140,8 +205,8 @@ const Kitchen = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {groupedByRecipe.map((recipe, recipeIndex) => (
-              <div key={recipeIndex} className="bg-white rounded-lg shadow-sm border border-gray-200">
+            {groupedByRecipe.map((recipe) => (
+              <div key={`${recipe.recipe_name}-${recipe.recipe_group_id}`} className="bg-white rounded-lg shadow-sm border border-gray-200">
                 {/* Fila de receta optimizada */}
                 <div className="flex items-center px-3 py-2">
                   {/* Lado izquierdo: Nombre e indicadores */}
@@ -209,6 +274,11 @@ const Kitchen = () => {
                               {/* Tiempo transcurrido */}
                               <div className="text-xs font-bold text-center py-2 px-3 text-gray-900">
                                 {formatTime(item.elapsed_time_minutes)}
+                              </div>
+
+                              {/* Hora de creación */}
+                              <div className="text-xs text-center text-gray-600">
+                                Creado: {formatCreationTime(item.created_at)}
                               </div>
 
 

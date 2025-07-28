@@ -108,7 +108,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         order_items = OrderItem.objects.filter(
             status='CREATED',
             order__status='CREATED'
-        ).select_related('recipe', 'order', 'order__table', 'order__table__zone').order_by('created_at')
+        ).select_related('recipe', 'recipe__group', 'order', 'order__table', 'order__table__zone').order_by('created_at')
         
         # Organizar items por receta
         kitchen_board = defaultdict(list)
@@ -127,19 +127,25 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'order_zone': item.order.table.zone.name,
                 'status': item.status,
                 'notes': item.notes,
-                'created_at': item.created_at,
+                'created_at': item.created_at.isoformat(),
                 'elapsed_time_minutes': elapsed_minutes,
                 'preparation_time': item.recipe.preparation_time,
                 'is_overdue': is_overdue,
-                'customizations_count': item.orderitemingredient_set.count()
+                'customizations_count': item.orderitemingredient_set.count(),
+                'recipe_group_name': item.recipe.group.name if item.recipe.group else 'Sin Grupo',
+                'recipe_group_id': item.recipe.group.id if item.recipe.group else None
             }
             kitchen_board[recipe_key].append(item_data)
         
         # Convertir a formato final
         result = []
         for recipe_name, items in kitchen_board.items():
+            # Usar el grupo del primer item (todos los items de la misma receta tienen el mismo grupo)
+            first_item = items[0] if items else {}
             result.append({
                 'recipe_name': recipe_name,
+                'recipe_group_name': first_item.get('recipe_group_name', 'Sin Grupo'),
+                'recipe_group_id': first_item.get('recipe_group_id'),
                 'total_items': len(items),
                 'pending_items': len([i for i in items if i['status'] == 'CREATED']),
                 'served_items': len([i for i in items if i['status'] == 'SERVED']),
