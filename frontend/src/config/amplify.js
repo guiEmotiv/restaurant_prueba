@@ -3,17 +3,45 @@
 
 const amplifyConfig = {
   Auth: {
-    // Region where your Cognito User Pool was created
-    region: import.meta.env.VITE_AWS_REGION || 'us-east-1',
-    
-    // Cognito User Pool ID
-    userPoolId: import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID || 'us-east-1_XXXXXXXXX',
-    
-    // Cognito User Pool App Client ID  
-    userPoolWebClientId: import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID || 'xxxxxxxxxxxxxxxxxxxxxxxxxx'
-    
-    // Note: OAuth configuration removed to fix Amplify initialization issues
-    // We're using the Authenticator component for login forms, not hosted UI
+    Cognito: {
+      // Region where your Cognito User Pool was created
+      region: import.meta.env.VITE_AWS_REGION || 'us-east-1',
+      
+      // Cognito User Pool ID
+      userPoolId: import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID || 'us-east-1_XXXXXXXXX',
+      
+      // Cognito User Pool App Client ID  
+      userPoolClientId: import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID || 'xxxxxxxxxxxxxxxxxxxxxxxxxx',
+      
+      // Identity pool is optional
+      identityPoolId: '',
+      
+      // Mandatory for user pool only
+      loginWith: {
+        username: true,
+        email: false,
+        phone: false
+      },
+      
+      // Sign up attributes
+      signUpVerificationMethod: 'code',
+      
+      // User attributes
+      userAttributes: {
+        email: {
+          required: true
+        }
+      },
+      
+      // Password policy
+      passwordFormat: {
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireNumbers: true,
+        requireSpecialCharacters: true
+      }
+    }
   }
 };
 
