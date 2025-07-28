@@ -366,17 +366,34 @@ const Payment = () => {
             Seleccione una opción de pago
           </h2>
           
+          {/* Mensaje informativo si hay items pagados */}
+          {paidItems.size > 0 && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800 text-center">
+                <AlertTriangle className="inline-block h-4 w-4 mr-1" />
+                Existen {paidItems.size} item(s) pagados parcialmente. Solo puede continuar con dividir cuenta.
+              </p>
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Pago Completo */}
             <Button
               onClick={() => setPaymentMode('full')}
-              className="h-24 flex flex-col items-center justify-center gap-2 text-lg"
-              disabled={processing}
+              className={`h-24 flex flex-col items-center justify-center gap-2 text-lg ${
+                paidItems.size > 0 ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              disabled={processing || paidItems.size > 0}
+              title={paidItems.size > 0 ? "No disponible: existen items pagados parcialmente" : ""}
             >
-              <CreditCard className="h-8 w-8" />
+              <CreditCard className={`h-8 w-8 ${paidItems.size > 0 ? 'text-gray-400' : ''}`} />
               <div className="text-center">
-                <div className="font-semibold">Pago Completo</div>
-                <div className="text-sm opacity-90">{formatCurrency(order.total_amount)}</div>
+                <div className={`font-semibold ${paidItems.size > 0 ? 'text-gray-500' : ''}`}>
+                  Pago Completo
+                </div>
+                <div className={`text-sm ${paidItems.size > 0 ? 'text-gray-400' : 'opacity-90'}`}>
+                  {paidItems.size > 0 ? 'No disponible' : formatCurrency(order.total_amount)}
+                </div>
               </div>
             </Button>
             
