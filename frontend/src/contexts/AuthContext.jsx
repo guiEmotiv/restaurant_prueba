@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
       canManageConfig: false,
       canManageInventory: false,
       canManageOrders: true,
-      canViewKitchen: false,
+      canViewKitchen: true,
       canViewTableStatus: true,
       canManagePayments: true,
       canViewHistory: false,

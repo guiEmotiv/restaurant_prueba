@@ -31,8 +31,15 @@ const MockAuthProvider = ({ children }) => {
 
 // Optional Auth Provider that uses real auth if configured, mock otherwise
 export const OptionalAuthProvider = ({ children }) => {
-  const isCognitoConfigured = import.meta.env.VITE_COGNITO_USER_POOL_ID || 
-                             process.env.REACT_APP_COGNITO_USER_POOL_ID;
+  const userPoolId = import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID;
+  const appClientId = import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID;
+  
+  const isCognitoConfigured = userPoolId && 
+                             appClientId && 
+                             userPoolId !== 'us-east-1_XXXXXXXXX' && 
+                             appClientId !== 'xxxxxxxxxxxxxxxxxxxxxxxxxx' &&
+                             userPoolId.length > 10 &&
+                             appClientId.length > 10;
   
   if (!isCognitoConfigured) {
     return <MockAuthProvider>{children}</MockAuthProvider>;
@@ -43,8 +50,15 @@ export const OptionalAuthProvider = ({ children }) => {
 
 // Hook that works with both real and mock auth
 export const useOptionalAuth = () => {
-  const isCognitoConfigured = import.meta.env.VITE_COGNITO_USER_POOL_ID || 
-                             process.env.REACT_APP_COGNITO_USER_POOL_ID;
+  const userPoolId = import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID;
+  const appClientId = import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID;
+  
+  const isCognitoConfigured = userPoolId && 
+                             appClientId && 
+                             userPoolId !== 'us-east-1_XXXXXXXXX' && 
+                             appClientId !== 'xxxxxxxxxxxxxxxxxxxxxxxxxx' &&
+                             userPoolId.length > 10 &&
+                             appClientId.length > 10;
   
   if (!isCognitoConfigured) {
     const context = React.useContext(MockAuthContext);

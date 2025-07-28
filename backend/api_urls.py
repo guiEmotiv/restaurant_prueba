@@ -31,6 +31,7 @@ router.register(r'order-item-ingredients', OrderItemIngredientViewSet, basename=
 router.register(r'payments', PaymentViewSet, basename='payment')
 
 urlpatterns = [
+    path('auth/', include('authentication.urls')),  # Authentication endpoints
     path('', include(router.urls)),  # Remove api/ prefix from here
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
