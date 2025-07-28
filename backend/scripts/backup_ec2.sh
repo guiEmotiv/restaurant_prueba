@@ -138,10 +138,10 @@ def create_database_backup():
     print('CREANDO BACKUP DE BASE DE DATOS')
     print('=' * 60)
     
-    backup_name = '$BACKUP_NAME'
-    compress = $COMPRESS
-    data_only = $DATA_ONLY  
-    schema_only = $SCHEMA_ONLY
+    backup_name = '__BACKUP_NAME__'
+    compress = __COMPRESS__
+    data_only = __DATA_ONLY__  
+    schema_only = __SCHEMA_ONLY__
     
     print(f'📁 Archivo: {backup_name}')
     print(f'📋 Tipo: {\"Solo datos\" if data_only else \"Solo estructura\" if schema_only else \"Completo\"}')
@@ -271,10 +271,10 @@ DATA_ONLY_PY=$([ "$DATA_ONLY" = true ] && echo "True" || echo "False")
 SCHEMA_ONLY_PY=$([ "$SCHEMA_ONLY" = true ] && echo "True" || echo "False")
 
 # Reemplazar variables en el script Python
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$BACKUP_NAME/$BACKUP_NAME/g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$COMPRESS/$COMPRESS_PY/g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$DATA_ONLY/$DATA_ONLY_PY/g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$SCHEMA_ONLY/$SCHEMA_ONLY_PY/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/__BACKUP_NAME__/$BACKUP_NAME/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/__COMPRESS__/$COMPRESS_PY/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/__DATA_ONLY__/$DATA_ONLY_PY/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/__SCHEMA_ONLY__/$SCHEMA_ONLY_PY/g")
 
 # Ejecutar en el contenedor
 docker-compose -f $COMPOSE_FILE exec -T web python -c "$PYTHON_SCRIPT"

@@ -145,9 +145,9 @@ def restore_database_backup():
     print('RESTAURANDO BACKUP DE BASE DE DATOS')
     print('=' * 60)
     
-    backup_file = '$BACKUP_FILE'
-    is_compressed = $IS_COMPRESSED
-    clean_first = $CLEAN_FIRST
+    backup_file = '__BACKUP_FILE__'
+    is_compressed = __IS_COMPRESSED__
+    clean_first = __CLEAN_FIRST__
     
     print(f'📁 Archivo: {backup_file}')
     print(f'🗜️  Comprimido: {\"Sí\" if is_compressed else \"No\"}')
@@ -290,9 +290,9 @@ IS_COMPRESSED_PY=$([ "$IS_COMPRESSED" = true ] && echo "True" || echo "False")
 CLEAN_FIRST_PY=$([ "$CLEAN_FIRST" = true ] && echo "True" || echo "False")
 
 # Reemplazar variables en el script Python
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s|\$BACKUP_FILE|$BACKUP_FILE|g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$IS_COMPRESSED/$IS_COMPRESSED_PY/g")
-PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/\$CLEAN_FIRST/$CLEAN_FIRST_PY/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s|__BACKUP_FILE__|$BACKUP_FILE|g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/__IS_COMPRESSED__/$IS_COMPRESSED_PY/g")
+PYTHON_SCRIPT=$(echo "$PYTHON_SCRIPT" | sed "s/__CLEAN_FIRST__/$CLEAN_FIRST_PY/g")
 
 # Ejecutar en el contenedor
 docker-compose -f $COMPOSE_FILE exec -T web python -c "$PYTHON_SCRIPT"
