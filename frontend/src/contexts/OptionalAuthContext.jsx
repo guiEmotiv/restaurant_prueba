@@ -6,14 +6,14 @@ const MockAuthContext = React.createContext();
 
 const MockAuthProvider = ({ children }) => {
   const mockValue = {
-    user: { username: 'Admin' },
+    user: { username: 'Usuario' },
     userRole: 'administradores',
     loading: false,
     isAuthenticated: true,
     isAdmin: () => true,
     isWaiter: () => false,
     hasPermission: () => true, // Allow all permissions when auth is disabled
-    logout: () => window.location.reload(),
+    logout: () => console.log('Logout deshabilitado - Sin autenticación'),
     refreshAuth: () => Promise.resolve(),
     ROLES: {
       ADMIN: 'administradores',
@@ -31,44 +31,20 @@ const MockAuthProvider = ({ children }) => {
 
 // Optional Auth Provider that uses real auth if configured, mock otherwise
 export const OptionalAuthProvider = ({ children }) => {
-  const userPoolId = import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID;
-  const appClientId = import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID;
+  // Always use mock provider - authentication disabled
+  const isCognitoConfigured = false;
   
-  const isCognitoConfigured = userPoolId && 
-                             appClientId && 
-                             userPoolId !== 'us-east-1_XXXXXXXXX' && 
-                             appClientId !== 'xxxxxxxxxxxxxxxxxxxxxxxxxx' &&
-                             userPoolId.length > 10 &&
-                             appClientId.length > 10;
-  
-  if (!isCognitoConfigured) {
-    return <MockAuthProvider>{children}</MockAuthProvider>;
-  }
-  
-  return <AuthProvider>{children}</AuthProvider>;
+  return <MockAuthProvider>{children}</MockAuthProvider>;
 };
 
 // Hook that works with both real and mock auth
 export const useOptionalAuth = () => {
-  const userPoolId = import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID;
-  const appClientId = import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID;
+  // Always use mock context - authentication disabled
+  const isCognitoConfigured = false;
   
-  const isCognitoConfigured = userPoolId && 
-                             appClientId && 
-                             userPoolId !== 'us-east-1_XXXXXXXXX' && 
-                             appClientId !== 'xxxxxxxxxxxxxxxxxxxxxxxxxx' &&
-                             userPoolId.length > 10 &&
-                             appClientId.length > 10;
-  
-  if (!isCognitoConfigured) {
-    const context = React.useContext(MockAuthContext);
-    if (context === undefined) {
-      throw new Error('useOptionalAuth must be used within an OptionalAuthProvider');
-    }
-    return context;
+  const context = React.useContext(MockAuthContext);
+  if (context === undefined) {
+    throw new Error('useOptionalAuth must be used within an OptionalAuthProvider');
   }
-  
-  // Use the real auth hook when Cognito is configured
-  const { useAuth } = require('./AuthContext');
-  return useAuth();
+  return context;
 };

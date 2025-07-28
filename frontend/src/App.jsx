@@ -36,35 +36,11 @@ console.log('  VITE_AWS_REGION:', import.meta.env.VITE_AWS_REGION);
 console.log('  VITE_AWS_COGNITO_USER_POOL_ID:', import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID);
 console.log('  VITE_AWS_COGNITO_APP_CLIENT_ID:', import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID);
 
-// Configure Amplify only if Cognito is configured
-// Check for real values, not default placeholders
-const userPoolId = import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID;
-const appClientId = import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID;
+// Disable Cognito - Always run without authentication
+const isCognitoConfigured = false;
 
-const isCognitoConfigured = userPoolId && 
-                           appClientId && 
-                           userPoolId !== 'us-east-1_XXXXXXXXX' && 
-                           appClientId !== 'xxxxxxxxxxxxxxxxxxxxxxxxxx' &&
-                           userPoolId.length > 10 &&
-                           appClientId.length > 10;
-
-console.log('Cognito Configuration Status:', {
-  userPoolId: userPoolId ? `${userPoolId.substring(0, 10)}...` : 'undefined',
-  appClientId: appClientId ? `${appClientId.substring(0, 10)}...` : 'undefined',
-  isConfigured: isCognitoConfigured
-});
-
-if (isCognitoConfigured) {
-  try {
-    Amplify.configure(amplifyConfig);
-    console.log('✅ AWS Amplify configured successfully');
-  } catch (error) {
-    console.warn('⚠️ Amplify configuration skipped:', error.message);
-  }
-} else {
-  console.log('ℹ️ Running without AWS Cognito authentication');
-  console.log('💡 To enable authentication, configure VITE_AWS_COGNITO_* variables');
-}
+console.log('ℹ️ Running without AWS Cognito authentication (disabled)');
+console.log('🔓 Authentication is disabled - Direct access enabled');
 
 const AppContent = () => {
   // Skip authentication if Cognito is not configured
