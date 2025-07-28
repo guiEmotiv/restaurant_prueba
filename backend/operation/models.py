@@ -86,6 +86,20 @@ class Order(models.Model):
             
             if all_items_served and self.orderitem_set.exists():
                 self.update_status('SERVED')
+    
+    def get_total_paid(self):
+        """Obtiene el total pagado de la orden"""
+        return self.payments.aggregate(
+            total=models.Sum('amount')
+        )['total'] or Decimal('0.00')
+    
+    def get_pending_amount(self):
+        """Obtiene el monto pendiente de pago"""
+        return self.total_amount - self.get_total_paid()
+    
+    def is_fully_paid(self):
+        """Verifica si la orden está completamente pagada"""
+        return self.get_pending_amount() <= Decimal('0.00')
 
 
 class OrderItem(models.Model):
@@ -194,6 +208,21 @@ class OrderItem(models.Model):
         super().delete(*args, **kwargs)
         # Recalcular total de la orden después de eliminar el item
         order.calculate_total()
+    
+    def get_paid_amount(self):
+        """Obtiene el monto pagado de este item"""
+        from django.db.models import Sum
+        return PaymentItem.objects.filter(
+            order_item=self
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    
+    def get_pending_amount(self):
+        """Obtiene el monto pendiente de pago de este item"""
+        return self.total_price - self.get_paid_amount()
+    
+    def is_fully_paid(self):
+        """Verifica si el item está completamente pagado"""
+        return self.get_pending_amount() <= Decimal('0.00')
 
 
 class OrderItemIngredient(models.Model):
@@ -245,12 +274,13 @@ class Payment(models.Model):
         ('OTHER', 'Otro'),
     ]
 
-    order = models.OneToOneField(Order, on_delete=models.CASCADE)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')
     payment_method = models.CharField(max_length=10, choices=PAYMENT_METHOD_CHOICES)
     tax_amount = models.DecimalField(
         max_digits=10, 
         decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0.00'))]
+        validators=[MinValueValidator(Decimal('0.00'))],
+        default=Decimal('0.00')
     )
     amount = models.DecimalField(
         max_digits=10, 
@@ -261,6 +291,10 @@ class Payment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     # Fecha operativa heredada de la orden
     operational_date = models.DateField(null=True, blank=True)
+    # Identificador para agrupar pagos del mismo split
+    split_group = models.CharField(max_length=36, null=True, blank=True)
+    # Persona responsable del pago (opcional)
+    payer_name = models.CharField(max_length=100, blank=True)
 
     class Meta:
         db_table = 'payment'
@@ -268,12 +302,43 @@ class Payment(models.Model):
         verbose_name_plural = 'Pagos'
 
     def __str__(self):
-        return f"Pago {self.order} - {self.payment_method}"
+        return f"Pago {self.order} - {self.payment_method} - {self.amount}"
 
     def save(self, *args, **kwargs):
         # Heredar fecha operativa de la orden
         if not self.operational_date and self.order:
             self.operational_date = self.order.operational_date
         super().save(*args, **kwargs)
-        # Actualizar estado de la orden a PAID
-        self.order.update_status('PAID')
+        # Verificar si la orden está completamente pagada
+        self._check_order_fully_paid()
+    
+    def _check_order_fully_paid(self):
+        """Verifica si la orden está completamente pagada"""
+        order_total = self.order.total_amount
+        total_paid = self.order.payments.aggregate(
+            total=models.Sum('amount')
+        )['total'] or Decimal('0.00')
+        
+        if total_paid >= order_total:
+            self.order.update_status('PAID')
+
+
+class PaymentItem(models.Model):
+    """Asocia items específicos con un pago (para splits)"""
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='payment_items')
+    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE)
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))]
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'payment_item'
+        verbose_name = 'Item de Pago'
+        verbose_name_plural = 'Items de Pago'
+        unique_together = ['payment', 'order_item']
+    
+    def __str__(self):
+        return f"{self.payment} - {self.order_item}"

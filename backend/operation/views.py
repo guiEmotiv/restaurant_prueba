@@ -2,12 +2,13 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
-from .models import Order, OrderItem, OrderItemIngredient, Payment
+from django.db import transaction
+from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
 from .serializers import (
     OrderSerializer, OrderDetailSerializer, OrderCreateSerializer,
     OrderItemSerializer, OrderItemCreateSerializer,
     OrderItemIngredientSerializer, OrderItemIngredientCreateSerializer,
-    PaymentSerializer, OrderStatusUpdateSerializer
+    PaymentSerializer, OrderStatusUpdateSerializer, SplitPaymentSerializer
 )
 
 
@@ -160,6 +161,40 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         serializer = OrderDetailSerializer(orders, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def split_payment(self, request, pk=None):
+        """Crear pagos divididos para una orden"""
+        order = self.get_object()
+        
+        # Verificar que la orden esté servida
+        if order.status != 'SERVED':
+            return Response(
+                {'error': 'Solo se pueden pagar órdenes entregadas'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar que no esté completamente pagada
+        if order.is_fully_paid():
+            return Response(
+                {'error': 'Esta orden ya está completamente pagada'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = SplitPaymentSerializer(
+            data=request.data,
+            context={'order': order}
+        )
+        
+        if serializer.is_valid():
+            with transaction.atomic():
+                payments = serializer.save()
+                
+            # Retornar la orden actualizada con pagos
+            response_serializer = OrderDetailSerializer(order)
+            return Response(response_serializer.data)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class OrderItemViewSet(viewsets.ModelViewSet):

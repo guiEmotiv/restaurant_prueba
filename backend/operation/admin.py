@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Order, OrderItem, OrderItemIngredient, Payment
+from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
 
 
 class OrderItemIngredientInline(admin.TabularInline):
@@ -40,9 +40,24 @@ class OrderItemIngredientAdmin(admin.ModelAdmin):
     readonly_fields = ['unit_price', 'total_price', 'created_at']
 
 
+class PaymentItemInline(admin.TabularInline):
+    model = PaymentItem
+    extra = 0
+    readonly_fields = ['created_at']
+
+
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ['order', 'payment_method', 'amount', 'tax_amount', 'created_at']
-    list_filter = ['payment_method', 'created_at']
-    search_fields = ['order__id']
+    list_display = ['order', 'payment_method', 'amount', 'tax_amount', 'payer_name', 'split_group', 'created_at']
+    list_filter = ['payment_method', 'created_at', 'split_group']
+    search_fields = ['order__id', 'payer_name']
+    readonly_fields = ['created_at']
+    inlines = [PaymentItemInline]
+
+
+@admin.register(PaymentItem)
+class PaymentItemAdmin(admin.ModelAdmin):
+    list_display = ['payment', 'order_item', 'amount', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['payment__order__id', 'order_item__recipe__name']
     readonly_fields = ['created_at']

@@ -280,6 +280,10 @@ export const apiService = {
       const response = await api.get('/orders/served/');
       return response.data;
     },
+    splitPayment: async (id, data) => {
+      const response = await api.post(`/orders/${id}/split_payment/`, data);
+      return response.data;
+    },
   },
 
   orderItems: {

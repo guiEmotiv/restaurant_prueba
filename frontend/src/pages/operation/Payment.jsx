@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CreditCard, DollarSign, Receipt, CheckCircle } from 'lucide-react';
 import Button from '../../components/common/Button';
+import SplitPaymentModal from '../../components/orders/SplitPaymentModal';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -12,6 +13,7 @@ const Payment = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [showSplitModal, setShowSplitModal] = useState(false);
   const [paymentData, setPaymentData] = useState({
     payment_method: 'CASH',
     amount_received: '',
@@ -142,6 +144,40 @@ const Payment = () => {
                           (error.response?.data && typeof error.response.data === 'object' ? 
                             JSON.stringify(error.response.data) : 
                             error.message);
+      showError('Error al procesar el pago: ' + errorMessage);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSplitPayment = async (splits, isSplit) => {
+    setProcessing(true);
+    try {
+      if (isSplit) {
+        // Usar el endpoint de pagos divididos
+        await apiService.orders.splitPayment(order.id, { splits });
+        showSuccess(`Pagos divididos procesados exitosamente (${splits.length} pagos)`);
+      } else {
+        // Pago completo usando el endpoint tradicional
+        const paymentPayload = {
+          order: order.id,
+          payment_method: splits[0].payment_method,
+          tax_amount: splits[0].tax_amount || '0.00',
+          amount: splits[0].amount.toFixed(2),
+          payer_name: splits[0].payer_name,
+          notes: splits[0].notes || ''
+        };
+        await apiService.payments.create(paymentPayload);
+        showSuccess('Pago procesado exitosamente');
+      }
+      
+      setShowSplitModal(false);
+      navigate('/payment-history');
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.error || 
+                          error.message;
       showError('Error al procesar el pago: ' + errorMessage);
     } finally {
       setProcessing(false);
@@ -342,7 +378,7 @@ const Payment = () => {
             </div>
 
 
-            <div className="pt-4">
+            <div className="pt-4 space-y-3">
               <Button
                 onClick={handleProcessPayment}
                 disabled={processing || !paymentData.amount_received}
@@ -356,14 +392,32 @@ const Payment = () => {
                 ) : (
                   <>
                     <CheckCircle className="h-4 w-4" />
-                    Procesar Pago
+                    Procesar Pago Completo
                   </>
                 )}
+              </Button>
+              
+              <Button
+                onClick={() => setShowSplitModal(true)}
+                disabled={processing}
+                variant="secondary"
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <CreditCard className="h-4 w-4" />
+                Dividir Cuenta
               </Button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Modal de pagos divididos */}
+      <SplitPaymentModal
+        isOpen={showSplitModal}
+        onClose={() => setShowSplitModal(false)}
+        onSubmit={handleSplitPayment}
+        order={order}
+      />
     </div>
   );
 };
