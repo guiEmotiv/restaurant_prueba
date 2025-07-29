@@ -10,7 +10,6 @@ const Orders = () => {
   const { showSuccess, showError } = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('CREATED');
 
   useEffect(() => {
     loadOrders();
@@ -31,9 +30,9 @@ const Orders = () => {
       setLoading(true);
       const data = await apiService.orders.getAll();
       
-      // Mostrar órdenes CREATED y SERVED (no pagadas) - las PAID no se muestran
+      // Mostrar solo órdenes CREATED (no pagadas) - las PAID no se muestran
       const activeOrders = Array.isArray(data) ? 
-        data.filter(order => order.status === 'CREATED' || order.status === 'SERVED') : [];
+        data.filter(order => order.status === 'CREATED') : [];
       
       // Cargar los items de cada orden para verificar si se puede eliminar y contar items
       const ordersWithItems = await Promise.all(
@@ -158,18 +157,8 @@ const Orders = () => {
     return statusTexts[status] || status;
   };
 
-  const filteredOrders = orders.filter(order => {
-    return order.status === filter;
-  });
-
-  const getFilterCounts = () => {
-    return {
-      CREATED: orders.filter(o => o.status === 'CREATED').length,
-      SERVED: orders.filter(o => o.status === 'SERVED').length
-    };
-  };
-
-  const counts = getFilterCounts();
+  // Solo mostramos órdenes CREATED
+  const filteredOrders = orders;
 
   if (loading) {
     return (
@@ -201,28 +190,8 @@ const Orders = () => {
         </Button>
       </div>
 
-      {/* Status Filter Tabs */}
+      {/* Orders Table */}
       <div className="bg-white rounded-lg shadow">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-4 md:px-6 overflow-x-auto">
-            {[
-              { key: 'CREATED', label: 'Creadas', count: counts.CREATED },
-              { key: 'SERVED', label: 'Entregadas', count: counts.SERVED }
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setFilter(tab.key)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                  filter === tab.key
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {tab.label} ({tab.count})
-              </button>
-            ))}
-          </nav>
-        </div>
 
         {/* Desktop Table */}
         <div className="hidden md:block overflow-x-auto">
@@ -262,7 +231,7 @@ const Orders = () => {
               {filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
-                    {`No hay pedidos ${getStatusText(filter).toLowerCase()}`}
+                    No hay pedidos activos
                   </td>
                 </tr>
               ) : (
@@ -347,7 +316,7 @@ const Orders = () => {
           {filteredOrders.length === 0 ? (
             <div className="p-6 text-center text-gray-500">
               <div className="text-4xl mb-2">🍽️</div>
-              <p className="text-lg font-medium">{`No hay pedidos ${getStatusText(filter).toLowerCase()}`}</p>
+              <p className="text-lg font-medium">No hay pedidos activos</p>
               <p className="text-sm">Los nuevos pedidos aparecerán aquí</p>
             </div>
           ) : (

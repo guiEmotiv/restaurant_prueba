@@ -10,7 +10,6 @@ from inventory.models import Recipe, Ingredient
 class Order(models.Model):
     STATUS_CHOICES = [
         ('CREATED', 'Creado'),
-        ('SERVED', 'Entregado'),
         ('PAID', 'Pagado'),
     ]
 
@@ -82,24 +81,15 @@ class Order(models.Model):
         self.status = new_status
         now = timezone.now()
         
-        if new_status == 'SERVED':
-            self.served_at = now
-        elif new_status == 'PAID':
+        if new_status == 'PAID':
             self.paid_at = now
         
         self.save()
 
     def check_and_update_order_status(self):
-        """Verifica si todos los items están servidos y actualiza el estado de la orden automáticamente"""
-        if self.status == 'CREATED':
-            # Verificar si todos los items están servidos
-            all_items_served = all(
-                item.status == 'SERVED' 
-                for item in self.orderitem_set.all()
-            )
-            
-            if all_items_served and self.orderitem_set.exists():
-                self.update_status('SERVED')
+        """Las órdenes ya no tienen estado SERVED - solo CREATED y PAID"""
+        # No necesitamos actualizar estado automáticamente
+        pass
     
     def get_total_paid(self):
         """Obtiene el total pagado de la orden"""
@@ -214,13 +204,9 @@ class OrderItem(models.Model):
             self._check_and_update_order_status()
     
     def _check_and_update_order_status(self):
-        """Verifica si todos los items están servidos y actualiza el estado de la orden"""
-        order = self.order
-        all_items_served = order.orderitem_set.filter(status='SERVED').count()
-        total_items = order.orderitem_set.count()
-        
-        if all_items_served == total_items and total_items > 0:
-            order.update_status('SERVED')
+        """Las órdenes ya no tienen estado SERVED automático"""
+        # Ya no actualizamos estado de orden cuando items se sirven
+        pass
     
     def delete(self, *args, **kwargs):
         """Override delete para recalcular el total de la orden"""

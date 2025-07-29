@@ -133,7 +133,7 @@ const NewOrder = () => {
     setOrderItems(prev => {
       const updatedPrev = prev.map(item => ({
         ...item,
-        can_edit: existingOrder?.status === 'SERVED' ? false : item.can_edit
+        can_edit: existingOrder?.status === 'PAID' ? false : item.can_edit
       }));
       
       const newItem = {
@@ -294,10 +294,7 @@ const NewOrder = () => {
         const newItems = orderItems.filter(item => !item.id && item.recipe);
         
         if (newItems.length > 0) {
-          // Si el pedido estaba SERVED y agregamos nuevos items, cambiar estado a CREATED
-          if (existingOrder?.status === 'SERVED') {
-            await apiService.orders.updateStatus(orderId, 'CREATED');
-          }
+          // Los pedidos solo tienen estado CREATED o PAID, no es necesario cambiar estado
           
           for (const item of newItems) {
             const createData = {
@@ -464,7 +461,7 @@ const NewOrder = () => {
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
                   errors.waiter ? 'border-red-500' : 'border-gray-300'
                 }`}
-                disabled={!!orderId || existingOrder?.status === 'SERVED'}
+                disabled={!!orderId || existingOrder?.status === 'PAID'}
               >
                 <option value="">Seleccionar mesero</option>
                 {availableWaiters.map(waiter => (
@@ -488,7 +485,7 @@ const NewOrder = () => {
                   }
                 }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                disabled={!!orderId || existingOrder?.status === 'SERVED'}
+                disabled={!!orderId || existingOrder?.status === 'PAID'}
               >
                 <option value="">Zona</option>
                 {availableZones.map(zone => (
@@ -507,7 +504,7 @@ const NewOrder = () => {
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
                   errors.table ? 'border-red-500' : 'border-gray-300'
                 }`}
-                disabled={!!orderId || existingOrder?.status === 'SERVED'}
+                disabled={!!orderId || existingOrder?.status === 'PAID'}
               >
                 <option value="">Mesa</option>
                 {getFilteredTables().map(table => (
@@ -527,7 +524,6 @@ const NewOrder = () => {
             <div className="text-center">
               <div className="inline-flex px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 font-medium text-sm">
                 Estado: {formData.status === 'CREATED' && 'Creado'}
-                {formData.status === 'SERVED' && 'Entregado'}
                 {formData.status === 'PAID' && 'Pagado'}
               </div>
             </div>
