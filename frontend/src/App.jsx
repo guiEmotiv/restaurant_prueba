@@ -19,6 +19,7 @@ import Orders from './pages/operation/Orders';
 import NewOrder from './pages/operation/NewOrder';
 import OrderDetail from './pages/operation/OrderDetail';
 import Payment from './pages/operation/Payment';
+import PaymentHistory from './pages/operation/PaymentHistory';
 import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
 import TableStatus from './pages/operation/TableStatus';
