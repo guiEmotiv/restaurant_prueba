@@ -37,7 +37,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = [
             'id', 'recipe', 'recipe_name', 'recipe_preparation_time', 'unit_price', 'total_price',
-            'status', 'notes', 'order_zone', 'order_table', 'order_id',
+            'status', 'notes', 'is_takeaway', 'has_taper', 'order_zone', 'order_table', 'order_id',
             'customizations', 'customizations_count',
             'elapsed_time_minutes', 'is_overdue',
             'paid_amount', 'pending_amount', 'is_fully_paid',
@@ -135,7 +135,7 @@ class OrderDetailSerializer(OrderSerializer):
 class OrderItemCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
-        fields = ['order', 'recipe', 'notes']
+        fields = ['order', 'recipe', 'notes', 'is_takeaway', 'has_taper']
     
     def validate_recipe(self, value):
         if not value.is_active:
@@ -151,7 +151,7 @@ class OrderItemForCreateSerializer(serializers.ModelSerializer):
     """Serializer para items cuando se crean dentro de una orden nueva"""
     class Meta:
         model = OrderItem
-        fields = ['recipe', 'notes']
+        fields = ['recipe', 'notes', 'is_takeaway', 'has_taper']
     
     def validate_recipe(self, value):
         if not value.is_active:

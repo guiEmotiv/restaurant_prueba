@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Minus, AlertTriangle, Check } from 'lucide-react';
+import { X, Plus, Minus, AlertTriangle, Check, Package2, ShoppingBag } from 'lucide-react';
 import Button from '../common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -81,7 +81,13 @@ const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
           : item
       ));
     } else {
-      setSelectedItems([...selectedItems, { recipe, quantity: 1, notes: '' }]);
+      setSelectedItems([...selectedItems, { 
+        recipe, 
+        quantity: 1, 
+        notes: '',
+        is_takeaway: false,
+        has_taper: false
+      }]);
     }
   };
 
@@ -106,6 +112,27 @@ const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
     ));
   };
 
+  const toggleTakeaway = (recipeId) => {
+    setSelectedItems(selectedItems.map(item => 
+      item.recipe.id === recipeId 
+        ? { 
+            ...item, 
+            is_takeaway: !item.is_takeaway,
+            // Si se activa takeaway, también activar taper automáticamente
+            has_taper: !item.is_takeaway ? true : item.has_taper
+          }
+        : item
+    ));
+  };
+
+  const toggleTaper = (recipeId) => {
+    setSelectedItems(selectedItems.map(item => 
+      item.recipe.id === recipeId 
+        ? { ...item, has_taper: !item.has_taper }
+        : item
+    ));
+  };
+
   const calculateTotal = () => {
     return selectedItems.reduce((total, item) => 
       total + (parseFloat(item.recipe.base_price || 0) * item.quantity), 0
@@ -124,7 +151,9 @@ const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
         for (let i = 0; i < quantity; i++) {
           itemsArray.push({
             recipe: item.recipe.id,
-            notes: item.notes || ''
+            notes: item.notes || '',
+            is_takeaway: item.is_takeaway || false,
+            has_taper: item.has_taper || false
           });
         }
       });
@@ -292,7 +321,20 @@ const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
                             >
                               <Minus className="h-4 w-4" />
                             </button>
-                            <span className="text-sm font-medium">{item.quantity}</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const newQuantity = parseInt(e.target.value) || 1;
+                                setSelectedItems(selectedItems.map(i => 
+                                  i.recipe.id === item.recipe.id 
+                                    ? { ...i, quantity: Math.max(1, newQuantity) }
+                                    : i
+                                ));
+                              }}
+                              className="w-16 text-center text-sm font-medium border border-gray-200 rounded px-2 py-1"
+                            />
                             <button
                               onClick={() => addItem(item.recipe)}
                               className="text-green-600 hover:text-green-800"
@@ -305,6 +347,35 @@ const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
                         <p className="text-xs text-gray-600 mb-2">
                           {formatCurrency(item.recipe.base_price)} × {item.quantity} = {formatCurrency(item.recipe.base_price * item.quantity)}
                         </p>
+                        
+                        {/* Takeaway options */}
+                        <div className="flex gap-2 mb-2">
+                          <button
+                            onClick={() => toggleTakeaway(item.recipe.id)}
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                              item.is_takeaway 
+                                ? 'bg-orange-100 text-orange-700 border border-orange-300' 
+                                : 'bg-gray-100 text-gray-600 border border-gray-300'
+                            }`}
+                          >
+                            <ShoppingBag className="h-3 w-3" />
+                            Para llevar
+                          </button>
+                          
+                          {item.is_takeaway && (
+                            <button
+                              onClick={() => toggleTaper(item.recipe.id)}
+                              className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                item.has_taper 
+                                  ? 'bg-green-100 text-green-700 border border-green-300' 
+                                  : 'bg-gray-100 text-gray-600 border border-gray-300'
+                              }`}
+                            >
+                              <Package2 className="h-3 w-3" />
+                              Con taper
+                            </button>
+                          )}
+                        </div>
                         
                         <textarea
                           placeholder="Notas especiales..."

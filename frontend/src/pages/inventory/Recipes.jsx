@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, ChefHat, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, ChefHat, Package, Search } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import RecipeModal from '../../components/recipe/RecipeModalFixed';
@@ -11,16 +11,44 @@ const Recipes = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [filters, setFilters] = useState({
+    name: '',
+    group: ''
+  });
+
+  useEffect(() => {
+    loadGroups();
+    loadRecipes();
+  }, []);
 
   useEffect(() => {
     loadRecipes();
-  }, []);
+  }, [filters]);
+
+  const loadGroups = async () => {
+    try {
+      const data = await apiService.groups.getAll();
+      setGroups(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error loading groups:', error);
+    }
+  };
 
   const loadRecipes = async () => {
     try {
       setLoading(true);
-      // Agregar parámetro para mostrar todas las recetas (incluyendo las sin stock)
-      const data = await apiService.recipes.getAll({ show_all: true });
+      const params = { show_all: true };
+      
+      // Add filters to params
+      if (filters.name) {
+        params.search = filters.name;
+      }
+      if (filters.group) {
+        params.group = filters.group;
+      }
+      
+      const data = await apiService.recipes.getAll(params);
       setRecipes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading recipes:', error);
@@ -134,6 +162,47 @@ const Recipes = () => {
           <Plus className="h-4 w-4" />
           Nueva Receta
         </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Buscar por nombre
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={filters.name}
+                onChange={(e) => setFilters({ ...filters, name: e.target.value })}
+                placeholder="Buscar receta..."
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Filtrar por grupo
+            </label>
+            <select
+              value={filters.group}
+              onChange={(e) => setFilters({ ...filters, group: e.target.value })}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+            >
+              <option value="">Todos los grupos</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow">

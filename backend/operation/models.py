@@ -122,6 +122,8 @@ class OrderItem(models.Model):
     )
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='CREATED')
     notes = models.TextField(blank=True)
+    is_takeaway = models.BooleanField(default=False, verbose_name='Para llevar')
+    has_taper = models.BooleanField(default=False, verbose_name='Con envoltorio')
     created_at = models.DateTimeField(auto_now_add=True)
     served_at = models.DateTimeField(null=True, blank=True)
 

@@ -54,6 +54,7 @@ const Dashboard = () => {
   });
   const [operationalDate, setOperationalDate] = useState(null);
   const [operationalInfo, setOperationalInfo] = useState(null);
+  const [operationalSummary, setOperationalSummary] = useState(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [operationalConfig, setOperationalConfig] = useState({
     opening_time: '20:00',
@@ -174,6 +175,7 @@ const Dashboard = () => {
       // Actualizar fecha operativa mostrada e información operacional
       setOperationalDate(operationalSummary.operational_date);
       setOperationalInfo(operationalInfoData);
+      setOperationalSummary(operationalSummary);
       
       // Filtrar órdenes por fecha operativa seleccionada
       const selectedOperationalDate = selectedDate;
@@ -793,6 +795,170 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Gráfico de Pie de Ventas por Método de Pago */}
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-6">
+          Distribución de Ventas por Método de Pago
+        </h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Pie Chart */}
+          <div className="flex justify-center items-center">
+            <div className="relative">
+              <svg viewBox="0 0 200 200" className="w-64 h-64">
+                {(() => {
+                  const paymentData = operationalSummary?.summary_by_method || [];
+                  const totalAmount = operationalSummary?.total_amount || 0;
+                  
+                  if (paymentData.length === 0 || totalAmount === 0) {
+                    return (
+                      <>
+                        <circle cx="100" cy="100" r="80" fill="#f3f4f6" stroke="#e5e7eb" strokeWidth="2" />
+                        <text x="100" y="105" textAnchor="middle" className="text-sm fill-gray-500">
+                          Sin datos
+                        </text>
+                      </>
+                    );
+                  }
+                  
+                  const colors = {
+                    'CASH': '#10b981',      // green
+                    'CARD': '#3b82f6',      // blue
+                    'YAPE_PLIN': '#8b5cf6', // purple
+                    'OTHER': '#f59e0b'      // amber
+                  };
+                  
+                  const methodNames = {
+                    'CASH': 'Efectivo',
+                    'CARD': 'Tarjeta',
+                    'YAPE_PLIN': 'Yape/Plin',
+                    'OTHER': 'Otro'
+                  };
+                  
+                  let currentAngle = -90;
+                  
+                  return paymentData.map((payment, index) => {
+                    const percentage = (payment.total / totalAmount);
+                    const angle = percentage * 360;
+                    const startAngle = currentAngle * Math.PI / 180;
+                    const endAngle = (currentAngle + angle) * Math.PI / 180;
+                    
+                    // Calcular puntos del arco
+                    const radius = 80;
+                    const x1 = 100 + radius * Math.cos(startAngle);
+                    const y1 = 100 + radius * Math.sin(startAngle);
+                    const x2 = 100 + radius * Math.cos(endAngle);
+                    const y2 = 100 + radius * Math.sin(endAngle);
+                    
+                    const largeArc = angle > 180 ? 1 : 0;
+                    
+                    const pathData = [
+                      `M 100 100`,
+                      `L ${x1} ${y1}`,
+                      `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
+                      'Z'
+                    ].join(' ');
+                    
+                    currentAngle += angle;
+                    
+                    return (
+                      <path
+                        key={index}
+                        d={pathData}
+                        fill={colors[payment.payment_method] || '#6b7280'}
+                        stroke="white"
+                        strokeWidth="2"
+                        className="hover:opacity-80 transition-opacity cursor-pointer"
+                        title={`${methodNames[payment.payment_method]}: ${formatCurrency(payment.total)}`}
+                      />
+                    );
+                  });
+                })()}
+              </svg>
+              
+              {/* Centro del pie chart con total */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-white rounded-full w-32 h-32 flex flex-col items-center justify-center shadow-inner">
+                  <p className="text-xs text-gray-500">Total</p>
+                  <p className="text-lg font-bold text-gray-900">{formatCurrency(operationalSummary?.total_amount || 0)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Leyenda y estadísticas */}
+          <div className="space-y-4">
+            {(() => {
+              const paymentData = operationalSummary?.summary_by_method || [];
+              const totalAmount = operationalSummary?.total_amount || 0;
+              
+              const colors = {
+                'CASH': '#10b981',
+                'CARD': '#3b82f6',
+                'YAPE_PLIN': '#8b5cf6',
+                'OTHER': '#f59e0b'
+              };
+              
+              const methodNames = {
+                'CASH': 'Efectivo',
+                'CARD': 'Tarjeta',
+                'YAPE_PLIN': 'Yape/Plin',
+                'OTHER': 'Otro'
+              };
+              
+              const icons = {
+                'CASH': '💵',
+                'CARD': '💳',
+                'YAPE_PLIN': '📱',
+                'OTHER': '🔄'
+              };
+              
+              return paymentData.map((payment, index) => {
+                const percentage = totalAmount > 0 ? ((payment.total / totalAmount) * 100).toFixed(1) : '0';
+                
+                return (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center">
+                      <div 
+                        className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
+                        style={{ backgroundColor: colors[payment.payment_method] || '#6b7280' }}
+                      ></div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{icons[payment.payment_method]}</span>
+                          <span className="font-medium text-gray-900">{methodNames[payment.payment_method]}</span>
+                        </div>
+                        <p className="text-sm text-gray-500">{payment.count} transacciones</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-gray-900">{formatCurrency(payment.total)}</p>
+                      <p className="text-sm text-gray-500">{percentage}%</p>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+            
+            {/* Resumen adicional */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Total de transacciones</p>
+                  <p className="text-lg font-semibold text-gray-900">{operationalSummary?.total_orders || 0}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Transacción promedio</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {formatCurrency((operationalSummary?.total_amount || 0) / (operationalSummary?.total_orders || 1))}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
     </div>
   );
