@@ -31,7 +31,7 @@ const Orders = () => {
       setLoading(true);
       const data = await apiService.orders.getAll();
       
-      // Filtrar órdenes CREATED y SERVED (no pagadas) - las PAID no se muestran
+      // Mostrar órdenes CREATED y SERVED (no pagadas) - las PAID no se muestran
       const activeOrders = Array.isArray(data) ? 
         data.filter(order => order.status === 'CREATED' || order.status === 'SERVED') : [];
       
@@ -41,17 +41,20 @@ const Orders = () => {
           try {
             const orderDetails = await apiService.orders.getById(order.id);
             const items = orderDetails.items || [];
+            const allItemsDelivered = items.length > 0 && items.every(item => item.status === 'SERVED');
             return {
               ...order,
               items: items,
-              items_count: items.length
+              items_count: items.length,
+              all_items_delivered: allItemsDelivered
             };
           } catch (error) {
             console.error(`Error loading items for order ${order.id}:`, error);
             return {
               ...order,
               items: [],
-              items_count: 0
+              items_count: 0,
+              all_items_delivered: false
             };
           }
         })
@@ -311,7 +314,7 @@ const Orders = () => {
                           <Edit className="h-4 w-4" />
                         </button>
                         
-                        {order.status === 'SERVED' && (
+                        {order.all_items_delivered && (
                           <button
                             onClick={() => handlePayment(order)}
                             className="text-green-600 hover:text-green-900 p-1 rounded"
@@ -392,7 +395,7 @@ const Orders = () => {
                         Editar
                       </button>
                       
-                      {order.status === 'SERVED' && (
+                      {order.all_items_delivered && (
                         <button
                           onClick={() => handlePayment(order)}
                           className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors text-center"

@@ -218,18 +218,6 @@ const NewOrder = () => {
             
             return newItem;
           }
-
-          if (field === 'has_taper') {
-            const newItem = { ...item, [field]: value };
-            
-            if (value === true) {
-              newItem.selected_container = defaultContainer?.id || null;
-            } else {
-              newItem.selected_container = null;
-            }
-            
-            return newItem;
-          }
           
           return { ...item, [field]: value };
         }
@@ -590,26 +578,26 @@ const NewOrder = () => {
                   return status === 'CREATED' ? 'Creado' : status === 'SERVED' ? 'Entregado' : status;
                 };
                 
-                // Lógica mejorada: bloquear items CREATED cuando se agrega un nuevo item
+                // Lógica de bloqueo: al agregar nuevo item, bloquear TODOS los items anteriores
                 const hasNewItems = orderItems.some(i => !i.id);
-                const isOldCreatedItem = !!item.id && item.status === 'CREATED';
-                const shouldBlockOldCreated = hasNewItems && isOldCreatedItem;
-                const finalCanEdit = item.can_edit && !shouldBlockOldCreated;
+                const isOldItem = !!item.id;
+                const shouldBlockOldItems = hasNewItems && isOldItem;
+                const finalCanEdit = item.can_edit && !shouldBlockOldItems;
                 
                 return (
                   <div key={item.tempKey || item.id || index} className="bg-white">
                     {/* Header del item */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
-                      <h3 className="text-lg font-semibold text-gray-900 text-center sm:text-left">
-                        Item #{displayNumber} - {getStatusText(item.status)}
-                      </h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+                      <span className="text-sm font-medium text-gray-900 text-center sm:text-left">
+                        #{displayNumber} - {getStatusText(item.status)}
+                      </span>
                       {item.can_delete && (
                         <button
                           onClick={() => removeOrderItem(index)}
-                          className="self-center sm:self-auto text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                          className="self-center sm:self-auto text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition-colors"
                           title="Eliminar"
                         >
-                          <Trash2 className="h-5 w-5" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       )}
                     </div>
@@ -671,14 +659,14 @@ const NewOrder = () => {
                       
                       {/* Precio unitario */}
                       <div className="md:col-span-2 text-center">
-                        <div className="text-sm font-semibold text-gray-900">
+                        <div className="text-sm font-medium text-gray-900">
                           {formatCurrency(item.unit_price)}
                         </div>
                       </div>
                       
                       {/* Precio total */}
                       <div className="md:col-span-2 text-center">
-                        <div className="text-lg font-bold text-blue-600">
+                        <div className="text-sm font-bold text-blue-600">
                           {formatCurrency(item.total_price)}
                         </div>
                       </div>
@@ -686,7 +674,7 @@ const NewOrder = () => {
                       {/* Opciones */}
                       <div className="md:col-span-1 text-center">
                         <div className="flex flex-col items-center space-y-2">
-                          <label className="flex items-center text-xs">
+                          <label className="flex items-center text-sm">
                             <input
                               type="checkbox"
                               checked={item.is_takeaway}
@@ -694,20 +682,13 @@ const NewOrder = () => {
                               className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                               disabled={!finalCanEdit}
                             />
-                            <span className="ml-2">Llevar</span>
+                            <span className="ml-2">Para llevar</span>
                           </label>
                           
-                          {item.is_takeaway && (
-                            <label className="flex items-center text-xs">
-                              <input
-                                type="checkbox"
-                                checked={item.has_taper}
-                                onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
-                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                disabled={!finalCanEdit || !defaultContainer}
-                              />
-                              <span className="ml-2">Envase</span>
-                            </label>
+                          {item.is_takeaway && defaultContainer && (
+                            <div className="text-sm text-gray-600">
+                              +{formatCurrency(defaultContainer.price)}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -729,7 +710,7 @@ const NewOrder = () => {
                     
                     {/* Separador */}
                     {index < orderItems.length - 1 && (
-                      <hr className="my-6 border-gray-200" />
+                      <hr className="my-4 border-gray-200" />
                     )}
                   </div>
                 );
