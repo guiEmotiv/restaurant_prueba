@@ -40,11 +40,16 @@ const Orders = () => {
           try {
             const orderDetails = await apiService.orders.getById(order.id);
             const items = orderDetails.items || [];
-            const allItemsDelivered = items.length > 0 && items.every(item => item.status === 'SERVED');
+            const totalItems = items.length;
+            const servedItems = items.filter(item => item.status === 'SERVED').length;
+            const allItemsDelivered = totalItems > 0 && items.every(item => item.status === 'SERVED');
+            
             return {
               ...order,
               items: items,
-              items_count: items.length,
+              items_count: totalItems,
+              served_items_count: servedItems,
+              items_status: `${servedItems}/${totalItems}`,
               all_items_delivered: allItemsDelivered
             };
           } catch (error) {
@@ -53,6 +58,8 @@ const Orders = () => {
               ...order,
               items: [],
               items_count: 0,
+              served_items_count: 0,
+              items_status: '0/0',
               all_items_delivered: false
             };
           }
@@ -259,7 +266,10 @@ const Orders = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="text-sm font-medium text-gray-900">
-                        {order.items_count || 0}
+                        {order.items_status}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        entregados
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -339,8 +349,8 @@ const Orders = () => {
                     {/* Order details */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <dt className="font-medium text-gray-500">Items</dt>
-                        <dd className="text-base font-semibold text-gray-900">{order.items_count || 0}</dd>
+                        <dt className="font-medium text-gray-500">Items entregados</dt>
+                        <dd className="text-base font-semibold text-gray-900">{order.items_status}</dd>
                       </div>
                       <div>
                         <dt className="font-medium text-gray-500">Total</dt>
