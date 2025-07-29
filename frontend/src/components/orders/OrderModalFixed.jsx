@@ -248,6 +248,21 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
             
             return newItem;
           }
+
+          // Lógica especial para envase: actualizar selected_container
+          if (field === 'has_taper') {
+            const newItem = { ...item, [field]: value };
+            
+            if (value === true) {
+              // Cuando se marca envase, usar el container por defecto
+              newItem.selected_container = defaultContainer?.id || null;
+            } else {
+              // Cuando se desmarca envase, quitar container
+              newItem.selected_container = null;
+            }
+            
+            return newItem;
+          }
           
           return { ...item, [field]: value };
         }
@@ -780,10 +795,10 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                                     checked={item.has_taper}
                                     onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
                                     className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                    disabled={!item.can_edit}
+                                    disabled={!item.can_edit || !defaultContainer}
                                   />
                                   <span className="ml-2 text-xs text-gray-700">
-                                    Con envase ({defaultContainer ? `+S/ ${defaultContainer.price}` : 'gratis'})
+                                    Con envase {defaultContainer ? `(+S/ ${defaultContainer.price})` : '(Sin stock)'}
                                   </span>
                                 </label>
                               )}
@@ -870,10 +885,10 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                                     checked={item.has_taper}
                                     onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
                                     className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                    disabled={!item.can_edit}
+                                    disabled={!item.can_edit || !defaultContainer}
                                   />
                                   <span className="ml-1 text-xs text-gray-700">
-                                    Envase (+S/ {defaultContainer?.price || '0.00'})
+                                    Envase {defaultContainer ? `(+S/ ${defaultContainer.price})` : '(Sin stock)'}
                                   </span>
                                 </label>
                               )}
