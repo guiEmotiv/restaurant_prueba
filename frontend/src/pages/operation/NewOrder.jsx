@@ -295,10 +295,6 @@ const NewOrder = () => {
         const newItems = orderItems.filter(item => !item.id && item.recipe);
         
         if (newItems.length > 0) {
-          if (existingOrder?.status === 'SERVED') {
-            await apiService.orders.updateStatus(orderId, 'CREATED');
-          }
-          
           for (const item of newItems) {
             const createData = {
               order: parseInt(orderId),
@@ -386,6 +382,26 @@ const NewOrder = () => {
     ));
   };
 
+  const incrementQuantity = (index) => {
+    setOrderItems(prev => prev.map((item, i) => {
+      if (i === index) {
+        const newQuantity = (item.quantity || 1) + 1;
+        return { ...item, quantity: newQuantity, displayQuantity: newQuantity.toString() };
+      }
+      return item;
+    }));
+  };
+
+  const decrementQuantity = (index) => {
+    setOrderItems(prev => prev.map((item, i) => {
+      if (i === index) {
+        const newQuantity = Math.max(1, (item.quantity || 1) - 1);
+        return { ...item, quantity: newQuantity, displayQuantity: newQuantity.toString() };
+      }
+      return item;
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div className="flex items-center justify-end gap-2 p-4 border-b border-gray-200">
@@ -415,14 +431,15 @@ const NewOrder = () => {
         </Button>
       </div>
 
-      <div className="p-4 max-w-6xl mx-auto">
-        <div className="space-y-4">
-          <div>
+      <div className="p-3">
+        <div className="space-y-3">
+          {/* Controles principales */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <select
               name="waiter"
               value={formData.waiter}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
+              className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
                 errors.waiter ? 'border-red-500' : 'border-gray-300'
               }`}
               disabled={!!orderId || existingOrder?.status === 'SERVED'}
@@ -434,73 +451,62 @@ const NewOrder = () => {
                 </option>
               ))}
             </select>
-            {errors.waiter && (
-              <p className="mt-1 text-sm text-red-600">{errors.waiter}</p>
-            )}
-          </div>
+            
+            <select
+              value={selectedZoneFilter}
+              onChange={(e) => {
+                setSelectedZoneFilter(e.target.value);
+                if (formData.table) {
+                  setFormData(prev => ({ ...prev, table: '' }));
+                }
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+              disabled={!!orderId || existingOrder?.status === 'SERVED'}
+            >
+              <option value="">Zona</option>
+              {availableZones.map(zone => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.name}
+                </option>
+              ))}
+            </select>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            <div>
-              <select
-                value={selectedZoneFilter}
-                onChange={(e) => {
-                  setSelectedZoneFilter(e.target.value);
-                  if (formData.table) {
-                    setFormData(prev => ({ ...prev, table: '' }));
-                  }
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-                disabled={!!orderId || existingOrder?.status === 'SERVED'}
-              >
-                <option value="">Zona</option>
-                {availableZones.map(zone => (
-                  <option key={zone.id} value={zone.id}>
-                    {zone.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              name="table"
+              value={formData.table}
+              onChange={handleInputChange}
+              className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
+                errors.table ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={!!orderId || existingOrder?.status === 'SERVED'}
+            >
+              <option value="">Mesa</option>
+              {getFilteredTables().map(table => (
+                <option key={table.id} value={table.id}>
+                  Mesa {table.table_number}
+                </option>
+              ))}
+            </select>
 
-            <div>
-              <select
-                name="table"
-                value={formData.table}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
-                  errors.table ? 'border-red-500' : 'border-gray-300'
-                }`}
-                disabled={!!orderId || existingOrder?.status === 'SERVED'}
-              >
-                <option value="">Mesa</option>
-                {getFilteredTables().map(table => (
-                  <option key={table.id} value={table.id}>
-                    Mesa {table.table_number}
-                  </option>
-                ))}
-              </select>
-              {errors.table && (
-                <p className="mt-1 text-sm text-red-600">{errors.table}</p>
-              )}
-            </div>
-
-            {existingOrder && (
-              <div>
-                <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 font-medium text-sm">
-                  {formData.status === 'CREATED' && 'Creado'}
-                  {formData.status === 'SERVED' && 'Entregado'}
-                  {formData.status === 'PAID' && 'Pagado'}
-                </div>
+            {existingOrder ? (
+              <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 font-medium text-sm text-center">
+                {formData.status === 'CREATED' && 'Creado'}
+                {formData.status === 'SERVED' && 'Entregado'}
+                {formData.status === 'PAID' && 'Pagado'}
               </div>
+            ) : (
+              <div></div>
             )}
           </div>
 
+          {/* Filtros y botón agregar */}
           <div className="flex items-center gap-2">
             <select
               value={selectedGroupFilter}
               onChange={(e) => setSelectedGroupFilter(e.target.value)}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
             >
-              <option value="">Grupos</option>
+              <option value="">Filtrar por grupo</option>
               {availableGroups.map(group => (
                 <option key={group.id} value={group.id}>
                   {group.name}
@@ -510,60 +516,72 @@ const NewOrder = () => {
             
             <button
               onClick={addOrderItem}
-              className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
               title="Agregar nuevo item"
             >
               <Plus className="h-4 w-4" />
+              Agregar
             </button>
           </div>
 
-          {errors.items && (
-            <p className="text-sm text-red-600">{errors.items}</p>
+          {/* Errores */}
+          {(errors.waiter || errors.table || errors.items) && (
+            <div className="space-y-1">
+              {errors.waiter && <p className="text-sm text-red-600">{errors.waiter}</p>}
+              {errors.table && <p className="text-sm text-red-600">{errors.table}</p>}
+              {errors.items && <p className="text-sm text-red-600">{errors.items}</p>}
+            </div>
           )}
 
+          {/* Items */}
           {orderItems.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <ShoppingCart className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="font-medium text-base">No hay items agregados</p>
+            <div className="text-center py-6 text-gray-500">
+              <ShoppingCart className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+              <p className="font-medium">No hay items agregados</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {orderItems.map((item, index) => {
                 const displayNumber = orderItems.length - index;
                 const getStatusText = (status) => {
                   return status === 'CREATED' ? 'Creado' : status === 'SERVED' ? 'Entregado' : status;
                 };
                 
+                // Lógica: si hay items nuevos (sin ID), los anteriores solo se pueden eliminar
+                const hasNewItems = orderItems.some(i => !i.id);
+                const isOldItem = !!item.id;
+                const canEditOldItem = !hasNewItems || !isOldItem;
+                const finalCanEdit = item.can_edit && canEditOldItem;
+                
                 return (
-                  <div key={item.tempKey || item.id || index} className={`p-4 rounded-lg border-2 ${ 
-                    !item.can_edit ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200'
+                  <div key={item.tempKey || item.id || index} className={`p-3 rounded border ${ 
+                    !finalCanEdit ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200'
                   }`}>
-                    {/* Header del item */}
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Item #{displayNumber} - {getStatusText(item.status)}
-                      </h3>
+                    {/* Header compacto */}
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-medium text-gray-900">
+                        #{displayNumber} - {getStatusText(item.status)}
+                      </span>
                       {item.can_delete && (
                         <button
                           onClick={() => removeOrderItem(index)}
-                          className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg"
+                          className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
                           title="Eliminar"
                         >
-                          <Trash2 className="h-5 w-5" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       )}
                     </div>
                     
-                    {/* Contenido del item */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Contenido en grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                       {/* Receta */}
-                      <div className="lg:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Receta</label>
+                      <div className="md:col-span-5">
                         <select
                           value={item.recipe}
                           onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          disabled={!item.can_edit}
+                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                          disabled={!finalCanEdit}
                         >
                           <option value="">Seleccionar receta...</option>
                           {getFilteredRecipes(!!item.recipe && item.recipe !== '').map(recipe => (
@@ -574,71 +592,83 @@ const NewOrder = () => {
                         </select>
                       </div>
                       
-                      {/* Cantidad */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={item.displayQuantity || item.quantity}
-                          onChange={(e) => handleQuantityChange(e, index)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          disabled={!item.can_edit}
-                          placeholder="1"
-                        />
+                      {/* Cantidad con botones */}
+                      <div className="md:col-span-2">
+                        <div className="flex items-center border border-gray-300 rounded">
+                          <button
+                            type="button"
+                            onClick={() => decrementQuantity(index)}
+                            disabled={!finalCanEdit}
+                            className="px-2 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={item.displayQuantity || item.quantity}
+                            onChange={(e) => handleQuantityChange(e, index)}
+                            className="w-full px-2 py-1 text-center border-0 focus:outline-none text-sm"
+                            disabled={!finalCanEdit}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => incrementQuantity(index)}
+                            disabled={!finalCanEdit}
+                            className="px-2 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                       
                       {/* Precio */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Precio Unitario</label>
-                        <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-center font-semibold text-gray-900">
+                      <div className="md:col-span-2">
+                        <div className="px-3 py-2 text-center font-semibold text-gray-900 text-sm">
                           {formatCurrency(item.unit_price)}
+                        </div>
+                      </div>
+                      
+                      {/* Opciones */}
+                      <div className="md:col-span-3">
+                        <div className="flex flex-col space-y-1">
+                          <label className="flex items-center text-xs">
+                            <input
+                              type="checkbox"
+                              checked={item.is_takeaway}
+                              onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
+                              className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              disabled={!finalCanEdit}
+                            />
+                            <span className="ml-1">Para llevar</span>
+                          </label>
+                          
+                          {item.is_takeaway && (
+                            <label className="flex items-center text-xs">
+                              <input
+                                type="checkbox"
+                                checked={item.has_taper}
+                                onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
+                                className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                disabled={!finalCanEdit || !defaultContainer}
+                              />
+                              <span className="ml-1">Con envase (+{defaultContainer?.price || '0'})</span>
+                            </label>
+                          )}
                         </div>
                       </div>
                     </div>
                     
-                    {/* Opciones de envío */}
-                    <div className="mt-4 space-y-3">
-                      <div className="flex flex-wrap items-center gap-6">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={item.is_takeaway}
-                            onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
-                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            disabled={!item.can_edit}
-                          />
-                          <span className="ml-2 text-sm font-medium text-gray-700">Para llevar</span>
-                        </label>
-                        
-                        {item.is_takeaway && (
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={item.has_taper}
-                              onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
-                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                              disabled={!item.can_edit || !defaultContainer}
-                            />
-                            <span className="ml-2 text-sm font-medium text-gray-700">
-                              Con envase {defaultContainer ? `(+${formatCurrency(defaultContainer.price)})` : '(Sin stock)'}
-                            </span>
-                          </label>
-                        )}
-                      </div>
-                      
-                      {/* Notas */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Notas especiales</label>
-                        <input
-                          type="text"
-                          value={item.notes}
-                          onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
-                          placeholder="Ej: Sin cebolla, extra picante..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          disabled={!item.can_edit}
-                        />
-                      </div>
+                    {/* Notas en fila separada */}
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={item.notes}
+                        onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
+                        placeholder="Notas especiales..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        disabled={!finalCanEdit}
+                      />
                     </div>
                   </div>
                 );
