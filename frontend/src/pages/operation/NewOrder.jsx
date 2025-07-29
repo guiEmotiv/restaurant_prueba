@@ -51,8 +51,17 @@ const NewOrder = () => {
         waiter: orderDetails.waiter?.id || orderDetails.waiter || '',
         status: orderDetails.status || 'CREATED'
       });
+
+      // Establecer filtros basados en el pedido existente
+      if (orderDetails.table?.zone?.id) {
+        setSelectedZoneFilter(orderDetails.table.zone.id.toString());
+      }
       
+      // Si hay items, establecer filtro de grupo basado en el primer item (para consistencia)
       const items = orderDetails.items || [];
+      if (items.length > 0 && items[0].recipe?.group?.id) {
+        setSelectedGroupFilter(items[0].recipe.group.id.toString());
+      }
       setOrderItems(items.map(item => ({
         id: item.id,
         recipe: typeof item.recipe === 'object' ? item.recipe.id : item.recipe,
@@ -470,7 +479,7 @@ const NewOrder = () => {
                 }`}
                 disabled={!!orderId || existingOrder?.status === 'PAID'}
               >
-                <option value="">Seleccionar mesero</option>
+                <option value="">Mesero</option>
                 {availableWaiters.map(waiter => (
                   <option key={waiter.id} value={waiter.id}>
                     {waiter.name}
