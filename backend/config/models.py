@@ -146,3 +146,29 @@ class RestaurantOperationalConfig(models.Model):
             return f"{self.opening_time.strftime('%H:%M')} - {self.closing_time.strftime('%H:%M')}"
         else:
             return f"{self.opening_time.strftime('%H:%M')} - {self.closing_time.strftime('%H:%M')} (+1 día)"
+
+
+class Waiter(models.Model):
+    """Meseros del restaurante"""
+    name = models.CharField(max_length=100, verbose_name="Nombre")
+    phone = models.CharField(max_length=20, blank=True, verbose_name="Teléfono")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'waiter'
+        verbose_name = 'Mesero'
+        verbose_name_plural = 'Meseros'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        # Soft delete - solo marcamos como inactivo si tiene órdenes asociadas
+        if hasattr(self, 'order_set') and self.order_set.exists():
+            self.is_active = False
+            self.save()
+        else:
+            super().delete(*args, **kwargs)

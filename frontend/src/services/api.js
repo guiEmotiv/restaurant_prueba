@@ -177,6 +177,18 @@ export const apiService = {
     },
   },
 
+  waiters: {
+    getAll: (params = {}) => {
+      const queryParams = new URLSearchParams(params).toString();
+      const url = queryParams ? `/waiters/?${queryParams}` : '/waiters/';
+      return api.get(url).then(response => response.data);
+    },
+    getById: (id) => apiService.getById('waiters', id),
+    create: (data) => apiService.create('waiters', data),
+    update: (id, data) => apiService.update('waiters', id, data),
+    delete: (id) => apiService.delete('waiters', id),
+  },
+
   // Inventory endpoints
   groups: {
     getAll: () => apiService.getAll('groups'),

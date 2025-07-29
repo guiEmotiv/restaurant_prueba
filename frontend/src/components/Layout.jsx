@@ -17,6 +17,7 @@ import {
   Layers,
   History,
   User,
+  Users,
   LogOut
 } from 'lucide-react';
 import { useOptionalAuth } from '../contexts/OptionalAuthContext';
@@ -38,6 +39,7 @@ const Layout = ({ children }) => {
         { name: 'Unidades', href: '/units', icon: Ruler, permission: 'canManageConfig' },
         { name: 'Zonas', href: '/zones', icon: MapPin, permission: 'canManageConfig' },
         { name: 'Mesas', href: '/tables', icon: Table, permission: 'canManageConfig' },
+        { name: 'Meseros', href: '/waiters', icon: Users, permission: 'canManageConfig' },
       ]
     },
     { 

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Unit, Zone, Table, RestaurantOperationalConfig
+from .models import Unit, Zone, Table, RestaurantOperationalConfig, Waiter
 
 
 class UnitSerializer(serializers.ModelSerializer):
@@ -52,3 +52,10 @@ class RestaurantOperationalConfigSerializer(serializers.ModelSerializer):
     
     def get_is_currently_open(self, obj):
         return obj.is_currently_open()
+
+
+class WaiterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Waiter
+        fields = ['id', 'name', 'phone', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']

@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 from decimal import Decimal
-from config.models import Table
+from config.models import Table, Waiter
 from inventory.models import Recipe, Ingredient
 
 
@@ -15,6 +15,7 @@ class Order(models.Model):
     ]
 
     table = models.ForeignKey(Table, on_delete=models.PROTECT)
+    waiter = models.ForeignKey(Waiter, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Mesero")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='CREATED')
     total_amount = models.DecimalField(
         max_digits=10, 
@@ -120,6 +121,7 @@ class OrderItem(models.Model):
         decimal_places=2, 
         validators=[MinValueValidator(Decimal('0.01'))]
     )
+    quantity = models.PositiveIntegerField(default=1, verbose_name='Cantidad')
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='CREATED')
     notes = models.TextField(blank=True)
     is_takeaway = models.BooleanField(default=False, verbose_name='Para llevar')
@@ -139,9 +141,9 @@ class OrderItem(models.Model):
         if not self.unit_price:
             self.unit_price = self.recipe.base_price
         
-        # Calcular precio total inicial (solo precio base)
+        # Calcular precio total inicial (precio base * cantidad)
         if not self.total_price:
-            self.total_price = self.unit_price
+            self.total_price = self.unit_price * self.quantity
             
         super().save(*args, **kwargs)
         
@@ -152,8 +154,8 @@ class OrderItem(models.Model):
             self.order.calculate_total()
 
     def calculate_total_price(self):
-        """Calcula el precio total del item incluyendo customizaciones"""
-        base_total = self.unit_price
+        """Calcula el precio total del item incluyendo customizaciones y cantidad"""
+        base_total = self.unit_price * self.quantity
         customization_total = Decimal('0.00')
         
         # Solo buscar customizaciones si el objeto ya está guardado
@@ -161,6 +163,15 @@ class OrderItem(models.Model):
             customization_total = sum(
                 item.total_price for item in self.orderitemingredient_set.all()
             )
+        
+        # Agregar costo del taper si es para llevar y tiene taper
+        if self.is_takeaway and self.has_taper:
+            try:
+                # Buscar el ingrediente "taper" en la base de datos
+                taper_ingredient = Ingredient.objects.get(name__iexact='taper')
+                base_total += taper_ingredient.cost_per_unit * self.quantity
+            except Ingredient.DoesNotExist:
+                pass  # Si no existe el ingrediente taper, no agregar costo
         
         self.total_price = base_total + customization_total
         
