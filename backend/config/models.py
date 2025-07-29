@@ -186,6 +186,7 @@ class Container(models.Model):
         validators=[MinValueValidator(Decimal('0.00'))],
         verbose_name="Precio"
     )
+    stock = models.PositiveIntegerField(default=0, verbose_name="Stock")
     is_active = models.BooleanField(default=True, verbose_name="Activo")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

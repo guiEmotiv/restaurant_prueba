@@ -64,5 +64,5 @@ class WaiterSerializer(serializers.ModelSerializer):
 class ContainerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Container
-        fields = ['id', 'name', 'description', 'price', 'is_active', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'price', 'stock', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']

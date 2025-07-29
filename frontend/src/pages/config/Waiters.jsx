@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Users } from 'lucide-react';
+import { Users, Plus } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
+import Modal from '../../components/common/Modal';
+import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -8,13 +10,17 @@ const Waiters = () => {
   const { showSuccess, showError } = useToast();
   const [waiters, setWaiters] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showWaiterModal, setShowWaiterModal] = useState(false);
+  const [selectedWaiter, setSelectedWaiter] = useState(null);
+  const [formData, setFormData] = useState({
+    name: ''
+  });
 
   const columns = [
     { key: 'id', title: 'ID' },
     { 
       key: 'name', 
-      title: 'Nombre', 
-      required: true,
+      title: 'Nombre',
       render: (value, item) => (
         <div className="flex items-center">
           <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
@@ -25,23 +31,6 @@ const Waiters = () => {
             <div className="text-sm text-gray-500">ID: {item.id}</div>
           </div>
         </div>
-      )
-    },
-    { 
-      key: 'phone', 
-      title: 'Teléfono',
-      render: (value) => value || 'Sin teléfono'
-    },
-    { 
-      key: 'is_active', 
-      title: 'Estado', 
-      type: 'checkbox',
-      render: (value) => (
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-          value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-        }`}>
-          {value ? 'Activo' : 'Inactivo'}
-        </span>
       )
     }
   ];
@@ -64,15 +53,33 @@ const Waiters = () => {
     }
   };
 
-  const handleSave = async (formData, isEdit) => {
+  const handleAdd = () => {
+    setSelectedWaiter(null);
+    setFormData({ name: '' });
+    setShowWaiterModal(true);
+  };
+
+  const handleEdit = (waiter) => {
+    setSelectedWaiter(waiter);
+    setFormData({ name: waiter.name });
+    setShowWaiterModal(true);
+  };
+
+  const handleCloseWaiterModal = () => {
+    setShowWaiterModal(false);
+    setSelectedWaiter(null);
+  };
+
+  const handleModalSave = async () => {
     try {
-      if (isEdit) {
-        await apiService.waiters.update(formData.id, formData);
+      if (selectedWaiter) {
+        await apiService.waiters.update(selectedWaiter.id, formData);
         showSuccess('Mesero actualizado exitosamente');
       } else {
         await apiService.waiters.create(formData);
         showSuccess('Mesero creado exitosamente');
       }
+      setShowWaiterModal(false);
       await loadWaiters();
     } catch (error) {
       console.error('Error saving waiter:', error);
@@ -81,18 +88,28 @@ const Waiters = () => {
   };
 
   const handleDelete = async (id) => {
-    try {
-      await apiService.waiters.delete(id);
-      await loadWaiters();
-      showSuccess('Mesero eliminado exitosamente');
-    } catch (error) {
-      console.error('Error deleting waiter:', error);
-      if (error.response?.status === 400) {
-        showError('No se puede eliminar este mesero porque está siendo usado en pedidos');
-      } else {
-        showError('Error al eliminar el mesero');
+    if (window.confirm('¿Estás seguro de que deseas eliminar este mesero?')) {
+      try {
+        await apiService.waiters.delete(id);
+        await loadWaiters();
+        showSuccess('Mesero eliminado exitosamente');
+      } catch (error) {
+        console.error('Error deleting waiter:', error);
+        if (error.response?.status === 400) {
+          showError('No se puede eliminar este mesero porque está siendo usado en pedidos');
+        } else {
+          showError('Error al eliminar el mesero');
+        }
       }
     }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   if (loading) {
@@ -114,19 +131,64 @@ const Waiters = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Meseros</h1>
-        <p className="text-gray-600">Gestiona el personal de meseros</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Meseros</h1>
+          <p className="text-gray-600">Gestiona el personal de meseros</p>
+        </div>
+        <Button onClick={handleAdd} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Nuevo Mesero
+        </Button>
       </div>
 
       <CrudTable
+        title="Meseros"
         data={waiters}
         columns={columns}
-        onSave={handleSave}
+        onEdit={handleEdit}
         onDelete={handleDelete}
-        title="Mesero"
-        addButtonText="Nuevo Mesero"
+        loading={loading}
+        hideAddButton={true}
+        hideTitle={true}
+        useCustomModals={true}
       />
+
+      {/* Waiter Modal */}
+      <Modal
+        isOpen={showWaiterModal}
+        onClose={handleCloseWaiterModal}
+        title={selectedWaiter ? 'Editar Mesero' : 'Nuevo Mesero'}
+      >
+        <form onSubmit={(e) => { e.preventDefault(); handleModalSave(); }} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleCloseWaiterModal}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit">
+              {selectedWaiter ? 'Actualizar' : 'Crear'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
