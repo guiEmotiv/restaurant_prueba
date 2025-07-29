@@ -102,12 +102,21 @@ api.interceptors.response.use(
   }
 );
 
+// Helper function to handle paginated responses
+const handlePaginatedResponse = (response) => {
+  // Handle paginated response
+  if (response.data && typeof response.data === 'object' && response.data.results) {
+    return response.data.results;
+  }
+  return Array.isArray(response.data) ? response.data : [];
+};
+
 // API service functions
 export const apiService = {
   // Generic CRUD operations
   async getAll(endpoint) {
     const response = await api.get(`/${endpoint}/`);
-    return response.data;
+    return handlePaginatedResponse(response);
   },
 
   async getById(endpoint, id) {
@@ -181,7 +190,7 @@ export const apiService = {
     getAll: (params = {}) => {
       const queryParams = new URLSearchParams(params).toString();
       const url = queryParams ? `/waiters/?${queryParams}` : '/waiters/';
-      return api.get(url).then(response => response.data);
+      return api.get(url).then(handlePaginatedResponse);
     },
     getById: (id) => apiService.getById('waiters', id),
     create: (data) => apiService.create('waiters', data),
@@ -370,7 +379,7 @@ export const apiService = {
       const queryParams = new URLSearchParams(params).toString();
       const url = queryParams ? `/containers/?${queryParams}` : '/containers/';
       const response = await api.get(url);
-      return response.data;
+      return handlePaginatedResponse(response);
     },
     getById: (id) => apiService.getById('containers', id),
     create: (data) => apiService.create('containers', data),
