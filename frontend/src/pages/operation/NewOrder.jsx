@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Minus, Save, Trash2, ShoppingCart } from 'lucide-react';
+import { Plus, Save, Trash2, ShoppingCart } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -354,210 +354,191 @@ const NewOrder = () => {
     }).format(amount || 0);
   };
 
-  const pageTitle = orderId ? `Editar Pedido #${orderId}` : 'Nuevo';
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/orders')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            <span className="hidden sm:inline">Volver</span>
-          </button>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900">{pageTitle}</h1>
-            <p className="text-sm md:text-base text-gray-600">
-              {orderId ? 'Modifica el pedido existente' : 'Crea un nuevo pedido'}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={handleSave}
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Guardar
-              </>
-            )}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={handleCancel}
-            disabled={loading}
-          >
-            Cancelar
-          </Button>
-        </div>
+    <div className="min-h-screen bg-white">
+      {/* Header con botones */}
+      <div className="flex items-center justify-end gap-2 p-4 border-b border-gray-200">
+        <Button
+          onClick={handleSave}
+          disabled={loading}
+          className="flex items-center gap-2"
+        >
+          {loading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+              Guardando...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              Guardar
+            </>
+          )}
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={handleCancel}
+          disabled={loading}
+        >
+          Cancelar
+        </Button>
       </div>
 
-      {/* Form Content */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="space-y-6">
-          {/* Filtros y configuración */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="space-y-4">
-              {/* Campo de mesero */}
-              <div>
-                <select
-                  name="waiter"
-                  value={formData.waiter}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
-                    errors.waiter ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  disabled={existingOrder?.status === 'SERVED'}
-                >
-                  <option value="">Seleccionar mesero</option>
-                  {availableWaiters.map(waiter => (
-                    <option key={waiter.id} value={waiter.id}>
-                      {waiter.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.waiter && (
-                  <p className="mt-1 text-sm text-red-600">{errors.waiter}</p>
-                )}
-              </div>
+      {/* Contenido principal */}
+      <div className="p-4">
+        <div className="space-y-3">
+          {/* Campo de mesero */}
+          <div>
+            <select
+              name="waiter"
+              value={formData.waiter}
+              onChange={handleInputChange}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
+                errors.waiter ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={existingOrder?.status === 'SERVED'}
+            >
+              <option value="">Seleccionar mesero</option>
+              {availableWaiters.map(waiter => (
+                <option key={waiter.id} value={waiter.id}>
+                  {waiter.name}
+                </option>
+              ))}
+            </select>
+            {errors.waiter && (
+              <p className="mt-1 text-sm text-red-600">{errors.waiter}</p>
+            )}
+          </div>
 
-              {/* Filtros de mesa y zona */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <select
-                    value={selectedZoneFilter}
-                    onChange={(e) => {
-                      setSelectedZoneFilter(e.target.value);
-                      if (formData.table) {
-                        setFormData(prev => ({ ...prev, table: '' }));
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-                    disabled={!!orderId || existingOrder?.status === 'SERVED'}
-                  >
-                    <option value="">Zona</option>
-                    {availableZones.map(zone => (
-                      <option key={zone.id} value={zone.id}>
-                        {zone.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <select
-                    name="table"
-                    value={formData.table}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
-                      errors.table ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    disabled={!!orderId || existingOrder?.status === 'SERVED'}
-                  >
-                    <option value="">Mesa</option>
-                    {getFilteredTables().map(table => (
-                      <option key={table.id} value={table.id}>
-                        Mesa {table.table_number}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.table && (
-                    <p className="mt-1 text-sm text-red-600">{errors.table}</p>
-                  )}
-                </div>
-
-                {existingOrder && (
-                  <div>
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 font-medium text-sm">
-                      {formData.status === 'CREATED' && 'Creado'}
-                      {formData.status === 'SERVED' && 'Entregado'}
-                      {formData.status === 'PAID' && 'Pagado'}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Filtro de grupos y botón agregar */}
-              <div className="flex items-center justify-between gap-2">
-                <select
-                  value={selectedGroupFilter}
-                  onChange={(e) => setSelectedGroupFilter(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-                >
-                  <option value="">Grupos</option>
-                  {availableGroups.map(group => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-                
-                <button
-                  onClick={addOrderItem}
-                  className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  title="Agregar nuevo item"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
+          {/* Filtros de mesa y zona */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div>
+              <select
+                value={selectedZoneFilter}
+                onChange={(e) => {
+                  setSelectedZoneFilter(e.target.value);
+                  if (formData.table) {
+                    setFormData(prev => ({ ...prev, table: '' }));
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                disabled={!!orderId || existingOrder?.status === 'SERVED'}
+              >
+                <option value="">Zona</option>
+                {availableZones.map(zone => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {errors.items && (
-              <p className="mt-4 text-sm text-red-600">{errors.items}</p>
-            )}
+            <div>
+              <select
+                name="table"
+                value={formData.table}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
+                  errors.table ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={!!orderId || existingOrder?.status === 'SERVED'}
+              >
+                <option value="">Mesa</option>
+                {getFilteredTables().map(table => (
+                  <option key={table.id} value={table.id}>
+                    Mesa {table.table_number}
+                  </option>
+                ))}
+              </select>
+              {errors.table && (
+                <p className="mt-1 text-sm text-red-600">{errors.table}</p>
+              )}
+            </div>
 
-            {/* Items del pedido */}
-            <div className="space-y-3 mt-6">
-              {orderItems.length === 0 ? (
-                <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg bg-white">
-                  <ShoppingCart className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="font-medium">No hay items agregados</p>
-                  <p className="text-sm">Haz clic en el botón + para agregar items</p>
+            {existingOrder && (
+              <div>
+                <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 font-medium text-sm">
+                  {formData.status === 'CREATED' && 'Creado'}
+                  {formData.status === 'SERVED' && 'Entregado'}
+                  {formData.status === 'PAID' && 'Pagado'}
                 </div>
-              ) : (
-                <>
-                  {/* Header de tabla - Solo en desktop */}
-                  <div className="hidden lg:grid grid-cols-12 gap-2 px-3 py-2 bg-gray-100 rounded-md text-xs font-medium text-gray-700">
-                    <div className="col-span-3">Item</div>
-                    <div className="col-span-1 text-center">Cant.</div>
-                    <div className="col-span-1 text-center">Precio</div>
-                    <div className="col-span-2 text-center">Para llevar/Taper</div>
-                    <div className="col-span-1 text-center">Estado</div>
-                    <div className="col-span-3">Notas</div>
-                    <div className="col-span-1 text-center">Acción</div>
-                  </div>
+              </div>
+            )}
+          </div>
+
+          {/* Filtro de grupos y botón agregar */}
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedGroupFilter}
+              onChange={(e) => setSelectedGroupFilter(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+            >
+              <option value="">Grupos</option>
+              {availableGroups.map(group => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+            
+            <button
+              onClick={addOrderItem}
+              className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              title="Agregar nuevo item"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          {errors.items && (
+            <p className="text-sm text-red-600">{errors.items}</p>
+          )}
+
+          {/* Items del pedido */}
+          <div className="space-y-2">
+            {orderItems.length === 0 ? (
+              <div className="text-center py-4 text-gray-500 border-2 border-dashed border-gray-300 rounded">
+                <ShoppingCart className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                <p className="font-medium text-sm">No hay items agregados</p>
+              </div>
+            ) : (
+              <>
+                {/* Header de tabla - Solo en desktop */}
+                <div className="hidden lg:grid grid-cols-11 gap-2 px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-700">
+                  <div className="col-span-3">Item</div>
+                  <div className="col-span-1 text-center">Cant.</div>
+                  <div className="col-span-1 text-center">Precio</div>
+                  <div className="col-span-2 text-center">Para llevar/Taper</div>
+                  <div className="col-span-3">Notas</div>
+                  <div className="col-span-1 text-center">Acción</div>
+                </div>
+                
+                {orderItems.map((item, index) => {
+                  const displayNumber = orderItems.length - index;
+                  const getStatusText = (status) => {
+                    return status === 'CREATED' ? 'Creado' : status === 'SERVED' ? 'Entregado' : status;
+                  };
                   
-                  {orderItems.map((item, index) => {
-                    const displayNumber = orderItems.length - index;
-                    return (
-                    <div key={item.tempKey || item.id || index} className={`border border-gray-200 rounded-lg p-3 ${ 
-                      !item.can_edit ? 'bg-gray-100' : 'bg-white'
-                    }`}>
-                      {/* Layout móvil - Formato de card */}
-                      <div className="lg:hidden space-y-3">
-                        <div className="flex justify-between items-start">
-                          <span className="font-medium text-sm text-gray-900">Item #{displayNumber}</span>
-                          {item.can_delete && (
-                            <button
-                              onClick={() => removeOrderItem(index)}
-                              className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
+                  return (
+                  <div key={item.tempKey || item.id || index} className={`border border-gray-200 rounded p-2 ${ 
+                    !item.can_edit ? 'bg-gray-100' : 'bg-white'
+                  }`}>
+                    {/* Layout móvil - Formato de card */}
+                    <div className="lg:hidden space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium text-sm text-gray-900">
+                          Item #{displayNumber} - {getStatusText(item.status)}
+                        </span>
+                        {item.can_delete && (
+                          <button
+                            onClick={() => removeOrderItem(index)}
+                            className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                         
                         <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">Receta</label>
@@ -576,15 +557,20 @@ const NewOrder = () => {
                           </select>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">Cantidad</label>
                             <input
-                              type="number"
-                              min="1"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
                               value={item.quantity}
-                              onChange={(e) => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9]/g, '');
+                                const numValue = parseInt(value) || 1;
+                                updateOrderItem(index, 'quantity', numValue);
+                              }}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-center"
                               disabled={!item.can_edit}
                             />
                           </div>
@@ -594,45 +580,32 @@ const NewOrder = () => {
                           </div>
                         </div>
                         
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-4">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={item.is_takeaway}
+                              onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              disabled={!item.can_edit}
+                            />
+                            <span className="ml-2 text-xs text-gray-700">Para llevar</span>
+                          </label>
+                          
+                          {item.is_takeaway && (
                             <label className="flex items-center">
                               <input
                                 type="checkbox"
-                                checked={item.is_takeaway}
-                                onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
+                                checked={item.has_taper}
+                                onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
                                 className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                disabled={!item.can_edit}
+                                disabled={!item.can_edit || !defaultContainer}
                               />
-                              <span className="ml-2 text-xs text-gray-700">Para llevar</span>
+                              <span className="ml-2 text-xs text-gray-700">
+                                Con envase {defaultContainer ? `(+S/ ${defaultContainer.price})` : '(Sin stock)'}
+                              </span>
                             </label>
-                            
-                            {item.is_takeaway && (
-                              <label className="flex items-center">
-                                <input
-                                  type="checkbox"
-                                  checked={item.has_taper}
-                                  onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
-                                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                  disabled={!item.can_edit || !defaultContainer}
-                                />
-                                <span className="ml-2 text-xs text-gray-700">
-                                  Con envase {defaultContainer ? `(+S/ ${defaultContainer.price})` : '(Sin stock)'}
-                                </span>
-                              </label>
-                            )}
-                          </div>
-                          
-                          <div>
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              item.status === 'CREATED' ? 'bg-yellow-100 text-yellow-800' :
-                              item.status === 'SERVED' ? 'bg-green-100 text-green-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {item.status === 'CREATED' && 'Creado'}
-                              {item.status === 'SERVED' && 'Entregado'}
-                            </span>
-                          </div>
+                          )}
                         </div>
                         
                         <div>
@@ -649,8 +622,11 @@ const NewOrder = () => {
                       </div>
                       
                       {/* Layout desktop - Grid */}
-                      <div className="hidden lg:grid grid-cols-12 gap-2 items-center">
+                      <div className="hidden lg:grid grid-cols-11 gap-2 items-center">
                         <div className="col-span-3">
+                          <div className="text-xs font-medium text-gray-900 mb-1">
+                            Item #{displayNumber} - {getStatusText(item.status)}
+                          </div>
                           <select
                             value={item.recipe}
                             onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
@@ -668,10 +644,15 @@ const NewOrder = () => {
                         
                         <div className="col-span-1 text-center">
                           <input
-                            type="number"
-                            min="1"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={item.quantity}
-                            onChange={(e) => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9]/g, '');
+                              const numValue = parseInt(value) || 1;
+                              updateOrderItem(index, 'quantity', numValue);
+                            }}
                             className="w-full px-1 py-1 border border-gray-300 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
                             disabled={!item.can_edit}
                           />
@@ -709,17 +690,6 @@ const NewOrder = () => {
                               </label>
                             )}
                           </div>
-                        </div>
-                        
-                        <div className="col-span-1 text-center">
-                          <span className={`inline-flex px-1 py-1 text-xs font-semibold rounded-full ${
-                            item.status === 'CREATED' ? 'bg-yellow-100 text-yellow-800' :
-                            item.status === 'SERVED' ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {item.status === 'CREATED' && 'Creado'}
-                            {item.status === 'SERVED' && 'Entregado'}
-                          </span>
                         </div>
 
                         <div className="col-span-3">
