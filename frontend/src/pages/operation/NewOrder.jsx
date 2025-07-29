@@ -185,12 +185,23 @@ const NewOrder = () => {
         if (i === index) {
           if (field === 'recipe') {
             const selectedRecipe = availableRecipes.find(recipe => recipe.id === parseInt(value));
+            const unitPrice = selectedRecipe?.base_price || 0;
+            const quantity = item.quantity || 1;
             return {
               ...item,
               recipe: value,
               recipe_name: selectedRecipe?.name || '',
-              unit_price: selectedRecipe?.base_price || 0,
-              total_price: selectedRecipe?.base_price || 0
+              unit_price: unitPrice,
+              total_price: unitPrice * quantity
+            };
+          }
+          
+          if (field === 'quantity') {
+            const unitPrice = item.unit_price || 0;
+            return {
+              ...item,
+              [field]: value,
+              total_price: unitPrice * value
             };
           }
           
@@ -295,6 +306,11 @@ const NewOrder = () => {
         const newItems = orderItems.filter(item => !item.id && item.recipe);
         
         if (newItems.length > 0) {
+          // Si el pedido estaba SERVED y agregamos nuevos items, cambiar estado a CREATED
+          if (existingOrder?.status === 'SERVED') {
+            await apiService.orders.updateStatus(orderId, 'CREATED');
+          }
+          
           for (const item of newItems) {
             const createData = {
               order: parseInt(orderId),
@@ -368,25 +384,39 @@ const NewOrder = () => {
     // Si está vacío, permitir temporalmente pero mantener 1 como valor efectivo
     if (rawValue === '') {
       // Actualizar la vista pero mantener quantity como 1 internamente
-      setOrderItems(prev => prev.map((item, i) => 
-        i === index ? { ...item, displayQuantity: '', quantity: 1 } : item
-      ));
+      setOrderItems(prev => prev.map((item, i) => {
+        if (i === index) {
+          const unitPrice = item.unit_price || 0;
+          return { ...item, displayQuantity: '', quantity: 1, total_price: unitPrice * 1 };
+        }
+        return item;
+      }));
       return;
     }
     
     const filteredValue = filterNumericInput(rawValue);
     const numValue = parseInt(filteredValue) || 1;
     
-    setOrderItems(prev => prev.map((item, i) => 
-      i === index ? { ...item, displayQuantity: filteredValue, quantity: numValue } : item
-    ));
+    setOrderItems(prev => prev.map((item, i) => {
+      if (i === index) {
+        const unitPrice = item.unit_price || 0;
+        return { ...item, displayQuantity: filteredValue, quantity: numValue, total_price: unitPrice * numValue };
+      }
+      return item;
+    }));
   };
 
   const incrementQuantity = (index) => {
     setOrderItems(prev => prev.map((item, i) => {
       if (i === index) {
         const newQuantity = (item.quantity || 1) + 1;
-        return { ...item, quantity: newQuantity, displayQuantity: newQuantity.toString() };
+        const unitPrice = item.unit_price || 0;
+        return { 
+          ...item, 
+          quantity: newQuantity, 
+          displayQuantity: newQuantity.toString(),
+          total_price: unitPrice * newQuantity
+        };
       }
       return item;
     }));
@@ -396,7 +426,13 @@ const NewOrder = () => {
     setOrderItems(prev => prev.map((item, i) => {
       if (i === index) {
         const newQuantity = Math.max(1, (item.quantity || 1) - 1);
-        return { ...item, quantity: newQuantity, displayQuantity: newQuantity.toString() };
+        const unitPrice = item.unit_price || 0;
+        return { 
+          ...item, 
+          quantity: newQuantity, 
+          displayQuantity: newQuantity.toString(),
+          total_price: unitPrice * newQuantity
+        };
       }
       return item;
     }));
@@ -408,18 +444,15 @@ const NewOrder = () => {
         <Button
           onClick={handleSave}
           disabled={loading}
-          className="flex items-center gap-2"
+          className="px-6 py-2"
         >
           {loading ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
               Guardando...
             </>
           ) : (
-            <>
-              <Save className="h-4 w-4" />
-              Guardar
-            </>
+            'Guardar'
           )}
         </Button>
         <Button
@@ -431,80 +464,93 @@ const NewOrder = () => {
         </Button>
       </div>
 
-      <div className="p-3">
-        <div className="space-y-3">
-          {/* Controles principales */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <select
-              name="waiter"
-              value={formData.waiter}
-              onChange={handleInputChange}
-              className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
-                errors.waiter ? 'border-red-500' : 'border-gray-300'
-              }`}
-              disabled={!!orderId || existingOrder?.status === 'SERVED'}
-            >
-              <option value="">Seleccionar mesero</option>
-              {availableWaiters.map(waiter => (
-                <option key={waiter.id} value={waiter.id}>
-                  {waiter.name}
-                </option>
-              ))}
-            </select>
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="space-y-6">
+          {/* Controles principales con espaciado */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <select
+                name="waiter"
+                value={formData.waiter}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                  errors.waiter ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={!!orderId || existingOrder?.status === 'SERVED'}
+              >
+                <option value="">Seleccionar mesero</option>
+                {availableWaiters.map(waiter => (
+                  <option key={waiter.id} value={waiter.id}>
+                    {waiter.name}
+                  </option>
+                ))}
+              </select>
+              {errors.waiter && (
+                <p className="mt-1 text-sm text-red-600">{errors.waiter}</p>
+              )}
+            </div>
             
-            <select
-              value={selectedZoneFilter}
-              onChange={(e) => {
-                setSelectedZoneFilter(e.target.value);
-                if (formData.table) {
-                  setFormData(prev => ({ ...prev, table: '' }));
-                }
-              }}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-              disabled={!!orderId || existingOrder?.status === 'SERVED'}
-            >
-              <option value="">Zona</option>
-              {availableZones.map(zone => (
-                <option key={zone.id} value={zone.id}>
-                  {zone.name}
-                </option>
-              ))}
-            </select>
+            <div>
+              <select
+                value={selectedZoneFilter}
+                onChange={(e) => {
+                  setSelectedZoneFilter(e.target.value);
+                  if (formData.table) {
+                    setFormData(prev => ({ ...prev, table: '' }));
+                  }
+                }}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                disabled={!!orderId || existingOrder?.status === 'SERVED'}
+              >
+                <option value="">Zona</option>
+                {availableZones.map(zone => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <select
-              name="table"
-              value={formData.table}
-              onChange={handleInputChange}
-              className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
-                errors.table ? 'border-red-500' : 'border-gray-300'
-              }`}
-              disabled={!!orderId || existingOrder?.status === 'SERVED'}
-            >
-              <option value="">Mesa</option>
-              {getFilteredTables().map(table => (
-                <option key={table.id} value={table.id}>
-                  Mesa {table.table_number}
-                </option>
-              ))}
-            </select>
+            <div>
+              <select
+                name="table"
+                value={formData.table}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                  errors.table ? 'border-red-500' : 'border-gray-300'
+                }`}
+                disabled={!!orderId || existingOrder?.status === 'SERVED'}
+              >
+                <option value="">Mesa</option>
+                {getFilteredTables().map(table => (
+                  <option key={table.id} value={table.id}>
+                    Mesa {table.table_number}
+                  </option>
+                ))}
+              </select>
+              {errors.table && (
+                <p className="mt-1 text-sm text-red-600">{errors.table}</p>
+              )}
+            </div>
+          </div>
 
-            {existingOrder ? (
-              <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 font-medium text-sm text-center">
-                {formData.status === 'CREATED' && 'Creado'}
+          {/* Status para pedidos existentes */}
+          {existingOrder && (
+            <div className="text-center">
+              <div className="inline-flex px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 font-medium text-sm">
+                Estado: {formData.status === 'CREATED' && 'Creado'}
                 {formData.status === 'SERVED' && 'Entregado'}
                 {formData.status === 'PAID' && 'Pagado'}
               </div>
-            ) : (
-              <div></div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Filtros y botón agregar */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
             <select
               value={selectedGroupFilter}
               onChange={(e) => setSelectedGroupFilter(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+              className="w-full sm:flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             >
               <option value="">Filtrar por grupo</option>
               {availableGroups.map(group => (
@@ -514,73 +560,70 @@ const NewOrder = () => {
               ))}
             </select>
             
-            <button
+            <Button
               onClick={addOrderItem}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
-              title="Agregar nuevo item"
+              className="w-full sm:w-auto px-6 py-3"
             >
-              <Plus className="h-4 w-4" />
               Agregar
-            </button>
+            </Button>
           </div>
 
           {/* Errores */}
-          {(errors.waiter || errors.table || errors.items) && (
-            <div className="space-y-1">
-              {errors.waiter && <p className="text-sm text-red-600">{errors.waiter}</p>}
-              {errors.table && <p className="text-sm text-red-600">{errors.table}</p>}
-              {errors.items && <p className="text-sm text-red-600">{errors.items}</p>}
+          {errors.items && (
+            <div className="text-center">
+              <p className="text-sm text-red-600">{errors.items}</p>
             </div>
           )}
 
-          {/* Items */}
+          {/* Items sin tarjetas */}
           {orderItems.length === 0 ? (
-            <div className="text-center py-6 text-gray-500">
-              <ShoppingCart className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-              <p className="font-medium">No hay items agregados</p>
+            <div className="text-center py-12 text-gray-500">
+              <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-lg font-medium">No hay items agregados</p>
+              <p className="text-sm text-gray-400 mt-2">Haz clic en "Agregar" para añadir items al pedido</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-4">
               {orderItems.map((item, index) => {
                 const displayNumber = orderItems.length - index;
                 const getStatusText = (status) => {
                   return status === 'CREATED' ? 'Creado' : status === 'SERVED' ? 'Entregado' : status;
                 };
                 
-                // Lógica: si hay items nuevos (sin ID), los anteriores solo se pueden eliminar
+                // Lógica mejorada: bloquear items CREATED cuando se agrega un nuevo item
                 const hasNewItems = orderItems.some(i => !i.id);
-                const isOldItem = !!item.id;
-                const canEditOldItem = !hasNewItems || !isOldItem;
-                const finalCanEdit = item.can_edit && canEditOldItem;
+                const isOldCreatedItem = !!item.id && item.status === 'CREATED';
+                const shouldBlockOldCreated = hasNewItems && isOldCreatedItem;
+                const finalCanEdit = item.can_edit && !shouldBlockOldCreated;
                 
                 return (
-                  <div key={item.tempKey || item.id || index} className={`p-3 rounded border ${ 
-                    !finalCanEdit ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200'
-                  }`}>
-                    {/* Header compacto */}
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="font-medium text-gray-900">
-                        #{displayNumber} - {getStatusText(item.status)}
-                      </span>
+                  <div key={item.tempKey || item.id || index} className="bg-white">
+                    {/* Header del item */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+                      <h3 className="text-lg font-semibold text-gray-900 text-center sm:text-left">
+                        Item #{displayNumber} - {getStatusText(item.status)}
+                      </h3>
                       {item.can_delete && (
                         <button
                           onClick={() => removeOrderItem(index)}
-                          className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
+                          className="self-center sm:self-auto text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg transition-colors"
                           title="Eliminar"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-5 w-5" />
                         </button>
                       )}
                     </div>
                     
-                    {/* Contenido en grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    {/* Contenido responsive */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                       {/* Receta */}
                       <div className="md:col-span-5">
                         <select
                           value={item.recipe}
                           onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                          className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                            !finalCanEdit ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'
+                          }`}
                           disabled={!finalCanEdit}
                         >
                           <option value="">Seleccionar receta...</option>
@@ -594,53 +637,64 @@ const NewOrder = () => {
                       
                       {/* Cantidad con botones */}
                       <div className="md:col-span-2">
-                        <div className="flex items-center border border-gray-300 rounded">
-                          <button
-                            type="button"
-                            onClick={() => decrementQuantity(index)}
-                            disabled={!finalCanEdit}
-                            className="px-2 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={item.displayQuantity || item.quantity}
-                            onChange={(e) => handleQuantityChange(e, index)}
-                            className="w-full px-2 py-1 text-center border-0 focus:outline-none text-sm"
-                            disabled={!finalCanEdit}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => incrementQuantity(index)}
-                            disabled={!finalCanEdit}
-                            className="px-2 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
-                          >
-                            +
-                          </button>
+                        <div className="flex items-center justify-center">
+                          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => decrementQuantity(index)}
+                              disabled={!finalCanEdit}
+                              className="px-3 py-3 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={item.displayQuantity || item.quantity}
+                              onChange={(e) => handleQuantityChange(e, index)}
+                              className={`w-16 px-2 py-3 text-center border-0 focus:outline-none text-sm ${
+                                !finalCanEdit ? 'bg-gray-100 cursor-not-allowed' : ''
+                              }`}
+                              disabled={!finalCanEdit}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => incrementQuantity(index)}
+                              disabled={!finalCanEdit}
+                              className="px-3 py-3 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
                       </div>
                       
-                      {/* Precio */}
-                      <div className="md:col-span-2">
-                        <div className="px-3 py-2 text-center font-semibold text-gray-900 text-sm">
+                      {/* Precio unitario */}
+                      <div className="md:col-span-2 text-center">
+                        <div className="text-sm font-semibold text-gray-900">
                           {formatCurrency(item.unit_price)}
                         </div>
                       </div>
                       
+                      {/* Precio total */}
+                      <div className="md:col-span-2 text-center">
+                        <div className="text-lg font-bold text-blue-600">
+                          {formatCurrency(item.total_price)}
+                        </div>
+                      </div>
+                      
                       {/* Opciones */}
-                      <div className="md:col-span-3">
-                        <div className="flex flex-col space-y-1">
+                      <div className="md:col-span-1 text-center">
+                        <div className="flex flex-col items-center space-y-2">
                           <label className="flex items-center text-xs">
                             <input
                               type="checkbox"
                               checked={item.is_takeaway}
                               onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
-                              className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                               disabled={!finalCanEdit}
                             />
-                            <span className="ml-1">Para llevar</span>
+                            <span className="ml-2">Llevar</span>
                           </label>
                           
                           {item.is_takeaway && (
@@ -649,27 +703,34 @@ const NewOrder = () => {
                                 type="checkbox"
                                 checked={item.has_taper}
                                 onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
-                                className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                 disabled={!finalCanEdit || !defaultContainer}
                               />
-                              <span className="ml-1">Con envase (+{defaultContainer?.price || '0'})</span>
+                              <span className="ml-2">Envase</span>
                             </label>
                           )}
                         </div>
                       </div>
                     </div>
                     
-                    {/* Notas en fila separada */}
-                    <div className="mt-2">
+                    {/* Notas */}
+                    <div className="mt-4">
                       <input
                         type="text"
                         value={item.notes}
                         onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
-                        placeholder="Notas especiales..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Notas especiales (opcional)..."
+                        className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                          !finalCanEdit ? 'bg-gray-100 cursor-not-allowed border-gray-200' : 'border-gray-300'
+                        }`}
                         disabled={!finalCanEdit}
                       />
                     </div>
+                    
+                    {/* Separador */}
+                    {index < orderItems.length - 1 && (
+                      <hr className="my-6 border-gray-200" />
+                    )}
                   </div>
                 );
               })}
