@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Edit, CreditCard, Trash2 } from 'lucide-react';
 import Button from '../../components/common/Button';
-import OrderModal from '../../components/orders/OrderModalFixed';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -12,11 +11,19 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('CREATED');
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     loadOrders();
+  }, []);
+
+  // Recargar órdenes cuando regresemos a esta vista
+  useEffect(() => {
+    const handleFocus = () => {
+      loadOrders();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const loadOrders = async () => {
@@ -60,17 +67,11 @@ const Orders = () => {
   };
 
   const handleAdd = () => {
-    setSelectedOrder(null);
-    setShowOrderModal(true);
+    navigate('/orders/new');
   };
 
   const handleEdit = (order) => {
-    setSelectedOrder(order);
-    setShowOrderModal(true);
-  };
-
-  const handleOrderSaved = () => {
-    loadOrders();
+    navigate(`/orders/${order.id}/edit`);
   };
 
   const handlePayment = (order) => {
@@ -193,7 +194,7 @@ const Orders = () => {
         </div>
         <Button onClick={handleAdd} className="flex items-center gap-2 w-full sm:w-auto justify-center">
           <Plus className="h-4 w-4" />
-          Nuevo Pedido
+          Nuevo
         </Button>
       </div>
 
@@ -410,13 +411,6 @@ const Orders = () => {
         </div>
       </div>
 
-      {/* Order Modal */}
-      <OrderModal
-        isOpen={showOrderModal}
-        onClose={() => setShowOrderModal(false)}
-        order={selectedOrder}
-        onSave={handleOrderSaved}
-      />
     </div>
   );
 };

@@ -16,10 +16,9 @@ import Groups from './pages/inventory/Groups';
 import Ingredients from './pages/inventory/Ingredients';
 import Recipes from './pages/inventory/Recipes';
 import Orders from './pages/operation/Orders';
+import NewOrder from './pages/operation/NewOrder';
 import OrderDetail from './pages/operation/OrderDetail';
 import Payment from './pages/operation/Payment';
-import Payments from './pages/operation/Payments';
-import PaymentHistory from './pages/operation/PaymentHistory';
 import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
 import TableStatus from './pages/operation/TableStatus';
@@ -106,6 +105,16 @@ const AppContent = () => {
               <Orders />
             </OptionalProtectedRoute>
           } />
+          <Route path="/orders/new" element={
+            <OptionalProtectedRoute requiredPermission="canManageOrders">
+              <NewOrder />
+            </OptionalProtectedRoute>
+          } />
+          <Route path="/orders/:id/edit" element={
+            <OptionalProtectedRoute requiredPermission="canManageOrders">
+              <NewOrder />
+            </OptionalProtectedRoute>
+          } />
           <Route path="/orders/:id" element={
             <OptionalProtectedRoute requiredPermission="canManageOrders">
               <OrderDetail />
@@ -133,11 +142,6 @@ const AppContent = () => {
           } />
 
           {/* Payment routes */}
-          <Route path="/payments" element={
-            <OptionalProtectedRoute requiredPermission="canManagePayments">
-              <Payments />
-            </OptionalProtectedRoute>
-          } />
           <Route path="/payment-history" element={
             <OptionalProtectedRoute requiredPermission="canViewHistory">
               <PaymentHistory />  
