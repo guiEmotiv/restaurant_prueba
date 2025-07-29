@@ -160,8 +160,15 @@ const NewOrder = () => {
 
   const removeOrderItem = (index) => {
     const item = orderItems[index];
-    if (!item.can_delete) {
+    
+    // Validaciones mejoradas para eliminación
+    if (item.status === 'SERVED') {
       showError('No se puede eliminar este item porque ya fue entregado');
+      return;
+    }
+    
+    if (!item.can_delete) {
+      showError('No se puede eliminar este item en este momento');
       return;
     }
     
@@ -574,11 +581,22 @@ const NewOrder = () => {
                   return status === 'CREATED' ? 'Creado' : status === 'SERVED' ? 'Entregado' : status;
                 };
                 
-                // Lógica de bloqueo: al agregar nuevo item, bloquear TODOS los items anteriores
+                // Lógica de bloqueo mejorada:
+                // 1. Items SERVED siempre bloqueados para edición
+                // 2. Al agregar nuevo item, bloquear items anteriores para edición
+                // 3. Items CREATED pueden eliminarse solo si no hay nuevos items o si está CREATED
+                const isServedItem = item.status === 'SERVED';
                 const hasNewItems = orderItems.some(i => !i.id);
                 const isOldItem = !!item.id;
                 const shouldBlockOldItems = hasNewItems && isOldItem;
-                const finalCanEdit = item.can_edit && !shouldBlockOldItems;
+                
+                // Edición: bloqueada si es SERVED o si hay nuevos items y es item anterior
+                const finalCanEdit = item.can_edit && !isServedItem && !shouldBlockOldItems;
+                
+                // Eliminación: solo permitida para items CREATED cuando no hay nuevos items, 
+                // o cuando hay nuevos items y el item está CREATED
+                const finalCanDelete = item.can_delete && item.status === 'CREATED' && 
+                  (!hasNewItems || (hasNewItems && item.status === 'CREATED'));
                 
                 return (
                   <div key={item.tempKey || item.id || index} className="bg-white">
@@ -587,7 +605,7 @@ const NewOrder = () => {
                       <span className="text-sm font-medium text-gray-900 text-center sm:text-left">
                         #{displayNumber} - {getStatusText(item.status)}
                       </span>
-                      {item.can_delete && (
+                      {finalCanDelete && (
                         <button
                           onClick={() => removeOrderItem(index)}
                           className="self-center sm:self-auto text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition-colors"

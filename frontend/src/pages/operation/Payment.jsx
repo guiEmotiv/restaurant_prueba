@@ -130,7 +130,7 @@ const Payment = () => {
 
       await apiService.payments.create(paymentPayload);
       showSuccess('Pago procesado exitosamente');
-      navigate('/payment-history');
+      navigate('/orders');
     } catch (error) {
       console.error('Error processing payment:', error);
       const errorMessage = error.response?.data?.detail || 
@@ -159,7 +159,7 @@ const Payment = () => {
     try {
       await apiService.orders.splitPayment(order.id, { splits: formattedSplits });
       showSuccess(`Pagos divididos procesados exitosamente (${splits.length} pagos)`);
-      navigate('/payment-history');
+      navigate('/orders');
     } catch (error) {
       console.error('Error processing payment:', error);
       const errorMessage = error.response?.data?.detail || 
@@ -345,148 +345,162 @@ const Payment = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          onClick={() => navigate('/payments')}
-          variant="secondary"
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Volver
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Procesar Pago</h1>
-          <p className="text-gray-600">Orden #{order.id} - Mesa {order.table_number} - {formatCurrency(order.total_amount)}</p>
-        </div>
-      </div>
-
-      {/* Selección de tipo de pago */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Modal/Popup inicial para selección de tipo de pago */}
       {!paymentMode && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6 text-center">
-            Seleccione una opción de pago
-          </h2>
-          
-          {/* Mensaje informativo si hay items pagados */}
-          {paidItems.size > 0 && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800 text-center">
-                <AlertTriangle className="inline-block h-4 w-4 mr-1" />
-                Existen {paidItems.size} item(s) pagados parcialmente. Solo puede continuar con dividir cuenta.
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+            {/* Header del modal */}
+            <div className="text-center mb-6">
+              <h1 className="text-xl font-bold text-gray-900">Procesar Pago</h1>
+              <p className="text-gray-600 mt-2">
+                Orden #{order.id} - Mesa {order.table_number}
+              </p>
+              <p className="text-2xl font-bold text-blue-600 mt-2">
+                {formatCurrency(order.total_amount)}
               </p>
             </div>
-          )}
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Pago Completo */}
-            <Button
-              onClick={() => setPaymentMode('full')}
-              className={`h-24 flex flex-col items-center justify-center gap-2 text-lg ${
-                paidItems.size > 0 ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              disabled={processing || paidItems.size > 0}
-              title={paidItems.size > 0 ? "No disponible: existen items pagados parcialmente" : ""}
-            >
-              <CreditCard className={`h-8 w-8 ${paidItems.size > 0 ? 'text-gray-400' : ''}`} />
-              <div className="text-center">
-                <div className={`font-semibold ${paidItems.size > 0 ? 'text-gray-500' : ''}`}>
-                  Pago Completo
-                </div>
-                <div className={`text-sm ${paidItems.size > 0 ? 'text-gray-400' : 'opacity-90'}`}>
-                  {paidItems.size > 0 ? 'No disponible' : formatCurrency(order.total_amount)}
-                </div>
+
+            {/* Mensaje informativo si hay items pagados */}
+            {paidItems.size > 0 && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800 text-center">
+                  <AlertTriangle className="inline-block h-4 w-4 mr-1" />
+                  Existen {paidItems.size} item(s) pagados parcialmente. Solo puede continuar con dividir cuenta.
+                </p>
               </div>
-            </Button>
-            
-            {/* Dividir Cuenta */}
-            <Button
-              onClick={() => setPaymentMode('split')}
-              variant="secondary"
-              className="h-24 flex flex-col items-center justify-center gap-2 text-lg"
-              disabled={processing}
-            >
-              <Split className="h-8 w-8" />
-              <div className="text-center">
-                <div className="font-semibold">Dividir Cuenta</div>
-                <div className="text-sm opacity-75">Pagos parciales</div>
-              </div>
-            </Button>
+            )}
+
+            {/* Opciones de pago */}
+            <div className="space-y-3">
+              {/* Pago Completo */}
+              <Button
+                onClick={() => setPaymentMode('full')}
+                className={`w-full h-16 flex items-center justify-center gap-3 text-lg ${
+                  paidItems.size > 0 ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                disabled={processing || paidItems.size > 0}
+                title={paidItems.size > 0 ? "No disponible: existen items pagados parcialmente" : ""}
+              >
+                <CreditCard className={`h-6 w-6 ${paidItems.size > 0 ? 'text-gray-400' : ''}`} />
+                <div className="text-center">
+                  <div className={`font-semibold ${paidItems.size > 0 ? 'text-gray-500' : ''}`}>
+                    Pago Completo
+                  </div>
+                </div>
+              </Button>
+              
+              {/* Dividir Cuenta */}
+              <Button
+                onClick={() => setPaymentMode('split')}
+                variant="secondary"
+                className="w-full h-16 flex items-center justify-center gap-3 text-lg"
+                disabled={processing}
+              >
+                <Split className="h-6 w-6" />
+                <div className="text-center">
+                  <div className="font-semibold">Dividir Cuenta</div>
+                </div>
+              </Button>
+            </div>
+
+            {/* Botón cancelar */}
+            <div className="mt-6">
+              <Button
+                onClick={() => navigate('/orders')}
+                variant="secondary"
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Cancelar
+              </Button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Mostrar items del pedido cuando hay un modo seleccionado */}
-      {paymentMode && renderOrderItems()}
+      {/* Items del pedido - solo para split payment */}
+      {paymentMode === 'split' && renderOrderItems()}
 
       {/* Formulario de Pago Completo */}
       {paymentMode === 'full' && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Pago Completo - {formatCurrency(order.total_amount)}
-            </h2>
-            <Button
-              onClick={() => setPaymentMode(null)}
-              variant="secondary"
-              size="sm"
-              className="flex items-center gap-1"
-            >
-              <X className="h-4 w-4" />
-              Cambiar
-            </Button>
-          </div>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Método de Pago
-              </label>
-              <select
-                name="payment_method"
-                value={paymentData.payment_method}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+        <div className="max-w-3xl mx-auto px-4 py-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6 p-4 bg-white rounded-lg shadow">
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setPaymentMode(null)}
+                variant="secondary"
+                size="sm"
+                className="flex items-center gap-2"
               >
-                <option value="CASH">Efectivo</option>
-                <option value="CARD">Tarjeta</option>
-                <option value="TRANSFER">Transferencia</option>
-                <option value="YAPE_PLIN">Yape/Plin</option>
-                <option value="OTHER">Otro</option>
-              </select>
+                <ArrowLeft className="h-4 w-4" />
+                Volver
+              </Button>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Pago Completo</h1>
+                <p className="text-gray-600">Orden #{order.id} - Mesa {order.table_number}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Total a pagar</p>
+              <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.total_amount)}</p>
+            </div>
+          </div>
+
+          {/* Formulario centrado */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Método de pago */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Método de Pago
+                </label>
+                <select
+                  name="payment_method"
+                  value={paymentData.payment_method}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="CASH">Efectivo</option>
+                  <option value="CARD">Tarjeta</option>
+                  <option value="TRANSFER">Transferencia</option>
+                  <option value="YAPE_PLIN">Yape/Plin</option>
+                  <option value="OTHER">Otro</option>
+                </select>
+              </div>
+
+              {/* Notas */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notas (Opcional)
+                </label>
+                <input
+                  type="text"
+                  name="notes"
+                  value={paymentData.notes}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Ej: Cliente pagó con billete de 100"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notas (Opcional)
-              </label>
-              <textarea
-                name="notes"
-                value={paymentData.notes}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="Ej: Cliente pagó con billete de 100"
-              />
-            </div>
-
-            <div className="pt-4">
+            {/* Botón de pago */}
+            <div className="mt-8">
               <Button
                 onClick={handleFullPayment}
                 disabled={processing}
-                className="w-full flex items-center justify-center gap-2"
+                className="w-full h-14 flex items-center justify-center gap-3 text-lg font-semibold"
               >
                 {processing ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Procesando...
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Procesando pago...
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="h-4 w-4" />
+                    <CheckCircle className="h-5 w-5" />
                     Procesar Pago - {formatCurrency(order.total_amount)}
                   </>
                 )}
@@ -498,22 +512,31 @@ const Payment = () => {
 
       {/* Formulario de División de Cuenta */}
       {paymentMode === 'split' && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Split className="h-5 w-5" />
-              Dividir Cuenta - {formatCurrency(order.total_amount)}
-            </h2>
-            <Button
-              onClick={() => setPaymentMode(null)}
-              variant="secondary"
-              size="sm"
-              className="flex items-center gap-1"
-            >
-              <X className="h-4 w-4" />
-              Cambiar
-            </Button>
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6 p-4 bg-white rounded-lg shadow">
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setPaymentMode(null)}
+                variant="secondary"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Volver
+              </Button>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Dividir Cuenta</h1>
+                <p className="text-gray-600">Orden #{order.id} - Mesa {order.table_number}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Total a dividir</p>
+              <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.total_amount)}</p>
+            </div>
           </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
 
           <div className="space-y-6">
             {/* Formulario de split actual */}
