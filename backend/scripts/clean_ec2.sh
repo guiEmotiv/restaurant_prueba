@@ -37,36 +37,30 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
 from django.db import connection, transaction
+from operation.models import Order, OrderItem, Payment, PaymentItem, OrderItemIngredient
+
+# Intentar importar ContainerSale si existe
+try:
+    from operation.models import ContainerSale
+    HAS_CONTAINER_SALE = True
+except ImportError:
+    HAS_CONTAINER_SALE = False
 
 def clean_orders():
     print('=' * 60)
     print('ELIMINANDO TODOS LOS DATOS DE ÓRDENES')
     print('=' * 60)
     
-    # Obtener conteos
-    with connection.cursor() as cursor:
-        cursor.execute('SELECT COUNT(*) FROM \"order\"')
-        orders = cursor.fetchone()[0]
-        cursor.execute('SELECT COUNT(*) FROM order_item')
-        items = cursor.fetchone()[0]
-        cursor.execute('SELECT COUNT(*) FROM payment')
-        payments = cursor.fetchone()[0]
-        cursor.execute('SELECT COUNT(*) FROM payment_item')
-        payment_items = cursor.fetchone()[0]
-        cursor.execute('SELECT COUNT(*) FROM order_item_ingredient')
-        ingredients = cursor.fetchone()[0]
-        
-        # Verificar si existe la tabla container_sale
-        cursor.execute(\"\"\"
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name='operation_containersale'
-        \"\"\")
-        has_container_sales = cursor.fetchone() is not None
-        
-        container_sales = 0
-        if has_container_sales:
-            cursor.execute('SELECT COUNT(*) FROM operation_containersale')
-            container_sales = cursor.fetchone()[0]
+    # Obtener conteos usando Django ORM
+    orders = Order.objects.count()
+    items = OrderItem.objects.count()
+    payments = Payment.objects.count()
+    payment_items = PaymentItem.objects.count()
+    ingredients = OrderItemIngredient.objects.count()
+    
+    container_sales = 0
+    if HAS_CONTAINER_SALE:
+        container_sales = ContainerSale.objects.count()
     
     print(f'📊 DATOS ACTUALES:')
     print(f'   Órdenes: {orders}')
@@ -74,7 +68,7 @@ def clean_orders():
     print(f'   Pagos: {payments}')
     print(f'   Items de pago: {payment_items}')
     print(f'   Ingredientes: {ingredients}')
-    if has_container_sales:
+    if HAS_CONTAINER_SALE:
         print(f'   Ventas de envases: {container_sales}')
     print()
     
@@ -85,45 +79,45 @@ def clean_orders():
     print('🗑️  ELIMINANDO DATOS...')
     
     try:
-        with transaction.atomic():
-            with connection.cursor() as cursor:
-                # Deshabilitar claves foráneas temporalmente para SQLite
-                cursor.execute('PRAGMA foreign_keys = OFF')
-                
-                # Eliminar en orden correcto
-                cursor.execute('DELETE FROM payment_item')
-                d1 = cursor.rowcount
-                print(f'   ✓ Items de pago: {d1}')
-                
-                cursor.execute('DELETE FROM payment')
-                d2 = cursor.rowcount
-                print(f'   ✓ Pagos: {d2}')
-                
-                cursor.execute('DELETE FROM order_item_ingredient')
-                d3 = cursor.rowcount
-                print(f'   ✓ Ingredientes de items: {d3}')
-                
-                # Eliminar ventas de envases si existe la tabla
-                d6 = 0
-                if has_container_sales:
-                    cursor.execute('DELETE FROM operation_containersale')
-                    d6 = cursor.rowcount
-                    print(f'   ✓ Ventas de envases: {d6}')
-                
-                cursor.execute('DELETE FROM order_item')
-                d4 = cursor.rowcount
-                print(f'   ✓ Items de orden: {d4}')
-                
-                cursor.execute('DELETE FROM \"order\"')
-                d5 = cursor.rowcount
-                print(f'   ✓ Órdenes: {d5}')
-                
-                # Resetear contadores de autoincremento
-                cursor.execute('DELETE FROM sqlite_sequence WHERE name IN (\"order\", \"order_item\", \"payment\", \"payment_item\", \"order_item_ingredient\", \"operation_containersale\")')
-                print(f'   ✓ Contadores reseteados')
-                
-                # Rehabilitar claves foráneas
-                cursor.execute('PRAGMA foreign_keys = ON')
+        # Método 1: Usar Django ORM (más confiable)
+        print('🔄 Usando Django ORM para eliminación segura...')
+        
+        # Eliminar usando ORM en orden correcto
+        d1 = PaymentItem.objects.all().count()
+        PaymentItem.objects.all().delete()
+        print(f'   ✓ Items de pago: {d1}')
+        
+        d2 = Payment.objects.all().count()
+        Payment.objects.all().delete()
+        print(f'   ✓ Pagos: {d2}')
+        
+        d3 = OrderItemIngredient.objects.all().count()
+        OrderItemIngredient.objects.all().delete()
+        print(f'   ✓ Ingredientes de items: {d3}')
+        
+        # Eliminar ventas de envases si existe el modelo
+        d6 = 0
+        if HAS_CONTAINER_SALE:
+            d6 = ContainerSale.objects.all().count()
+            ContainerSale.objects.all().delete()
+            print(f'   ✓ Ventas de envases: {d6}')
+        
+        d4 = OrderItem.objects.all().count()
+        OrderItem.objects.all().delete()
+        print(f'   ✓ Items de orden: {d4}')
+        
+        d5 = Order.objects.all().count()
+        Order.objects.all().delete()
+        print(f'   ✓ Órdenes: {d5}')
+        
+        # Método 2: Resetear contadores con SQL directo
+        print('🔄 Reseteando contadores de autoincremento...')
+        with connection.cursor() as cursor:
+            # Deshabilitar claves foráneas para este comando específico
+            cursor.execute('PRAGMA foreign_keys = OFF')
+            cursor.execute('DELETE FROM sqlite_sequence WHERE name IN (\"operation_order\", \"operation_orderitem\", \"operation_payment\", \"operation_paymentitem\", \"operation_orderitemingredient\", \"operation_containersale\")')
+            cursor.execute('PRAGMA foreign_keys = ON')
+            print(f'   ✓ Contadores reseteados')
                 
         print()
         print('✅ LIMPIEZA COMPLETADA EXITOSAMENTE')
