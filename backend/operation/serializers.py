@@ -172,28 +172,37 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         selected_container_id = validated_data.pop('selected_container', None)
+        quantity = validated_data.pop('quantity', 1)  # Extraer cantidad
+        order = validated_data['order']
         
-        # Crear el OrderItem
-        order_item = super().create(validated_data)
+        created_items = []
         
-        # Si tiene taper y hay container seleccionado, crear ContainerSale
-        if order_item.has_taper and selected_container_id:
-            from config.models import Container
-            try:
-                container = Container.objects.get(id=selected_container_id, is_active=True)
-                
-                # Crear ContainerSale con la cantidad del item
-                ContainerSale.objects.create(
-                    order=order_item.order,
-                    container=container,
-                    quantity=order_item.quantity,
-                    unit_price=container.price,
-                    total_price=container.price * order_item.quantity
-                )
-            except Container.DoesNotExist:
-                pass  # Si no encuentra el container, no crear ContainerSale
+        # Crear N OrderItems individuales basados en la cantidad
+        for i in range(quantity):
+            # Crear cada OrderItem con cantidad = 1
+            individual_item_data = {**validated_data, 'quantity': 1}
+            order_item = OrderItem.objects.create(**individual_item_data)
+            created_items.append(order_item)
+            
+            # Si tiene taper y hay container seleccionado, crear ContainerSale solo para el primer item
+            if order_item.has_taper and selected_container_id and i == 0:
+                from config.models import Container
+                try:
+                    container = Container.objects.get(id=selected_container_id, is_active=True)
+                    
+                    # Crear ContainerSale con la cantidad original
+                    ContainerSale.objects.create(
+                        order=order,
+                        container=container,
+                        quantity=quantity,  # Cantidad original de envases
+                        unit_price=container.price,
+                        total_price=container.price * quantity
+                    )
+                except Container.DoesNotExist:
+                    pass  # Si no encuentra el container, no crear ContainerSale
         
-        return order_item
+        # Retornar el primer item creado (para compatibilidad con el frontend)
+        return created_items[0] if created_items else None
 
 
 class OrderItemForCreateSerializer(serializers.ModelSerializer):
@@ -230,26 +239,31 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         # Crear items y containers
         for item_data in items_data:
             selected_container_id = item_data.pop('selected_container', None)
+            quantity = item_data.pop('quantity', 1)  # Extraer la cantidad
             
-            # Crear OrderItem
-            order_item = OrderItem.objects.create(order=order, **item_data)
-            
-            # Si tiene taper y hay container seleccionado, crear ContainerSale
-            if order_item.has_taper and selected_container_id:
-                from config.models import Container
-                try:
-                    container = Container.objects.get(id=selected_container_id, is_active=True)
-                    
-                    # Crear ContainerSale con la cantidad del item
-                    ContainerSale.objects.create(
-                        order=order,
-                        container=container,
-                        quantity=order_item.quantity,
-                        unit_price=container.price,
-                        total_price=container.price * order_item.quantity
-                    )
-                except Container.DoesNotExist:
-                    pass  # Si no encuentra el container, no crear ContainerSale
+            # Crear N OrderItems individuales basados en la cantidad
+            for i in range(quantity):
+                # Crear cada OrderItem con cantidad = 1
+                individual_item_data = {**item_data, 'quantity': 1}
+                order_item = OrderItem.objects.create(order=order, **individual_item_data)
+                
+                # Si tiene taper y hay container seleccionado, crear ContainerSale solo para el primer item
+                # (para evitar duplicar envases innecesariamente)
+                if order_item.has_taper and selected_container_id and i == 0:
+                    from config.models import Container
+                    try:
+                        container = Container.objects.get(id=selected_container_id, is_active=True)
+                        
+                        # Crear ContainerSale con la cantidad original para todos los items
+                        ContainerSale.objects.create(
+                            order=order,
+                            container=container,
+                            quantity=quantity,  # Cantidad original de envases
+                            unit_price=container.price,
+                            total_price=container.price * quantity
+                        )
+                    except Container.DoesNotExist:
+                        pass  # Si no encuentra el container, no crear ContainerSale
         
         # Consumir ingredientes
         order.consume_ingredients_on_creation()
@@ -311,9 +325,10 @@ class PaymentSerializer(serializers.ModelSerializer):
     def validate(self, data):
         order = data['order']
         
-        # Verificar que la orden esté servida
-        if order.status != 'SERVED':
-            raise serializers.ValidationError("Solo se pueden pagar órdenes entregadas")
+        # Verificar que todos los items estén servidos
+        all_items_served = order.orderitem_set.exists() and order.orderitem_set.filter(status='CREATED').count() == 0
+        if not all_items_served:
+            raise serializers.ValidationError("Solo se pueden pagar órdenes cuando todos los items han sido entregados")
         
         # Verificar que no se pague más del total pendiente
         pending = order.get_pending_amount()
@@ -331,8 +346,7 @@ class OrderStatusUpdateSerializer(serializers.Serializer):
         
         # Validar transiciones de estado válidas
         valid_transitions = {
-            'CREATED': ['SERVED'],
-            'SERVED': ['PAID'],
+            'CREATED': ['PAID'],
             'PAID': []
         }
         

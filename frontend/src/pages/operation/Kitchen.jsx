@@ -258,13 +258,11 @@ const Kitchen = () => {
                             onClick={() => updateItemStatus(item.id, 'SERVED')}
                             className={`
                               relative flex-shrink-0 w-52 rounded-lg border-2 transition-all duration-200 cursor-pointer
-                              ${isOverdue ? 'border-red-300 bg-red-50 hover:bg-red-100 shadow-red-200' : 
-                                isWarning ? 'border-orange-300 bg-orange-50 hover:bg-orange-100 shadow-orange-200' : 
-                                'border-gray-300 bg-white hover:bg-blue-50'}
+                              border-yellow-300 bg-yellow-50 hover:bg-yellow-100
                               shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95
                             `}
                           >
-                            {/* Barra de progreso de tiempo */}
+                            {/* Barra de progreso de tiempo - solo visual, no afecta color del botón */}
                             <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 rounded-t-lg overflow-hidden">
                               <div 
                                 className={`h-full ${timeStatus.color} transition-all duration-300`}
@@ -276,36 +274,35 @@ const Kitchen = () => {
                             <div className="p-3 space-y-2">
                               {/* Primera línea: Orden */}
                               <div className="flex items-center justify-end">
-                                <span className="text-xs text-gray-500 font-medium">
+                                <span className="text-sm text-gray-700 font-medium">
                                   #{item.order_id}
                                 </span>
                               </div>
 
                               {/* Zona y mesa */}
-                              <div className="text-xs font-bold text-center py-2 px-3 text-gray-900">
+                              <div className="text-sm font-bold text-center py-2 px-3 text-gray-900">
                                 {item.order_zone} - {item.order_table}
                               </div>
 
                               {/* Tiempo transcurrido */}
-                              <div className="text-xs font-bold text-center py-2 px-3 text-gray-900">
+                              <div className="text-sm font-bold text-center py-2 px-3 text-gray-900">
                                 {formatTime(item.elapsed_time_minutes)}
                               </div>
 
                               {/* Hora de creación */}
-                              <div className="text-xs text-center text-gray-600">
+                              <div className="text-sm text-center text-gray-600">
                                 Creado: {formatCreationTime(item.created_at)}
                               </div>
 
-
                               {/* Personalizaciones */}
                               {item.customizations_count > 0 && (
-                                <div className="text-xs font-bold text-center py-2 px-3 text-gray-900">
+                                <div className="text-sm font-bold text-center py-2 px-3 text-gray-900">
                                   +{item.customizations_count} extra{item.customizations_count > 1 ? 's' : ''}
                                 </div>
                               )}
 
                               {/* Notas (siempre mostrar campo) - Campo más grande y flexible */}
-                              <div className="text-xs font-bold py-3 px-3 text-gray-900 min-h-[80px] break-words whitespace-pre-wrap leading-relaxed">
+                              <div className="text-sm font-bold py-3 px-3 text-gray-900 min-h-[80px] break-words whitespace-pre-wrap leading-relaxed">
                                 {(item.notes && item.notes.trim()) ? item.notes : ''}
                               </div>
                             </div>

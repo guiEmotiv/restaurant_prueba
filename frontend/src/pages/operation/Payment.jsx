@@ -81,9 +81,13 @@ const Payment = () => {
       setLoading(true);
       const orderData = await apiService.orders.getById(id);
       
-      if (orderData.status !== 'SERVED') {
-        showError('Solo se pueden procesar pagos de órdenes entregadas');
-        navigate('/payments');
+      // Verificar que todos los items estén servidos antes de permitir pago
+      const allItemsServed = orderData.items && orderData.items.length > 0 && 
+        orderData.items.every(item => item.status === 'SERVED');
+      
+      if (!allItemsServed) {
+        showError('Solo se pueden procesar pagos cuando todos los items han sido entregados');
+        navigate('/orders');
         return;
       }
       

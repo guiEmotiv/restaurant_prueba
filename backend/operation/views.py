@@ -173,10 +173,11 @@ class OrderViewSet(viewsets.ModelViewSet):
         """Crear pagos divididos para una orden"""
         order = self.get_object()
         
-        # Verificar que la orden esté servida
-        if order.status != 'SERVED':
+        # Verificar que todos los items estén servidos
+        all_items_served = order.orderitem_set.exists() and order.orderitem_set.filter(status='CREATED').count() == 0
+        if not all_items_served:
             return Response(
-                {'error': 'Solo se pueden pagar órdenes entregadas'},
+                {'error': 'Solo se pueden pagar órdenes cuando todos los items han sido entregados'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
