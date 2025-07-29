@@ -90,8 +90,8 @@ const Kitchen = () => {
       recipe.items.map(item => ({
         ...item,
         recipe_name: recipe.recipe_name,
-        recipe_group_name: recipe.recipe_group_name,
-        recipe_group_id: recipe.recipe_group_id
+        recipe_group_name: recipe.recipe_group_name || 'Sin Grupo',
+        recipe_group_id: recipe.recipe_group_id || null
       }))
     );
 
@@ -107,12 +107,30 @@ const Kitchen = () => {
     
     // Si está seleccionado "all", mostrar todas las columnas de grupos
     if (selectedGroupTab === 'all') {
+      // Primero agregar columnas para todos los grupos existentes
       groups.forEach(group => {
         columns[group.id] = {
           ...group,
           items: timeFilteredItems.filter(item => item.recipe_group_id === group.id)
         };
       });
+      
+      // Agregar columna para items sin grupo
+      const itemsWithoutGroup = timeFilteredItems.filter(item => !item.recipe_group_id);
+      if (itemsWithoutGroup.length > 0 || groups.length === 0) {
+        columns['sin-grupo'] = {
+          id: 'sin-grupo',
+          name: 'Sin Grupo',
+          items: itemsWithoutGroup
+        };
+      }
+    } else if (selectedGroupTab === 'sin-grupo') {
+      // Mostrar solo items sin grupo
+      columns['sin-grupo'] = {
+        id: 'sin-grupo',
+        name: 'Sin Grupo',
+        items: timeFilteredItems.filter(item => !item.recipe_group_id)
+      };
     } else {
       // Solo mostrar la columna del grupo seleccionado
       const selectedGroup = groups.find(g => g.id === selectedGroupTab);
@@ -194,37 +212,52 @@ const Kitchen = () => {
           </div>
         </div>
 
-        {/* Pestañas de grupos */}
-        <div className="mt-3 border-t pt-3">
-          <div className="flex gap-2 overflow-x-auto">
-            <button
-              onClick={() => setSelectedGroupTab('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                selectedGroupTab === 'all'
-                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              Todos ({totalItems})
-            </button>
-            {groups.map(group => {
-              const groupItems = kanbanColumns[group.id]?.items.length || 0;
-              return (
+        {/* Pestañas de grupos - Solo mostrar si hay items */}
+        {totalItems > 0 && (
+          <div className="mt-3 border-t pt-3">
+            <div className="flex gap-2 overflow-x-auto">
+              <button
+                onClick={() => setSelectedGroupTab('all')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  selectedGroupTab === 'all'
+                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                Todos ({totalItems})
+              </button>
+              {groups.map(group => {
+                const groupItems = kanbanColumns[group.id]?.items.length || 0;
+                return (
+                  <button
+                    key={group.id}
+                    onClick={() => setSelectedGroupTab(group.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                      selectedGroupTab === group.id
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
+                  >
+                    {group.name} ({groupItems})
+                  </button>
+                );
+              })}
+              {/* Pestaña para items sin grupo */}
+              {(kanbanColumns['sin-grupo']?.items.length > 0 || groups.length === 0) && (
                 <button
-                  key={group.id}
-                  onClick={() => setSelectedGroupTab(group.id)}
+                  onClick={() => setSelectedGroupTab('sin-grupo')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    selectedGroupTab === group.id
+                    selectedGroupTab === 'sin-grupo'
                       ? 'bg-blue-100 text-blue-700 border border-blue-200'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  {group.name} ({groupItems})
+                  Sin Grupo ({kanbanColumns['sin-grupo']?.items.length || 0})
                 </button>
-              );
-            })}
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Tablero Kanban */}
@@ -242,9 +275,9 @@ const Kitchen = () => {
             </div>
           </div>
         ) : (
-          <div className="flex gap-6 h-full">
+          <div className="flex gap-4 h-full overflow-x-auto pb-4">
             {Object.values(kanbanColumns).map(column => (
-              <div key={column.id} className="flex-1 min-w-80 max-w-96">
+              <div key={column.id} className="flex-shrink-0 w-80">
                 {/* Header de columna */}
                 <div className="bg-white rounded-t-lg px-4 py-3 border-b border-gray-200">
                   <h3 className="font-semibold text-gray-900 flex items-center justify-between">
@@ -256,7 +289,7 @@ const Kitchen = () => {
                 </div>
 
                 {/* Items de la columna */}
-                <div className="bg-gray-100 rounded-b-lg p-3 h-full overflow-y-auto space-y-3">
+                <div className="bg-gray-100 rounded-b-lg p-3 min-h-[400px] max-h-[calc(100vh-300px)] overflow-y-auto space-y-3">
                   {column.items.map(item => {
                     const timeStatus = getTimeStatus(item.elapsed_time_minutes, item.preparation_time);
                     
