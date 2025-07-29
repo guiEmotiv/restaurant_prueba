@@ -10,6 +10,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     table: '',
+    waiter: '',
     status: 'CREATED'
   });
   
@@ -18,6 +19,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const [availableTables, setAvailableTables] = useState([]);
   const [availableZones, setAvailableZones] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
+  const [availableWaiters, setAvailableWaiters] = useState([]);
   const [selectedZoneFilter, setSelectedZoneFilter] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState('');
   const [deletedItemIds, setDeletedItemIds] = useState([]); // Llevar registro de items eliminados
@@ -31,6 +33,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         // Modo edición
         setFormData({
           table: order.table?.id || order.table || '',
+          waiter: order.waiter?.id || order.waiter || '',
           status: order.status || 'CREATED'
         });
         loadOrderItems();
@@ -44,6 +47,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const resetForm = () => {
     setFormData({
       table: '',
+      waiter: '',
       status: 'CREATED'
     });
     setOrderItems([]);
@@ -98,17 +102,19 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
 
   const loadAvailableData = async () => {
     try {
-      const [recipesData, tablesData, zonesData, groupsData] = await Promise.all([
+      const [recipesData, tablesData, zonesData, groupsData, waitersData] = await Promise.all([
         apiService.recipes.getAll(), // Sin show_all, el backend filtra automáticamente
         apiService.tables.getAll(),
         apiService.zones.getAll(),
-        apiService.groups.getAll()
+        apiService.groups.getAll(),
+        apiService.waiters.getAll()
       ]);
       // El backend ya filtra recetas activas con stock suficiente
       setAvailableRecipes(Array.isArray(recipesData) ? recipesData : []);
       setAvailableTables(Array.isArray(tablesData) ? tablesData : []);
       setAvailableZones(Array.isArray(zonesData) ? zonesData : []);
       setAvailableGroups(Array.isArray(groupsData) ? groupsData : []);
+      setAvailableWaiters(Array.isArray(waitersData) ? waitersData.filter(w => w.is_active) : []);
     } catch (error) {
       console.error('Error loading available data:', error);
     }
@@ -128,7 +134,11 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         total_price: item.total_price,
         status: item.status,
         notes: item.notes || '',
+        quantity: item.quantity || 1,
+        is_takeaway: item.is_takeaway || false,
+        has_taper: item.has_taper || false,
         can_delete: item.status === 'CREATED',
+        can_edit: item.status === 'CREATED', // Inicialmente todos los items existentes pueden editarse
         tempKey: item.tempKey || (Date.now() + Math.random())
       })));
     } catch (error) {
@@ -151,6 +161,12 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
 
   const addOrderItem = () => {
     setOrderItems(prev => {
+      // Marcar todos los items existentes como no editables cuando se agrega uno nuevo
+      const updatedPrev = prev.map(item => ({
+        ...item,
+        can_edit: false // Bloquear edición de items anteriores
+      }));
+      
       const newItem = {
         id: null,
         recipe: '',
@@ -159,11 +175,15 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         total_price: '',
         status: 'CREATED',
         notes: '',
+        quantity: 1,
+        is_takeaway: false,
+        has_taper: false,
         can_delete: true,
+        can_edit: true, // Solo el nuevo item puede ser editado
         tempKey: Date.now() + Math.random() // Unique key for React
       };
       // Add new item at the beginning of the array
-      return [newItem, ...prev];
+      return [newItem, ...updatedPrev];
     });
   };
 
@@ -214,6 +234,16 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       const tableId = parseInt(formData.table);
       if (isNaN(tableId) || tableId <= 0) {
         newErrors.table = 'Debe seleccionar una mesa válida';
+      }
+    }
+    
+    // Validar mesero
+    if (!formData.waiter || formData.waiter === '') {
+      newErrors.waiter = 'El mesero es requerido';
+    } else {
+      const waiterId = parseInt(formData.waiter);
+      if (isNaN(waiterId) || waiterId <= 0) {
+        newErrors.waiter = 'Debe seleccionar un mesero válido';
       }
     }
     
@@ -283,9 +313,10 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       
       let savedOrder;
       if (order?.id) {
-        // Actualizar pedido existente - table requerido por serializer (UI deshabilitada)
+        // Actualizar pedido existente - table y waiter requeridos por serializer
         const orderData = {
           table: parseInt(formData.table),
+          waiter: parseInt(formData.waiter),
           status: formData.status
         };
         savedOrder = await apiService.orders.update(order.id, orderData);
@@ -313,7 +344,10 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
               const createData = {
                 order: order.id,
                 recipe: parseInt(item.recipe),
-                notes: item.notes || ''
+                notes: item.notes || '',
+                quantity: item.quantity || 1,
+                is_takeaway: item.is_takeaway || false,
+                has_taper: item.has_taper || false
               };
               await apiService.orderItems.create(createData);
             } catch (error) {
@@ -344,7 +378,10 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           
           return {
             recipe: parsedRecipeId,
-            notes: (item.notes || '').toString().trim()
+            notes: (item.notes || '').toString().trim(),
+            quantity: parseInt(item.quantity) || 1,
+            is_takeaway: item.is_takeaway || false,
+            has_taper: item.has_taper || false
           };
         });
         
@@ -355,6 +392,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         
         const orderData = {
           table: parseInt(formData.table),
+          waiter: parseInt(formData.waiter),
           items: processedItems
         };
         
@@ -488,6 +526,30 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
             {/* Filtros y Items unificados */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="space-y-4">
+                {/* Campo de mesero - arriba de todo */}
+                <div>
+                  <select
+                    name="waiter"
+                    value={formData.waiter}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
+                      errors.waiter ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">Seleccionar mesero</option>
+                    {availableWaiters.map(waiter => (
+                      <option key={waiter.id} value={waiter.id}>
+                        {waiter.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.waiter && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.waiter}
+                    </p>
+                  )}
+                </div>
+
                 {/* Filtros de mesa y zona */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Filtro de Zona */}
@@ -595,10 +657,12 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                 ) : (
                   <>
                     {/* Header de tabla - Solo en desktop */}
-                    <div className="hidden lg:grid grid-cols-12 gap-3 px-3 py-2 bg-gray-100 rounded-md text-sm font-medium text-gray-700">
-                      <div className="col-span-4">Item</div>
-                      <div className="col-span-2 text-center">Precio Unit.</div>
-                      <div className="col-span-2 text-center">Estado</div>
+                    <div className="hidden lg:grid grid-cols-12 gap-2 px-3 py-2 bg-gray-100 rounded-md text-xs font-medium text-gray-700">
+                      <div className="col-span-3">Item</div>
+                      <div className="col-span-1 text-center">Cant.</div>
+                      <div className="col-span-1 text-center">Precio</div>
+                      <div className="col-span-2 text-center">Para llevar/Taper</div>
+                      <div className="col-span-1 text-center">Estado</div>
                       <div className="col-span-3">Notas</div>
                       <div className="col-span-1 text-center">Acción</div>
                     </div>
@@ -607,7 +671,9 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                       // Calculate display number (reverse of actual index)
                       const displayNumber = orderItems.length - index;
                       return (
-                      <div key={item.tempKey || item.id || index} className="border border-gray-200 rounded-lg bg-white p-3">
+                      <div key={item.tempKey || item.id || index} className={`border border-gray-200 rounded-lg p-3 ${ 
+                        !item.can_edit ? 'bg-gray-100' : 'bg-white'
+                      }`}>
                         {/* Layout móvil - Formato de card */}
                         <div className="lg:hidden space-y-3">
                           <div className="flex justify-between items-start">
@@ -629,7 +695,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                             value={item.recipe}
                             onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
                             className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-                            disabled={!item.can_delete}
+                            disabled={!item.can_edit}
                           >
                             <option value="">
                               {getFilteredRecipes(!!item.recipe && item.recipe !== '').length === 0 ? 'No hay recetas disponibles' : 'Seleccionar...'}
@@ -642,11 +708,51 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                           </select>
                           </div>
                           
-                          <div className="flex justify-between items-center">
+                          <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-xs font-medium text-gray-500 mb-1">Precio</label>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Cantidad</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                disabled={!item.can_edit}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Precio Unit.</label>
                               <div className="text-sm font-semibold text-gray-900">{formatCurrency(item.unit_price)}</div>
                             </div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center space-x-4">
+                              <label className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  checked={item.is_takeaway}
+                                  onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
+                                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                  disabled={!item.can_edit}
+                                />
+                                <span className="ml-2 text-xs text-gray-700">Para llevar</span>
+                              </label>
+                              
+                              {item.is_takeaway && (
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.has_taper}
+                                    onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
+                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    disabled={!item.can_edit}
+                                  />
+                                  <span className="ml-2 text-xs text-gray-700">Con taper</span>
+                                </label>
+                              )}
+                            </div>
+                            
                             <div>
                               <label className="block text-xs font-medium text-gray-500 mb-1">Estado</label>
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -668,19 +774,19 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                               onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
                               placeholder="Ej: Sin cebolla"
                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              disabled={!item.can_delete}
+                              disabled={!item.can_edit}
                             />
                           </div>
                         </div>
                         
-                        {/* Layout desktop - Grid original */}
-                        <div className="hidden lg:grid grid-cols-12 gap-3 items-center">
-                          <div className="col-span-4">
+                        {/* Layout desktop - Grid actualizado */}
+                        <div className="hidden lg:grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-3">
                             <select
                               value={item.recipe}
                               onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
-                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-                              disabled={!item.can_delete}
+                              className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                              disabled={!item.can_edit}
                             >
                               <option value="">
                                 {getFilteredRecipes(!!item.recipe && item.recipe !== '').length === 0 ? 'No hay recetas disponibles' : 'Seleccionar...'}
@@ -693,12 +799,51 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                             </select>
                           </div>
                           
-                          <div className="col-span-2 text-center text-sm font-semibold text-gray-900">
+                          <div className="col-span-1 text-center">
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                              className="w-full px-1 py-1 border border-gray-300 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              disabled={!item.can_edit}
+                            />
+                          </div>
+                          
+                          <div className="col-span-1 text-center text-xs font-semibold text-gray-900">
                             {formatCurrency(item.unit_price)}
                           </div>
                           
                           <div className="col-span-2 text-center">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            <div className="flex justify-center items-center space-x-2">
+                              <label className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  checked={item.is_takeaway}
+                                  onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
+                                  className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                  disabled={!item.can_edit}
+                                />
+                                <span className="ml-1 text-xs text-gray-700">P.llevar</span>
+                              </label>
+                              
+                              {item.is_takeaway && (
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.has_taper}
+                                    onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
+                                    className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    disabled={!item.can_edit}
+                                  />
+                                  <span className="ml-1 text-xs text-gray-700">Taper</span>
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="col-span-1 text-center">
+                            <span className={`inline-flex px-1 py-1 text-xs font-semibold rounded-full ${
                               item.status === 'CREATED' ? 'bg-yellow-100 text-yellow-800' :
                               item.status === 'SERVED' ? 'bg-green-100 text-green-800' :
                               'bg-gray-100 text-gray-800'
@@ -714,8 +859,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                               value={item.notes}
                               onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
                               placeholder="Ej: Sin cebolla"
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              disabled={!item.can_delete}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              disabled={!item.can_edit}
                             />
                           </div>
                           
@@ -726,7 +871,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                                 className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
                                 title="Eliminar"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3 w-3" />
                               </button>
                             )}
                           </div>
@@ -757,7 +902,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                Guardar Pedido
+                Guardar
               </>
             )}
           </button>
