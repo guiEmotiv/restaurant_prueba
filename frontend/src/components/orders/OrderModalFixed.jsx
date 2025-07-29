@@ -490,9 +490,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Filtro de Zona */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Zona {!order && '*'}
-                  </label>
                   <select
                     value={selectedZoneFilter}
                     onChange={(e) => {
@@ -505,7 +502,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                     disabled={!!order} // No cambiar en edición
                   >
-                    <option value="">Todas las zonas ({availableTables.length})</option>
+                    <option value="">Zona ...</option>
                     {availableZones.map(zone => (
                       <option key={zone.id} value={zone.id}>
                         {zone.name} ({availableTables.filter(t => t.zone === zone.id).length})
@@ -516,9 +513,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
 
                 {/* Selector de Mesa */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mesa *
-                  </label>
                   <select
                     name="table"
                     value={formData.table}
@@ -528,12 +522,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                     }`}
                     disabled={!!order} // No cambiar mesa en edición para evitar confusión operativa
                   >
-                    <option value="">
-                      {getFilteredTables().length === 0 
-                        ? (selectedZoneFilter ? `No hay mesas en ${getSelectedZoneName()}` : 'Seleccionar mesa...')
-                        : `Seleccionar mesa... (${getFilteredTables().length})`
-                      }
-                    </option>
+                    <option value="">Mesa</option>
                     {getFilteredTables().map(table => (
                       <option key={table.id} value={table.id}>
                         Mesa {table.table_number}
@@ -574,16 +563,16 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                   onChange={(e) => setSelectedGroupFilter(e.target.value)}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                 >
-                  <option value="">Todos ({availableRecipes.length})</option>
+                  <option value="">Grupos</option>
                   {availableGroups.map(group => (
                     <option key={group.id} value={group.id}>
-                      {group.name} ({availableRecipes.filter(r => r.group === group.id).length})
+                      {group.name}
                     </option>
                   ))}
                 </select>
                 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-3">
                   {/* Add Item Button */}
                   <button
                     onClick={addOrderItem}
@@ -606,16 +595,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                     ) : (
                       <Save className="h-4 w-4" />
                     )}
-                  </button>
-                  
-                  {/* Cancel Button */}
-                  <button
-                    onClick={onClose}
-                    disabled={loading}
-                    className="p-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Cancelar"
-                  >
-                    <X className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -677,13 +656,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                             </option>
                             {getFilteredRecipes(!!item.recipe && item.recipe !== '').map(recipe => (
                               <option key={recipe.id} value={recipe.id}>
-                                {!!item.recipe && item.recipe !== '' ? (
-                                  // Si ya hay un item seleccionado, solo mostrar el nombre
-                                  recipe.name
-                                ) : (
-                                  // Si no hay selección, mostrar información completa para ayudar a seleccionar
-                                  `${recipe.name} (${formatCurrency(recipe.base_price)})${!selectedGroupFilter && recipe.group_name ? ` - ${recipe.group_name}` : ''}`
-                                )}
+                                {recipe.name}
                               </option>
                             ))}
                           </select>
@@ -734,11 +707,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                               </option>
                               {getFilteredRecipes(!!item.recipe && item.recipe !== '').map(recipe => (
                                 <option key={recipe.id} value={recipe.id}>
-                                  {!!item.recipe && item.recipe !== '' ? (
-                                    recipe.name
-                                  ) : (
-                                    `${recipe.name} (${formatCurrency(recipe.base_price)})${!selectedGroupFilter && recipe.group_name ? ` - ${recipe.group_name}` : ''}`
-                                  )}
+                                  {recipe.name}
                                 </option>
                               ))}
                             </select>
