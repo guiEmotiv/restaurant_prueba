@@ -9,6 +9,7 @@ import { useToast } from '../../contexts/ToastContext';
 const Waiters = () => {
   const { showSuccess, showError } = useToast();
   const [waiters, setWaiters] = useState([]);
+  const [filteredWaiters, setFilteredWaiters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showWaiterModal, setShowWaiterModal] = useState(false);
   const [selectedWaiter, setSelectedWaiter] = useState(null);
@@ -38,6 +39,11 @@ const Waiters = () => {
   useEffect(() => {
     loadWaiters();
   }, []);
+
+  useEffect(() => {
+    // Actualizar waiters filtrados cuando cambian los waiters
+    setFilteredWaiters(Array.isArray(waiters) ? waiters : []);
+  }, [waiters]);
 
   const loadWaiters = async () => {
     try {
@@ -144,7 +150,7 @@ const Waiters = () => {
 
       <CrudTable
         title="Meseros"
-        data={waiters}
+        data={filteredWaiters}
         columns={columns}
         onEdit={handleEdit}
         onDelete={handleDelete}

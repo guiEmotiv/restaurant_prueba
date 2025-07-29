@@ -9,6 +9,7 @@ import { useToast } from '../../contexts/ToastContext';
 const Containers = () => {
   const { showSuccess, showError } = useToast();
   const [containers, setContainers] = useState([]);
+  const [filteredContainers, setFilteredContainers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showContainerModal, setShowContainerModal] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
@@ -68,6 +69,11 @@ const Containers = () => {
   useEffect(() => {
     loadContainers();
   }, []);
+
+  useEffect(() => {
+    // Actualizar containers filtrados cuando cambian los containers
+    setFilteredContainers(Array.isArray(containers) ? containers : []);
+  }, [containers]);
 
   const loadContainers = async () => {
     try {
@@ -184,7 +190,7 @@ const Containers = () => {
 
       <CrudTable
         title="Envases"
-        data={containers}
+        data={filteredContainers}
         columns={columns}
         onEdit={handleEdit}
         onDelete={handleDelete}
