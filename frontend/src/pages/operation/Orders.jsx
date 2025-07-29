@@ -24,9 +24,9 @@ const Orders = () => {
       setLoading(true);
       const data = await apiService.orders.getAll();
       
-      // Filtrar solo órdenes CREATED - las SERVED van a la vista de pagos
+      // Filtrar órdenes CREATED y SERVED (no pagadas) - las PAID no se muestran
       const activeOrders = Array.isArray(data) ? 
-        data.filter(order => order.status === 'CREATED') : [];
+        data.filter(order => order.status === 'CREATED' || order.status === 'SERVED') : [];
       
       // Cargar los items de cada orden para verificar si se puede eliminar y contar items
       const ordersWithItems = await Promise.all(
@@ -160,7 +160,8 @@ const Orders = () => {
 
   const getFilterCounts = () => {
     return {
-      CREATED: orders.filter(o => o.status === 'CREATED').length
+      CREATED: orders.filter(o => o.status === 'CREATED').length,
+      SERVED: orders.filter(o => o.status === 'SERVED').length
     };
   };
 
@@ -201,7 +202,8 @@ const Orders = () => {
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8 px-4 md:px-6 overflow-x-auto">
             {[
-              { key: 'CREATED', label: 'Creadas', count: counts.CREATED }
+              { key: 'CREATED', label: 'Creadas', count: counts.CREATED },
+              { key: 'SERVED', label: 'Entregadas', count: counts.SERVED }
             ].map((tab) => (
               <button
                 key={tab.key}

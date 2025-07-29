@@ -336,6 +336,12 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleCancel = () => {
+    if (confirm('¿Estás seguro de cancelar? Se perderán todos los cambios no guardados.')) {
+      onClose();
+    }
+  };
+
   const handleSave = async () => {
     if (!validateForm()) {
       return;
@@ -561,12 +567,32 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
               {order ? `Editar Pedido #${order.id}` : 'Nuevo Pedido'}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-2 -m-2"
-          >
-            <X className="h-6 w-6" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Guardar
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleCancel}
+              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+              disabled={loading}
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -940,26 +966,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex-shrink-0 flex items-center justify-end px-4 sm:px-6 py-4 border-t border-gray-200 bg-white">
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Guardar
-              </>
-            )}
-          </button>
-        </div>
 
       </div>
     </div>
