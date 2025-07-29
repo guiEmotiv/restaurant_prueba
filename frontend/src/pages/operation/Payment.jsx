@@ -111,7 +111,7 @@ const Payment = () => {
   };
 
   const handleFullPayment = async () => {
-    const orderTotal = parseFloat(order?.grand_total || order?.total_amount) || 0;
+    const orderTotal = parseFloat(order?.total_amount) || 0;
     
     if (orderTotal <= 0) {
       showError('El total de la orden debe ser mayor a 0');
@@ -299,7 +299,7 @@ const Payment = () => {
                     {item.is_takeaway && (
                       <div className="text-orange-600 text-xs mt-1 flex items-center gap-1">
                         <span>📦</span>
-                        <span>Para llevar</span>
+                        <span>Para llevar (envase incluido)</span>
                       </div>
                     )}
                   </div>
@@ -321,45 +321,6 @@ const Payment = () => {
             );
           })}
         </div>
-
-        {/* Container Sales - Envases para llevar */}
-        {order.container_sales && order.container_sales.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <h4 className="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span>📦</span>
-              Envases para llevar
-            </h4>
-            <div className="space-y-2">
-              {order.container_sales.map((containerSale) => (
-                <div key={containerSale.id} className="p-3 rounded-lg border border-orange-200 bg-orange-50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">
-                        {containerSale.container_name} x{containerSale.quantity}
-                      </div>
-                      <div className="text-gray-600 text-xs mt-1">
-                        Adicional por servicio para llevar
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium text-orange-700">
-                        {formatCurrency(containerSale.total_price)}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {formatCurrency(containerSale.unit_price)} c/u
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 p-2 bg-orange-100 rounded-lg">
-              <div className="text-xs text-orange-800">
-                💡 Los envases se cobran por separado del precio de los alimentos
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -401,26 +362,9 @@ const Payment = () => {
               <p className="text-gray-600 mt-2">
                 Orden #{order.id} - Mesa {order.table_number}
               </p>
-              
-              {/* Breakdown de totales */}
-              <div className="mt-3 space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Alimentos:</span>
-                  <span className="font-medium">{formatCurrency(order.total_amount)}</span>
-                </div>
-                {order.containers_total > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-orange-600">Envases para llevar:</span>
-                    <span className="font-medium text-orange-600">{formatCurrency(order.containers_total)}</span>
-                  </div>
-                )}
-                <div className="border-t pt-1">
-                  <div className="flex justify-between">
-                    <span className="font-semibold text-gray-900">Total:</span>
-                    <span className="text-2xl font-bold text-blue-600">{formatCurrency(order.grand_total || order.total_amount)}</span>
-                  </div>
-                </div>
-              </div>
+              <p className="text-2xl font-bold text-blue-600 mt-4">
+                {formatCurrency(order.total_amount)}
+              </p>
             </div>
 
             {/* Mensaje informativo si hay items pagados */}
@@ -506,17 +450,7 @@ const Payment = () => {
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-500">Total a pagar</p>
-              <div className="space-y-1">
-                <div className="flex justify-end text-xs text-gray-600">
-                  Alimentos: {formatCurrency(order.total_amount)}
-                </div>
-                {order.containers_total > 0 && (
-                  <div className="flex justify-end text-xs text-orange-600">
-                    Envases: {formatCurrency(order.containers_total)}
-                  </div>
-                )}
-                <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.grand_total || order.total_amount)}</p>
-              </div>
+              <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.total_amount)}</p>
             </div>
           </div>
 
@@ -573,7 +507,7 @@ const Payment = () => {
                 ) : (
                   <>
                     <CheckCircle className="h-5 w-5" />
-                    Procesar Pago - {formatCurrency(order.grand_total || order.total_amount)}
+                    Procesar Pago - {formatCurrency(order.total_amount)}
                   </>
                 )}
               </Button>
@@ -604,37 +538,11 @@ const Payment = () => {
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-500">Total a dividir</p>
-              <div className="space-y-1">
-                <div className="flex justify-end text-xs text-gray-600">
-                  Alimentos: {formatCurrency(order.total_amount)}
-                </div>
-                {order.containers_total > 0 && (
-                  <div className="flex justify-end text-xs text-orange-600">
-                    Envases: {formatCurrency(order.containers_total)}
-                  </div>
-                )}
-                <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.grand_total || order.total_amount)}</p>
-              </div>
+              <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.total_amount)}</p>
             </div>
           </div>
           
           <div className="bg-white rounded-lg shadow p-6">
-            {/* Información sobre envases para llevar */}
-            {order.container_sales && order.container_sales.length > 0 && (
-              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <span>📦</span>
-                  <h4 className="text-sm font-medium text-orange-800">
-                    Envases para llevar incluidos
-                  </h4>
-                </div>
-                <div className="text-xs text-orange-700">
-                  Total en envases: {formatCurrency(order.containers_total)} - 
-                  Los envases se cobran por separado del precio de los alimentos
-                </div>
-              </div>
-            )}
-            
             <div className="space-y-6">
             {/* Formulario de split actual */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -49,12 +49,12 @@ class Order(models.Model):
         return RestaurantOperationalConfig.get_operational_date()
 
     def calculate_total(self):
-        """Calcula SOLO el total de items de comida (SIN envases)"""
+        """Calcula el total de items (incluyendo envases distribuidos)"""
         if self.pk:
-            # Total de items de comida SOLAMENTE
+            # Total de items (ahora incluye envases distribuidos)
             items_total = sum(item.total_price for item in self.orderitem_set.all())
             
-            # El total_amount es SOLO la venta de comida (sin envases)
+            # El total_amount ahora incluye todo (comida + envases)
             self.total_amount = items_total
             super().save()  # Usar super() para evitar recursión
             return items_total
@@ -67,8 +67,8 @@ class Order(models.Model):
         return Decimal('0.00')
     
     def get_grand_total(self):
-        """Obtiene el total general (comida + envases) para la boleta final"""
-        return self.total_amount + self.get_containers_total()
+        """Obtiene el total general (ya incluye envases distribuidos)"""
+        return self.total_amount
 
     def consume_ingredients_on_creation(self):
         """Método separado para consumir ingredientes cuando se crea la orden"""
@@ -99,7 +99,7 @@ class Order(models.Model):
     
     def get_pending_amount(self):
         """Obtiene el monto pendiente de pago"""
-        return self.total_amount - self.get_total_paid()
+        return self.get_grand_total() - self.get_total_paid()
     
     def is_fully_paid(self):
         """Verifica si la orden está completamente pagada"""
@@ -157,9 +157,10 @@ class OrderItem(models.Model):
             self.order.calculate_total()
 
     def calculate_total_price(self):
-        """Calcula el precio total del item incluyendo customizaciones y cantidad"""
+        """Calcula el precio total del item incluyendo customizaciones, cantidad y envases"""
         base_total = self.unit_price * self.quantity
         customization_total = Decimal('0.00')
+        container_total = Decimal('0.00')
         
         # Solo buscar customizaciones si el objeto ya está guardado
         if self.pk:
@@ -167,10 +168,18 @@ class OrderItem(models.Model):
                 item.total_price for item in self.orderitemingredient_set.all()
             )
         
-        # Nota: Los envases (taper) ahora se manejan por separado en ContainerSale
-        # Ya no se incluyen en el cálculo del precio del item
+        # Incluir precio de envases si es para llevar
+        if self.has_taper and self.pk:
+            # Buscar envases asociados a este pedido y calcular proporcionalmente
+            container_sales = self.order.container_sales.all()
+            if container_sales.exists():
+                # Distribuir el costo de envases entre todos los items para llevar
+                takeaway_items_count = self.order.orderitem_set.filter(has_taper=True).count()
+                if takeaway_items_count > 0:
+                    total_container_cost = sum(cs.total_price for cs in container_sales)
+                    container_total = total_container_cost / takeaway_items_count
         
-        self.total_price = base_total + customization_total
+        self.total_price = base_total + customization_total + container_total
         
         # Solo guardar si ya existe en la BD para evitar recursión
         if self.pk:
@@ -320,7 +329,7 @@ class Payment(models.Model):
     
     def _check_order_fully_paid(self):
         """Verifica si la orden está completamente pagada"""
-        order_total = self.order.total_amount
+        order_total = self.order.get_grand_total()
         total_paid = self.order.payments.aggregate(
             total=models.Sum('amount')
         )['total'] or Decimal('0.00')
