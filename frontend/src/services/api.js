@@ -216,7 +216,7 @@ export const apiService = {
       const queryParams = new URLSearchParams(params).toString();
       const url = queryParams ? `/ingredients/?${queryParams}` : '/ingredients/';
       const response = await api.get(url);
-      return response.data;
+      return handlePaginatedResponse(response);
     },
     getById: (id) => apiService.getById('ingredients', id),
     create: (data) => apiService.create('ingredients', data),
