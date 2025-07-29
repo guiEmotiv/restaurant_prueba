@@ -62,6 +62,7 @@ const NewOrder = () => {
         status: item.status,
         notes: item.notes || '',
         quantity: item.quantity || 1,
+        displayQuantity: (item.quantity || 1).toString(),
         is_takeaway: item.is_takeaway || false,
         has_taper: item.has_taper || false,
         selected_container: item.selected_container || null,
@@ -144,6 +145,7 @@ const NewOrder = () => {
         status: 'CREATED',
         notes: '',
         quantity: 1,
+        displayQuantity: '1',
         is_takeaway: false,
         has_taper: false,
         selected_container: null,
@@ -160,6 +162,13 @@ const NewOrder = () => {
     const item = orderItems[index];
     if (!item.can_delete) {
       showError('No se puede eliminar este item porque ya fue entregado');
+      return;
+    }
+    
+    const itemName = item.recipe_name || 'este item';
+    const confirmMessage = `¿Estás seguro que deseas eliminar el item ${itemName}?`;
+    
+    if (!confirm(confirmMessage)) {
       return;
     }
     
@@ -357,6 +366,26 @@ const NewOrder = () => {
     return result;
   };
 
+  const handleQuantityChange = (e, index) => {
+    const rawValue = e.target.value;
+    
+    // Si está vacío, permitir temporalmente pero mantener 1 como valor efectivo
+    if (rawValue === '') {
+      // Actualizar la vista pero mantener quantity como 1 internamente
+      setOrderItems(prev => prev.map((item, i) => 
+        i === index ? { ...item, displayQuantity: '', quantity: 1 } : item
+      ));
+      return;
+    }
+    
+    const filteredValue = filterNumericInput(rawValue);
+    const numValue = parseInt(filteredValue) || 1;
+    
+    setOrderItems(prev => prev.map((item, i) => 
+      i === index ? { ...item, displayQuantity: filteredValue, quantity: numValue } : item
+    ));
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div className="flex items-center justify-end gap-2 p-4 border-b border-gray-200">
@@ -386,8 +415,8 @@ const NewOrder = () => {
         </Button>
       </div>
 
-      <div className="p-4">
-        <div className="space-y-3">
+      <div className="p-4 max-w-6xl mx-auto">
+        <div className="space-y-4">
           <div>
             <select
               name="waiter"
@@ -396,7 +425,7 @@ const NewOrder = () => {
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
                 errors.waiter ? 'border-red-500' : 'border-gray-300'
               }`}
-              disabled={existingOrder?.status === 'SERVED'}
+              disabled={!!orderId || existingOrder?.status === 'SERVED'}
             >
               <option value="">Seleccionar mesero</option>
               {availableWaiters.map(waiter => (
@@ -492,227 +521,130 @@ const NewOrder = () => {
             <p className="text-sm text-red-600">{errors.items}</p>
           )}
 
-          <div className="space-y-2">
-            {orderItems.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 border-2 border-dashed border-gray-300 rounded">
-                <ShoppingCart className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-                <p className="font-medium text-sm">No hay items agregados</p>
-              </div>
-            ) : (
-              <>
-                <div className="hidden lg:grid grid-cols-11 gap-2 px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-700">
-                  <div className="col-span-3">Item</div>
-                  <div className="col-span-1 text-center">Cant.</div>
-                  <div className="col-span-1 text-center">Precio</div>
-                  <div className="col-span-2 text-center">Para llevar/Taper</div>
-                  <div className="col-span-3">Notas</div>
-                  <div className="col-span-1 text-center">Acción</div>
-                </div>
+          {orderItems.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <ShoppingCart className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="font-medium text-base">No hay items agregados</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {orderItems.map((item, index) => {
+                const displayNumber = orderItems.length - index;
+                const getStatusText = (status) => {
+                  return status === 'CREATED' ? 'Creado' : status === 'SERVED' ? 'Entregado' : status;
+                };
                 
-                {orderItems.map((item, index) => {
-                  const displayNumber = orderItems.length - index;
-                  const getStatusText = (status) => {
-                    return status === 'CREATED' ? 'Creado' : status === 'SERVED' ? 'Entregado' : status;
-                  };
-                  
-                  return (
-                    <div key={item.tempKey || item.id || index} className={`border border-gray-200 rounded p-2 ${ 
-                      !item.can_edit ? 'bg-gray-100' : 'bg-white'
-                    }`}>
-                      <div className="lg:hidden space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium text-sm text-gray-900">
-                            Item #{displayNumber} - {getStatusText(item.status)}
-                          </span>
-                          {item.can_delete && (
-                            <button
-                              onClick={() => removeOrderItem(index)}
-                              className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Receta</label>
-                          <select
-                            value={item.recipe}
-                            onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-                            disabled={!item.can_edit}
-                          >
-                            <option value="">Seleccionar...</option>
-                            {getFilteredRecipes(!!item.recipe && item.recipe !== '').map(recipe => (
-                              <option key={recipe.id} value={recipe.id}>
-                                {recipe.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Cantidad</label>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const value = filterNumericInput(e.target.value);
-                                const numValue = parseInt(value) || 1;
-                                updateOrderItem(index, 'quantity', numValue);
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-center"
-                              disabled={!item.can_edit}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Precio Unit.</label>
-                            <div className="text-sm font-semibold text-gray-900">{formatCurrency(item.unit_price)}</div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-4">
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={item.is_takeaway}
-                              onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
-                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                              disabled={!item.can_edit}
-                            />
-                            <span className="ml-2 text-xs text-gray-700">Para llevar</span>
-                          </label>
-                          
-                          {item.is_takeaway && (
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={item.has_taper}
-                                onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
-                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                disabled={!item.can_edit || !defaultContainer}
-                              />
-                              <span className="ml-2 text-xs text-gray-700">
-                                Con envase {defaultContainer ? `(+S/ ${defaultContainer.price})` : '(Sin stock)'}
-                              </span>
-                            </label>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Notas</label>
-                          <input
-                            type="text"
-                            value={item.notes}
-                            onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
-                            placeholder="Ej: Sin cebolla"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            disabled={!item.can_edit}
-                          />
-                        </div>
+                return (
+                  <div key={item.tempKey || item.id || index} className={`p-4 rounded-lg border-2 ${ 
+                    !item.can_edit ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200'
+                  }`}>
+                    {/* Header del item */}
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Item #{displayNumber} - {getStatusText(item.status)}
+                      </h3>
+                      {item.can_delete && (
+                        <button
+                          onClick={() => removeOrderItem(index)}
+                          className="text-red-600 hover:text-red-800 p-2 hover:bg-red-50 rounded-lg"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Contenido del item */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Receta */}
+                      <div className="lg:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Receta</label>
+                        <select
+                          value={item.recipe}
+                          onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          disabled={!item.can_edit}
+                        >
+                          <option value="">Seleccionar receta...</option>
+                          {getFilteredRecipes(!!item.recipe && item.recipe !== '').map(recipe => (
+                            <option key={recipe.id} value={recipe.id}>
+                              {recipe.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       
-                      <div className="hidden lg:grid grid-cols-11 gap-2 items-center">
-                        <div className="col-span-3">
-                          <div className="text-xs font-medium text-gray-900 mb-1">
-                            Item #{displayNumber} - {getStatusText(item.status)}
-                          </div>
-                          <select
-                            value={item.recipe}
-                            onChange={(e) => updateOrderItem(index, 'recipe', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-                            disabled={!item.can_edit}
-                          >
-                            <option value="">Seleccionar...</option>
-                            {getFilteredRecipes(!!item.recipe && item.recipe !== '').map(recipe => (
-                              <option key={recipe.id} value={recipe.id}>
-                                {recipe.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        
-                        <div className="col-span-1 text-center">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={item.quantity}
-                            onChange={(e) => {
-                              const value = filterNumericInput(e.target.value);
-                              const numValue = parseInt(value) || 1;
-                              updateOrderItem(index, 'quantity', numValue);
-                            }}
-                            className="w-full px-1 py-1 border border-gray-300 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            disabled={!item.can_edit}
-                          />
-                        </div>
-                        
-                        <div className="col-span-1 text-center text-xs font-semibold text-gray-900">
+                      {/* Cantidad */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={item.displayQuantity || item.quantity}
+                          onChange={(e) => handleQuantityChange(e, index)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          disabled={!item.can_edit}
+                          placeholder="1"
+                        />
+                      </div>
+                      
+                      {/* Precio */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Precio Unitario</label>
+                        <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-center font-semibold text-gray-900">
                           {formatCurrency(item.unit_price)}
-                        </div>
-                        
-                        <div className="col-span-2 text-center">
-                          <div className="flex justify-center items-center space-x-2">
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={item.is_takeaway}
-                                onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
-                                className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                disabled={!item.can_edit}
-                              />
-                              <span className="ml-1 text-xs text-gray-700">P.llevar</span>
-                            </label>
-                            
-                            {item.is_takeaway && (
-                              <label className="flex items-center">
-                                <input
-                                  type="checkbox"
-                                  checked={item.has_taper}
-                                  onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
-                                  className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                  disabled={!item.can_edit || !defaultContainer}
-                                />
-                                <span className="ml-1 text-xs text-gray-700">
-                                  Envase {defaultContainer ? `(+S/ ${defaultContainer.price})` : '(Sin stock)'}
-                                </span>
-                              </label>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="col-span-3">
-                          <input
-                            type="text"
-                            value={item.notes}
-                            onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
-                            placeholder="Ej: Sin cebolla"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            disabled={!item.can_edit}
-                          />
-                        </div>
-                        
-                        <div className="col-span-1 text-center">
-                          {item.can_delete && (
-                            <button
-                              onClick={() => removeOrderItem(index)}
-                              className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-              </>
-            )}
-          </div>
+                    
+                    {/* Opciones de envío */}
+                    <div className="mt-4 space-y-3">
+                      <div className="flex flex-wrap items-center gap-6">
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={item.is_takeaway}
+                            onChange={(e) => updateOrderItem(index, 'is_takeaway', e.target.checked)}
+                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            disabled={!item.can_edit}
+                          />
+                          <span className="ml-2 text-sm font-medium text-gray-700">Para llevar</span>
+                        </label>
+                        
+                        {item.is_takeaway && (
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={item.has_taper}
+                              onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              disabled={!item.can_edit || !defaultContainer}
+                            />
+                            <span className="ml-2 text-sm font-medium text-gray-700">
+                              Con envase {defaultContainer ? `(+${formatCurrency(defaultContainer.price)})` : '(Sin stock)'}
+                            </span>
+                          </label>
+                        )}
+                      </div>
+                      
+                      {/* Notas */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Notas especiales</label>
+                        <input
+                          type="text"
+                          value={item.notes}
+                          onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
+                          placeholder="Ej: Sin cebolla, extra picante..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          disabled={!item.can_edit}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

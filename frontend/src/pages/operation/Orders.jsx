@@ -236,6 +236,9 @@ const Orders = () => {
                   Mesa
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Mesero
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Items
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -255,7 +258,7 @@ const Orders = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
                     {`No hay pedidos ${getStatusText(filter).toLowerCase()}`}
                   </td>
                 </tr>
@@ -275,6 +278,11 @@ const Orders = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="text-sm font-medium text-gray-900">
                         {order.table_number || order.table}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="text-sm font-medium text-gray-900">
+                        {order.waiter_name || order.waiter || 'N/A'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -349,6 +357,7 @@ const Orders = () => {
                       <div>
                         <h3 className="text-lg font-bold text-gray-900">Pedido #{order.id}</h3>
                         <p className="text-sm text-gray-600">{order.zone_name} - Mesa {order.table_number || order.table}</p>
+                        <p className="text-sm text-gray-500">Mesero: {order.waiter_name || order.waiter || 'N/A'}</p>
                       </div>
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
                         {getStatusText(order.status)}
