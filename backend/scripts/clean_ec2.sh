@@ -55,6 +55,18 @@ def clean_orders():
         payment_items = cursor.fetchone()[0]
         cursor.execute('SELECT COUNT(*) FROM order_item_ingredient')
         ingredients = cursor.fetchone()[0]
+        
+        # Verificar si existe la tabla container_sale
+        cursor.execute(\"\"\"
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='operation_containersale'
+        \"\"\")
+        has_container_sales = cursor.fetchone() is not None
+        
+        container_sales = 0
+        if has_container_sales:
+            cursor.execute('SELECT COUNT(*) FROM operation_containersale')
+            container_sales = cursor.fetchone()[0]
     
     print(f'📊 DATOS ACTUALES:')
     print(f'   Órdenes: {orders}')
@@ -62,9 +74,11 @@ def clean_orders():
     print(f'   Pagos: {payments}')
     print(f'   Items de pago: {payment_items}')
     print(f'   Ingredientes: {ingredients}')
+    if has_container_sales:
+        print(f'   Ventas de envases: {container_sales}')
     print()
     
-    if orders == 0 and items == 0 and payments == 0:
+    if orders == 0 and items == 0 and payments == 0 and container_sales == 0:
         print('✅ Base de datos ya está limpia')
         return
     
@@ -73,6 +87,9 @@ def clean_orders():
     try:
         with transaction.atomic():
             with connection.cursor() as cursor:
+                # Deshabilitar claves foráneas temporalmente para SQLite
+                cursor.execute('PRAGMA foreign_keys = OFF')
+                
                 # Eliminar en orden correcto
                 cursor.execute('DELETE FROM payment_item')
                 d1 = cursor.rowcount
@@ -84,7 +101,14 @@ def clean_orders():
                 
                 cursor.execute('DELETE FROM order_item_ingredient')
                 d3 = cursor.rowcount
-                print(f'   ✓ Ingredientes: {d3}')
+                print(f'   ✓ Ingredientes de items: {d3}')
+                
+                # Eliminar ventas de envases si existe la tabla
+                d6 = 0
+                if has_container_sales:
+                    cursor.execute('DELETE FROM operation_containersale')
+                    d6 = cursor.rowcount
+                    print(f'   ✓ Ventas de envases: {d6}')
                 
                 cursor.execute('DELETE FROM order_item')
                 d4 = cursor.rowcount
@@ -94,9 +118,17 @@ def clean_orders():
                 d5 = cursor.rowcount
                 print(f'   ✓ Órdenes: {d5}')
                 
+                # Resetear contadores de autoincremento
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name IN (\"order\", \"order_item\", \"payment\", \"payment_item\", \"order_item_ingredient\", \"operation_containersale\")')
+                print(f'   ✓ Contadores reseteados')
+                
+                # Rehabilitar claves foráneas
+                cursor.execute('PRAGMA foreign_keys = ON')
+                
         print()
         print('✅ LIMPIEZA COMPLETADA EXITOSAMENTE')
-        print(f'   Total eliminado: {d1 + d2 + d3 + d4 + d5} registros')
+        print(f'   Total eliminado: {d1 + d2 + d3 + d4 + d5 + d6} registros')
+        print('   🔄 Contadores de ID reseteados a 1')
         
     except Exception as e:
         print(f'❌ ERROR: {str(e)}')
