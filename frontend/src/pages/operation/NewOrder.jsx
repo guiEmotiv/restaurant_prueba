@@ -9,7 +9,7 @@ const NewOrder = () => {
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const params = useParams();
-  const orderId = params.id; // Para edición
+  const orderId = params.id;
   
   const [formData, setFormData] = useState({
     table: '',
@@ -37,7 +37,6 @@ const NewOrder = () => {
     if (orderId) {
       loadExistingOrder();
     } else {
-      // Agregar un item inicial para nuevo pedido
       addOrderItem();
     }
   }, [orderId]);
@@ -67,7 +66,7 @@ const NewOrder = () => {
         has_taper: item.has_taper || false,
         selected_container: item.selected_container || null,
         can_delete: item.status === 'CREATED',
-        can_edit: orderDetails.status === 'CREATED' ? true : false, // Si el pedido está SERVED, no se pueden editar items existentes
+        can_edit: orderDetails.status === 'CREATED' ? true : false,
         tempKey: item.tempKey || (Date.now() + Math.random())
       })));
     } catch (error) {
@@ -131,7 +130,6 @@ const NewOrder = () => {
 
   const addOrderItem = () => {
     setOrderItems(prev => {
-      // Si hay items existentes y el pedido está SERVED, marcarlos como no editables
       const updatedPrev = prev.map(item => ({
         ...item,
         can_edit: existingOrder?.status === 'SERVED' ? false : item.can_edit
@@ -271,7 +269,6 @@ const NewOrder = () => {
       });
       
       if (orderId) {
-        // Edición de pedido existente
         const orderData = {
           table: parseInt(formData.table),
           waiter: parseInt(formData.waiter),
@@ -280,18 +277,15 @@ const NewOrder = () => {
         
         await apiService.orders.update(orderId, orderData);
         
-        // Eliminar items removidos
         if (deletedItemIds.length > 0) {
           for (const itemId of deletedItemIds) {
             await apiService.orderItems.delete(itemId);
           }
         }
         
-        // Crear nuevos items
         const newItems = orderItems.filter(item => !item.id && item.recipe);
         
         if (newItems.length > 0) {
-          // Si el pedido estaba SERVED y agregamos nuevos items, cambiar estado a CREATED
           if (existingOrder?.status === 'SERVED') {
             await apiService.orders.updateStatus(orderId, 'CREATED');
           }
@@ -312,7 +306,6 @@ const NewOrder = () => {
         
         showSuccess('Pedido actualizado exitosamente');
       } else {
-        // Creación de nuevo pedido
         const processedItems = validItems.map(item => ({
           recipe: parseInt(item.recipe),
           notes: (item.notes || '').toString().trim(),
@@ -354,9 +347,18 @@ const NewOrder = () => {
     }).format(amount || 0);
   };
 
+  const filterNumericInput = (value) => {
+    let result = '';
+    for (let char of value) {
+      if (char >= '0' && char <= '9') {
+        result += char;
+      }
+    }
+    return result;
+  };
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Header con botones */}
       <div className="flex items-center justify-end gap-2 p-4 border-b border-gray-200">
         <Button
           onClick={handleSave}
@@ -384,10 +386,8 @@ const NewOrder = () => {
         </Button>
       </div>
 
-      {/* Contenido principal */}
       <div className="p-4">
         <div className="space-y-3">
-          {/* Campo de mesero */}
           <div>
             <select
               name="waiter"
@@ -410,7 +410,6 @@ const NewOrder = () => {
             )}
           </div>
 
-          {/* Filtros de mesa y zona */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div>
               <select
@@ -466,7 +465,6 @@ const NewOrder = () => {
             )}
           </div>
 
-          {/* Filtro de grupos y botón agregar */}
           <div className="flex items-center gap-2">
             <select
               value={selectedGroupFilter}
@@ -494,7 +492,6 @@ const NewOrder = () => {
             <p className="text-sm text-red-600">{errors.items}</p>
           )}
 
-          {/* Items del pedido */}
           <div className="space-y-2">
             {orderItems.length === 0 ? (
               <div className="text-center py-4 text-gray-500 border-2 border-dashed border-gray-300 rounded">
@@ -503,7 +500,6 @@ const NewOrder = () => {
               </div>
             ) : (
               <>
-                {/* Header de tabla - Solo en desktop */}
                 <div className="hidden lg:grid grid-cols-11 gap-2 px-2 py-1 bg-gray-100 rounded text-xs font-medium text-gray-700">
                   <div className="col-span-3">Item</div>
                   <div className="col-span-1 text-center">Cant.</div>
@@ -520,25 +516,24 @@ const NewOrder = () => {
                   };
                   
                   return (
-                  <div key={item.tempKey || item.id || index} className={`border border-gray-200 rounded p-2 ${ 
-                    !item.can_edit ? 'bg-gray-100' : 'bg-white'
-                  }`}>
-                    {/* Layout móvil - Formato de card */}
-                    <div className="lg:hidden space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-sm text-gray-900">
-                          Item #{displayNumber} - {getStatusText(item.status)}
-                        </span>
-                        {item.can_delete && (
-                          <button
-                            onClick={() => removeOrderItem(index)}
-                            className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
+                    <div key={item.tempKey || item.id || index} className={`border border-gray-200 rounded p-2 ${ 
+                      !item.can_edit ? 'bg-gray-100' : 'bg-white'
+                    }`}>
+                      <div className="lg:hidden space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-sm text-gray-900">
+                            Item #{displayNumber} - {getStatusText(item.status)}
+                          </span>
+                          {item.can_delete && (
+                            <button
+                              onClick={() => removeOrderItem(index)}
+                              className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                         
                         <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">Receta</label>
@@ -563,15 +558,9 @@ const NewOrder = () => {
                             <input
                               type="text"
                               inputMode="numeric"
-                              pattern="[0-9]*"
                               value={item.quantity}
                               onChange={(e) => {
-                                let value = '';
-                                for (let char of e.target.value) {
-                                  if (char >= '0' && char <= '9') {
-                                    value += char;
-                                  }
-                                }
+                                const value = filterNumericInput(e.target.value);
                                 const numValue = parseInt(value) || 1;
                                 updateOrderItem(index, 'quantity', numValue);
                               }}
@@ -626,7 +615,6 @@ const NewOrder = () => {
                         </div>
                       </div>
                       
-                      {/* Layout desktop - Grid */}
                       <div className="hidden lg:grid grid-cols-11 gap-2 items-center">
                         <div className="col-span-3">
                           <div className="text-xs font-medium text-gray-900 mb-1">
@@ -651,15 +639,9 @@ const NewOrder = () => {
                           <input
                             type="text"
                             inputMode="numeric"
-                            pattern="[0-9]*"
                             value={item.quantity}
                             onChange={(e) => {
-                              let value = '';
-                              for (let char of e.target.value) {
-                                if (char >= '0' && char <= '9') {
-                                  value += char;
-                                }
-                              }
+                              const value = filterNumericInput(e.target.value);
                               const numValue = parseInt(value) || 1;
                               updateOrderItem(index, 'quantity', numValue);
                             }}
@@ -727,10 +709,9 @@ const NewOrder = () => {
                       </div>
                     </div>
                   );
-                  })}
-                </>
-              )}
-            </div>
+                })}
+              </>
+            )}
           </div>
         </div>
       </div>
