@@ -53,9 +53,9 @@ const Layout = ({ children }) => {
         { name: 'Recetas', href: '/recipes', icon: ChefHat, permission: 'canManageInventory' },
       ]
     },
+    { name: 'Estado Mesas', href: '/table-status', icon: Table, permission: 'canViewTableStatus' },
     { name: 'Pedidos', href: '/orders', icon: ShoppingCart, permission: 'canManageOrders' },
     { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
-    { name: 'Estado Mesas', href: '/table-status', icon: Table, permission: 'canViewTableStatus' },
     { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
   ];
 

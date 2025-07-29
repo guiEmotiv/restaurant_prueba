@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Table, Users, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Table, Users, Clock, CheckCircle, AlertCircle, Plus, ShoppingCart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
 const TableStatus = () => {
   const { showError } = useToast();
+  const navigate = useNavigate();
   const [tables, setTables] = useState([]);
   const [zones, setZones] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -70,6 +72,23 @@ const TableStatus = () => {
     return zone ? zone.name : 'Sin zona';
   };
 
+  const handleTableClick = (table) => {
+    const tableStatus = getTableStatus(table);
+    
+    if (tableStatus.status === 'occupied') {
+      // Si la mesa está ocupada, ir a ver los pedidos de esa mesa
+      navigate('/orders', { 
+        state: { 
+          filterTable: table.id,
+          filterZone: table.zone 
+        }
+      });
+    } else {
+      // Si la mesa está disponible, ir a crear nuevo pedido tipo e-commerce
+      navigate(`/table/${table.id}/order-ecommerce`);
+    }
+  };
+
   const filteredTables = selectedZone 
     ? tables.filter(table => table.zone === parseInt(selectedZone))
     : tables;
@@ -99,104 +118,119 @@ const TableStatus = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Estado de Mesas</h1>
-          <p className="text-gray-600">Disponibilidad en tiempo real de las mesas</p>
-        </div>
-        
-        {/* Filtro por zona */}
-        <div className="flex items-center gap-4">
-          <select
-            value={selectedZone}
-            onChange={(e) => setSelectedZone(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="">Todas las zonas</option>
-            {zones.map(zone => (
-              <option key={zone.id} value={zone.id}>
-                {zone.name}
-              </option>
-            ))}
-          </select>
+    <div className="space-y-4">
+      {/* Header compacto */}
+      <div className="bg-white rounded-lg shadow-sm p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Table className="h-5 w-5" />
+              Estado de Mesas
+            </h1>
+            <p className="text-sm text-gray-600">Selecciona una mesa para crear pedido o ver pedidos activos</p>
+          </div>
+          
+          {/* Filtro por zona */}
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedZone}
+              onChange={(e) => setSelectedZone(e.target.value)}
+              className="text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">Todas las zonas</option>
+              {zones.map(zone => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.name}
+                </option>
+              ))}
+            </select>
+            
+            {/* Leyenda compacta */}
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-gray-600">Disponible</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <span className="text-gray-600">Ocupada</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Leyenda */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-3">Leyenda</h3>
-        <div className="flex flex-wrap gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-            <span className="text-sm text-gray-700">Disponible</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-            <span className="text-sm text-gray-700">Ocupada (con pedidos activos)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Mesas agrupadas por zona */}
+      {/* Mesas agrupadas por zona - Diseño más compacto */}
       {Object.keys(groupedTables).length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
           <Table className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No hay mesas</h3>
           <p className="text-gray-600">No se encontraron mesas para mostrar</p>
         </div>
       ) : (
-        Object.entries(groupedTables).map(([zoneName, zoneTables]) => (
-          <div key={zoneName} className="space-y-4">
-            <h2 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
-              {zoneName}
-            </h2>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              {zoneTables.map((table) => {
-                const tableStatus = getTableStatus(table);
-                const StatusIcon = tableStatus.icon;
-                
-                return (
-                  <div
-                    key={table.id}
-                    className={`relative p-4 rounded-lg border-2 ${tableStatus.borderColor} ${tableStatus.color} transition-all duration-200 hover:shadow-lg`}
-                  >
-                    <div className="flex flex-col items-center text-center">
-                      <div className="flex items-center justify-center w-12 h-12 mb-2">
-                        <StatusIcon className={`h-8 w-8 ${tableStatus.textColor}`} />
-                      </div>
-                      
-                      <div className={`text-lg font-bold ${tableStatus.textColor} mb-1`}>
-                        {table.table_number}
-                      </div>
-                      
-                      <div className={`text-sm ${tableStatus.textColor} opacity-90 mb-2`}>
-                        {tableStatus.label}
-                      </div>
-                      
-                      {table.capacity && (
-                        <div className={`flex items-center gap-1 text-xs ${tableStatus.textColor} opacity-75`}>
-                          <Users className="h-3 w-3" />
-                          <span>{table.capacity} personas</span>
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          {Object.entries(groupedTables).map(([zoneName, zoneTables]) => (
+            <div key={zoneName} className="mb-6 last:mb-0">
+              <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                {zoneName}
+              </h2>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                {zoneTables.map((table) => {
+                  const tableStatus = getTableStatus(table);
+                  const StatusIcon = tableStatus.status === 'available' ? Plus : ShoppingCart;
+                  
+                  return (
+                    <button
+                      key={table.id}
+                      onClick={() => handleTableClick(table)}
+                      className={`group relative p-3 rounded-lg border-2 transition-all duration-200 hover:shadow-md hover:scale-105 ${
+                        tableStatus.status === 'available' 
+                          ? 'border-green-300 bg-green-50 hover:bg-green-100 hover:border-green-400' 
+                          : 'border-red-300 bg-red-50 hover:bg-red-100 hover:border-red-400'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center text-center">
+                        <div className={`flex items-center justify-center w-8 h-8 mb-1 rounded-full ${
+                          tableStatus.status === 'available' 
+                            ? 'bg-green-500 group-hover:bg-green-600' 
+                            : 'bg-red-500 group-hover:bg-red-600'
+                        }`}>
+                          <StatusIcon className="h-4 w-4 text-white" />
                         </div>
-                      )}
-                      
-                      {tableStatus.orders.length > 0 && (
-                        <div className={`mt-2 text-xs ${tableStatus.textColor} opacity-90`}>
-                          <div className="flex items-center gap-1 justify-center">
-                            <Clock className="h-3 w-3" />
-                            <span>{tableStatus.orders.length} pedido{tableStatus.orders.length > 1 ? 's' : ''}</span>
+                        
+                        <div className="text-sm font-bold text-gray-900 mb-1">
+                          Mesa {table.table_number}
+                        </div>
+                        
+                        {table.capacity && (
+                          <div className="flex items-center gap-1 text-xs text-gray-600">
+                            <Users className="h-3 w-3" />
+                            <span>{table.capacity}</span>
                           </div>
+                        )}
+                        
+                        {tableStatus.orders.length > 0 && (
+                          <div className="absolute -top-1 -right-1">
+                            <div className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                              {tableStatus.orders.length}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Hover text */}
+                        <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                          {tableStatus.status === 'available' ? 'Crear pedido' : `Ver ${tableStatus.orders.length} pedido(s)`}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
     </div>
   );

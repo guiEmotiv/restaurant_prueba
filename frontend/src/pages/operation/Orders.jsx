@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Edit, CreditCard, Trash2 } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 
 const Orders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showSuccess, showError } = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,6 +15,24 @@ const Orders = () => {
   useEffect(() => {
     loadOrders();
   }, []);
+
+  // Filtros desde TableStatus
+  const initialFilters = location.state || {};
+  const [filteredOrders, setFilteredOrders] = useState([]);
+
+  useEffect(() => {
+    let filtered = orders;
+    
+    if (initialFilters.filterTable) {
+      filtered = filtered.filter(order => order.table === initialFilters.filterTable);
+    }
+    
+    if (initialFilters.filterZone) {
+      filtered = filtered.filter(order => order.zone === initialFilters.filterZone || order.table?.zone === initialFilters.filterZone);
+    }
+    
+    setFilteredOrders(filtered);
+  }, [orders, location.state]);
 
   // Recargar órdenes cuando regresemos a esta vista
   useEffect(() => {
@@ -164,8 +183,8 @@ const Orders = () => {
     return statusTexts[status] || status;
   };
 
-  // Solo mostramos órdenes CREATED
-  const filteredOrders = orders;
+  // Usar las órdenes filtradas si existen filtros, sino mostrar todas
+  const ordersToShow = initialFilters.filterTable || initialFilters.filterZone ? filteredOrders : orders;
 
   if (loading) {
     return (
@@ -235,14 +254,14 @@ const Orders = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredOrders.length === 0 ? (
+              {ordersToShow.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
                     No hay pedidos activos
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order) => (
+                ordersToShow.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="text-sm font-medium text-gray-900">
@@ -323,7 +342,7 @@ const Orders = () => {
 
         {/* Mobile Cards */}
         <div className="md:hidden">
-          {filteredOrders.length === 0 ? (
+          {ordersToShow.length === 0 ? (
             <div className="p-6 text-center text-gray-500">
               <div className="text-4xl mb-2">🍽️</div>
               <p className="text-lg font-medium">No hay pedidos activos</p>
@@ -331,7 +350,7 @@ const Orders = () => {
             </div>
           ) : (
             <div className="space-y-3 p-4">
-              {filteredOrders.map((order) => (
+              {ordersToShow.map((order) => (
                 <div key={order.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="space-y-3">
                     {/* Order header */}
