@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('operation', '0007_add_operational_date'),
+        ('operation', '0008_payment_payer_name_payment_split_group_and_more'),
     ]
 
     operations = [
