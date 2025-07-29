@@ -6,14 +6,12 @@ import { useToast } from '../../contexts/ToastContext';
 const Kitchen = () => {
   const [kitchenBoard, setKitchenBoard] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [groups, setGroups] = useState([]);
   const [selectedGroupTab, setSelectedGroupTab] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all'); // all, normal, warning, overdue
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     loadKitchenBoard();
-    loadGroups();
     
     // Auto-refresh en tiempo real cada 5 segundos
     const interval = setInterval(loadKitchenBoard, 5000);
@@ -32,14 +30,6 @@ const Kitchen = () => {
     }
   };
 
-  const loadGroups = async () => {
-    try {
-      const data = await apiService.groups.getAll();
-      setGroups(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Error loading groups:', error);
-    }
-  };
 
   const updateItemStatus = async (itemId, newStatus) => {
     try {
@@ -102,47 +92,38 @@ const Kitchen = () => {
       return timeStatus.status === timeFilter;
     });
 
-    // Agrupar por grupos
+    // Crear grupos dinámicamente basado en los items que realmente existen
+    const dynamicGroups = {};
+    
+    // Agrupar items por grupo y crear columnas dinámicamente
+    timeFilteredItems.forEach(item => {
+      const groupKey = item.recipe_group_id || 'sin-grupo';
+      const groupName = item.recipe_group_name || 'Sin Grupo';
+      
+      if (!dynamicGroups[groupKey]) {
+        dynamicGroups[groupKey] = {
+          id: groupKey,
+          name: groupName,
+          items: []
+        };
+      }
+      
+      dynamicGroups[groupKey].items.push(item);
+    });
+
+    // Filtrar por pestaña seleccionada
     const columns = {};
     
-    // Si está seleccionado "all", mostrar todas las columnas de grupos
     if (selectedGroupTab === 'all') {
-      // Primero agregar columnas para todos los grupos existentes
-      groups.forEach(group => {
-        columns[group.id] = {
-          ...group,
-          items: timeFilteredItems.filter(item => item.recipe_group_id === group.id)
-        };
-      });
-      
-      // Agregar columna para items sin grupo
-      const itemsWithoutGroup = timeFilteredItems.filter(item => !item.recipe_group_id);
-      if (itemsWithoutGroup.length > 0 || groups.length === 0) {
-        columns['sin-grupo'] = {
-          id: 'sin-grupo',
-          name: 'Sin Grupo',
-          items: itemsWithoutGroup
-        };
-      }
-    } else if (selectedGroupTab === 'sin-grupo') {
-      // Mostrar solo items sin grupo
-      columns['sin-grupo'] = {
-        id: 'sin-grupo',
-        name: 'Sin Grupo',
-        items: timeFilteredItems.filter(item => !item.recipe_group_id)
-      };
+      // Mostrar todos los grupos dinámicos
+      return dynamicGroups;
     } else {
-      // Solo mostrar la columna del grupo seleccionado
-      const selectedGroup = groups.find(g => g.id === selectedGroupTab);
-      if (selectedGroup) {
-        columns[selectedGroup.id] = {
-          ...selectedGroup,
-          items: timeFilteredItems.filter(item => item.recipe_group_id === selectedGroup.id)
-        };
+      // Solo mostrar el grupo seleccionado si existe
+      if (dynamicGroups[selectedGroupTab]) {
+        columns[selectedGroupTab] = dynamicGroups[selectedGroupTab];
       }
+      return columns;
     }
-
-    return columns;
   };
 
   const kanbanColumns = getKanbanColumns();
@@ -150,6 +131,37 @@ const Kitchen = () => {
   const overdueItems = Object.values(kanbanColumns).reduce((sum, col) => 
     sum + col.items.filter(item => getTimeStatus(item.elapsed_time_minutes, item.preparation_time).status === 'overdue').length, 0
   );
+  
+  // Obtener grupos dinámicos para las pestañas (siempre todos los grupos que tienen items)
+  const getDynamicGroupsForTabs = () => {
+    const allItems = kitchenBoard.flatMap(recipe => 
+      recipe.items.map(item => ({
+        ...item,
+        recipe_group_name: recipe.recipe_group_name || 'Sin Grupo',
+        recipe_group_id: recipe.recipe_group_id || null
+      }))
+    );
+    
+    const dynamicGroups = {};
+    allItems.forEach(item => {
+      const groupKey = item.recipe_group_id || 'sin-grupo';
+      const groupName = item.recipe_group_name || 'Sin Grupo';
+      
+      if (!dynamicGroups[groupKey]) {
+        dynamicGroups[groupKey] = {
+          id: groupKey,
+          name: groupName,
+          items: []
+        };
+      }
+      
+      dynamicGroups[groupKey].items.push(item);
+    });
+    
+    return Object.values(dynamicGroups);
+  };
+  
+  const dynamicGroupsForTabs = getDynamicGroupsForTabs();
 
   if (loading) {
     return (
@@ -226,8 +238,9 @@ const Kitchen = () => {
               >
                 Todos ({totalItems})
               </button>
-              {groups.map(group => {
-                const groupItems = kanbanColumns[group.id]?.items.length || 0;
+              {dynamicGroupsForTabs.map(group => {
+                // Calcular items del grupo para la pestaña (todos los items, no filtrados por tiempo)
+                const groupItems = group.items.length;
                 return (
                   <button
                     key={group.id}
@@ -242,19 +255,6 @@ const Kitchen = () => {
                   </button>
                 );
               })}
-              {/* Pestaña para items sin grupo */}
-              {(kanbanColumns['sin-grupo']?.items.length > 0 || groups.length === 0) && (
-                <button
-                  onClick={() => setSelectedGroupTab('sin-grupo')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    selectedGroupTab === 'sin-grupo'
-                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                >
-                  Sin Grupo ({kanbanColumns['sin-grupo']?.items.length || 0})
-                </button>
-              )}
             </div>
           </div>
         )}
