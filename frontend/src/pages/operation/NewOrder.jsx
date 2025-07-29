@@ -566,7 +566,12 @@ const NewOrder = () => {
                               pattern="[0-9]*"
                               value={item.quantity}
                               onChange={(e) => {
-                                const value = e.target.value.replace(/[^0-9]/g, '');
+                                let value = '';
+                                for (let char of e.target.value) {
+                                  if (char >= '0' && char <= '9') {
+                                    value += char;
+                                  }
+                                }
                                 const numValue = parseInt(value) || 1;
                                 updateOrderItem(index, 'quantity', numValue);
                               }}
@@ -649,7 +654,12 @@ const NewOrder = () => {
                             pattern="[0-9]*"
                             value={item.quantity}
                             onChange={(e) => {
-                              const value = e.target.value.replace(/[^0-9]/g, '');
+                              let value = '';
+                              for (let char of e.target.value) {
+                                if (char >= '0' && char <= '9') {
+                                  value += char;
+                                }
+                              }
                               const numValue = parseInt(value) || 1;
                               updateOrderItem(index, 'quantity', numValue);
                             }}
