@@ -128,6 +128,18 @@ class OrderSerializer(serializers.ModelSerializer):
         return obj.get_grand_total()
 
 
+class ContainerSaleSerializer(serializers.ModelSerializer):
+    container_name = serializers.CharField(source='container.name', read_only=True)
+    
+    class Meta:
+        model = ContainerSale
+        fields = [
+            'id', 'order', 'container', 'container_name', 'quantity', 
+            'unit_price', 'total_price', 'created_at', 'operational_date'
+        ]
+        read_only_fields = ['id', 'unit_price', 'total_price', 'created_at', 'operational_date']
+
+
 class OrderDetailSerializer(OrderSerializer):
     table_detail = TableSerializer(source='table', read_only=True)
     items = OrderItemSerializer(source='orderitem_set', many=True, read_only=True)
@@ -402,15 +414,3 @@ class SplitPaymentSerializer(serializers.Serializer):
             payments.append(payment)
         
         return payments
-
-
-class ContainerSaleSerializer(serializers.ModelSerializer):
-    container_name = serializers.CharField(source='container.name', read_only=True)
-    
-    class Meta:
-        model = ContainerSale
-        fields = [
-            'id', 'order', 'container', 'container_name', 'quantity', 
-            'unit_price', 'total_price', 'created_at', 'operational_date'
-        ]
-        read_only_fields = ['id', 'unit_price', 'total_price', 'created_at', 'operational_date']
