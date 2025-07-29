@@ -120,6 +120,7 @@ class RestaurantOperationalConfigViewSet(viewsets.ModelViewSet):
 
 class WaiterViewSet(viewsets.ModelViewSet):
     serializer_class = WaiterSerializer
+    pagination_class = None  # Disable pagination
     
     def get_queryset(self):
         queryset = Waiter.objects.all().order_by('name')
@@ -133,6 +134,7 @@ class WaiterViewSet(viewsets.ModelViewSet):
 
 class ContainerViewSet(viewsets.ModelViewSet):
     serializer_class = ContainerSerializer
+    pagination_class = None  # Disable pagination
     
     def get_queryset(self):
         queryset = Container.objects.all().order_by('name')

@@ -1,59 +1,35 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus } from 'lucide-react';
-import CrudTable from '../../components/common/CrudTable';
-import Modal from '../../components/common/Modal';
+import { Plus, Edit, Trash2, Users } from 'lucide-react';
 import Button from '../../components/common/Button';
+import Modal from '../../components/common/Modal';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
 const Waiters = () => {
   const { showSuccess, showError } = useToast();
   const [waiters, setWaiters] = useState([]);
-  const [filteredWaiters, setFilteredWaiters] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showWaiterModal, setShowWaiterModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [selectedWaiter, setSelectedWaiter] = useState(null);
   const [formData, setFormData] = useState({
     name: ''
   });
 
-  const columns = [
-    { key: 'id', title: 'ID' },
-    { 
-      key: 'name', 
-      title: 'Nombre',
-      render: (value, item) => (
-        <div className="flex items-center">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-            <Users className="h-4 w-4 text-blue-600" />
-          </div>
-          <div>
-            <div className="text-sm font-medium text-gray-900">{value}</div>
-            <div className="text-sm text-gray-500">ID: {item.id}</div>
-          </div>
-        </div>
-      )
-    }
-  ];
-
   useEffect(() => {
     loadWaiters();
   }, []);
 
-  useEffect(() => {
-    // Actualizar waiters filtrados cuando cambian los waiters
-    setFilteredWaiters(Array.isArray(waiters) ? waiters : []);
-  }, [waiters]);
-
   const loadWaiters = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Loading waiters...');
       const data = await apiService.waiters.getAll();
-      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
-      setWaiters(sortedData);
+      console.log('✅ Waiters loaded:', data);
+      setWaiters(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading waiters:', error);
+      console.error('❌ Error loading waiters:', error);
       showError('Error al cargar los meseros');
+      setWaiters([]); // Ensure it's always an array
     } finally {
       setLoading(false);
     }
@@ -62,21 +38,17 @@ const Waiters = () => {
   const handleAdd = () => {
     setSelectedWaiter(null);
     setFormData({ name: '' });
-    setShowWaiterModal(true);
+    setShowModal(true);
   };
 
   const handleEdit = (waiter) => {
     setSelectedWaiter(waiter);
     setFormData({ name: waiter.name });
-    setShowWaiterModal(true);
+    setShowModal(true);
   };
 
-  const handleCloseWaiterModal = () => {
-    setShowWaiterModal(false);
-    setSelectedWaiter(null);
-  };
-
-  const handleModalSave = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     try {
       if (selectedWaiter) {
         await apiService.waiters.update(selectedWaiter.id, formData);
@@ -85,7 +57,7 @@ const Waiters = () => {
         await apiService.waiters.create(formData);
         showSuccess('Mesero creado exitosamente');
       }
-      setShowWaiterModal(false);
+      setShowModal(false);
       await loadWaiters();
     } catch (error) {
       console.error('Error saving waiter:', error);
@@ -93,19 +65,15 @@ const Waiters = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este mesero?')) {
+  const handleDelete = async (waiter) => {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar a ${waiter.name}?`)) {
       try {
-        await apiService.waiters.delete(id);
+        await apiService.waiters.delete(waiter.id);
         await loadWaiters();
         showSuccess('Mesero eliminado exitosamente');
       } catch (error) {
         console.error('Error deleting waiter:', error);
-        if (error.response?.status === 400) {
-          showError('No se puede eliminar este mesero porque está siendo usado en pedidos');
-        } else {
-          showError('Error al eliminar el mesero');
-        }
+        showError('Error al eliminar el mesero');
       }
     }
   };
@@ -148,25 +116,76 @@ const Waiters = () => {
         </Button>
       </div>
 
-      <CrudTable
-        title="Meseros"
-        data={filteredWaiters}
-        columns={columns}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        loading={loading}
-        hideAddButton={true}
-        hideTitle={true}
-        useCustomModals={true}
-      />
+      <div className="bg-white rounded-lg shadow">
+        <div className="overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Nombre
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {waiters.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-6 py-4 text-center text-gray-500">
+                    No hay meseros registrados
+                  </td>
+                </tr>
+              ) : (
+                waiters.map((waiter) => (
+                  <tr key={waiter.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {waiter.id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                          <Users className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">{waiter.name}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() => handleEdit(waiter)}
+                          className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50"
+                          title="Editar"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(waiter)}
+                          className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      {/* Waiter Modal */}
+      {/* Modal */}
       <Modal
-        isOpen={showWaiterModal}
-        onClose={handleCloseWaiterModal}
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
         title={selectedWaiter ? 'Editar Mesero' : 'Nuevo Mesero'}
       >
-        <form onSubmit={(e) => { e.preventDefault(); handleModalSave(); }} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Nombre *
@@ -185,7 +204,7 @@ const Waiters = () => {
             <Button
               type="button"
               variant="secondary"
-              onClick={handleCloseWaiterModal}
+              onClick={() => setShowModal(false)}
             >
               Cancelar
             </Button>

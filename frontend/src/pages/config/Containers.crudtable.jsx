@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Package, DollarSign } from 'lucide-react';
-import Button from '../../components/common/Button';
+import { Package, DollarSign, Plus } from 'lucide-react';
+import CrudTable from '../../components/common/CrudTable';
 import Modal from '../../components/common/Modal';
+import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
 const Containers = () => {
   const { showSuccess, showError } = useToast();
   const [containers, setContainers] = useState([]);
+  const [filteredContainers, setFilteredContainers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [showContainerModal, setShowContainerModal] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -24,21 +26,64 @@ const Containers = () => {
     }).format(amount || 0);
   };
 
+  const columns = [
+    { key: 'id', title: 'ID' },
+    { 
+      key: 'name', 
+      title: 'Nombre',
+      render: (value, item) => (
+        <div className="flex items-center">
+          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+            <Package className="h-4 w-4 text-green-600" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-gray-900">{value}</div>
+            <div className="text-sm text-gray-500">ID: {item.id}</div>
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: 'price', 
+      title: 'Precio',
+      render: (value) => (
+        <div className="flex items-center font-semibold text-gray-900">
+          <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
+          {formatCurrency(value)}
+        </div>
+      )
+    },
+    { 
+      key: 'stock', 
+      title: 'Stock',
+      render: (value) => (
+        <span className={`font-semibold ${
+          (value || 0) <= 5 ? 'text-red-600' : 'text-gray-900'
+        }`}>
+          {value || 0}
+        </span>
+      )
+    }
+  ];
+
   useEffect(() => {
     loadContainers();
   }, []);
 
+  useEffect(() => {
+    // Actualizar containers filtrados cuando cambian los containers
+    setFilteredContainers(Array.isArray(containers) ? containers : []);
+  }, [containers]);
+
   const loadContainers = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Loading containers...');
       const data = await apiService.containers.getAll();
-      console.log('✅ Containers loaded:', data);
-      setContainers(Array.isArray(data) ? data : []);
+      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
+      setContainers(sortedData);
     } catch (error) {
-      console.error('❌ Error loading containers:', error);
+      console.error('Error loading containers:', error);
       showError('Error al cargar los envases');
-      setContainers([]); // Ensure it's always an array
     } finally {
       setLoading(false);
     }
@@ -47,7 +92,7 @@ const Containers = () => {
   const handleAdd = () => {
     setSelectedContainer(null);
     setFormData({ name: '', price: '', stock: '' });
-    setShowModal(true);
+    setShowContainerModal(true);
   };
 
   const handleEdit = (container) => {
@@ -57,11 +102,15 @@ const Containers = () => {
       price: container.price,
       stock: container.stock || ''
     });
-    setShowModal(true);
+    setShowContainerModal(true);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleCloseContainerModal = () => {
+    setShowContainerModal(false);
+    setSelectedContainer(null);
+  };
+
+  const handleModalSave = async () => {
     try {
       const submitData = {
         ...formData,
@@ -76,7 +125,7 @@ const Containers = () => {
         await apiService.containers.create(submitData);
         showSuccess('Envase creado exitosamente');
       }
-      setShowModal(false);
+      setShowContainerModal(false);
       await loadContainers();
     } catch (error) {
       console.error('Error saving container:', error);
@@ -84,15 +133,19 @@ const Containers = () => {
     }
   };
 
-  const handleDelete = async (container) => {
-    if (window.confirm(`¿Estás seguro de que deseas eliminar ${container.name}?`)) {
+  const handleDelete = async (id) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este envase?')) {
       try {
-        await apiService.containers.delete(container.id);
+        await apiService.containers.delete(id);
         await loadContainers();
         showSuccess('Envase eliminado exitosamente');
       } catch (error) {
         console.error('Error deleting container:', error);
-        showError('Error al eliminar el envase');
+        if (error.response?.status === 400) {
+          showError('No se puede eliminar este envase porque está siendo usado en pedidos');
+        } else {
+          showError('Error al eliminar el envase');
+        }
       }
     }
   };
@@ -135,95 +188,25 @@ const Containers = () => {
         </Button>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <div className="overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nombre
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Precio
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Stock
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {containers.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                    No hay envases registrados
-                  </td>
-                </tr>
-              ) : (
-                containers.map((container) => (
-                  <tr key={container.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {container.id}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                          <Package className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div className="text-sm font-medium text-gray-900">{container.name}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm font-semibold text-gray-900">
-                        <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
-                        {formatCurrency(container.price)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-semibold ${
-                        (container.stock || 0) <= 5 ? 'text-red-600' : 'text-gray-900'
-                      }`}>
-                        {container.stock || 0}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                      <div className="flex justify-center gap-2">
-                        <button
-                          onClick={() => handleEdit(container)}
-                          className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50"
-                          title="Editar"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(container)}
-                          className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <CrudTable
+        title="Envases"
+        data={filteredContainers}
+        columns={columns}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        loading={loading}
+        hideAddButton={true}
+        hideTitle={true}
+        useCustomModals={true}
+      />
 
-      {/* Modal */}
+      {/* Container Modal */}
       <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        isOpen={showContainerModal}
+        onClose={handleCloseContainerModal}
         title={selectedContainer ? 'Editar Envase' : 'Nuevo Envase'}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleModalSave(); }} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Nombre *
@@ -276,7 +259,7 @@ const Containers = () => {
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setShowModal(false)}
+              onClick={handleCloseContainerModal}
             >
               Cancelar
             </Button>

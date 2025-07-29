@@ -104,11 +104,15 @@ api.interceptors.response.use(
 
 // Helper function to handle paginated responses
 const handlePaginatedResponse = (response) => {
+  console.log('🔍 Raw API Response:', response.data);
   // Handle paginated response
   if (response.data && typeof response.data === 'object' && response.data.results) {
+    console.log('📋 Extracted results:', response.data.results);
     return response.data.results;
   }
-  return Array.isArray(response.data) ? response.data : [];
+  const fallback = Array.isArray(response.data) ? response.data : [];
+  console.log('📋 Using fallback:', fallback);
+  return fallback;
 };
 
 // API service functions
@@ -187,10 +191,13 @@ export const apiService = {
   },
 
   waiters: {
-    getAll: (params = {}) => {
+    getAll: async (params = {}) => {
       const queryParams = new URLSearchParams(params).toString();
       const url = queryParams ? `/waiters/?${queryParams}` : '/waiters/';
-      return api.get(url).then(handlePaginatedResponse);
+      const response = await api.get(url);
+      console.log('🔍 WAITERS Raw response:', response.data);
+      // Return data directly since pagination is disabled
+      return Array.isArray(response.data) ? response.data : [];
     },
     getById: (id) => apiService.getById('waiters', id),
     create: (data) => apiService.create('waiters', data),
@@ -379,7 +386,9 @@ export const apiService = {
       const queryParams = new URLSearchParams(params).toString();
       const url = queryParams ? `/containers/?${queryParams}` : '/containers/';
       const response = await api.get(url);
-      return handlePaginatedResponse(response);
+      console.log('🔍 CONTAINERS Raw response:', response.data);
+      // Return data directly since pagination is disabled
+      return Array.isArray(response.data) ? response.data : [];
     },
     getById: (id) => apiService.getById('containers', id),
     create: (data) => apiService.create('containers', data),
