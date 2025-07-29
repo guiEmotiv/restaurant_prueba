@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 from decimal import Decimal
-from config.models import Table, Waiter
+from config.models import Table, Waiter, Container
 from inventory.models import Recipe, Ingredient
 
 
@@ -50,9 +50,16 @@ class Order(models.Model):
         return RestaurantOperationalConfig.get_operational_date()
 
     def calculate_total(self):
-        """Calcula el total de la orden"""
+        """Calcula el total de la orden incluyendo items y envases"""
         if self.pk:
-            total = sum(item.total_price for item in self.orderitem_set.all())
+            # Total de items de comida
+            items_total = sum(item.total_price for item in self.orderitem_set.all())
+            
+            # Total de envases (separado)
+            containers_total = sum(container.total_price for container in self.container_sales.all())
+            
+            # Total general
+            total = items_total + containers_total
             self.total_amount = total
             super().save()  # Usar super() para evitar recursión
             return total
@@ -164,14 +171,8 @@ class OrderItem(models.Model):
                 item.total_price for item in self.orderitemingredient_set.all()
             )
         
-        # Agregar costo del taper si es para llevar y tiene taper
-        if self.is_takeaway and self.has_taper:
-            try:
-                # Buscar el ingrediente "taper" en la base de datos
-                taper_ingredient = Ingredient.objects.get(name__iexact='taper')
-                base_total += taper_ingredient.cost_per_unit * self.quantity
-            except Ingredient.DoesNotExist:
-                pass  # Si no existe el ingrediente taper, no agregar costo
+        # Nota: Los envases (taper) ahora se manejan por separado en ContainerSale
+        # Ya no se incluyen en el cálculo del precio del item
         
         self.total_price = base_total + customization_total
         
@@ -355,3 +356,51 @@ class PaymentItem(models.Model):
     
     def __str__(self):
         return f"{self.payment} - {self.order_item}"
+
+
+class ContainerSale(models.Model):
+    """Venta de envases asociada a un pedido (separada del costo de los alimentos)"""
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='container_sales', verbose_name="Pedido")
+    container = models.ForeignKey(Container, on_delete=models.PROTECT, verbose_name="Envase")
+    quantity = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)], verbose_name="Cantidad")
+    unit_price = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name="Precio unitario"
+    )
+    total_price = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name="Total"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    operational_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'container_sale'
+        verbose_name = 'Venta de Envase'
+        verbose_name_plural = 'Ventas de Envases'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Envase {self.container.name} x{self.quantity} - Pedido #{self.order.id}"
+
+    def save(self, *args, **kwargs):
+        # Establecer precio unitario del envase si no está definido
+        if not self.unit_price:
+            self.unit_price = self.container.price
+        
+        # Calcular precio total
+        self.total_price = self.unit_price * self.quantity
+        
+        # Heredar fecha operativa de la orden
+        if not self.operational_date and self.order:
+            self.operational_date = self.order.operational_date
+        
+        super().save(*args, **kwargs)
+        
+        # Recalcular total de la orden incluyendo envases
+        if self.order:
+            self.order.calculate_total()

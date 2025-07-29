@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Unit, Zone, Table, RestaurantOperationalConfig, Waiter
+from .models import Unit, Zone, Table, RestaurantOperationalConfig, Waiter, Container
 
 
 class UnitSerializer(serializers.ModelSerializer):
@@ -58,4 +58,11 @@ class WaiterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Waiter
         fields = ['id', 'name', 'phone', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ContainerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Container
+        fields = ['id', 'name', 'description', 'price', 'is_active', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']

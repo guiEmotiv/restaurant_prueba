@@ -1,6 +1,8 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from decimal import Decimal
+from django.core.validators import MinValueValidator
 
 
 
@@ -168,6 +170,38 @@ class Waiter(models.Model):
     def delete(self, *args, **kwargs):
         # Soft delete - solo marcamos como inactivo si tiene órdenes asociadas
         if hasattr(self, 'order_set') and self.order_set.exists():
+            self.is_active = False
+            self.save()
+        else:
+            super().delete(*args, **kwargs)
+
+
+class Container(models.Model):
+    """Envases para comida para llevar"""
+    name = models.CharField(max_length=100, unique=True, verbose_name="Nombre")
+    description = models.TextField(blank=True, verbose_name="Descripción")
+    price = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name="Precio"
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'container'
+        verbose_name = 'Envase'
+        verbose_name_plural = 'Envases'
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} - {self.price}"
+
+    def delete(self, *args, **kwargs):
+        # Soft delete - solo marcamos como inactivo si tiene ventas asociadas
+        if hasattr(self, 'containersale_set') and self.containersale_set.exists():
             self.is_active = False
             self.save()
         else:

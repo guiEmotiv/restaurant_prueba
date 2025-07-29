@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
+from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem, ContainerSale
 from config.serializers import TableSerializer
 from inventory.serializers import RecipeSerializer, IngredientSerializer
 from decimal import Decimal
@@ -123,10 +123,11 @@ class OrderSerializer(serializers.ModelSerializer):
 class OrderDetailSerializer(OrderSerializer):
     table_detail = TableSerializer(source='table', read_only=True)
     items = OrderItemSerializer(source='orderitem_set', many=True, read_only=True)
+    container_sales = ContainerSaleSerializer(many=True, read_only=True)
     payments = serializers.SerializerMethodField()
     
     class Meta(OrderSerializer.Meta):
-        fields = OrderSerializer.Meta.fields + ['table_detail', 'items', 'payments']
+        fields = OrderSerializer.Meta.fields + ['table_detail', 'items', 'container_sales', 'payments']
     
     def get_payments(self, obj):
         from .serializers import PaymentSerializer
@@ -344,3 +345,15 @@ class SplitPaymentSerializer(serializers.Serializer):
             payments.append(payment)
         
         return payments
+
+
+class ContainerSaleSerializer(serializers.ModelSerializer):
+    container_name = serializers.CharField(source='container.name', read_only=True)
+    
+    class Meta:
+        model = ContainerSale
+        fields = [
+            'id', 'order', 'container', 'container_name', 'quantity', 
+            'unit_price', 'total_price', 'created_at', 'operational_date'
+        ]
+        read_only_fields = ['id', 'unit_price', 'total_price', 'created_at', 'operational_date']

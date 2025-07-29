@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
+from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem, ContainerSale
 
 
 class OrderItemIngredientInline(admin.TabularInline):
@@ -14,13 +14,19 @@ class OrderItemInline(admin.TabularInline):
     readonly_fields = ['unit_price', 'total_price']
 
 
+class ContainerSaleInline(admin.TabularInline):
+    model = ContainerSale
+    extra = 0
+    readonly_fields = ['unit_price', 'total_price', 'created_at']
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = ['id', 'table', 'status', 'total_amount', 'created_at']
     list_filter = ['status', 'table__zone', 'created_at']
     search_fields = ['table__table_number']
     readonly_fields = ['total_amount', 'created_at', 'served_at', 'paid_at']
-    inlines = [OrderItemInline]
+    inlines = [OrderItemInline, ContainerSaleInline]
 
 
 @admin.register(OrderItem)
@@ -61,3 +67,11 @@ class PaymentItemAdmin(admin.ModelAdmin):
     list_filter = ['created_at']
     search_fields = ['payment__order__id', 'order_item__recipe__name']
     readonly_fields = ['created_at']
+
+
+@admin.register(ContainerSale)
+class ContainerSaleAdmin(admin.ModelAdmin):
+    list_display = ['order', 'container', 'quantity', 'unit_price', 'total_price', 'created_at']
+    list_filter = ['container', 'created_at', 'operational_date']
+    search_fields = ['order__id', 'container__name']
+    readonly_fields = ['unit_price', 'total_price', 'created_at', 'operational_date']
