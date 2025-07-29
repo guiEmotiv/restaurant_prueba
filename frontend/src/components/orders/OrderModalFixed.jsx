@@ -485,94 +485,88 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="space-y-6">
-            {/* Información básica */}
+            {/* Filtros y Items unificados */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Filtro de Zona */}
-                <div>
-                  <select
-                    value={selectedZoneFilter}
-                    onChange={(e) => {
-                      setSelectedZoneFilter(e.target.value);
-                      // Limpiar mesa seleccionada si cambia la zona
-                      if (formData.table) {
-                        setFormData(prev => ({ ...prev, table: '' }));
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    disabled={!!order} // No cambiar en edición
-                  >
-                    <option value="">Zona ...</option>
-                    {availableZones.map(zone => (
-                      <option key={zone.id} value={zone.id}>
-                        {zone.name} ({availableTables.filter(t => t.zone === zone.id).length})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="space-y-4">
+                {/* Filtros de mesa y zona */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Filtro de Zona */}
+                  <div>
+                    <select
+                      value={selectedZoneFilter}
+                      onChange={(e) => {
+                        setSelectedZoneFilter(e.target.value);
+                        // Limpiar mesa seleccionada si cambia la zona
+                        if (formData.table) {
+                          setFormData(prev => ({ ...prev, table: '' }));
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                      disabled={!!order} // No cambiar en edición
+                    >
+                      <option value="">Zona</option>
+                      {availableZones.map(zone => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name} ({availableTables.filter(t => t.zone === zone.id).length})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                {/* Selector de Mesa */}
-                <div>
-                  <select
-                    name="table"
-                    value={formData.table}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                      errors.table ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    disabled={!!order} // No cambiar mesa en edición para evitar confusión operativa
-                  >
-                    <option value="">Mesa</option>
-                    {getFilteredTables().map(table => (
-                      <option key={table.id} value={table.id}>
-                        Mesa {table.table_number}
-                        {!selectedZoneFilter && ` - ${table.zone_name}`}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.table && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.table}
-                    </p>
+                  {/* Selector de Mesa */}
+                  <div>
+                    <select
+                      name="table"
+                      value={formData.table}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
+                        errors.table ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      disabled={!!order} // No cambiar mesa en edición para evitar confusión operativa
+                    >
+                      <option value="">Mesa</option>
+                      {getFilteredTables().map(table => (
+                        <option key={table.id} value={table.id}>
+                          Mesa {table.table_number}
+                          {!selectedZoneFilter && ` - ${table.zone_name}`}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.table && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.table}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Estado Actual (solo en edición) */}
+                  {order && (
+                    <div>
+                      <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 font-medium text-sm">
+                        {formData.status === 'CREATED' && 'Creado'}
+                        {formData.status === 'SERVED' && 'Entregado'}
+                        {formData.status === 'PAID' && 'Pagado'}
+                      </div>
+                    </div>
                   )}
                 </div>
 
-
-                {/* Estado Actual (solo en edición) */}
-                {order && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Estado Actual
-                    </label>
-                    <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 font-medium">
-                      {formData.status === 'CREATED' && 'Creado'}
-                      {formData.status === 'SERVED' && 'Entregado'}
-                      {formData.status === 'PAID' && 'Pagado'}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Items */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex items-center justify-between mb-4 gap-2">
-                {/* Group Filter */}
-                <select
-                  value={selectedGroupFilter}
-                  onChange={(e) => setSelectedGroupFilter(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
-                >
-                  <option value="">Grupos</option>
-                  {availableGroups.map(group => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-                
-                {/* Action Buttons */}
-                <div className="flex items-center gap-3">
+                {/* Filtro de grupos y botón agregar */}
+                <div className="flex items-center justify-between gap-2">
+                  {/* Group Filter */}
+                  <select
+                    value={selectedGroupFilter}
+                    onChange={(e) => setSelectedGroupFilter(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">Grupos</option>
+                    {availableGroups.map(group => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                  
                   {/* Add Item Button */}
                   <button
                     onClick={addOrderItem}
@@ -581,20 +575,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                     title={order && order.status !== 'CREATED' ? 'Solo se pueden agregar items a órdenes creadas' : 'Agregar nuevo item'}
                   >
                     <Plus className="h-4 w-4" />
-                  </button>
-                  
-                  {/* Save Button */}
-                  <button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={loading ? "Guardando..." : "Guardar pedido"}
-                  >
-                    {loading ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
                   </button>
                 </div>
               </div>
@@ -760,6 +740,27 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
             </div>
 
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 flex items-center justify-end px-4 sm:px-6 py-4 border-t border-gray-200 bg-white">
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Guardar Pedido
+              </>
+            )}
+          </button>
         </div>
 
       </div>
