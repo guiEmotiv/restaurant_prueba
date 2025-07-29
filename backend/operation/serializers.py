@@ -93,17 +93,19 @@ class OrderSerializer(serializers.ModelSerializer):
     total_paid = serializers.SerializerMethodField()
     pending_amount = serializers.SerializerMethodField()
     is_fully_paid = serializers.SerializerMethodField()
+    containers_total = serializers.SerializerMethodField()
+    grand_total = serializers.SerializerMethodField()
     
     class Meta:
         model = Order
         fields = [
             'id', 'table', 'table_number', 'zone_name', 'waiter', 'waiter_name', 'status',
-            'total_amount', 'total_paid', 'pending_amount', 'is_fully_paid',
+            'total_amount', 'containers_total', 'grand_total', 'total_paid', 'pending_amount', 'is_fully_paid',
             'items_count', 'created_at',
             'served_at', 'paid_at', 'operational_date'
         ]
         read_only_fields = [
-            'id', 'total_amount', 'created_at',
+            'id', 'total_amount', 'containers_total', 'grand_total', 'created_at',
             'served_at', 'paid_at'
         ]
     
@@ -118,6 +120,12 @@ class OrderSerializer(serializers.ModelSerializer):
     
     def get_is_fully_paid(self, obj):
         return obj.is_fully_paid()
+    
+    def get_containers_total(self, obj):
+        return obj.get_containers_total()
+    
+    def get_grand_total(self, obj):
+        return obj.get_grand_total()
 
 
 class OrderDetailSerializer(OrderSerializer):

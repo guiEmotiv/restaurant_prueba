@@ -1,11 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import Unit, Zone, Table, RestaurantOperationalConfig, Waiter
+from .models import Unit, Zone, Table, RestaurantOperationalConfig, Waiter, Container
 from .serializers import (
     UnitSerializer, ZoneSerializer, 
     TableSerializer, TableDetailSerializer,
-    RestaurantOperationalConfigSerializer, WaiterSerializer
+    RestaurantOperationalConfigSerializer, WaiterSerializer, ContainerSerializer
 )
 
 
@@ -123,6 +123,19 @@ class WaiterViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         queryset = Waiter.objects.all().order_by('name')
+        # Filtrar por activos si se especifica
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            is_active_bool = is_active.lower() in ('true', '1', 'yes')
+            queryset = queryset.filter(is_active=is_active_bool)
+        return queryset
+
+
+class ContainerViewSet(viewsets.ModelViewSet):
+    serializer_class = ContainerSerializer
+    
+    def get_queryset(self):
+        queryset = Container.objects.all().order_by('name')
         # Filtrar por activos si se especifica
         is_active = self.request.query_params.get('is_active')
         if is_active is not None:

@@ -11,6 +11,7 @@ import Units from './pages/config/Units';
 import Zones from './pages/config/Zones';
 import Tables from './pages/config/Tables';
 import Waiters from './pages/config/Waiters';
+import Containers from './pages/config/Containers';
 import Groups from './pages/inventory/Groups';
 import Ingredients from './pages/inventory/Ingredients';
 import Recipes from './pages/inventory/Recipes';
@@ -74,6 +75,11 @@ const AppContent = () => {
           <Route path="/waiters" element={
             <OptionalProtectedRoute requiredPermission="canManageConfig">
               <Waiters />
+            </OptionalProtectedRoute>
+          } />
+          <Route path="/containers" element={
+            <OptionalProtectedRoute requiredPermission="canManageConfig">
+              <Containers />
             </OptionalProtectedRoute>
           } />
 

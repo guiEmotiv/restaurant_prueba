@@ -365,6 +365,19 @@ export const apiService = {
     },
   },
 
+  containers: {
+    getAll: async (params = {}) => {
+      const queryParams = new URLSearchParams(params).toString();
+      const url = queryParams ? `/containers/?${queryParams}` : '/containers/';
+      const response = await api.get(url);
+      return response.data;
+    },
+    getById: (id) => apiService.getById('containers', id),
+    create: (data) => apiService.create('containers', data),
+    update: (id, data) => apiService.update('containers', id, data),
+    delete: (id) => apiService.delete('containers', id),
+  },
+
 };
 
 export default api;

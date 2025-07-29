@@ -40,6 +40,7 @@ const Layout = ({ children }) => {
         { name: 'Zonas', href: '/zones', icon: MapPin, permission: 'canManageConfig' },
         { name: 'Mesas', href: '/tables', icon: Table, permission: 'canManageConfig' },
         { name: 'Meseros', href: '/waiters', icon: Users, permission: 'canManageConfig' },
+        { name: 'Envases', href: '/containers', icon: Package, permission: 'canManageConfig' },
       ]
     },
     { 

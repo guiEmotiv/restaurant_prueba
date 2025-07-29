@@ -20,6 +20,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const [availableZones, setAvailableZones] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
   const [availableWaiters, setAvailableWaiters] = useState([]);
+  const [availableContainers, setAvailableContainers] = useState([]);
+  const [defaultContainer, setDefaultContainer] = useState(null);
   const [selectedZoneFilter, setSelectedZoneFilter] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState('');
   const [deletedItemIds, setDeletedItemIds] = useState([]); // Llevar registro de items eliminados
@@ -102,12 +104,13 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
 
   const loadAvailableData = async () => {
     try {
-      const [recipesData, tablesData, zonesData, groupsData, waitersData] = await Promise.all([
+      const [recipesData, tablesData, zonesData, groupsData, waitersData, containersData] = await Promise.all([
         apiService.recipes.getAll(), // Sin show_all, el backend filtra automáticamente
         apiService.tables.getAll(),
         apiService.zones.getAll(),
         apiService.groups.getAll(),
-        apiService.waiters.getAll()
+        apiService.waiters.getAll(),
+        apiService.containers.getAll({ is_active: true })
       ]);
       // El backend ya filtra recetas activas con stock suficiente
       setAvailableRecipes(Array.isArray(recipesData) ? recipesData : []);
@@ -115,6 +118,15 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       setAvailableZones(Array.isArray(zonesData) ? zonesData : []);
       setAvailableGroups(Array.isArray(groupsData) ? groupsData : []);
       setAvailableWaiters(Array.isArray(waitersData) ? waitersData.filter(w => w.is_active) : []);
+      
+      // Configurar envases
+      const containers = Array.isArray(containersData) ? containersData : [];
+      setAvailableContainers(containers);
+      
+      // Buscar envase por defecto (puede ser el más barato o uno llamado "taper")
+      const defaultCont = containers.find(c => c.name.toLowerCase().includes('taper')) || 
+                         containers.sort((a, b) => parseFloat(a.price) - parseFloat(b.price))[0];
+      setDefaultContainer(defaultCont);
     } catch (error) {
       console.error('Error loading available data:', error);
     }
@@ -137,6 +149,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         quantity: item.quantity || 1,
         is_takeaway: item.is_takeaway || false,
         has_taper: item.has_taper || false,
+        selected_container: item.selected_container || null,
         can_delete: item.status === 'CREATED',
         can_edit: item.status === 'CREATED', // Inicialmente todos los items existentes pueden editarse
         tempKey: item.tempKey || (Date.now() + Math.random())
@@ -178,6 +191,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         quantity: 1,
         is_takeaway: false,
         has_taper: false,
+        selected_container: null,
         can_delete: true,
         can_edit: true, // Solo el nuevo item puede ser editado
         tempKey: Date.now() + Math.random() // Unique key for React
@@ -217,6 +231,24 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
               total_price: selectedRecipe?.base_price || 0
             };
           }
+          
+          // Lógica especial para "para llevar": automáticamente poner taper por defecto
+          if (field === 'is_takeaway') {
+            const newItem = { ...item, [field]: value };
+            
+            if (value === true) {
+              // Cuando se marca para llevar, automáticamente poner taper y container por defecto
+              newItem.has_taper = true;
+              newItem.selected_container = defaultContainer?.id || null;
+            } else {
+              // Cuando se desmarca para llevar, quitar taper
+              newItem.has_taper = false;
+              newItem.selected_container = null;
+            }
+            
+            return newItem;
+          }
+          
           return { ...item, [field]: value };
         }
         return item;
@@ -748,7 +780,9 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                                     className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                     disabled={!item.can_edit}
                                   />
-                                  <span className="ml-2 text-xs text-gray-700">Con taper</span>
+                                  <span className="ml-2 text-xs text-gray-700">
+                                    Con envase ({defaultContainer ? `+S/ ${defaultContainer.price}` : 'gratis'})
+                                  </span>
                                 </label>
                               )}
                             </div>
@@ -836,7 +870,9 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                                     className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                     disabled={!item.can_edit}
                                   />
-                                  <span className="ml-1 text-xs text-gray-700">Taper</span>
+                                  <span className="ml-1 text-xs text-gray-700">
+                                    Envase (+S/ {defaultContainer?.price || '0.00'})
+                                  </span>
                                 </label>
                               )}
                             </div>

@@ -50,20 +50,26 @@ class Order(models.Model):
         return RestaurantOperationalConfig.get_operational_date()
 
     def calculate_total(self):
-        """Calcula el total de la orden incluyendo items y envases"""
+        """Calcula SOLO el total de items de comida (SIN envases)"""
         if self.pk:
-            # Total de items de comida
+            # Total de items de comida SOLAMENTE
             items_total = sum(item.total_price for item in self.orderitem_set.all())
             
-            # Total de envases (separado)
-            containers_total = sum(container.total_price for container in self.container_sales.all())
-            
-            # Total general
-            total = items_total + containers_total
-            self.total_amount = total
+            # El total_amount es SOLO la venta de comida (sin envases)
+            self.total_amount = items_total
             super().save()  # Usar super() para evitar recursión
-            return total
+            return items_total
         return Decimal('0.00')
+    
+    def get_containers_total(self):
+        """Obtiene el total de envases por separado"""
+        if self.pk:
+            return sum(container.total_price for container in self.container_sales.all())
+        return Decimal('0.00')
+    
+    def get_grand_total(self):
+        """Obtiene el total general (comida + envases) para la boleta final"""
+        return self.total_amount + self.get_containers_total()
 
     def consume_ingredients_on_creation(self):
         """Método separado para consumir ingredientes cuando se crea la orden"""
