@@ -143,9 +143,11 @@ class OrderDetailSerializer(OrderSerializer):
 
 
 class OrderItemCreateSerializer(serializers.ModelSerializer):
+    selected_container = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    
     class Meta:
         model = OrderItem
-        fields = ['order', 'recipe', 'notes', 'quantity', 'is_takeaway', 'has_taper']
+        fields = ['order', 'recipe', 'notes', 'quantity', 'is_takeaway', 'has_taper', 'selected_container']
     
     def validate_recipe(self, value):
         if not value.is_active:
@@ -155,13 +157,40 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("No hay suficiente stock para esta receta")
         
         return value
+    
+    def create(self, validated_data):
+        selected_container_id = validated_data.pop('selected_container', None)
+        
+        # Crear el OrderItem
+        order_item = super().create(validated_data)
+        
+        # Si tiene taper y hay container seleccionado, crear ContainerSale
+        if order_item.has_taper and selected_container_id:
+            from config.models import Container
+            try:
+                container = Container.objects.get(id=selected_container_id, is_active=True)
+                
+                # Crear ContainerSale con la cantidad del item
+                ContainerSale.objects.create(
+                    order=order_item.order,
+                    container=container,
+                    quantity=order_item.quantity,
+                    unit_price=container.price,
+                    total_price=container.price * order_item.quantity
+                )
+            except Container.DoesNotExist:
+                pass  # Si no encuentra el container, no crear ContainerSale
+        
+        return order_item
 
 
 class OrderItemForCreateSerializer(serializers.ModelSerializer):
     """Serializer para items cuando se crean dentro de una orden nueva"""
+    selected_container = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    
     class Meta:
         model = OrderItem
-        fields = ['recipe', 'notes', 'quantity', 'is_takeaway', 'has_taper']
+        fields = ['recipe', 'notes', 'quantity', 'is_takeaway', 'has_taper', 'selected_container']
     
     def validate_recipe(self, value):
         if not value.is_active:
@@ -186,9 +215,29 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         # Crear orden
         order = Order.objects.create(**validated_data)
         
-        # Crear items
+        # Crear items y containers
         for item_data in items_data:
-            OrderItem.objects.create(order=order, **item_data)
+            selected_container_id = item_data.pop('selected_container', None)
+            
+            # Crear OrderItem
+            order_item = OrderItem.objects.create(order=order, **item_data)
+            
+            # Si tiene taper y hay container seleccionado, crear ContainerSale
+            if order_item.has_taper and selected_container_id:
+                from config.models import Container
+                try:
+                    container = Container.objects.get(id=selected_container_id, is_active=True)
+                    
+                    # Crear ContainerSale con la cantidad del item
+                    ContainerSale.objects.create(
+                        order=order,
+                        container=container,
+                        quantity=order_item.quantity,
+                        unit_price=container.price,
+                        total_price=container.price * order_item.quantity
+                    )
+                except Container.DoesNotExist:
+                    pass  # Si no encuentra el container, no crear ContainerSale
         
         # Consumir ingredientes
         order.consume_ingredients_on_creation()

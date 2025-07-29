@@ -203,12 +203,43 @@ const OrderReceipt = () => {
           </div>
         </div>
 
+        {/* Container Sales (Envases) */}
+        {order.container_sales?.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 border-b pb-2">Envases</h3>
+            <div className="space-y-2">
+              {order.container_sales.map((containerSale, index) => (
+                <div key={index} className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-start gap-2">
+                      <span className="text-sm font-semibold text-gray-700 mt-0.5">{containerSale.quantity}x</span>
+                      <div className="flex-1">
+                        <p className="font-medium">{containerSale.container_name}</p>
+                        <p className="text-sm text-gray-500">Para llevar</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right ml-4">
+                    <p className="font-medium">{formatCurrency(containerSale.total_price)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Totals */}
         <div className="border-t pt-4 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Subtotal:</span>
+            <span className="text-gray-600">Subtotal (Comida):</span>
             <span>{formatCurrency(order.total_amount)}</span>
           </div>
+          {order.containers_total && order.containers_total > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Envases:</span>
+              <span>{formatCurrency(order.containers_total)}</span>
+            </div>
+          )}
           {payment?.tax_amount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">IGV (18%):</span>
@@ -217,7 +248,7 @@ const OrderReceipt = () => {
           )}
           <div className="flex justify-between text-lg font-bold pt-2 border-t">
             <span>Total:</span>
-            <span className="text-green-600">{formatCurrency(payment?.amount || order.total_amount)}</span>
+            <span className="text-green-600">{formatCurrency(order.grand_total || payment?.amount || order.total_amount)}</span>
           </div>
         </div>
 

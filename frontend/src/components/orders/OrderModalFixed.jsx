@@ -379,7 +379,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                 notes: item.notes || '',
                 quantity: item.quantity || 1,
                 is_takeaway: item.is_takeaway || false,
-                has_taper: item.has_taper || false
+                has_taper: item.has_taper || false,
+                selected_container: item.selected_container || null
               };
               await apiService.orderItems.create(createData);
             } catch (error) {
@@ -413,7 +414,8 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
             notes: (item.notes || '').toString().trim(),
             quantity: parseInt(item.quantity) || 1,
             is_takeaway: item.is_takeaway || false,
-            has_taper: item.has_taper || false
+            has_taper: item.has_taper || false,
+            selected_container: item.selected_container || null
           };
         });
         
