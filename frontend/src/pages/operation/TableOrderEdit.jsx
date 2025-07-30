@@ -329,26 +329,28 @@ const TableOrderEdit = () => {
 
             {/* Botones de acción */}
             <div className="flex items-center gap-3">
-              {checkAllItemsDelivered() ? (
+              {/* Botón Agregar Items - siempre visible */}
+              <button
+                onClick={() => setShowNewItems(!showNewItems)}
+                className="relative bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="font-medium">Agregar Items</span>
+                {getNewItemsCount() > 0 && (
+                  <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                    {getNewItemsCount()}
+                  </div>
+                )}
+              </button>
+              
+              {/* Botón Procesar Pago - solo visible cuando todos items están entregados */}
+              {checkAllItemsDelivered() && (
                 <button
                   onClick={handleGoToPayment}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
                 >
                   <CreditCard className="h-4 w-4" />
                   Procesar Pago
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowNewItems(!showNewItems)}
-                  className="relative bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="font-medium">Agregar Items</span>
-                  {getNewItemsCount() > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                      {getNewItemsCount()}
-                    </div>
-                  )}
                 </button>
               )}
             </div>

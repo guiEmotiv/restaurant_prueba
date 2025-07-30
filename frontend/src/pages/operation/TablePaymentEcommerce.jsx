@@ -151,16 +151,16 @@ const TablePaymentEcommerce = () => {
   };
 
   const toggleItemSelection = (itemId) => {
-    if (selectedItems[itemId] !== null) {
-      // Ya está asignado a un split, no hacer nada
-      return;
-    }
-
     const currentSplitIndex = splitPayments.length;
     const newSelectedItems = { ...selectedItems };
     
+    // Si el item ya está asignado a un split finalizado (no al actual), no permitir cambios
+    if (selectedItems[itemId] !== null && selectedItems[itemId] < currentSplitIndex) {
+      return;
+    }
+    
     if (newSelectedItems[itemId] === currentSplitIndex) {
-      // Deseleccionar
+      // Deseleccionar - volver a null
       newSelectedItems[itemId] = null;
     } else {
       // Seleccionar para el split actual
