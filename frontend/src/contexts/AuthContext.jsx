@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
+import { Hub } from 'aws-amplify/utils';
 
 const AuthContext = createContext();
 
@@ -67,6 +68,10 @@ export const AuthProvider = ({ children }) => {
   const checkAuthState = async () => {
     try {
       setLoading(true);
+      
+      // Add a small delay to ensure session is fully established
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const currentUser = await getCurrentUser();
       
       if (currentUser) {
@@ -76,6 +81,11 @@ export const AuthProvider = ({ children }) => {
         // Get user role from Cognito groups
         const role = await getUserRole(currentUser);
         setUserRole(role);
+        
+        console.log('✅ Auth state updated:', {
+          username: currentUser.username,
+          role: role
+        });
       } else {
         setUser(null);
         setUserRole(null);
@@ -93,6 +103,33 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkAuthState();
+    
+    // Listen for authentication events
+    const hubListenerCancel = Hub.listen('auth', ({ payload }) => {
+      switch (payload.event) {
+        case 'signInWithRedirect':
+        case 'signedIn':
+          console.log('🔐 User signed in, refreshing auth state');
+          checkAuthState();
+          break;
+        case 'signedOut':
+          console.log('🔓 User signed out');
+          setUser(null);
+          setUserRole(null);
+          setIsAuthenticated(false);
+          break;
+        case 'tokenRefresh':
+          console.log('🔄 Token refreshed');
+          checkAuthState();
+          break;
+        default:
+          break;
+      }
+    });
+
+    return () => {
+      hubListenerCancel();
+    };
   }, []);
 
   const logout = async () => {

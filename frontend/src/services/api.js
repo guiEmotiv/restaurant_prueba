@@ -48,6 +48,8 @@ api.interceptors.request.use(
       if (session.tokens?.accessToken) {
         config.headers.Authorization = `Bearer ${session.tokens.accessToken}`;
         console.log('🔐 Added JWT token to request');
+      } else {
+        console.log('ℹ️ No access token available in session');
       }
     } catch (error) {
       // If not authenticated or error getting token, continue without auth
