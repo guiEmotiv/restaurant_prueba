@@ -654,7 +654,17 @@ const TableOrderEdit = () => {
                         onChange={(e) => setItemTaper(e.target.checked)}
                         className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                       />
-                      <span className="text-sm font-medium text-gray-700">Incluir taper/envase</span>
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-gray-700">Incluir taper/envase</span>
+                        {containers.length > 0 && itemTaper && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {containers[0].name} - {formatCurrency(containers[0].price)}
+                            {containers[0].stock !== undefined && (
+                              <span className="ml-1">({containers[0].stock} disponibles)</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </label>
                   )}
                 </div>

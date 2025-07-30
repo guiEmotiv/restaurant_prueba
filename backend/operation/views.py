@@ -73,13 +73,20 @@ class OrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        serializer = OrderItemCreateSerializer(data=request.data)
+        serializer = OrderItemCreateSerializer(data=request.data, context={'order': order})
         if serializer.is_valid():
-            order_item = serializer.save(order=order)
-            order.calculate_total()
-            
-            response_serializer = OrderItemSerializer(order_item)
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+            try:
+                order_item = serializer.save()
+                order.calculate_total()
+                
+                response_serializer = OrderItemSerializer(order_item)
+                return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                logger.error(f"ADD_ITEM DEBUG - Exception during save: {str(e)}")
+                return Response({
+                    'error': 'Error interno al crear el item',
+                    'details': str(e)
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         # Debug logging para errores
         logger.error(f"ADD_ITEM DEBUG - Serializer errors: {serializer.errors}")
