@@ -288,8 +288,8 @@ export const apiService = {
       const response = await api.post(`/orders/${id}/update_status/`, { status });
       return response.data;
     },
-    addItem: async (id, recipe, notes = '') => {
-      const response = await api.post(`/orders/${id}/add_item/`, { recipe, notes });
+    addItem: async (id, itemData) => {
+      const response = await api.post(`/orders/${id}/add_item/`, itemData);
       return response.data;
     },
     getActive: async () => {
