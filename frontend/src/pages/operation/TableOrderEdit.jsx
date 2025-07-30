@@ -31,6 +31,7 @@ const TableOrderEdit = () => {
   const [order, setOrder] = useState(null);
   const [groups, setGroups] = useState([]);
   const [recipes, setRecipes] = useState([]);
+  const [containers, setContainers] = useState([]);
   const [existingItems, setExistingItems] = useState([]);
   const [newItems, setNewItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,17 +62,19 @@ const TableOrderEdit = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tableData, orderData, groupsData, recipesData] = await Promise.all([
+      const [tableData, orderData, groupsData, recipesData, containersData] = await Promise.all([
         apiService.tables.getById(tableId),
         apiService.orders.getById(orderId),
         apiService.groups.getAll(),
-        apiService.recipes.getAll()
+        apiService.recipes.getAll(),
+        apiService.containers.getAll()
       ]);
       
       setTable(tableData);
       setOrder(orderData);
       setExistingItems(orderData.items || []);
       setGroups(Array.isArray(groupsData) ? groupsData : []);
+      setContainers(Array.isArray(containersData) ? containersData.filter(c => c.is_active) : []);
       
       // Solo recetas activas con stock
       const availableRecipes = recipesData.filter(recipe => recipe.is_active && recipe.available !== false);
@@ -205,8 +208,14 @@ const TableOrderEdit = () => {
             recipe: newItem.recipe.id,
             notes: newItem.notes || '',
             is_takeaway: newItem.is_takeaway || false,
-            has_taper: newItem.has_taper || false
+            has_taper: newItem.has_taper || false,
+            quantity: 1
           };
+
+          // Si el item tiene taper, agregar el contenedor por defecto
+          if (newItem.has_taper && containers.length > 0) {
+            itemData.selected_container = containers[0].id;
+          }
           
           await apiService.orders.addItem(orderId, itemData);
         }
