@@ -1,11 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Amplify } from 'aws-amplify';
 import { ToastProvider } from './contexts/ToastContext';
-import { OptionalAuthProvider } from './contexts/OptionalAuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
-import OptionalProtectedRoute from './components/auth/OptionalProtectedRoute';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Units from './pages/config/Units';
 import Zones from './pages/config/Zones';
@@ -41,11 +41,14 @@ console.log('  VITE_AWS_REGION:', import.meta.env.VITE_AWS_REGION);
 console.log('  VITE_AWS_COGNITO_USER_POOL_ID:', import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID);
 console.log('  VITE_AWS_COGNITO_APP_CLIENT_ID:', import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID);
 
-// Disable Cognito - Always run without authentication
-const isCognitoConfigured = false;
+// Configure AWS Amplify
+Amplify.configure(amplifyConfig);
 
-console.log('ℹ️ Running without AWS Cognito authentication (disabled)');
-console.log('🔓 Authentication is disabled - Direct access enabled');
+// Enable Cognito authentication - Configure with your AWS Cognito settings
+const isCognitoConfigured = true;
+
+console.log('🔐 AWS Cognito authentication enabled');
+console.log('🔑 Users must login to access the application');
 
 const AppContent = () => {
   // Skip authentication if Cognito is not configured
@@ -54,124 +57,124 @@ const AppContent = () => {
       <Routes>
           {/* Dashboard */}
           <Route path="/" element={
-            <OptionalProtectedRoute requiredPermission="canViewDashboard">
+            <ProtectedRoute requiredPermission="canViewDashboard">
               <Dashboard />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
 
           {/* Configuration routes */}
           <Route path="/units" element={
-            <OptionalProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="canManageConfig">
               <Units />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/zones" element={
-            <OptionalProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="canManageConfig">
               <Zones />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/tables" element={
-            <OptionalProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="canManageConfig">
               <Tables />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/waiters" element={
-            <OptionalProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="canManageConfig">
               <Waiters />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/containers" element={
-            <OptionalProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="canManageConfig">
               <Containers />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
 
           {/* Inventory routes */}
           <Route path="/groups" element={
-            <OptionalProtectedRoute requiredPermission="canManageInventory">
+            <ProtectedRoute requiredPermission="canManageInventory">
               <Groups />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/ingredients" element={
-            <OptionalProtectedRoute requiredPermission="canManageInventory">
+            <ProtectedRoute requiredPermission="canManageInventory">
               <Ingredients />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/recipes" element={
-            <OptionalProtectedRoute requiredPermission="canManageInventory">
+            <ProtectedRoute requiredPermission="canManageInventory">
               <Recipes />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
 
           {/* Operation routes */}
           <Route path="/orders" element={
-            <OptionalProtectedRoute requiredPermission="canManageOrders">
+            <ProtectedRoute requiredPermission="canManageOrders">
               <Orders />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/orders/new" element={
-            <OptionalProtectedRoute requiredPermission="canManageOrders">
+            <ProtectedRoute requiredPermission="canManageOrders">
               <NewOrder />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/orders/:id/edit" element={
-            <OptionalProtectedRoute requiredPermission="canManageOrders">
+            <ProtectedRoute requiredPermission="canManageOrders">
               <NewOrder />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/orders/:id" element={
-            <OptionalProtectedRoute requiredPermission="canManageOrders">
+            <ProtectedRoute requiredPermission="canManageOrders">
               <OrderDetail />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/orders/:id/payment" element={
-            <OptionalProtectedRoute requiredPermission="canManagePayments">
+            <ProtectedRoute requiredPermission="canManagePayments">
               <Payment />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/orders/:id/receipt" element={
-            <OptionalProtectedRoute requiredPermission="canManagePayments">
+            <ProtectedRoute requiredPermission="canManagePayments">
               <OrderReceipt />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/kitchen" element={
-            <OptionalProtectedRoute requiredPermission="canViewKitchen">
+            <ProtectedRoute requiredPermission="canViewKitchen">
               <Kitchen />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/table-status" element={
-            <OptionalProtectedRoute requiredPermission="canViewTableStatus">
+            <ProtectedRoute requiredPermission="canViewTableStatus">
               <TableStatus />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/table/:tableId/order-ecommerce" element={
-            <OptionalProtectedRoute requiredPermission="canManageOrders">
+            <ProtectedRoute requiredPermission="canManageOrders">
               <TableOrderEcommerce />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/table/:tableId/order-edit" element={
-            <OptionalProtectedRoute requiredPermission="canManageOrders">
+            <ProtectedRoute requiredPermission="canManageOrders">
               <TableOrderEdit />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/table/:tableId/payment-ecommerce" element={
-            <OptionalProtectedRoute requiredPermission="canManagePayments">
+            <ProtectedRoute requiredPermission="canManagePayments">
               <TablePaymentEcommerce />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
 
           {/* Payment routes */}
           <Route path="/payment-history" element={
-            <OptionalProtectedRoute requiredPermission="canViewHistory">
+            <ProtectedRoute requiredPermission="canViewHistory">
               <PaymentHistory />  
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
 
           {/* Redirect to orders for unauthorized access */}
           <Route path="*" element={
-            <OptionalProtectedRoute requiredPermission="canManageOrders">
+            <ProtectedRoute requiredPermission="canManageOrders">
               <Orders />
-            </OptionalProtectedRoute>
+            </ProtectedRoute>
           } />
         </Routes>
     </Layout>
@@ -184,11 +187,11 @@ const AppContent = () => {
 function App() {
   return (
     <ToastProvider>
-      <OptionalAuthProvider>
+      <AuthProvider>
         <Router>
           <AppContent />
         </Router>
-      </OptionalAuthProvider>
+      </AuthProvider>
     </ToastProvider>
   );
 }
