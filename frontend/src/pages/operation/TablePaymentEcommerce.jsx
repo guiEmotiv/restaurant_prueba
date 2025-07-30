@@ -54,6 +54,11 @@ const TablePaymentEcommerce = () => {
     loadData();
   }, [tableId, orderId]);
 
+  const hasPartialPayments = () => {
+    if (!order || !order.items) return false;
+    return order.items.some(item => item.paid_amount > 0 && !item.is_fully_paid);
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -217,6 +222,104 @@ const TablePaymentEcommerce = () => {
     setSplitPayments(splitPayments.filter((_, idx) => idx !== splitIndex));
   };
 
+  const handlePartialPayment = async () => {
+    const selectedSplitItems = getCurrentSplitItems();
+    
+    if (selectedSplitItems.length === 0) {
+      showError('Debe seleccionar al menos un item para pagar');
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      
+      // Crear un pago parcial directo
+      const partialPayment = {
+        items: selectedSplitItems.map(item => item.id),
+        payment_method: currentSplitMethod,
+        amount: parseFloat(getCurrentSplitTotal()).toFixed(2),
+        notes: currentSplitNotes || ''
+      };
+
+      await apiService.orders.splitPayment(orderId, { splits: [partialPayment] });
+      showSuccess(`Pago parcial procesado exitosamente - ${formatCurrency(getCurrentSplitTotal())}`);
+      
+      // Recargar datos del pedido para ver el estado actualizado
+      const [tableData, orderData] = await Promise.all([
+        apiService.tables.getById(tableId),
+        apiService.orders.getById(orderId)
+      ]);
+      
+      setTable(tableData);
+      setOrder(orderData);
+      
+      // Reinicializar estados para siguiente pago
+      setSplitPayments([]);
+      setCurrentSplitMethod('CASH');
+      setCurrentSplitNotes('');
+      
+      const itemsMap = {};
+      orderData.items.forEach(item => {
+        itemsMap[item.id] = null;
+      });
+      setSelectedItems(itemsMap);
+      
+      // Verificar si todos los items están pagados completamente
+      const orderFullyPaid = orderData.items && orderData.items.length > 0 && 
+        orderData.items.every(item => item.is_fully_paid);
+        
+      if (orderFullyPaid) {
+        showSuccess('¡Pedido completamente pagado!');
+        setTimeout(() => {
+          navigate('/table-status');
+        }, 2000);
+      }
+      
+    } catch (error) {
+      console.error('Error processing partial payment:', error);
+      const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
+      showError('Error al procesar el pago: ' + errorMessage);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handlePayRemainingTotal = async () => {
+    const unassignedItems = getUnassignedItems();
+    
+    if (unassignedItems.length === 0) {
+      showError('No hay items pendientes para pagar');
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      
+      // Crear un pago por el resto de los items
+      const remainingPayment = {
+        items: unassignedItems.map(item => item.id),
+        payment_method: currentSplitMethod,
+        amount: unassignedItems.reduce((total, item) => total + parseFloat(item.total_price || 0), 0).toFixed(2),
+        notes: currentSplitNotes || 'Pago del resto completo'
+      };
+
+      await apiService.orders.splitPayment(orderId, { splits: [remainingPayment] });
+      showSuccess(`Pago restante procesado exitosamente - ${formatCurrency(remainingPayment.amount)}`);
+      showSuccess('¡Pedido completamente pagado!');
+      
+      setTimeout(() => {
+        navigate('/table-status');
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error processing remaining payment:', error);
+      const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
+      showError('Error al procesar el pago: ' + errorMessage);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleSplitPayments = async () => {
     if (splitPayments.length === 0) {
       showError('Debe agregar al menos un pago dividido');
@@ -234,38 +337,13 @@ const TablePaymentEcommerce = () => {
       }));
 
       await apiService.orders.splitPayment(orderId, { splits: formattedSplits });
-      showSuccess(`Pago parcial procesado exitosamente`);
-      
-      // Recargar datos del pedido para ver el estado actualizado
-      const [tableData, orderData] = await Promise.all([
-        apiService.tables.getById(tableId),
-        apiService.orders.getById(orderId)
-      ]);
-      
-      setTable(tableData);
-      setOrder(orderData);
-      
-      // Reinicializar estados para siguiente pago
-      setSplitPayments([]);
-      const itemsMap = {};
-      orderData.items.forEach(item => {
-        itemsMap[item.id] = null;
-      });
-      setSelectedItems(itemsMap);
-      
-      // Verificar si todos los items están pagados
-      const remainingAmount = getRemainingAmount();
-      if (remainingAmount <= 0) {
-        showSuccess('¡Pedido completamente pagado!');
-        setTimeout(() => {
-          navigate('/table-status');
-        }, 2000);
-      }
+      showSuccess(`Pagos procesados exitosamente`);
+      navigate('/table-status');
       
     } catch (error) {
       console.error('Error processing split payments:', error);
       const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
-      showError('Error al procesar el pago: ' + errorMessage);
+      showError('Error al procesar los pagos: ' + errorMessage);
     } finally {
       setProcessing(false);
     }
@@ -364,54 +442,89 @@ const TablePaymentEcommerce = () => {
       {!paymentMode && (
         <div className="max-w-2xl mx-auto p-4">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                ¿Cómo desea procesar el pago?
-              </h2>
-              <p className="text-gray-600">
-                Seleccione el tipo de pago que mejor se adapte a sus necesidades
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Pago Completo */}
-              <button
-                onClick={() => setPaymentMode('full')}
-                className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 text-left"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <CreditCard className="h-6 w-6 text-blue-600" />
+            {hasPartialPayments() ? (
+              // Si hay pagos parciales, solo mostrar opción de dividir cuenta
+              <div className="text-center">
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                    Continuar con Pagos Parciales
+                  </h2>
+                  <p className="text-gray-600">
+                    Este pedido tiene pagos parciales pendientes. Continúe dividiendo la cuenta.
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => setPaymentMode('split')}
+                  className="w-full max-w-md mx-auto p-6 border-2 border-green-300 bg-green-50 rounded-lg hover:bg-green-100 transition-all duration-200"
+                >
+                  <div className="flex items-center justify-center gap-3 mb-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Split className="h-6 w-6 text-green-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900">Dividir Cuenta</h3>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Pago Completo</h3>
-                </div>
-                <p className="text-gray-600 text-sm">
-                  Un solo pago por el total de la cuenta
-                </p>
-                <div className="mt-3 text-xl font-bold text-blue-600">
-                  {formatCurrency(order.total_amount)}
-                </div>
-              </button>
-
-              {/* Pago Dividido */}
-              <button
-                onClick={() => setPaymentMode('split')}
-                className="p-6 border-2 border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all duration-200 text-left"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Split className="h-6 w-6 text-green-600" />
+                  <p className="text-gray-600 text-sm">
+                    Continuar procesando pagos parciales por items
+                  </p>
+                  <div className="mt-3 text-sm text-green-600 font-medium">
+                    Restante: {formatCurrency(getRemainingAmount())}
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Dividir Cuenta</h3>
+                </button>
+              </div>
+            ) : (
+              // Si no hay pagos parciales, mostrar ambas opciones
+              <>
+                <div className="text-center mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                    ¿Cómo desea procesar el pago?
+                  </h2>
+                  <p className="text-gray-600">
+                    Seleccione el tipo de pago que mejor se adapte a sus necesidades
+                  </p>
                 </div>
-                <p className="text-gray-600 text-sm">
-                  Procesar pagos parciales por items específicos
-                </p>
-                <div className="mt-3 text-sm text-green-600 font-medium">
-                  {order.items.length} items disponibles
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Pago Completo */}
+                  <button
+                    onClick={() => setPaymentMode('full')}
+                    className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 text-left"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <CreditCard className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Pago Completo</h3>
+                    </div>
+                    <p className="text-gray-600 text-sm">
+                      Un solo pago por el total de la cuenta
+                    </p>
+                    <div className="mt-3 text-xl font-bold text-blue-600">
+                      {formatCurrency(order.total_amount)}
+                    </div>
+                  </button>
+
+                  {/* Pago Dividido */}
+                  <button
+                    onClick={() => setPaymentMode('split')}
+                    className="p-6 border-2 border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all duration-200 text-left"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Split className="h-6 w-6 text-green-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Dividir Cuenta</h3>
+                    </div>
+                    <p className="text-gray-600 text-sm">
+                      Procesar pagos parciales por items específicos
+                    </p>
+                    <div className="mt-3 text-sm text-green-600 font-medium">
+                      {order.items.length} items disponibles
+                    </div>
+                  </button>
                 </div>
-              </button>
-            </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -690,23 +803,39 @@ const TablePaymentEcommerce = () => {
                     />
                   </div>
 
-                  {/* Botón procesar pago parcial */}
-                  <button
-                    onClick={() => {
-                      if (getCurrentSplitItems().length > 0) {
-                        addSplitPayment();
-                        // Procesar inmediatamente
-                        setTimeout(() => {
-                          handleSplitPayments();
-                        }, 100);
-                      }
-                    }}
-                    disabled={getCurrentSplitItems().length === 0}
-                    className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                    Procesar Pago Parcial
-                  </button>
+                  {/* Botones de pago */}
+                  <div className="space-y-2">
+                    {/* Botón procesar pago parcial */}
+                    <button
+                      onClick={handlePartialPayment}
+                      disabled={getCurrentSplitItems().length === 0 || processing}
+                      className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+                    >
+                      {processing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Procesando...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4" />
+                          Procesar Pago Parcial
+                        </>
+                      )}
+                    </button>
+                    
+                    {/* Botón pagar resto completo */}
+                    {getUnassignedItems().length > 0 && (
+                      <button
+                        onClick={handlePayRemainingTotal}
+                        disabled={processing}
+                        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2 text-sm"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        Pagar Resto Completo ({formatCurrency(getUnassignedItems().reduce((total, item) => total + parseFloat(item.total_price || 0), 0))})
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Pagos agregados */}
