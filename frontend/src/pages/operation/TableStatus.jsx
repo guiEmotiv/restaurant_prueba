@@ -72,17 +72,41 @@ const TableStatus = () => {
     return zone ? zone.name : 'Sin zona';
   };
 
-  const handleTableClick = (table) => {
+  const handleTableClick = async (table) => {
     const tableStatus = getTableStatus(table);
     
     if (tableStatus.status === 'occupied') {
-      // Si la mesa está ocupada, ir a ver los pedidos de esa mesa
-      navigate('/orders', { 
-        state: { 
-          filterTable: table.id,
-          filterZone: table.zone 
+      // Si la mesa está ocupada, verificar el estado de los items del pedido
+      try {
+        // Obtener el pedido activo de la mesa
+        const activeOrder = tableStatus.orders[0]; // Tomamos el primer pedido activo
+        if (activeOrder) {
+          const orderDetails = await apiService.orders.getById(activeOrder.id);
+          const allItemsDelivered = orderDetails.items && orderDetails.items.length > 0 && 
+            orderDetails.items.every(item => item.status === 'SERVED');
+          
+          if (allItemsDelivered) {
+            // Todos los items entregados -> Ir a procesar pago
+            navigate(`/table/${table.id}/payment-ecommerce`, {
+              state: { orderId: activeOrder.id }
+            });
+          } else {
+            // Hay items pendientes -> Ir a modificar pedido
+            navigate(`/table/${table.id}/order-edit`, {
+              state: { orderId: activeOrder.id }
+            });
+          }
         }
-      });
+      } catch (error) {
+        console.error('Error checking order status:', error);
+        // En caso de error, ir a la vista de pedidos tradicional
+        navigate('/orders', { 
+          state: { 
+            filterTable: table.id,
+            filterZone: table.zone 
+          }
+        });
+      }
     } else {
       // Si la mesa está disponible, ir a crear nuevo pedido tipo e-commerce
       navigate(`/table/${table.id}/order-ecommerce`);

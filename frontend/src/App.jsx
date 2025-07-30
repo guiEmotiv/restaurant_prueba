@@ -24,6 +24,8 @@ import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
 import TableStatus from './pages/operation/TableStatus';
 import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
+import TableOrderEdit from './pages/operation/TableOrderEdit';
+import TablePaymentEcommerce from './pages/operation/TablePaymentEcommerce';
 
 // Debug environment variables
 console.log('API Configuration Debug:');
@@ -145,6 +147,16 @@ const AppContent = () => {
           <Route path="/table/:tableId/order-ecommerce" element={
             <OptionalProtectedRoute requiredPermission="canManageOrders">
               <TableOrderEcommerce />
+            </OptionalProtectedRoute>
+          } />
+          <Route path="/table/:tableId/order-edit" element={
+            <OptionalProtectedRoute requiredPermission="canManageOrders">
+              <TableOrderEdit />
+            </OptionalProtectedRoute>
+          } />
+          <Route path="/table/:tableId/payment-ecommerce" element={
+            <OptionalProtectedRoute requiredPermission="canManagePayments">
+              <TablePaymentEcommerce />
             </OptionalProtectedRoute>
           } />
 
