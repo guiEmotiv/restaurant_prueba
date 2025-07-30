@@ -223,13 +223,6 @@ const TablePaymentEcommerce = () => {
       return;
     }
 
-    // Verificar que todos los items estén asignados
-    const unassignedItems = order.items.filter(item => selectedItems[item.id] === null);
-    if (unassignedItems.length > 0) {
-      showError(`Faltan ${unassignedItems.length} items por asignar a un pago`);
-      return;
-    }
-
     try {
       setProcessing(true);
       
@@ -241,13 +234,38 @@ const TablePaymentEcommerce = () => {
       }));
 
       await apiService.orders.splitPayment(orderId, { splits: formattedSplits });
-      showSuccess(`Pagos divididos procesados exitosamente (${splitPayments.length} pagos)`);
-      navigate('/table-status');
+      showSuccess(`Pago parcial procesado exitosamente`);
+      
+      // Recargar datos del pedido para ver el estado actualizado
+      const [tableData, orderData] = await Promise.all([
+        apiService.tables.getById(tableId),
+        apiService.orders.getById(orderId)
+      ]);
+      
+      setTable(tableData);
+      setOrder(orderData);
+      
+      // Reinicializar estados para siguiente pago
+      setSplitPayments([]);
+      const itemsMap = {};
+      orderData.items.forEach(item => {
+        itemsMap[item.id] = null;
+      });
+      setSelectedItems(itemsMap);
+      
+      // Verificar si todos los items están pagados
+      const remainingAmount = getRemainingAmount();
+      if (remainingAmount <= 0) {
+        showSuccess('¡Pedido completamente pagado!');
+        setTimeout(() => {
+          navigate('/table-status');
+        }, 2000);
+      }
       
     } catch (error) {
       console.error('Error processing split payments:', error);
       const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
-      showError('Error al procesar los pagos: ' + errorMessage);
+      showError('Error al procesar el pago: ' + errorMessage);
     } finally {
       setProcessing(false);
     }
@@ -305,7 +323,7 @@ const TablePaymentEcommerce = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/table-status')}
+                onClick={() => navigate(`/table/${tableId}/order-edit`, { state: { orderId: orderId }})}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -387,10 +405,10 @@ const TablePaymentEcommerce = () => {
                   <h3 className="text-lg font-semibold text-gray-900">Dividir Cuenta</h3>
                 </div>
                 <p className="text-gray-600 text-sm">
-                  Divide los items entre múltiples pagos
+                  Procesar pagos parciales por items específicos
                 </p>
                 <div className="mt-3 text-sm text-green-600 font-medium">
-                  {order.items.length} items para dividir
+                  {order.items.length} items disponibles
                 </div>
               </button>
             </div>
@@ -407,7 +425,7 @@ const TablePaymentEcommerce = () => {
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">Pago Completo</h2>
                 <button
-                  onClick={() => setPaymentMode(null)}
+                  onClick={() => navigate(`/table/${tableId}/order-edit`, { state: { orderId: orderId }})}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <ArrowLeft className="h-5 w-5" />
@@ -514,7 +532,7 @@ const TablePaymentEcommerce = () => {
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">Items del Pedido</h2>
                   <button
-                    onClick={() => setPaymentMode(null)}
+                    onClick={() => navigate(`/table/${tableId}/order-edit`, { state: { orderId: orderId }})}
                     className="text-gray-400 hover:text-gray-600"
                   >
                     <ArrowLeft className="h-5 w-5" />
@@ -672,14 +690,22 @@ const TablePaymentEcommerce = () => {
                     />
                   </div>
 
-                  {/* Botón agregar pago */}
+                  {/* Botón procesar pago parcial */}
                   <button
-                    onClick={addSplitPayment}
+                    onClick={() => {
+                      if (getCurrentSplitItems().length > 0) {
+                        addSplitPayment();
+                        // Procesar inmediatamente
+                        setTimeout(() => {
+                          handleSplitPayments();
+                        }, 100);
+                      }
+                    }}
                     disabled={getCurrentSplitItems().length === 0}
                     className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
                   >
-                    <Plus className="h-4 w-4" />
-                    Agregar Pago
+                    <CheckCircle className="h-4 w-4" />
+                    Procesar Pago Parcial
                   </button>
                 </div>
 

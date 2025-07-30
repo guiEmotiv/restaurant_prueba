@@ -298,7 +298,7 @@ const TableOrderEdit = () => {
       {/* Header fijo */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Info de la mesa y pedido */}
             <div className="flex items-center gap-4">
               <button
@@ -309,35 +309,37 @@ const TableOrderEdit = () => {
               </button>
               
               <div>
-                <h1 className="text-lg font-bold text-gray-900">
+                <h1 className="text-base sm:text-lg font-bold text-gray-900">
                   Mesa {table.table_number} - Pedido #{order.id}
                 </h1>
-                <p className="text-sm text-gray-600 flex items-center gap-2">
+                <p className="text-xs sm:text-sm text-gray-600 flex flex-wrap items-center gap-2">
                   <span>{table.zone_name}</span>
                   {table.capacity && (
                     <>
                       <span>•</span>
                       <Users className="h-3 w-3" />
-                      <span>{table.capacity} personas</span>
+                      <span className="hidden sm:inline">{table.capacity} personas</span>
+                      <span className="sm:hidden">{table.capacity}p</span>
                     </>
                   )}
                   <span>•</span>
-                  <span>Total: {formatCurrency(order.total_amount)}</span>
+                  <span className="font-medium">{formatCurrency(order.total_amount)}</span>
                 </p>
               </div>
             </div>
 
             {/* Botones de acción */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {/* Botón Agregar Items - siempre visible */}
               <button
                 onClick={() => setShowNewItems(!showNewItems)}
-                className="relative bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                className="relative bg-blue-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
               >
                 <Plus className="h-4 w-4" />
-                <span className="font-medium">Agregar Items</span>
+                <span className="font-medium hidden sm:inline">Agregar Items</span>
+                <span className="font-medium sm:hidden">Items</span>
                 {getNewItemsCount() > 0 && (
-                  <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                  <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold">
                     {getNewItemsCount()}
                   </div>
                 )}
@@ -347,10 +349,11 @@ const TableOrderEdit = () => {
               {checkAllItemsDelivered() && (
                 <button
                   onClick={handleGoToPayment}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+                  className="bg-green-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:bg-green-700 flex items-center gap-2 text-sm"
                 >
                   <CreditCard className="h-4 w-4" />
-                  Procesar Pago
+                  <span className="hidden sm:inline">Procesar Pago</span>
+                  <span className="sm:hidden">Pagar</span>
                 </button>
               )}
             </div>

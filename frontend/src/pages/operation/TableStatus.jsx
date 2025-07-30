@@ -133,17 +133,17 @@ const TableStatus = () => {
     <div className="space-y-4">
       {/* Header compacto */}
       <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
               <Table className="h-5 w-5" />
               Estado de Mesas
             </h1>
-            <p className="text-sm text-gray-600">Selecciona una mesa para crear pedido o ver pedidos activos</p>
+            <p className="text-xs sm:text-sm text-gray-600">Selecciona una mesa para crear pedido o ver pedidos activos</p>
           </div>
           
-          {/* Filtro por zona */}
-          <div className="flex items-center gap-3">
+          {/* Filtro por zona y leyenda */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <select
               value={selectedZone}
               onChange={(e) => setSelectedZone(e.target.value)}
@@ -161,11 +161,13 @@ const TableStatus = () => {
             <div className="flex items-center gap-4 text-xs">
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-gray-600">Disponible</span>
+                <span className="text-gray-600 hidden sm:inline">Disponible</span>
+                <span className="text-gray-600 sm:hidden">Disp.</span>
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="text-gray-600">Ocupada</span>
+                <span className="text-gray-600 hidden sm:inline">Ocupada</span>
+                <span className="text-gray-600 sm:hidden">Ocup.</span>
               </div>
             </div>
           </div>
