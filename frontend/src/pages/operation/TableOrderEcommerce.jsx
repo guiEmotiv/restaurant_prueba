@@ -16,11 +16,13 @@ import {
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const TableOrderEcommerce = () => {
   const { tableId } = useParams();
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
+  const { user } = useAuth();
   
   // Estados principales
   const [table, setTable] = useState(null);
@@ -186,6 +188,7 @@ const TableOrderEcommerce = () => {
 
       const orderData = {
         table: parseInt(tableId),
+        waiter_name: user?.username || 'Sistema',
         items: itemsArray
       };
 

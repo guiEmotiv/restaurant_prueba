@@ -232,7 +232,7 @@ deploy_on_ec2() {
     # Step 4: Health checks
     log_info "Checking application health..."
     sleep 5
-    if curl -f http://localhost:8000/api/v1/units/ > /dev/null 2>&1; then
+    if curl -f http://localhost:8000/admin/ > /dev/null 2>&1; then
         log_success "Backend API is responding"
     else
         log_error "Backend API is not responding"
@@ -358,7 +358,7 @@ ENDSSH
         
         echo "🔍 Checking application health..."
         sleep 5
-        if curl -f http://localhost:8000/api/v1/units/ > /dev/null 2>&1; then
+        if curl -f http://localhost:8000/admin/ > /dev/null 2>&1; then
             echo "✅ Backend API is responding"
         else
             echo "❌ Backend API is not responding"

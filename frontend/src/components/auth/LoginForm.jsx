@@ -65,19 +65,19 @@ const LoginForm = ({ children }) => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Authenticator
-          components={customComponents}
-          formFields={customFormFields}
-          // Hide sign up tab - users should be created by admin
-          hideSignUp={true}
-          className="amplify-authenticator"
-        >
+    <Authenticator
+      components={customComponents}
+      formFields={customFormFields}
+      // Hide sign up tab - users should be created by admin
+      hideSignUp={true}
+      className="amplify-authenticator"
+    >
+      {({ signOut, user }) => (
+        <div className="min-h-screen bg-gray-50">
           {children}
-        </Authenticator>
-      </div>
-    </div>
+        </div>
+      )}
+    </Authenticator>
   );
 };
 

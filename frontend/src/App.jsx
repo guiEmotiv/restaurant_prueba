@@ -6,6 +6,7 @@ import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import RoleBasedRedirect from './components/RoleBasedRedirect';
 import Dashboard from './pages/Dashboard';
 import Units from './pages/config/Units';
 import Zones from './pages/config/Zones';
@@ -170,10 +171,10 @@ const AppContent = () => {
             </ProtectedRoute>
           } />
 
-          {/* Redirect to orders for unauthorized access */}
+          {/* Role-based redirect for unauthorized paths */}
           <Route path="*" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <Orders />
+            <ProtectedRoute>
+              <RoleBasedRedirect />
             </ProtectedRoute>
           } />
         </Routes>
