@@ -17,7 +17,8 @@ import {
   Activity,
   Settings,
   Save,
-  X
+  X,
+  CreditCard
 } from 'lucide-react';
 import { apiService } from '../services/api';
 
