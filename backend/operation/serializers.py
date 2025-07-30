@@ -205,8 +205,8 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         
         # Crear N OrderItems individuales basados en la cantidad
         for i in range(quantity):
-            # Crear cada OrderItem con cantidad = 1
-            individual_item_data = {**validated_data, 'quantity': 1}
+            # Crear cada OrderItem con cantidad = 1, incluyendo la orden
+            individual_item_data = {**validated_data, 'quantity': 1, 'order': order}
             order_item = OrderItem.objects.create(**individual_item_data)
             created_items.append(order_item)
             
