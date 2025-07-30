@@ -558,148 +558,180 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Gráficas de Pie por Grupo de Recetas */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Distribución de Ventas por Grupo de Recetas
-          </h2>
-          <div className="text-sm text-gray-500">
-            {stats.recipeGroups ? `${stats.recipeGroups.length} grupos con ventas` : 'Cargando datos...'}
-          </div>
-        </div>
+
+      {/* Gráfica de Pie de Métodos de Pago */}
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+          <CreditCard className="h-6 w-6 text-blue-500" />
+          Distribución de Métodos de Pago
+        </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {stats.recipeGroups?.map((group, groupIndex) => {
-            const colors = [
-              '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-              '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'
-            ];
-            
-            return (
-              <div key={groupIndex} className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
-                <div className="text-center mb-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">{group.category}</h3>
-                  <p className="text-sm text-gray-600">{group.totalCount} items vendidos</p>
-                </div>
-                
-                <div className="flex justify-center mb-6">
-                  <div className="relative">
-                    <svg viewBox="0 0 200 200" className="w-40 h-40">
-                      {(() => {
-                        if (!group.recipes || group.recipes.length === 0 || group.totalCount === 0) {
-                          return (
-                            <>
-                              <circle cx="100" cy="100" r="80" fill="#f3f4f6" stroke="#e5e7eb" strokeWidth="2" />
-                              <text x="100" y="105" textAnchor="middle" className="text-sm fill-gray-500">
-                                Sin datos
-                              </text>
-                            </>
-                          );
-                        }
-                        
-                        let currentAngle = -90;
-                        
-                        // Caso especial: una sola receta - mostrar círculo completo
-                        if (group.recipes.length === 1) {
-                          return (
-                            <circle
-                              cx="100"
-                              cy="100"
-                              r="80"
-                              fill={colors[0]}
-                              stroke="white"
-                              strokeWidth="2"
-                              className="hover:opacity-80 transition-opacity cursor-pointer"
-                              title={`${group.recipes[0].name}: ${group.recipes[0].count} vendidas`}
-                            />
-                          );
-                        }
-                        
-                        // Múltiples recetas - pie chart normal
-                        return group.recipes.map((recipe, index) => {
-                          const angle = (recipe.count / group.totalCount) * 360;
-                          const startAngle = currentAngle * Math.PI / 180;
-                          const endAngle = (currentAngle + angle) * Math.PI / 180;
-                          
-                          // Calcular puntos del arco
-                          const radius = 80;
-                          const x1 = 100 + radius * Math.cos(startAngle);
-                          const y1 = 100 + radius * Math.sin(startAngle);
-                          const x2 = 100 + radius * Math.cos(endAngle);
-                          const y2 = 100 + radius * Math.sin(endAngle);
-                          
-                          const largeArc = angle > 180 ? 1 : 0;
-                          
-                          const pathData = [
-                            `M 100 100`,
-                            `L ${x1} ${y1}`,
-                            `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
-                            'Z'
-                          ].join(' ');
-                          
-                          currentAngle += angle;
-                          
-                          return (
-                            <path
-                              key={index}
-                              d={pathData}
-                              fill={colors[index % colors.length]}
-                              stroke="white"
-                              strokeWidth="2"
-                              className="hover:opacity-80 transition-opacity cursor-pointer"
-                              title={`${recipe.name}: ${recipe.count} vendidas`}
-                            />
-                          );
-                        });
-                      })()}
-                    </svg>
-                  </div>
-                </div>
-                
-                {/* Leyenda mejorada */}
-                <div className="space-y-3">
-                  {group.recipes?.map((recipe, index) => {
-                    const percentage = group.totalCount > 0 ? ((recipe.count / group.totalCount) * 100).toFixed(1) : '0';
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Pie Chart */}
+          <div className="flex justify-center items-center">
+            <div className="relative">
+              <svg viewBox="0 0 200 200" className="w-64 h-64">
+                {(() => {
+                  const paymentData = operationalSummary?.summary_by_method || [];
+                  const totalAmount = operationalSummary?.total_amount || 0;
+                  
+                  if (paymentData.length === 0 || totalAmount === 0) {
+                    return (
+                      <>
+                        <circle cx="100" cy="100" r="80" fill="#f3f4f6" stroke="#e5e7eb" strokeWidth="2" />
+                        <text x="100" y="105" textAnchor="middle" className="text-sm fill-gray-500">
+                          Sin datos
+                        </text>
+                      </>
+                    );
+                  }
+                  
+                  const colors = {
+                    'CASH': '#10b981',      // green
+                    'CARD': '#3b82f6',      // blue
+                    'TRANSFER': '#8b5cf6',  // purple
+                    'YAPE_PLIN': '#ec4899', // pink
+                    'OTHER': '#f59e0b'      // amber
+                  };
+                  
+                  let currentAngle = -90;
+                  
+                  // Caso especial: un solo método de pago
+                  if (paymentData.length === 1) {
+                    return (
+                      <circle
+                        cx="100"
+                        cy="100"
+                        r="80"
+                        fill={colors[paymentData[0].payment_method] || '#6b7280'}
+                        stroke="white"
+                        strokeWidth="2"
+                        className="hover:opacity-80 transition-opacity cursor-pointer"
+                      />
+                    );
+                  }
+                  
+                  return paymentData.map((payment, index) => {
+                    const percentage = (payment.total / totalAmount);
+                    const angle = percentage * 360;
+                    const startAngle = currentAngle * Math.PI / 180;
+                    const endAngle = (currentAngle + angle) * Math.PI / 180;
+                    
+                    // Calcular puntos del arco
+                    const radius = 80;
+                    const x1 = 100 + radius * Math.cos(startAngle);
+                    const y1 = 100 + radius * Math.sin(startAngle);
+                    const x2 = 100 + radius * Math.cos(endAngle);
+                    const y2 = 100 + radius * Math.sin(endAngle);
+                    
+                    const largeArc = angle > 180 ? 1 : 0;
+                    
+                    const pathData = [
+                      `M 100 100`,
+                      `L ${x1} ${y1}`,
+                      `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
+                      'Z'
+                    ].join(' ');
+                    
+                    currentAngle += angle;
                     
                     return (
-                      <div key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center min-w-0 flex-1">
-                          <div 
-                            className="w-4 h-4 rounded-full mr-3 flex-shrink-0 border-2 border-white shadow-sm"
-                            style={{ backgroundColor: colors[index % colors.length] }}
-                          ></div>
-                          <span className="text-sm font-medium text-gray-700 truncate">{recipe.name}</span>
-                        </div>
-                        <div className="text-right ml-3 flex-shrink-0">
-                          <div className="text-sm font-bold text-gray-900">{recipe.count}</div>
-                          <div className="text-xs text-gray-500">{percentage}%</div>
-                        </div>
-                      </div>
+                      <path
+                        key={index}
+                        d={pathData}
+                        fill={colors[payment.payment_method] || '#6b7280'}
+                        stroke="white"
+                        strokeWidth="2"
+                        className="hover:opacity-80 transition-opacity cursor-pointer"
+                      />
                     );
-                  }) || (
-                    <div className="text-center py-8">
-                      <ChefHat className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500 text-sm">No hay ventas en este grupo</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          }) || (
-            <div className="col-span-full">
-              <div className="bg-white rounded-lg shadow p-8 text-center">
-                <Activity className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay datos de ventas</h3>
-                <p className="text-gray-500 mb-4">
-                  Aún no se han registrado ventas de recetas o los datos están cargando.
-                </p>
-                <div className="text-xs text-gray-400">
-                  Debug: {stats.recipeGroups ? 'Array vacío' : 'Datos no disponibles'}
+                  });
+                })()}
+              </svg>
+              
+              {/* Centro del pie chart con total */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-white rounded-full w-32 h-32 flex flex-col items-center justify-center shadow-inner">
+                  <p className="text-xs text-gray-500">Total</p>
+                  <p className="text-lg font-bold text-gray-900">{formatCurrency(operationalSummary?.total_amount || 0)}</p>
                 </div>
               </div>
             </div>
-          )}
+          </div>
+          
+          {/* Leyenda y estadísticas */}
+          <div className="space-y-4">
+            {(() => {
+              const paymentData = operationalSummary?.summary_by_method || [];
+              const totalAmount = operationalSummary?.total_amount || 0;
+              
+              const colors = {
+                'CASH': '#10b981',
+                'CARD': '#3b82f6',
+                'TRANSFER': '#8b5cf6',
+                'YAPE_PLIN': '#ec4899',
+                'OTHER': '#f59e0b'
+              };
+              
+              const methodNames = {
+                'CASH': 'Efectivo',
+                'CARD': 'Tarjeta',
+                'TRANSFER': 'Transferencia',
+                'YAPE_PLIN': 'Yape/Plin',
+                'OTHER': 'Otro'
+              };
+              
+              const icons = {
+                'CASH': '💵',
+                'CARD': '💳',
+                'TRANSFER': '🏦',
+                'YAPE_PLIN': '📱',
+                'OTHER': '🔄'
+              };
+              
+              return paymentData.map((payment, index) => {
+                const percentage = totalAmount > 0 ? ((payment.total / totalAmount) * 100).toFixed(1) : '0';
+                
+                return (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center">
+                      <div 
+                        className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
+                        style={{ backgroundColor: colors[payment.payment_method] || '#6b7280' }}
+                      ></div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{icons[payment.payment_method]}</span>
+                          <span className="font-medium text-gray-900">{methodNames[payment.payment_method]}</span>
+                        </div>
+                        <p className="text-sm text-gray-500">{payment.count} transacciones</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-gray-900">{formatCurrency(payment.total)}</p>
+                      <p className="text-sm text-gray-500">{percentage}%</p>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+            
+            {/* Resumen adicional */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Total de transacciones</p>
+                  <p className="text-lg font-semibold text-gray-900">{operationalSummary?.total_orders || 0}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Transacción promedio</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {formatCurrency((operationalSummary?.total_amount || 0) / (operationalSummary?.total_orders || 1))}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -796,313 +828,6 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Tarjeta de Distribución de Ventas por Grupo de Recetas */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-          <ChefHat className="h-6 w-6 text-purple-500" />
-          Distribución de Ventas por Grupo de Recetas
-        </h2>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Pie Chart */}
-          <div className="flex justify-center items-center">
-            <div className="relative">
-              <svg viewBox="0 0 200 200" className="w-64 h-64">
-                {(() => {
-                  const groupsData = stats.recipeGroups || [];
-                  const totalItems = groupsData.reduce((sum, group) => sum + group.totalCount, 0);
-                  
-                  if (groupsData.length === 0 || totalItems === 0) {
-                    return (
-                      <>
-                        <circle cx="100" cy="100" r="80" fill="#f3f4f6" stroke="#e5e7eb" strokeWidth="2" />
-                        <text x="100" y="105" textAnchor="middle" className="text-sm fill-gray-500">
-                          Sin datos
-                        </text>
-                      </>
-                    );
-                  }
-                  
-                  const colors = [
-                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-                    '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'
-                  ];
-                  
-                  let currentAngle = -90;
-                  
-                  return groupsData.map((group, index) => {
-                    const percentage = (group.totalCount / totalItems);
-                    const angle = percentage * 360;
-                    const startAngle = currentAngle * Math.PI / 180;
-                    const endAngle = (currentAngle + angle) * Math.PI / 180;
-                    
-                    // Calcular puntos del arco
-                    const radius = 80;
-                    const x1 = 100 + radius * Math.cos(startAngle);
-                    const y1 = 100 + radius * Math.sin(startAngle);
-                    const x2 = 100 + radius * Math.cos(endAngle);
-                    const y2 = 100 + radius * Math.sin(endAngle);
-                    
-                    const largeArc = angle > 180 ? 1 : 0;
-                    
-                    const pathData = [
-                      `M 100 100`,
-                      `L ${x1} ${y1}`,
-                      `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
-                      'Z'
-                    ].join(' ');
-                    
-                    currentAngle += angle;
-                    
-                    return (
-                      <path
-                        key={index}
-                        d={pathData}
-                        fill={colors[index % colors.length]}
-                        stroke="white"
-                        strokeWidth="2"
-                        className="hover:opacity-80 transition-opacity cursor-pointer"
-                        title={`${group.category}: ${group.totalCount} items`}
-                      />
-                    );
-                  });
-                })()}
-              </svg>
-              
-              {/* Centro del pie chart con total */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-white rounded-full w-32 h-32 flex flex-col items-center justify-center shadow-inner">
-                  <p className="text-xs text-gray-500">Total Items</p>
-                  <p className="text-lg font-bold text-gray-900">
-                    {stats.recipeGroups?.reduce((sum, group) => sum + group.totalCount, 0) || 0}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Leyenda y estadísticas */}
-          <div className="space-y-4">
-            {(() => {
-              const groupsData = stats.recipeGroups || [];
-              const totalItems = groupsData.reduce((sum, group) => sum + group.totalCount, 0);
-              
-              const colors = [
-                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-                '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'
-              ];
-              
-              return groupsData.map((group, index) => {
-                const percentage = totalItems > 0 ? ((group.totalCount / totalItems) * 100).toFixed(1) : '0';
-                
-                return (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center">
-                      <div 
-                        className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
-                        style={{ backgroundColor: colors[index % colors.length] }}
-                      ></div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">{group.category}</span>
-                        </div>
-                        <p className="text-sm text-gray-500">{group.recipes.length} recetas diferentes</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-gray-900">{group.totalCount} items</p>
-                      <p className="text-sm text-gray-500">{percentage}%</p>
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-            
-            {/* Resumen adicional */}
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500">Grupos activos</p>
-                  <p className="text-lg font-semibold text-gray-900">{stats.recipeGroups?.length || 0}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Promedio por grupo</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {stats.recipeGroups?.length > 0 
-                      ? Math.round(stats.recipeGroups.reduce((sum, g) => sum + g.totalCount, 0) / stats.recipeGroups.length)
-                      : 0
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Gráfico de Pie de Ventas por Método de Pago */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">
-          Distribución de Ventas por Método de Pago
-        </h2>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Pie Chart */}
-          <div className="flex justify-center items-center">
-            <div className="relative">
-              <svg viewBox="0 0 200 200" className="w-64 h-64">
-                {(() => {
-                  const paymentData = operationalSummary?.summary_by_method || [];
-                  const totalAmount = operationalSummary?.total_amount || 0;
-                  
-                  if (paymentData.length === 0 || totalAmount === 0) {
-                    return (
-                      <>
-                        <circle cx="100" cy="100" r="80" fill="#f3f4f6" stroke="#e5e7eb" strokeWidth="2" />
-                        <text x="100" y="105" textAnchor="middle" className="text-sm fill-gray-500">
-                          Sin datos
-                        </text>
-                      </>
-                    );
-                  }
-                  
-                  const colors = {
-                    'CASH': '#10b981',      // green
-                    'CARD': '#3b82f6',      // blue
-                    'YAPE_PLIN': '#8b5cf6', // purple
-                    'OTHER': '#f59e0b'      // amber
-                  };
-                  
-                  const methodNames = {
-                    'CASH': 'Efectivo',
-                    'CARD': 'Tarjeta',
-                    'YAPE_PLIN': 'Yape/Plin',
-                    'OTHER': 'Otro'
-                  };
-                  
-                  let currentAngle = -90;
-                  
-                  return paymentData.map((payment, index) => {
-                    const percentage = (payment.total / totalAmount);
-                    const angle = percentage * 360;
-                    const startAngle = currentAngle * Math.PI / 180;
-                    const endAngle = (currentAngle + angle) * Math.PI / 180;
-                    
-                    // Calcular puntos del arco
-                    const radius = 80;
-                    const x1 = 100 + radius * Math.cos(startAngle);
-                    const y1 = 100 + radius * Math.sin(startAngle);
-                    const x2 = 100 + radius * Math.cos(endAngle);
-                    const y2 = 100 + radius * Math.sin(endAngle);
-                    
-                    const largeArc = angle > 180 ? 1 : 0;
-                    
-                    const pathData = [
-                      `M 100 100`,
-                      `L ${x1} ${y1}`,
-                      `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
-                      'Z'
-                    ].join(' ');
-                    
-                    currentAngle += angle;
-                    
-                    return (
-                      <path
-                        key={index}
-                        d={pathData}
-                        fill={colors[payment.payment_method] || '#6b7280'}
-                        stroke="white"
-                        strokeWidth="2"
-                        className="hover:opacity-80 transition-opacity cursor-pointer"
-                        title={`${methodNames[payment.payment_method]}: ${formatCurrency(payment.total)}`}
-                      />
-                    );
-                  });
-                })()}
-              </svg>
-              
-              {/* Centro del pie chart con total */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-white rounded-full w-32 h-32 flex flex-col items-center justify-center shadow-inner">
-                  <p className="text-xs text-gray-500">Total</p>
-                  <p className="text-lg font-bold text-gray-900">{formatCurrency(operationalSummary?.total_amount || 0)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Leyenda y estadísticas */}
-          <div className="space-y-4">
-            {(() => {
-              const paymentData = operationalSummary?.summary_by_method || [];
-              const totalAmount = operationalSummary?.total_amount || 0;
-              
-              const colors = {
-                'CASH': '#10b981',
-                'CARD': '#3b82f6',
-                'YAPE_PLIN': '#8b5cf6',
-                'OTHER': '#f59e0b'
-              };
-              
-              const methodNames = {
-                'CASH': 'Efectivo',
-                'CARD': 'Tarjeta',
-                'YAPE_PLIN': 'Yape/Plin',
-                'OTHER': 'Otro'
-              };
-              
-              const icons = {
-                'CASH': '💵',
-                'CARD': '💳',
-                'YAPE_PLIN': '📱',
-                'OTHER': '🔄'
-              };
-              
-              return paymentData.map((payment, index) => {
-                const percentage = totalAmount > 0 ? ((payment.total / totalAmount) * 100).toFixed(1) : '0';
-                
-                return (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center">
-                      <div 
-                        className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
-                        style={{ backgroundColor: colors[payment.payment_method] || '#6b7280' }}
-                      ></div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">{icons[payment.payment_method]}</span>
-                          <span className="font-medium text-gray-900">{methodNames[payment.payment_method]}</span>
-                        </div>
-                        <p className="text-sm text-gray-500">{payment.count} transacciones</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-gray-900">{formatCurrency(payment.total)}</p>
-                      <p className="text-sm text-gray-500">{percentage}%</p>
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-            
-            {/* Resumen adicional */}
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500">Total de transacciones</p>
-                  <p className="text-lg font-semibold text-gray-900">{operationalSummary?.total_orders || 0}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Transacción promedio</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {formatCurrency((operationalSummary?.total_amount || 0) / (operationalSummary?.total_orders || 1))}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
     </div>
   );
