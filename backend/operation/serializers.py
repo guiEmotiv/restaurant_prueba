@@ -161,6 +161,16 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = ['order', 'recipe', 'notes', 'quantity', 'is_takeaway', 'has_taper', 'selected_container']
     
+    def validate(self, data):
+        # Si has_taper es True pero no hay selected_container, buscar el primer container disponible
+        if data.get('has_taper', False) and not data.get('selected_container'):
+            from config.models import Container
+            default_container = Container.objects.filter(is_active=True).first()
+            if default_container:
+                data['selected_container'] = default_container.id
+        
+        return data
+    
     def validate_recipe(self, value):
         if not value.is_active:
             raise serializers.ValidationError("Esta receta no está disponible")
