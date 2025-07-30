@@ -82,10 +82,10 @@ const TablePaymentEcommerce = () => {
         return;
       }
 
-      // Inicializar selectedItems
+      // Inicializar selectedItems - excluir items completamente pagados
       const itemsMap = {};
       orderData.items.forEach(item => {
-        itemsMap[item.id] = null; // null = no asignado
+        itemsMap[item.id] = item.is_fully_paid ? 'paid' : null; // 'paid' para items pagados, null = no asignado
       });
       setSelectedItems(itemsMap);
       
@@ -158,6 +158,12 @@ const TablePaymentEcommerce = () => {
   const toggleItemSelection = (itemId) => {
     const currentSplitIndex = splitPayments.length;
     const newSelectedItems = { ...selectedItems };
+    
+    // Obtener el item para verificar si está pagado
+    const item = order.items.find(i => i.id === itemId);
+    if (item && item.is_fully_paid) {
+      return; // No permitir seleccionar items ya pagados
+    }
     
     // Si el item ya está asignado a un split finalizado (no al actual), no permitir cambios
     if (selectedItems[itemId] !== null && selectedItems[itemId] < currentSplitIndex) {
@@ -260,7 +266,7 @@ const TablePaymentEcommerce = () => {
       
       const itemsMap = {};
       orderData.items.forEach(item => {
-        itemsMap[item.id] = null;
+        itemsMap[item.id] = item.is_fully_paid ? 'paid' : null;
       });
       setSelectedItems(itemsMap);
       
@@ -362,7 +368,11 @@ const TablePaymentEcommerce = () => {
   };
 
   const getUnassignedItems = () => {
-    return order.items.filter(item => selectedItems[item.id] === null);
+    return order.items.filter(item => selectedItems[item.id] === null && !item.is_fully_paid);
+  };
+
+  const getAvailableItemsCount = () => {
+    return order.items.filter(item => !item.is_fully_paid).length;
   };
 
   if (loading) {
@@ -519,7 +529,7 @@ const TablePaymentEcommerce = () => {
                       Procesar pagos parciales por items específicos
                     </p>
                     <div className="mt-3 text-sm text-green-600 font-medium">
-                      {order.items.length} items disponibles
+                      {getAvailableItemsCount()} items disponibles
                     </div>
                   </button>
                 </div>
@@ -662,33 +672,43 @@ const TablePaymentEcommerce = () => {
                     const isAssigned = selectedItems[item.id] !== null;
                     const isSelectedForCurrent = selectedItems[item.id] === splitPayments.length;
                     const assignedToSplit = selectedItems[item.id];
+                    const isItemPaid = item.is_fully_paid || false; // Verificar si el item está completamente pagado
 
                     return (
                       <div
                         key={item.id}
-                        onClick={() => toggleItemSelection(item.id)}
-                        className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
-                          isAssigned && !isSelectedForCurrent
+                        onClick={() => !isItemPaid && toggleItemSelection(item.id)}
+                        className={`p-3 border rounded-lg transition-all duration-200 ${
+                          isItemPaid
+                            ? 'bg-green-50 border-green-300 cursor-not-allowed opacity-80'
+                            : isAssigned && !isSelectedForCurrent
                             ? 'bg-gray-100 border-gray-300 cursor-not-allowed opacity-60'
                             : isSelectedForCurrent
-                            ? 'bg-blue-50 border-blue-300'
-                            : 'bg-white border-gray-200 hover:border-blue-200 hover:bg-blue-25'
+                            ? 'bg-blue-50 border-blue-300 cursor-pointer'
+                            : 'bg-white border-gray-200 hover:border-blue-200 hover:bg-blue-25 cursor-pointer'
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                              isSelectedForCurrent 
+                              isItemPaid
+                                ? 'bg-green-600 border-green-600'
+                                : isSelectedForCurrent 
                                 ? 'bg-blue-600 border-blue-600' 
                                 : 'border-gray-300'
                             }`}>
-                              {isSelectedForCurrent && <Check className="h-3 w-3 text-white" />}
+                              {(isSelectedForCurrent || isItemPaid) && <Check className="h-3 w-3 text-white" />}
                             </div>
                             <div>
                               <div className="font-medium text-gray-900 flex items-center gap-2">
                                 {item.recipe_name}
                                 {item.is_takeaway && (
                                   <Package className="h-3 w-3 text-orange-500" />
+                                )}
+                                {isItemPaid && (
+                                  <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+                                    PAGADO
+                                  </span>
                                 )}
                               </div>
                               {item.notes && (
@@ -702,7 +722,12 @@ const TablePaymentEcommerce = () => {
                             <div className="font-medium text-gray-900">
                               {formatCurrency(item.total_price)}
                             </div>
-                            {isAssigned && !isSelectedForCurrent && (
+                            {isItemPaid && (
+                              <div className="text-xs text-green-600 font-medium">
+                                Completado
+                              </div>
+                            )}
+                            {!isItemPaid && isAssigned && !isSelectedForCurrent && (
                               <div className="text-xs text-gray-500">
                                 Pago {assignedToSplit + 1}
                               </div>
