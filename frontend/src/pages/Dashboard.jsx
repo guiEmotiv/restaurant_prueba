@@ -796,6 +796,150 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Tarjeta de Distribución de Ventas por Grupo de Recetas */}
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+          <ChefHat className="h-6 w-6 text-purple-500" />
+          Distribución de Ventas por Grupo de Recetas
+        </h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Pie Chart */}
+          <div className="flex justify-center items-center">
+            <div className="relative">
+              <svg viewBox="0 0 200 200" className="w-64 h-64">
+                {(() => {
+                  const groupsData = stats.recipeGroups || [];
+                  const totalItems = groupsData.reduce((sum, group) => sum + group.totalCount, 0);
+                  
+                  if (groupsData.length === 0 || totalItems === 0) {
+                    return (
+                      <>
+                        <circle cx="100" cy="100" r="80" fill="#f3f4f6" stroke="#e5e7eb" strokeWidth="2" />
+                        <text x="100" y="105" textAnchor="middle" className="text-sm fill-gray-500">
+                          Sin datos
+                        </text>
+                      </>
+                    );
+                  }
+                  
+                  const colors = [
+                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                    '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'
+                  ];
+                  
+                  let currentAngle = -90;
+                  
+                  return groupsData.map((group, index) => {
+                    const percentage = (group.totalCount / totalItems);
+                    const angle = percentage * 360;
+                    const startAngle = currentAngle * Math.PI / 180;
+                    const endAngle = (currentAngle + angle) * Math.PI / 180;
+                    
+                    // Calcular puntos del arco
+                    const radius = 80;
+                    const x1 = 100 + radius * Math.cos(startAngle);
+                    const y1 = 100 + radius * Math.sin(startAngle);
+                    const x2 = 100 + radius * Math.cos(endAngle);
+                    const y2 = 100 + radius * Math.sin(endAngle);
+                    
+                    const largeArc = angle > 180 ? 1 : 0;
+                    
+                    const pathData = [
+                      `M 100 100`,
+                      `L ${x1} ${y1}`,
+                      `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
+                      'Z'
+                    ].join(' ');
+                    
+                    currentAngle += angle;
+                    
+                    return (
+                      <path
+                        key={index}
+                        d={pathData}
+                        fill={colors[index % colors.length]}
+                        stroke="white"
+                        strokeWidth="2"
+                        className="hover:opacity-80 transition-opacity cursor-pointer"
+                        title={`${group.category}: ${group.totalCount} items`}
+                      />
+                    );
+                  });
+                })()}
+              </svg>
+              
+              {/* Centro del pie chart con total */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-white rounded-full w-32 h-32 flex flex-col items-center justify-center shadow-inner">
+                  <p className="text-xs text-gray-500">Total Items</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {stats.recipeGroups?.reduce((sum, group) => sum + group.totalCount, 0) || 0}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Leyenda y estadísticas */}
+          <div className="space-y-4">
+            {(() => {
+              const groupsData = stats.recipeGroups || [];
+              const totalItems = groupsData.reduce((sum, group) => sum + group.totalCount, 0);
+              
+              const colors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'
+              ];
+              
+              return groupsData.map((group, index) => {
+                const percentage = totalItems > 0 ? ((group.totalCount / totalItems) * 100).toFixed(1) : '0';
+                
+                return (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center">
+                      <div 
+                        className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
+                        style={{ backgroundColor: colors[index % colors.length] }}
+                      ></div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{group.category}</span>
+                        </div>
+                        <p className="text-sm text-gray-500">{group.recipes.length} recetas diferentes</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-gray-900">{group.totalCount} items</p>
+                      <p className="text-sm text-gray-500">{percentage}%</p>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+            
+            {/* Resumen adicional */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Grupos activos</p>
+                  <p className="text-lg font-semibold text-gray-900">{stats.recipeGroups?.length || 0}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Promedio por grupo</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {stats.recipeGroups?.length > 0 
+                      ? Math.round(stats.recipeGroups.reduce((sum, g) => sum + g.totalCount, 0) / stats.recipeGroups.length)
+                      : 0
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Gráfico de Pie de Ventas por Método de Pago */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-6">

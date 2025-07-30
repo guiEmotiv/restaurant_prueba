@@ -48,6 +48,16 @@ const TableOrderEcommerce = () => {
   const loadData = async () => {
     try {
       setLoading(true);
+      
+      // Primero verificar horario operativo
+      const operationalInfo = await apiService.restaurantConfig.getOperationalInfo();
+      
+      if (operationalInfo && operationalInfo.has_config && !operationalInfo.is_currently_open) {
+        showError(`El restaurante está cerrado. Horario de atención: ${operationalInfo.business_hours}`);
+        navigate('/table-status');
+        return;
+      }
+      
       const [tableData, groupsData, recipesData] = await Promise.all([
         apiService.tables.getById(tableId),
         apiService.groups.getAll(),
@@ -152,6 +162,14 @@ const TableOrderEcommerce = () => {
 
     try {
       setCreatingOrder(true);
+      
+      // Verificar horario operativo antes de crear pedido
+      const operationalInfo = await apiService.restaurantConfig.getOperationalInfo();
+      
+      if (operationalInfo && operationalInfo.has_config && !operationalInfo.is_currently_open) {
+        showError(`No se puede crear pedido. El restaurante está cerrado. Horario: ${operationalInfo.business_hours}`);
+        return;
+      }
       
       // Convertir items del carrito al formato del backend
       const itemsArray = [];
