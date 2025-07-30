@@ -159,7 +159,7 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = OrderItem
-        fields = ['order', 'recipe', 'notes', 'quantity', 'is_takeaway', 'has_taper', 'selected_container']
+        fields = ['recipe', 'notes', 'quantity', 'is_takeaway', 'has_taper', 'selected_container']
     
     def validate(self, data):
         # Si has_taper es True pero no hay selected_container, buscar el primer container disponible
@@ -183,7 +183,7 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         selected_container_id = validated_data.pop('selected_container', None)
         quantity = validated_data.pop('quantity', 1)  # Extraer cantidad
-        order = validated_data['order']
+        order = validated_data.pop('order')  # order viene del save(order=order) en la vista
         
         created_items = []
         

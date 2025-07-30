@@ -58,7 +58,14 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def add_item(self, request, pk=None):
         """Agregar item a una orden existente"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         order = self.get_object()
+        
+        # Debug logging
+        logger.error(f"ADD_ITEM DEBUG - Order ID: {order.id}, Status: {order.status}")
+        logger.error(f"ADD_ITEM DEBUG - Request data: {request.data}")
         
         if order.status != 'CREATED':
             return Response(
@@ -74,7 +81,13 @@ class OrderViewSet(viewsets.ModelViewSet):
             response_serializer = OrderItemSerializer(order_item)
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Debug logging para errores
+        logger.error(f"ADD_ITEM DEBUG - Serializer errors: {serializer.errors}")
+        return Response({
+            'error': 'Datos inválidos',
+            'details': serializer.errors,
+            'received_data': request.data
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['get'])
     def active(self, request):
