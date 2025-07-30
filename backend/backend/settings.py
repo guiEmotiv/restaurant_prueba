@@ -123,6 +123,19 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
+# Add EC2 IP to CORS if configured
+EC2_IP = os.getenv('EC2_PUBLIC_IP', '')
+if EC2_IP:
+    CORS_ALLOWED_ORIGINS.append(f"http://{EC2_IP}")
+
+# Add domain to CORS if configured
+DOMAIN_NAME = os.getenv('DOMAIN_NAME', '')
+if DOMAIN_NAME:
+    CORS_ALLOWED_ORIGINS.extend([
+        f"https://{DOMAIN_NAME}",
+        f"https://www.{DOMAIN_NAME}",
+    ])
+
 CORS_ALLOW_CREDENTIALS = True
 
 
