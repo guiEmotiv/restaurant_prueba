@@ -269,7 +269,7 @@ const TableOrderEcommerce = () => {
 
       <div className="flex">
         {/* Panel principal del menú */}
-        <div className={`flex-1 transition-all duration-300 ${showCart ? 'mr-80' : 'mr-0'}`}>
+        <div className={`flex-1 transition-all duration-300 ${showCart ? 'hidden sm:block sm:mr-80' : 'mr-0'}`}>
           {/* Filtros */}
           <div className="bg-white border-b border-gray-200 p-4">
             <div className="flex flex-col sm:flex-row gap-4">
@@ -374,9 +374,17 @@ const TableOrderEcommerce = () => {
           </div>
         </div>
 
+        {/* Overlay para móviles */}
+        {showCart && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden"
+            onClick={() => setShowCart(false)}
+          />
+        )}
+
         {/* Panel del carrito (sidebar) */}
         {showCart && (
-          <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-gray-200 shadow-lg z-30">
+          <div className="fixed right-0 top-0 h-full w-full sm:w-80 bg-white border-l border-gray-200 shadow-lg z-50 pt-16 sm:pt-0">
             <div className="flex flex-col h-full">
               {/* Header del carrito */}
               <div className="p-4 border-b border-gray-200">
