@@ -803,99 +803,65 @@ const TablePaymentEcommerce = () => {
                     />
                   </div>
 
-                  {/* Botones de pago */}
+                  {/* Botón único para procesar pago */}
                   <div className="space-y-2">
-                    {/* Botón procesar pago parcial */}
                     <button
                       onClick={handlePartialPayment}
                       disabled={getCurrentSplitItems().length === 0 || processing}
-                      className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+                      className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold flex items-center justify-center gap-2 text-lg"
                     >
                       {processing ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Procesando...
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          Procesando Pago...
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="h-4 w-4" />
-                          Procesar Pago Parcial
+                          <CheckCircle className="h-5 w-5" />
+                          Procesar Pago - {formatCurrency(getCurrentSplitTotal())}
                         </>
                       )}
                     </button>
                     
-                    {/* Botón pagar resto completo */}
-                    {getUnassignedItems().length > 0 && (
+                    {/* Botón secundario para pagar resto completo */}
+                    {getUnassignedItems().length > 0 && getCurrentSplitItems().length === 0 && (
                       <button
                         onClick={handlePayRemainingTotal}
                         disabled={processing}
                         className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2 text-sm"
                       >
                         <CreditCard className="h-4 w-4" />
-                        Pagar Resto Completo ({formatCurrency(getUnassignedItems().reduce((total, item) => total + parseFloat(item.total_price || 0), 0))})
+                        Pagar Todo el Resto ({formatCurrency(getUnassignedItems().reduce((total, item) => total + parseFloat(item.total_price || 0), 0))})
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Pagos agregados */}
-                {splitPayments.length > 0 && (
+                {/* Información de pagos realizados */}
+                {order.total_paid > 0 && (
                   <div className="border-t pt-4">
                     <h3 className="text-md font-medium text-gray-900 mb-3">
-                      Pagos Configurados ({splitPayments.length})
+                      Estado del Pago
                     </h3>
                     
-                    <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
-                      {splitPayments.map((split, index) => (
-                        <div key={split.id} className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium text-sm">Pago {index + 1}</span>
-                                <span className="text-xs px-2 py-1 bg-white rounded border">
-                                  {getPaymentMethodName(split.payment_method)}
-                                </span>
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                {split.items.length} item(s) • {formatCurrency(split.amount)}
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => removeSplitPayment(index)}
-                              className="text-red-600 hover:text-red-800 p-1"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-green-800">
+                            Total Pagado: {formatCurrency(order.total_paid)}
+                          </div>
+                          <div className="text-sm text-green-600">
+                            Pendiente: {formatCurrency(order.pending_amount)}
                           </div>
                         </div>
-                      ))}
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      </div>
                     </div>
 
-                    {/* Botón procesar pagos divididos */}
-                    {getUnassignedItems().length === 0 && (
-                      <button
-                        onClick={handleSplitPayments}
-                        disabled={processing}
-                        className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-semibold flex items-center justify-center gap-2"
-                      >
-                        {processing ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            Procesando...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4" />
-                            Procesar {splitPayments.length} Pagos
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    {getUnassignedItems().length > 0 && (
-                      <div className="text-center p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-sm text-yellow-800">
-                          Faltan {getUnassignedItems().length} items por asignar
+                    {order.pending_amount > 0 && (
+                      <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                          Continúe seleccionando items para procesar más pagos
                         </p>
                       </div>
                     )}

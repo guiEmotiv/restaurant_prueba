@@ -54,7 +54,6 @@ const Layout = ({ children }) => {
       ]
     },
     { name: 'Estado Mesas', href: '/table-status', icon: Table, permission: 'canViewTableStatus' },
-    { name: 'Pedidos', href: '/orders', icon: ShoppingCart, permission: 'canManageOrders' },
     { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
     { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
   ];

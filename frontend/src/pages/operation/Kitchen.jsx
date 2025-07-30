@@ -32,6 +32,12 @@ const Kitchen = () => {
 
 
   const updateItemStatus = async (itemId, newStatus) => {
+    // Mostrar confirmación antes de cambiar estado
+    const confirmed = window.confirm('¿Estás seguro de que deseas marcar este item como entregado?');
+    if (!confirmed) {
+      return;
+    }
+
     try {
       await apiService.orderItems.updateStatus(itemId, newStatus);
       await loadKitchenBoard();
