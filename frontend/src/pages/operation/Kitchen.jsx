@@ -117,6 +117,14 @@ const Kitchen = () => {
       dynamicGroups[groupKey].items.push(item);
     });
 
+    // Ordenar items dentro de cada grupo por created_at (orden de llegada)
+    Object.values(dynamicGroups).forEach(group => {
+      group.items.sort((a, b) => {
+        // Ordenar por created_at ascendente (más antiguos primero)
+        return new Date(a.created_at) - new Date(b.created_at);
+      });
+    });
+
     // Filtrar por pestaña seleccionada
     const columns = {};
     
