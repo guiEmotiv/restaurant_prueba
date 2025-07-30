@@ -281,9 +281,12 @@ const Kitchen = () => {
             </div>
           </div>
         ) : (
-          <div className="flex gap-4 h-full overflow-x-auto pb-4">
-            {Object.values(kanbanColumns).map(column => (
-              <div key={column.id} className="flex-shrink-0 w-80">
+          // Vista diferente para "Todos" vs grupos individuales
+          selectedGroupTab === 'all' ? (
+            // Vista Kanban columnar para "Todos"
+            <div className="flex gap-4 h-full overflow-x-auto pb-4">
+              {Object.values(kanbanColumns).map(column => (
+                <div key={column.id} className="flex-shrink-0 w-80">
                 {/* Header de columna */}
                 <div className="bg-white rounded-t-lg px-4 py-3 border-b border-gray-200">
                   <h3 className="font-semibold text-gray-900 flex items-center justify-between">
@@ -392,6 +395,120 @@ const Kitchen = () => {
               </div>
             ))}
           </div>
+          ) : (
+            // Vista Grid para grupos individuales - usa toda la pantalla
+            <div className="h-full">
+              {Object.values(kanbanColumns).map(column => (
+                <div key={column.id} className="h-full">
+                  {/* Header del grupo */}
+                  <div className="bg-white rounded-lg px-4 py-3 mb-4 border border-gray-200">
+                    <h3 className="font-semibold text-gray-900 flex items-center justify-between">
+                      <span>{column.name}</span>
+                      <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs">
+                        {column.items.length} items
+                      </span>
+                    </h3>
+                  </div>
+
+                  {/* Grid de items */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                    {column.items.map(item => {
+                      const timeStatus = getTimeStatus(item.elapsed_time_minutes, item.preparation_time);
+                      
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => updateItemStatus(item.id, 'SERVED')}
+                          className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} relative`}
+                        >
+                          {/* Barra de progreso de tiempo */}
+                          <div className="mb-3">
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className={`h-1.5 rounded-full transition-all duration-300 ${timeStatus.color}`}
+                                style={{ width: `${Math.min((item.elapsed_time_minutes / item.preparation_time) * 100, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Información principal */}
+                          <div className="space-y-2">
+                            {/* Header con número de pedido y tiempo */}
+                            <div className="flex justify-between items-start">
+                              <span className="text-lg font-bold text-gray-900">#{item.order_id}</span>
+                              <div className="text-right">
+                                <div className={`text-sm font-medium ${timeStatus.textColor}`}>
+                                  {formatTime(item.elapsed_time_minutes)}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {formatCreationTime(item.created_at)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Receta */}
+                            <div className="font-medium text-gray-900 text-center py-2 bg-gray-50 rounded">
+                              {item.recipe_name}
+                            </div>
+
+                            {/* Ubicación */}
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <MapPin className="h-4 w-4" />
+                              <span>{item.order_zone} - Mesa {item.order_table}</span>
+                            </div>
+
+                            {/* Mesero */}
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <User className="h-4 w-4" />
+                              <span>{item.waiter_name}</span>
+                            </div>
+
+                            {/* Para llevar */}
+                            {item.is_takeaway && (
+                              <div className="flex items-center gap-2 text-sm text-orange-600">
+                                <Package className="h-4 w-4" />
+                                <span>Para llevar</span>
+                              </div>
+                            )}
+
+                            {/* Personalizaciones */}
+                            {item.customizations_count > 0 && (
+                              <div className="text-sm text-blue-600">
+                                +{item.customizations_count} personalización{item.customizations_count > 1 ? 'es' : ''}
+                              </div>
+                            )}
+
+                            {/* Notas */}
+                            {item.notes && item.notes.trim() && (
+                              <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
+                                <strong>Notas:</strong> {item.notes}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Badge de urgencia */}
+                          {timeStatus.status === 'overdue' && (
+                            <div className="absolute -top-1 -right-1">
+                              <div className="bg-red-500 text-white rounded-full p-1 animate-pulse">
+                                <AlertTriangle className="h-3 w-3" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {column.items.length === 0 && (
+                    <div className="text-center text-gray-500 py-16">
+                      <div className="text-4xl mb-2">🍽️</div>
+                      <p className="text-lg">No hay items en {column.name}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>
