@@ -38,11 +38,32 @@ install_frontend_deps() {
     echo -e "\n${YELLOW}📦 Installing frontend dependencies...${NC}"
     cd "$FRONTEND_DIR"
     
-    # Use npm ci for faster, reliable installs in production
-    if [ -f "package-lock.json" ]; then
-        npm ci --only=production --silent
+    # Clean previous installations if they exist but are broken
+    if [ -d "node_modules" ] && [ ! -f "node_modules/.bin/vite" ]; then
+        echo -e "${BLUE}  🧹 Cleaning broken node_modules${NC}"
+        rm -rf node_modules package-lock.json
+    fi
+    
+    # Install dependencies (including dev dependencies for build tools)
+    if [ -f "package-lock.json" ] && [ -d "node_modules" ]; then
+        echo -e "${BLUE}  📦 Using npm ci (faster)${NC}"
+        npm ci --silent --no-fund --no-audit
     else
-        npm install --only=production --silent --no-fund --no-audit
+        echo -e "${BLUE}  📦 Using npm install${NC}"
+        npm install --silent --no-fund --no-audit
+    fi
+    
+    # Verify critical build tools are installed
+    if [ ! -f "node_modules/.bin/vite" ]; then
+        echo -e "${YELLOW}  🔧 Installing vite explicitly${NC}"
+        npm install vite --save-dev --silent
+    fi
+    
+    # Verify vite is available
+    if [ -f "node_modules/.bin/vite" ]; then
+        echo -e "${GREEN}  ✅ Vite build tool available${NC}"
+    else
+        echo -e "${YELLOW}  ⚠️ Vite not found, will use npx fallback${NC}"
     fi
     
     echo -e "${GREEN}✅ Frontend dependencies installed${NC}"
@@ -56,16 +77,58 @@ build_frontend() {
     # Set production environment
     export NODE_ENV=production
     
-    # Build with local vite
-    ./node_modules/.bin/vite build --mode production
+    # Try multiple build methods in order of preference
+    local build_success=false
     
-    # Verify build
+    # Method 1: Try local vite binary
+    if [ -f "./node_modules/.bin/vite" ]; then
+        echo -e "${BLUE}  📦 Using local vite binary${NC}"
+        if ./node_modules/.bin/vite build --mode production; then
+            build_success=true
+        fi
+    fi
+    
+    # Method 2: Try npm run build
+    if [ "$build_success" = false ]; then
+        echo -e "${BLUE}  📦 Trying npm run build${NC}"
+        if npm run build; then
+            build_success=true
+        fi
+    fi
+    
+    # Method 3: Try npx vite
+    if [ "$build_success" = false ]; then
+        echo -e "${BLUE}  📦 Trying npx vite${NC}"
+        if npx vite build --mode production; then
+            build_success=true
+        fi
+    fi
+    
+    # Method 4: Install vite and try again
+    if [ "$build_success" = false ]; then
+        echo -e "${YELLOW}  📦 Installing vite and retrying...${NC}"
+        npm install vite --save-dev --silent
+        if [ -f "./node_modules/.bin/vite" ]; then
+            if ./node_modules/.bin/vite build --mode production; then
+                build_success=true
+            fi
+        fi
+    fi
+    
+    # Check if build was successful
+    if [ "$build_success" = false ]; then
+        echo -e "${RED}❌ All build methods failed${NC}"
+        exit 1
+    fi
+    
+    # Verify build output
     if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
-        echo -e "${RED}❌ Frontend build failed or empty${NC}"
+        echo -e "${RED}❌ Frontend build completed but output is empty${NC}"
         exit 1
     fi
     
     echo -e "${GREEN}✅ Frontend built successfully${NC}"
+    echo -e "${BLUE}  📊 Build size: $(du -sh dist | cut -f1)${NC}"
 }
 
 # Function to prepare backend
