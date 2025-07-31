@@ -34,11 +34,28 @@ const api = axios.create({
 });
 
 
-// Add request interceptor for debugging (no authentication required)
+// Add request interceptor for authentication and debugging
 api.interceptors.request.use(
   async (config) => {
     console.log(`📡 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    console.log('ℹ️ Running without authentication - backend allows all requests');
+    
+    // Add JWT token for authentication
+    try {
+      // Try to get auth session from AWS Amplify
+      const { fetchAuthSession } = await import('aws-amplify/auth');
+      const session = await fetchAuthSession();
+      
+      if (session.tokens?.accessToken) {
+        config.headers.Authorization = `Bearer ${session.tokens.accessToken}`;
+        console.log('🔐 Added JWT token to request');
+      } else {
+        console.log('ℹ️ No access token available in session');
+      }
+    } catch (error) {
+      // If not authenticated or error getting token, continue without auth
+      console.log('ℹ️ No auth token available:', error.message);
+    }
+    
     return config;
   },
   (error) => {
@@ -66,9 +83,21 @@ api.interceptors.response.use(
     console.error('  Error:', error.message);
     console.error('  Response:', error.response?.data);
     
-    // Handle authentication errors (disabled - no auth required)
+    // Handle authentication errors
     if (error.response?.status === 401) {
-      console.log('🚨 401 error - but authentication is disabled, this should not happen');
+      console.log('🚨 Authentication failed - redirecting to login');
+      // Clear any cached session data and redirect to login
+      try {
+        import('aws-amplify/auth').then(({ signOut }) => {
+          signOut().then(() => {
+            window.location.reload();
+          }).catch(() => {
+            window.location.reload();
+          });
+        });
+      } catch {
+        window.location.reload();
+      }
     }
     
     return Promise.reject(error);

@@ -45,11 +45,18 @@ console.log('  VITE_AWS_COGNITO_APP_CLIENT_ID:', import.meta.env.VITE_AWS_COGNIT
 // Configure AWS Amplify
 Amplify.configure(amplifyConfig);
 
-// Disable Cognito authentication temporarily - TODO: Configure with real AWS Cognito settings
-const isCognitoConfigured = false;
+// Enable Cognito authentication - Check if Cognito is properly configured
+const isCognitoConfigured = !!(
+  import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID && 
+  import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID
+);
 
-console.log('ℹ️ AWS Cognito authentication disabled - direct access enabled');
-console.log('⚠️ TODO: Configure real AWS Cognito settings and enable authentication');
+console.log('🔐 AWS Cognito authentication status:', isCognitoConfigured ? 'ENABLED' : 'DISABLED');
+if (isCognitoConfigured) {
+  console.log('✅ Cognito configuration found - authentication enabled');
+} else {
+  console.log('⚠️ Cognito environment variables missing - authentication disabled');
+}
 
 const AppContent = () => {
   // Skip authentication if Cognito is not configured

@@ -69,24 +69,30 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      // Since authentication is disabled, set a default admin user
-      console.log('ℹ️ Authentication disabled - setting default admin access');
+      // Add a small delay to ensure session is fully established
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      const defaultUser = {
-        username: 'admin',
-        userId: 'admin-no-auth'
-      };
+      const currentUser = await getCurrentUser();
       
-      setUser(defaultUser);
-      setIsAuthenticated(true);
-      setUserRole(ROLES.ADMIN); // Grant admin access by default
-      
-      console.log('✅ Auth state set (no authentication):', {
-        username: defaultUser.username,
-        role: ROLES.ADMIN
-      });
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+        
+        // Get user role from Cognito groups
+        const role = await getUserRole(currentUser);
+        setUserRole(role);
+        
+        console.log('✅ Auth state updated:', {
+          username: currentUser.username,
+          role: role
+        });
+      } else {
+        setUser(null);
+        setUserRole(null);
+        setIsAuthenticated(false);
+      }
     } catch (error) {
-      console.log('Error setting default auth state:', error);
+      console.log('No authenticated user:', error);
       setUser(null);
       setUserRole(null);
       setIsAuthenticated(false);
@@ -97,20 +103,44 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkAuthState();
-    // Note: AWS Amplify event listeners removed since authentication is disabled
+    
+    // Listen for authentication events
+    const hubListenerCancel = Hub.listen('auth', ({ payload }) => {
+      switch (payload.event) {
+        case 'signInWithRedirect':
+        case 'signedIn':
+          console.log('🔐 User signed in, refreshing auth state');
+          checkAuthState();
+          break;
+        case 'signedOut':
+          console.log('🔓 User signed out');
+          setUser(null);
+          setUserRole(null);
+          setIsAuthenticated(false);
+          break;
+        case 'tokenRefresh':
+          console.log('🔄 Token refreshed');
+          checkAuthState();
+          break;
+        default:
+          break;
+      }
+    });
+
+    return () => {
+      hubListenerCancel();
+    };
   }, []);
 
   const logout = async () => {
     try {
-      console.log('ℹ️ Logout called (authentication disabled - no action needed)');
-      // Since authentication is disabled, no actual logout is needed
-      // But we can still clear the state if desired
+      await signOut();
       setUser(null);
       setUserRole(null);
       setIsAuthenticated(false);
       window.location.reload(); // Force page reload to clear any cached data
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.error('Error signing out:', error);
     }
   };
 
