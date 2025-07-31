@@ -149,10 +149,24 @@ prepare_backend() {
     
     echo -e "${BLUE}  🐍 Using Python: $python_cmd ($(${python_cmd} --version))${NC}"
     
+    # Check and install python3-venv if needed
+    if [ "$python_cmd" = "python3" ] && ! $python_cmd -m venv --help >/dev/null 2>&1; then
+        echo -e "${YELLOW}  📦 Installing python3-venv package${NC}"
+        if sudo apt update && sudo apt install -y python3-venv; then
+            echo -e "${GREEN}  ✅ python3-venv installed${NC}"
+        else
+            echo -e "${RED}  ❌ Failed to install python3-venv${NC}"
+            exit 1
+        fi
+    fi
+    
     # Create virtual environment if it doesn't exist
     if [ ! -d "venv" ]; then
         echo -e "${BLUE}  📦 Creating virtual environment${NC}"
-        $python_cmd -m venv venv
+        if ! $python_cmd -m venv venv; then
+            echo -e "${RED}  ❌ Failed to create virtual environment${NC}"
+            exit 1
+        fi
     fi
     
     # Activate virtual environment
