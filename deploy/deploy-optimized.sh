@@ -136,16 +136,42 @@ prepare_backend() {
     echo -e "\n${YELLOW}🐍 Preparing backend...${NC}"
     cd "$BACKEND_DIR"
     
-    # Activate virtual environment if it exists
+    # Detect Python command
+    local python_cmd=""
+    if command -v python3 >/dev/null 2>&1; then
+        python_cmd="python3"
+    elif command -v python >/dev/null 2>&1; then
+        python_cmd="python"
+    else
+        echo -e "${RED}❌ Python not found${NC}"
+        exit 1
+    fi
+    
+    echo -e "${BLUE}  🐍 Using Python: $python_cmd ($(${python_cmd} --version))${NC}"
+    
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "venv" ]; then
+        echo -e "${BLUE}  📦 Creating virtual environment${NC}"
+        $python_cmd -m venv venv
+    fi
+    
+    # Activate virtual environment
     if [ -f "venv/bin/activate" ]; then
+        echo -e "${BLUE}  🔌 Activating virtual environment${NC}"
         source venv/bin/activate
+        # Update python_cmd to use the venv python
+        python_cmd="python"
+    else
+        echo -e "${YELLOW}  ⚠️ Virtual environment not found, using system Python${NC}"
     fi
     
     # Install/update Python dependencies
+    echo -e "${BLUE}  📦 Installing Python dependencies${NC}"
     pip install -r requirements.txt --quiet --no-cache-dir
     
     # Collect static files
-    python manage.py collectstatic --noinput --clear
+    echo -e "${BLUE}  📁 Collecting static files${NC}"
+    $python_cmd manage.py collectstatic --noinput --clear
     
     echo -e "${GREEN}✅ Backend prepared${NC}"
 }
