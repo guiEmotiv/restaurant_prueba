@@ -1,11 +1,12 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Amplify } from 'aws-amplify';
 import { ToastProvider } from './contexts/ToastContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import AuthLoadingScreen from './components/auth/AuthLoadingScreen';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
 import Dashboard from './pages/Dashboard';
 import Units from './pages/config/Units';
@@ -59,6 +60,13 @@ if (isCognitoConfigured) {
 }
 
 const AppContent = () => {
+  const { loading: authLoading } = useAuth();
+  
+  // Show loading screen while checking authentication
+  if (isCognitoConfigured && authLoading) {
+    return <AuthLoadingScreen />;
+  }
+  
   // Skip authentication if Cognito is not configured
   const content = (
     <Layout>

@@ -110,7 +110,10 @@ export const AuthProvider = ({ children }) => {
         case 'signInWithRedirect':
         case 'signedIn':
           console.log('🔐 User signed in, refreshing auth state');
-          checkAuthState();
+          // Add a delay to ensure Cognito session is fully established
+          setTimeout(() => {
+            checkAuthState();
+          }, 500);
           break;
         case 'signedOut':
           console.log('🔓 User signed out');
@@ -120,6 +123,10 @@ export const AuthProvider = ({ children }) => {
           break;
         case 'tokenRefresh':
           console.log('🔄 Token refreshed');
+          checkAuthState();
+          break;
+        case 'customOAuthState':
+          console.log('🔄 OAuth state changed');
           checkAuthState();
           break;
         default:

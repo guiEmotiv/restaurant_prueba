@@ -66,6 +66,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "backend.cognito_auth.CognitoAuthenticationMiddleware",  # AWS Cognito authentication
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -137,6 +138,22 @@ if DOMAIN_NAME:
     ])
 
 CORS_ALLOW_CREDENTIALS = True
+
+
+# ──────────────────────────────────────────────────────────────
+# AWS Cognito Configuration
+# ──────────────────────────────────────────────────────────────
+AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+COGNITO_USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID', '')
+COGNITO_APP_CLIENT_ID = os.getenv('COGNITO_APP_CLIENT_ID', '')
+
+# Enable Cognito authentication - Check if Cognito is properly configured
+COGNITO_ENABLED = bool(COGNITO_USER_POOL_ID and COGNITO_APP_CLIENT_ID)
+
+if COGNITO_ENABLED:
+    print(f"✅ AWS Cognito authentication ENABLED - User Pool: {COGNITO_USER_POOL_ID[:10]}...")
+else:
+    print("⚠️ AWS Cognito authentication DISABLED - Missing configuration")
 
 
 # ──────────────────────────────────────────────────────────────

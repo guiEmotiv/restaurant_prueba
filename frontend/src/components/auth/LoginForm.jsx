@@ -72,11 +72,22 @@ const LoginForm = ({ children }) => {
       hideSignUp={true}
       className="amplify-authenticator"
     >
-      {({ signOut, user }) => (
-        <div className="min-h-screen bg-gray-50">
-          {children}
-        </div>
-      )}
+      {({ signOut, user }) => {
+        // Log authentication state for debugging
+        if (user) {
+          console.log('✅ User authenticated:', {
+            username: user.username,
+            userId: user.userId,
+            signInDetails: user.signInDetails
+          });
+        }
+        
+        return (
+          <div className="min-h-screen bg-gray-50">
+            {children}
+          </div>
+        );
+      }}
     </Authenticator>
   );
 };

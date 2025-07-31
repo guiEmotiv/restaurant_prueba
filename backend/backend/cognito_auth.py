@@ -34,6 +34,11 @@ class CognitoAuthenticationMiddleware:
         self.jwks_client = None
         
     def __call__(self, request):
+        # Check if Cognito is enabled
+        if not getattr(settings, 'COGNITO_ENABLED', False):
+            # If Cognito is not enabled, pass through without authentication
+            return self.get_response(request)
+        
         # Skip authentication for certain paths
         skip_paths = ['/admin/', '/api/v1/health/', '/static/', '/media/']
         if any(request.path.startswith(path) for path in skip_paths):
