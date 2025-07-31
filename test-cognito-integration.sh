@@ -3,6 +3,15 @@
 echo "🔍 Testing AWS Cognito Integration..."
 echo "====================================="
 
+# Detect if running on EC2
+if [ -f "/opt/restaurant-web/docker-compose.ec2.yml" ]; then
+    echo "📍 Running on EC2 environment"
+    IS_EC2=true
+else
+    echo "📍 Running on local development environment"
+    IS_EC2=false
+fi
+
 # Check if .env files exist
 echo ""
 echo "📄 Checking environment files..."
@@ -24,6 +33,10 @@ fi
 echo ""
 echo "📦 Checking Python dependencies..."
 cd backend
+if [ "$IS_EC2" = true ] && [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+fi
+
 if pip show PyJWT cryptography requests > /dev/null 2>&1; then
     echo "✅ Required Python packages installed"
 else
@@ -38,14 +51,22 @@ cd frontend
 if [ -d "node_modules/aws-amplify" ] && [ -d "node_modules/@aws-amplify/ui-react" ]; then
     echo "✅ AWS Amplify packages installed"
 else
-    echo "❌ Missing Node packages - run: npm install"
+    echo "❌ Missing Node packages - run: cd frontend && npm install"
 fi
 cd ..
 
 echo ""
 echo "====================================="
-echo "🚀 To start the application:"
-echo "1. Configure your AWS Cognito credentials in .env files"
-echo "2. Start backend: cd backend && python manage.py runserver"
-echo "3. Start frontend: cd frontend && npm run dev"
-echo "4. Create users in AWS Cognito console with groups: administradores or meseros"
+if [ "$IS_EC2" = true ]; then
+    echo "🚀 To configure Cognito on EC2:"
+    echo "1. Run: ./update-cognito-config.sh"
+    echo "2. Rebuild frontend: cd frontend && npm run build"
+    echo "3. Restart Docker: ./deploy/ec2-deploy.sh restart"
+    echo "4. Create users in AWS Cognito console with groups: administradores or meseros"
+else
+    echo "🚀 To start the application:"
+    echo "1. Configure your AWS Cognito credentials in .env files"
+    echo "2. Start backend: cd backend && python manage.py runserver"
+    echo "3. Start frontend: cd frontend && npm run dev"
+    echo "4. Create users in AWS Cognito console with groups: administradores or meseros"
+fi
