@@ -1,72 +1,156 @@
 #!/bin/bash
 
-echo "🔍 Testing AWS Cognito Integration..."
-echo "====================================="
+echo "🔍 Testing Restaurant Web Application Setup..."
+echo "============================================="
 
-# Detect if running on EC2
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Detect environment
 if [ -f "/opt/restaurant-web/docker-compose.ec2.yml" ]; then
-    echo "📍 Running on EC2 environment"
+    echo -e "${BLUE}📍 Running on EC2 environment${NC}"
     IS_EC2=true
+    PROJECT_DIR="/opt/restaurant-web"
 else
-    echo "📍 Running on local development environment"
+    echo -e "${BLUE}📍 Running on local development environment${NC}"
     IS_EC2=false
+    PROJECT_DIR="."
 fi
 
-# Check if .env files exist
-echo ""
-echo "📄 Checking environment files..."
-if [ -f "frontend/.env" ]; then
-    echo "✅ frontend/.env exists"
-    grep -E "VITE_AWS_COGNITO|VITE_AWS_REGION" frontend/.env | sed 's/=.*/=***/'
+cd "$PROJECT_DIR"
+
+# Function to check file and show relevant config
+check_env_file() {
+    local file="$1"
+    local desc="$2"
+    
+    if [ -f "$file" ]; then
+        echo -e "${GREEN}✅ $desc exists${NC}"
+        
+        # Check Cognito configuration
+        if grep -q "COGNITO_USER_POOL_ID" "$file" 2>/dev/null; then
+            local cognito_configured=false
+            if grep -E "(COGNITO_USER_POOL_ID|VITE_AWS_COGNITO_USER_POOL_ID)=" "$file" | grep -v "=$" | grep -v "=us-east-1_CHANGEME123" >/dev/null 2>&1; then
+                echo -e "${GREEN}  🔐 Cognito: CONFIGURED${NC}"
+                cognito_configured=true
+            else
+                echo -e "${YELLOW}  🔒 Cognito: DISABLED (empty values)${NC}"
+            fi
+            
+            # Show masked values
+            if [ "$cognito_configured" = true ]; then
+                grep -E "(AWS_REGION|VITE_AWS_REGION|COGNITO_USER_POOL_ID|VITE_AWS_COGNITO_USER_POOL_ID)" "$file" | sed 's/=.*/=***/' | sed 's/^/    /'
+            fi
+        else
+            echo -e "${YELLOW}  ⚠️ No Cognito configuration found${NC}"
+        fi
+    else
+        echo -e "${RED}❌ $desc not found${NC}"
+        return 1
+    fi
+}
+
+# Check environment files
+echo -e "\n${BLUE}📄 Checking environment files...${NC}"
+check_env_file "frontend/.env" "frontend/.env"
+check_env_file "backend/.env" "backend/.env"
+
+# Check system requirements
+echo -e "\n${BLUE}⚙️ Checking system requirements...${NC}"
+
+# Node.js version
+node_version=$(node --version 2>/dev/null || echo "none")
+if [[ $node_version == v20* ]] || [[ $node_version == v22* ]]; then
+    echo -e "${GREEN}✅ Node.js: $node_version (compatible)${NC}"
+elif [[ $node_version == v18* ]]; then
+    echo -e "${YELLOW}⚠️ Node.js: $node_version (may cause issues with Vite 7+)${NC}"
+    echo -e "${BLUE}  💡 Consider upgrading: ./deploy/setup-node-version.sh${NC}"
 else
-    echo "❌ frontend/.env not found - copy from frontend/.env.example"
+    echo -e "${RED}❌ Node.js: $node_version (incompatible or missing)${NC}"
 fi
 
-if [ -f "backend/.env" ]; then
-    echo "✅ backend/.env exists"
-    grep -E "COGNITO_USER_POOL_ID|COGNITO_APP_CLIENT_ID|AWS_REGION" backend/.env | sed 's/=.*/=***/'
-else
-    echo "❌ backend/.env not found - copy from backend/.env.example"
+# Disk space
+if [ "$IS_EC2" = true ]; then
+    available_space=$(df / | tail -1 | awk '{print int($4/1024/1024)}')
+    if [ "$available_space" -gt 1 ]; then
+        echo -e "${GREEN}✅ Disk space: ${available_space}GB available${NC}"
+    else
+        echo -e "${RED}❌ Disk space: ${available_space}GB available (low!)${NC}"
+        echo -e "${BLUE}  💡 Run cleanup: sudo ./deploy/cleanup-ec2.sh${NC}"
+    fi
 fi
 
 # Check Python dependencies
-echo ""
-echo "📦 Checking Python dependencies..."
-cd backend
-if [ "$IS_EC2" = true ] && [ -f "venv/bin/activate" ]; then
-    source venv/bin/activate
+echo -e "\n${BLUE}📦 Checking Python dependencies...${NC}"
+cd backend 2>/dev/null || cd .
+if [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate 2>/dev/null
 fi
 
-if pip show PyJWT cryptography requests > /dev/null 2>&1; then
-    echo "✅ Required Python packages installed"
+missing_packages=()
+for package in PyJWT cryptography requests; do
+    if ! pip show "$package" >/dev/null 2>&1; then
+        missing_packages+=("$package")
+    fi
+done
+
+if [ ${#missing_packages[@]} -eq 0 ]; then
+    echo -e "${GREEN}✅ Required Python packages installed${NC}"
 else
-    echo "❌ Missing Python packages - run: pip install -r requirements.txt"
+    echo -e "${RED}❌ Missing Python packages: ${missing_packages[*]}${NC}"
+    echo -e "${BLUE}  💡 Install: pip install -r requirements.txt${NC}"
 fi
-cd ..
+cd "$PROJECT_DIR"
 
 # Check Node dependencies
-echo ""
-echo "📦 Checking Node dependencies..."
-cd frontend
+echo -e "\n${BLUE}📦 Checking Node dependencies...${NC}"
+cd frontend 2>/dev/null || cd .
 if [ -d "node_modules/aws-amplify" ] && [ -d "node_modules/@aws-amplify/ui-react" ]; then
-    echo "✅ AWS Amplify packages installed"
+    echo -e "${GREEN}✅ AWS Amplify packages installed${NC}"
+elif [ ! -d "node_modules" ]; then
+    echo -e "${YELLOW}⚠️ node_modules not found${NC}"
+    echo -e "${BLUE}  💡 Install: npm install${NC}"
 else
-    echo "❌ Missing Node packages - run: cd frontend && npm install"
+    echo -e "${RED}❌ Missing AWS Amplify packages${NC}"
+    echo -e "${BLUE}  💡 Install: npm install${NC}"
 fi
-cd ..
+cd "$PROJECT_DIR"
 
-echo ""
-echo "====================================="
+# Check Docker (EC2 only)
 if [ "$IS_EC2" = true ]; then
-    echo "🚀 To configure Cognito on EC2:"
-    echo "1. Run: ./update-cognito-config.sh"
-    echo "2. Rebuild frontend: cd frontend && npm run build"
-    echo "3. Restart Docker: ./deploy/ec2-deploy.sh restart"
-    echo "4. Create users in AWS Cognito console with groups: administradores or meseros"
-else
-    echo "🚀 To start the application:"
-    echo "1. Configure your AWS Cognito credentials in .env files"
-    echo "2. Start backend: cd backend && python manage.py runserver"
-    echo "3. Start frontend: cd frontend && npm run dev"
-    echo "4. Create users in AWS Cognito console with groups: administradores or meseros"
+    echo -e "\n${BLUE}🐳 Checking Docker services...${NC}"
+    if docker-compose -f docker-compose.ec2.yml ps 2>/dev/null | grep -q "Up"; then
+        echo -e "${GREEN}✅ Docker containers running${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Docker containers not running${NC}"
+        echo -e "${BLUE}  💡 Start: ./deploy/deploy-optimized.sh${NC}"
+    fi
 fi
+
+# Summary and recommendations
+echo -e "\n${BLUE}=====================================${NC}"
+echo -e "${BLUE}🎯 Next Steps:${NC}"
+
+if [ "$IS_EC2" = true ]; then
+    echo -e "\n${YELLOW}For EC2 deployment:${NC}"
+    echo -e "1. ${GREEN}Complete setup:${NC} sudo ./deploy/setup-ec2-complete.sh"
+    echo -e "2. ${GREEN}Quick deploy:${NC} ./deploy/deploy-optimized.sh"
+    echo -e "3. ${GREEN}Configure Cognito:${NC} ./deploy/configure-cognito.sh"
+    echo -e "4. ${GREEN}Cleanup space:${NC} sudo ./deploy/cleanup-ec2.sh"
+else
+    echo -e "\n${YELLOW}For local development:${NC}"
+    echo -e "1. ${GREEN}Start backend:${NC} cd backend && python manage.py runserver"
+    echo -e "2. ${GREEN}Start frontend:${NC} cd frontend && npm run dev"
+    echo -e "3. ${GREEN}Configure Cognito:${NC} Update .env files with your credentials"
+fi
+
+echo -e "\n${YELLOW}For AWS Cognito setup:${NC}"
+echo -e "• Create User Pool with groups: ${BLUE}administradores${NC}, ${BLUE}meseros${NC}"
+echo -e "• Create users and assign to appropriate groups"
+echo -e "• Configure App Client (public, no secret)"
+
+echo -e "\n${GREEN}🎉 Setup check completed!${NC}"
