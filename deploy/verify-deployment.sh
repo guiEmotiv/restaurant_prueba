@@ -69,7 +69,11 @@ api_total=${#endpoints[@]}
 for endpoint in "${endpoints[@]}"; do
     status=$(curl -s -o /dev/null -w "%{http_code}" http://$DOMAIN/api/v1/$endpoint/ 2>/dev/null || echo "000")
     if [ "$status" = "200" ] || [ "$status" = "401" ] || [ "$status" = "403" ]; then
-        echo -e "${GREEN}✅ API /$endpoint/: Status $status${NC}"
+        if [ "$status" = "403" ]; then
+            echo -e "${GREEN}✅ API /$endpoint/: Cognito auth required (Status $status)${NC}"
+        else
+            echo -e "${GREEN}✅ API /$endpoint/: Status $status${NC}"
+        fi
         ((api_working++))
     else
         echo -e "${RED}❌ API /$endpoint/: Status $status${NC}"

@@ -281,11 +281,15 @@ echo -e "\n${YELLOW}🔍 PHASE 7: Final Verification${NC}"
 # Wait for services to be ready
 sleep 10
 
-# Test API
+# Test API (expect 403 with Cognito enabled)
 for i in {1..3}; do
     API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/zones/ 2>/dev/null || echo "000")
-    if [ "$API_STATUS" = "200" ]; then
-        echo -e "${GREEN}✅ API working (Status: $API_STATUS)${NC}"
+    if [ "$API_STATUS" = "200" ] || [ "$API_STATUS" = "403" ]; then
+        if [ "$API_STATUS" = "403" ]; then
+            echo -e "${GREEN}✅ API working with Cognito auth (Status: $API_STATUS)${NC}"
+        else
+            echo -e "${GREEN}✅ API working (Status: $API_STATUS)${NC}"
+        fi
         break
     else
         echo -e "${YELLOW}⚠️ API Status: $API_STATUS (attempt $i/3)${NC}"
