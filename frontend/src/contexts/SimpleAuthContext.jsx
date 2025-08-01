@@ -105,16 +105,22 @@ export const SimpleAuthProvider = ({ children }) => {
             logWithTimestamp('✅ User is cook', { username: user.username, groups });
             setUserRole(ROLES.COOK);
           } else {
-            logWithTimestamp('⚠️ User has unrecognized groups, no role assigned', { username: user.username, groups });
-            setUserRole(null); // No role instead of defaulting to admin
+            logWithTimestamp('❌ User has unrecognized groups, forcing logout', { username: user.username, groups });
+            setUserRole(null);
+            // Force logout for users with unrecognized groups
+            setTimeout(() => signOut(), 1000);
           }
         } else {
-          logWithTimestamp('⚠️ No groups found for user', { username: user.username, groups });
-          setUserRole(null); // No role instead of defaulting to admin
+          logWithTimestamp('❌ No groups found for user, forcing logout', { username: user.username, groups });
+          setUserRole(null);
+          // Force logout for users without groups
+          setTimeout(() => signOut(), 1000);
         }
       } catch (error) {
-        logWithTimestamp('❌ Error getting groups from session:', { error: error.message, username: user.username });
-        setUserRole(null); // No role on error instead of defaulting to admin
+        logWithTimestamp('❌ Error getting groups from session, forcing logout:', { error: error.message, username: user.username });
+        setUserRole(null);
+        // Force logout on error
+        setTimeout(() => signOut(), 1000);
       } finally {
         setLoading(false);
       }
