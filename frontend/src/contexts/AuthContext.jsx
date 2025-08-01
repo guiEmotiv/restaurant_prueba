@@ -67,11 +67,14 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthState = async () => {
     try {
+      console.log('🔍 Starting auth state check...');
       setLoading(true);
       
       // Add a small delay to ensure session is fully established
+      console.log('🔍 Waiting half second for session to stabilize...');
       await new Promise(resolve => setTimeout(resolve, 500));
       
+      console.log('🔍 Getting current user...');
       const currentUser = await getCurrentUser();
       
       if (currentUser) {
@@ -80,6 +83,7 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         
         // Get user role from Cognito groups
+        console.log('🔍 Getting user role...');
         const role = await getUserRole(currentUser);
         setUserRole(role);
         
@@ -96,17 +100,20 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.log('❌ Auth check failed:', error.message);
+      console.error('❌ Full error:', error);
       setUser(null);
       setUserRole(null);
       setIsAuthenticated(false);
     } finally {
+      console.log('🔍 Auth check completed, setting loading to false');
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Only check auth state initially, don't do it automatically
+    // Initialize auth state check immediately
     console.log('🔍 Initializing AuthContext...');
+    checkAuthState();
     
     // Listen for custom authentication success event
     const handleAuthSuccess = (event) => {
