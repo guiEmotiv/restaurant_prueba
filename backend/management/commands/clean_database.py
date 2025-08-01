@@ -29,37 +29,42 @@ class Command(BaseCommand):
 
         self.stdout.write("🗑️ Limpiando base de datos...")
         
+        # Verificar qué tablas existen realmente
+        cursor = connection.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        existing_tables = [row[0] for row in cursor.fetchall()]
+        
+        self.stdout.write(f"📋 Tablas encontradas: {', '.join(existing_tables)}")
+        
         with transaction.atomic():
             cursor = connection.cursor()
             
             # Deshabilitar foreign keys
             cursor.execute('PRAGMA foreign_keys=OFF')
             
-            # Obtener todas las tablas de la aplicación
-            app_tables = [
-                # Operación
-                'payment_item', 'container_sale', 'payment', 
-                'order_item_ingredient', 'order_item', 'order',
-                
-                # Inventario  
-                'recipe_item', 'recipe', 'ingredient', 'group',
-                
-                # Configuración
-                'container', 'waiter', 'table', 'zone', 'unit',
-                'restaurant_operational_config',
-                
-                # Sistema Django (opcional)
-                'django_session', 'authtoken_token', 'django_admin_log'
-            ]
-            
-            # Limpiar tablas
-            for table in app_tables:
+            # Solo limpiar tablas que existen
+            tables_cleaned = 0
+            for table in existing_tables:
                 try:
+                    # Saltar tablas del sistema Django
+                    if table.startswith(('auth_', 'django_content_type', 'django_migrations')):
+                        continue
+                        
                     if table in ['table', 'group', 'order']:
                         cursor.execute(f'DELETE FROM "{table}"')
                     else:
                         cursor.execute(f'DELETE FROM {table}')
-                    self.stdout.write(f'✅ Limpiado: {table}')
+                    
+                    # Verificar cuántos registros se eliminaron
+                    cursor.execute(f'SELECT changes()')
+                    deleted = cursor.fetchone()[0]
+                    
+                    if deleted > 0:
+                        self.stdout.write(f'✅ {table}: {deleted} registros eliminados')
+                        tables_cleaned += 1
+                    else:
+                        self.stdout.write(f'ℹ️  {table}: ya estaba vacía')
+                        
                 except Exception as e:
                     self.stdout.write(f'⚠️  Error limpiando {table}: {e}')
             
@@ -74,5 +79,5 @@ class Command(BaseCommand):
             cursor.execute('PRAGMA foreign_keys=ON')
         
         self.stdout.write(
-            self.style.SUCCESS('🎯 ¡Base de datos limpiada completamente!')
+            self.style.SUCCESS(f'🎯 ¡Base de datos limpiada! {tables_cleaned} tablas procesadas.')
         )
