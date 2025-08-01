@@ -1,276 +1,165 @@
-# 🚀 EC2 Deployment Guide - Restaurant Management System
+# Restaurant Web - Deployment Scripts
 
-Guía simplificada para desplegar el sistema de gestión de restaurante en EC2 **sin autenticación**.
+Scripts optimizados para el despliegue completo de la aplicación web de restaurante en EC2.
 
-## 📋 Prerequisitos
+## 📋 Scripts Disponibles
 
-### En tu máquina local:
-- Git configurado con acceso al repositorio
-- SSH configurado para conectar a EC2
-
-### En la instancia EC2:
-- Ubuntu 20.04 LTS o superior
-- Docker y Docker Compose instalados
-- Puerto 80 y 8000 abiertos en Security Groups
-
-## ⚙️ Configuración Inicial EC2
-
-### 1. Preparar la instancia EC2
+### 1. `setup-initial.sh` (Fases 1-4)
+**Setup inicial del servidor**
+- 🧹 Limpieza ultra del sistema
+- 🔧 Instalación de paquetes esenciales  
+- ⚙️ Configuración de variables de entorno
+- 🌐 Configuración de Nginx
 
 ```bash
-# Conectar a EC2
-ssh ubuntu@your-ec2-ip
-
-# Actualizar sistema
-sudo apt update && sudo apt upgrade -y
-
-# Instalar Docker
-sudo apt install -y docker.io docker-compose
-sudo usermod -aG docker ubuntu
-sudo systemctl enable docker
-sudo systemctl start docker
-
-# Crear directorio de aplicación
-sudo mkdir -p /opt/restaurant-web
-sudo chown ubuntu:ubuntu /opt/restaurant-web
+sudo ./deploy/setup-initial.sh
 ```
 
-### 2. Configurar archivo .env.ec2
-
-**IMPORTANTE**: El sistema ahora usa un archivo `.env.ec2` en tu EC2 para las configuraciones.
+### 2. `build-deploy.sh` (Fases 5-7)
+**Build y despliegue de la aplicación**
+- 🏗️ Build del frontend con Vite
+- 🐳 Despliegue de containers Docker
+- 💾 Configuración de base de datos
+- 🔍 Verificación final
 
 ```bash
-# 1. Copiar template desde tu máquina local
-scp .env.ec2.example ubuntu@your-ec2-ip:/opt/restaurant-web/.env.ec2
-
-# 2. Editar configuración en EC2
-ssh ubuntu@your-ec2-ip
-nano /opt/restaurant-web/.env.ec2
+sudo ./deploy/build-deploy.sh
 ```
 
-**Configuración mínima requerida en .env.ec2:**
-```bash
-DJANGO_SECRET_KEY=tu-clave-secreta-muy-segura
-DEBUG=False
-ALLOWED_HOSTS=tu-dominio.com,tu-ip-ec2
-EC2_PUBLIC_IP=tu-ip-ec2-publica
-TIME_ZONE=America/Lima
-LANGUAGE_CODE=es-pe
-```
-
-### 3. Configurar variables locales
+### 3. `debug-cognito-permissions.sh`
+**Debug de problemas de permisos**
+- 🔍 Verifica configuración de Cognito
+- 🔐 Testa autenticación JWT
+- 📊 Analiza logs de permisos
+- ✅ Valida grupos de usuario
 
 ```bash
-# En tu máquina local, exportar la IP de EC2
-export EC2_HOST=your-ec2-public-ip.amazonaws.com
+sudo ./deploy/debug-cognito-permissions.sh
 ```
 
-## 🚢 Deployment
+## 🚀 Uso Recomendado
 
-### **Opción 1: Desde tu máquina local (Recomendado)**
+### Despliegue Completo desde Cero
+```bash
+# 1. Setup inicial (solo una vez)
+sudo ./deploy/setup-initial.sh
+
+# 2. Build y deploy (repetible)
+sudo ./deploy/build-deploy.sh
+```
+
+### Debug de Problemas de Permisos
+```bash
+# Si aparece "Usted no tiene permiso para realizar esta acción"
+sudo ./deploy/debug-cognito-permissions.sh
+```
+
+## 🔐 Configuración AWS Cognito
+
+Los scripts están configurados para:
+- **User Pool ID**: `us-west-2_bdCwF60ZI`
+- **App Client ID**: `4i9hrd7srgbqbtun09p43ncfn0`
+- **Región**: `us-west-2`
+
+### Grupos de Usuario Configurados:
+- **administradores**: Acceso completo a todos los módulos
+- **meseros**: Estado mesas + historial + pedidos + pagos
+- **cocineros**: Vista cocina + modificar estado de pedidos
+
+## 📁 Archivos de Entorno Generados
+
+| Archivo | Propósito | Ubicación |
+|---------|-----------|-----------|
+| `.env.ec2` | Configuración principal | `/opt/restaurant-web/` |
+| `backend/.env` | Variables backend | `/opt/restaurant-web/backend/` |
+| `frontend/.env.production` | Variables frontend | `/opt/restaurant-web/frontend/` |
+
+## 🌐 URLs de la Aplicación
+
+- **Frontend**: http://xn--elfogndedonsoto-zrb.com
+- **API**: http://xn--elfogndedonsoto-zrb.com/api/v1/
+- **Admin**: http://xn--elfogndedonsoto-zrb.com/api/v1/admin/
+
+## 🔧 Comandos de Mantenimiento
 
 ```bash
-# Desde el directorio raíz del proyecto en tu máquina local
-EC2_HOST=your-ec2-ip.amazonaws.com ./deploy/ec2-deploy.sh deploy
-```
+# Ver logs del backend
+docker-compose -f docker-compose.ec2.yml logs web
 
-**Comandos disponibles desde tu máquina local:**
-```bash
-# Desplegar aplicación
-EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh deploy
-
-# Ver estado de la aplicación
-EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh status
-
-# Ver logs de la aplicación
-EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh logs
-
-# Reiniciar aplicación
-EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh restart
-
-# Parar aplicación
-EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh stop
-
-# Crear backup de base de datos
-EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh backup
-```
-
-### **Opción 2: Desde dentro de EC2**
-
-Si ya estás conectado por SSH a tu EC2, puedes usar comandos locales:
-
-```bash
-# Conectar a EC2
-ssh ubuntu@your-ec2-ip
-cd /opt/restaurant-web
-
-# Comandos disponibles dentro de EC2:
-./deploy/local-commands.sh start     # Construir e iniciar aplicación
-./deploy/local-commands.sh status    # Ver estado
-./deploy/local-commands.sh logs      # Ver logs
-./deploy/local-commands.sh restart   # Reiniciar
-./deploy/local-commands.sh stop      # Parar
-./deploy/local-commands.sh backup    # Crear backup
-
-# Comandos adicionales usando .env.ec2:
-./deploy/local-commands.sh info      # Mostrar configuración actual del sistema
-./deploy/local-commands.sh urls      # Mostrar URLs de acceso (usando EC2_PUBLIC_IP)
-./deploy/local-commands.sh test      # Probar conectividad a todos los endpoints
-```
-
-### **Comandos avanzados con .env.ec2**
-
-Los nuevos comandos `info`, `urls` y `test` aprovechan las variables configuradas en tu archivo `.env.ec2`:
-
-```bash
-# Ver configuración completa del sistema
-./deploy/local-commands.sh info
-# Muestra: DEBUG, ALLOWED_HOSTS, EC2_PUBLIC_IP, DOMAIN_NAME, etc.
-
-# Obtener URLs de acceso usando tu IP configurada
-./deploy/local-commands.sh urls
-# Muestra: Frontend, Backend API, Admin URLs usando EC2_PUBLIC_IP
-
-# Probar conectividad completa
-./deploy/local-commands.sh test
-# Prueba: Docker containers, localhost, IP pública, dominio (si está configurado)
-```
-
-## 📦 Arquitectura de Deployment
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                        EC2 Instance                     │
-├─────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌────────────────┐  ┌──────────────┐ │
-│  │    Nginx    │  │   Django API   │  │   SQLite     │ │
-│  │  (Port 80)  │  │  (Port 8000)   │  │  Database    │ │
-│  │             │  │                │  │              │ │
-│  │ ┌─────────┐ │  │ ┌────────────┐ │  │ ┌──────────┐ │ │
-│  │ │Frontend │ │  │ │ REST API   │ │  │ │ Data     │ │ │
-│  │ │ React   │ │  │ │ DRF        │ │  │ │ Volume   │ │ │
-│  │ └─────────┘ │  │ └────────────┘ │  │ └──────────┘ │ │
-│  └─────────────┘  └────────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
-## 🔧 Configuración
-
-### Variables de entorno importantes:
-
-- `EC2_HOST`: IP pública de tu instancia EC2
-- `DJANGO_SECRET_KEY`: Clave secreta para Django (configurar en producción)
-- `DEBUG`: False en producción
-
-### Persistencia de datos:
-
-- **Base de datos SQLite**: `/opt/restaurant-web/data/restaurant.sqlite3`
-- **Archivos media**: `/opt/restaurant-web/data/media/`
-- **Logs**: `/opt/restaurant-web/data/logs/`
-- **Backups**: `/opt/restaurant-web/data/backups/`
-- **Configuración**: `/opt/restaurant-web/.env.ec2` (mantenido entre deployments)
-
-## 🌐 Acceso
-
-Una vez desplegado, la aplicación estará disponible en:
-
-- **Frontend**: `http://your-ec2-ip/`
-- **Backend API**: `http://your-ec2-ip/api/v1/`
-- **Admin Django**: `http://your-ec2-ip/api/v1/admin/`
-- **API Docs**: `http://your-ec2-ip/api/v1/docs/`
-
-## 🛡️ Seguridad
-
-**⚠️ IMPORTANTE**: Esta configuración **NO incluye autenticación**. La aplicación es completamente abierta.
-
-Para uso en producción, considera:
-- Configurar HTTPS con Let's Encrypt
-- Restringir acceso por IP
-- Implementar rate limiting
-- Configurar firewall apropiado
-
-## 🔍 Troubleshooting
-
-### Problemas con .env.ec2:
-```bash
-# Verificar que existe el archivo
-ssh ubuntu@your-ec2-ip "ls -la /opt/restaurant-web/.env.ec2"
-
-# Ver contenido (sin mostrar valores secretos)
-ssh ubuntu@your-ec2-ip "grep -E '^[A-Z_]+=' /opt/restaurant-web/.env.ec2 | sed 's/=.*/=***/' "
-```
-
-### Verificar estado de contenedores:
-```bash
-ssh ubuntu@your-ec2-ip
-cd /opt/restaurant-web
-docker-compose -f docker-compose.ec2.yml ps
-```
-
-### Ver logs detallados:
-```bash
-ssh ubuntu@your-ec2-ip
-cd /opt/restaurant-web
-docker-compose -f docker-compose.ec2.yml logs --tail=100
-```
-
-### Reiniciar servicios:
-```bash
-ssh ubuntu@your-ec2-ip
-cd /opt/restaurant-web
+# Reiniciar servicios
 docker-compose -f docker-compose.ec2.yml restart
+
+# Ver estado de containers
+docker-compose -f docker-compose.ec2.yml ps
+
+# Ver variables de entorno del container
+docker-compose -f docker-compose.ec2.yml exec web env | grep COGNITO
 ```
 
-### Verificar conectividad:
+## 📊 Optimizaciones Implementadas
+
+### Espacio en Disco
+- ✅ Limpieza ultra de paquetes innecesarios
+- ✅ Eliminación de caches y logs antiguos
+- ✅ Optimización de Docker images
+- ✅ Remoción de dependencias de desarrollo post-build
+
+### Rendimiento
+- ✅ Nginx optimizado para aplicación SPA
+- ✅ Configuración CORS eficiente
+- ✅ Build production de Vite optimizado
+- ✅ Static files caching
+
+### Seguridad
+- ✅ Archivos .env con permisos restrictivos (600)
+- ✅ Headers de seguridad en Nginx
+- ✅ Autenticación JWT con AWS Cognito
+- ✅ Permisos granulares por grupo de usuario
+
+## 🚨 Troubleshooting
+
+### Error: "Usted no tiene permiso para realizar esta acción"
+
+**Posibles causas:**
+1. Usuario no está en el grupo correcto en AWS Cognito
+2. JWT token no contiene el claim 'cognito:groups'
+3. Configuración de permisos incorrecta
+
+**Solución:**
 ```bash
-# Desde tu máquina local
-curl http://your-ec2-ip/api/v1/categories/
+# 1. Ejecutar debug
+sudo ./deploy/debug-cognito-permissions.sh
+
+# 2. Verificar grupos en AWS Cognito Console
+# 3. Comprobar JWT token en browser DevTools
 ```
 
-### Error común: ".env.ec2 file not found"
+### Error: API devuelve 500 Internal Server Error
+
+**Solución:**
 ```bash
-# Crear archivo desde template
-scp .env.ec2.example ubuntu@your-ec2-ip:/opt/restaurant-web/.env.ec2
-ssh ubuntu@your-ec2-ip
-nano /opt/restaurant-web/.env.ec2  # Editar configuración
+# Ver logs detallados
+docker-compose -f docker-compose.ec2.yml logs web --tail=100
+
+# Verificar configuración
+docker-compose -f docker-compose.ec2.yml exec web python manage.py check
 ```
 
-## 📊 Monitoreo
+### Error: Frontend no carga datos
 
-### Health checks automáticos:
-- El contenedor Django incluye health checks
-- Nginx sirve contenido estático eficientemente
-- SQLite almacena datos persistentemente
-
-### Backups automáticos:
+**Solución:**
 ```bash
-# Crear backup manual
-EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh backup
+# Verificar variables de entorno frontend
+cat /opt/restaurant-web/frontend/.env.production
 
-# Los backups se almacenan en /opt/restaurant-web/data/backups/
+# Rebuild frontend si es necesario
+sudo ./deploy/build-deploy.sh
 ```
 
-## 🔄 Actualizaciones
+## 📝 Notas Importantes
 
-Para actualizar la aplicación:
-
-```bash
-# 1. Hacer pull de cambios localmente
-git pull origin main
-
-# 2. Redesplegar
-EC2_HOST=your-ec2-ip ./deploy/ec2-deploy.sh deploy
-```
-
-## 📞 Soporte
-
-Si encuentras problemas:
-
-1. Verifica que Docker esté corriendo en EC2
-2. Confirma que los puertos estén abiertos en Security Groups
-3. Revisa los logs con el comando `logs`
-4. Verifica la conectividad de red
-
----
-
-**🎉 ¡Tu sistema de gestión de restaurante está listo para usar!**
+- **Requiere Ubuntu 20.04+ con Docker y Docker Compose**
+- **Ejecutar siempre como root (sudo)**
+- **Los scripts son idempotentes (se pueden ejecutar múltiples veces)**
+- **El sistema usa SQLite para simplicidad en producción**
+- **No crea usuarios de prueba - usa AWS Cognito exclusivamente**
