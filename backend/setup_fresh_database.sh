@@ -37,7 +37,7 @@ python3 manage.py migrate --noinput
 
 echo ""
 echo "🍽️ Poblando base de datos con datos del restaurante..."
-python3 manage.py populate_database
+python3 manage.py populate_test_data --no-clean
 
 echo ""
 echo "📊 Verificación final..."
