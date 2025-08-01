@@ -243,25 +243,28 @@ populate_from_backup() {
     echo ""
     
     if [ "$IS_SQLITE" = true ]; then
-        # SQLite file - copy directly
-        echo -e "${YELLOW}📋 Copiando archivo SQLite...${NC}"
+        # SQLite file - use specialized restore script
+        echo -e "${YELLOW}📋 Usando script especializado para SQLite...${NC}"
         
-        if [ "$RUNNING_ON_EC2" = true ]; then
-            # For EC2, we need to replace the database file in the container
-            echo -e "${YELLOW}⚠️  Restauración de SQLite en EC2 requiere reinicio de contenedores${NC}"
-            
-            # Stop containers
-            docker-compose -f $COMPOSE_FILE down
-            
-            # Copy file to the right location
-            docker-compose -f $COMPOSE_FILE run --rm -v "$(realpath "$BACKUP_FILE"):/backup.sqlite3" web sh -c "cp /backup.sqlite3 /app/db.sqlite3"
-            
-            # Start containers
-            docker-compose -f $COMPOSE_FILE up -d
-            
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        SQLITE_SCRIPT="$SCRIPT_DIR/database-restore-sqlite.sh"
+        
+        if [ -f "$SQLITE_SCRIPT" ]; then
+            echo -e "${YELLOW}Ejecutando: $SQLITE_SCRIPT${NC}"
+            bash "$SQLITE_SCRIPT" "$BACKUP_FILE" --force
         else
-            # Local development
-            cp "$BACKUP_FILE" db.sqlite3
+            echo -e "${RED}❌ Error: Script de restauración SQLite no encontrado${NC}"
+            echo -e "${YELLOW}Intentando método básico...${NC}"
+            
+            if [ "$RUNNING_ON_EC2" = true ]; then
+                # Basic EC2 method
+                docker-compose -f $COMPOSE_FILE down
+                docker-compose -f $COMPOSE_FILE run --rm -v "$(realpath "$BACKUP_FILE"):/backup.sqlite3" web sh -c "cp /backup.sqlite3 /app/db.sqlite3"
+                docker-compose -f $COMPOSE_FILE up -d
+            else
+                # Basic local method
+                cp "$BACKUP_FILE" db.sqlite3
+            fi
         fi
         
         echo -e "${GREEN}✅ Base de datos SQLite restaurada${NC}"
