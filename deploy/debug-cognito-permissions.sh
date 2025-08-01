@@ -69,8 +69,8 @@ try:
     from django.http import HttpRequest
     from backend.cognito_auth import CognitoUser
     
-    # Create a test admin user
-    test_user = CognitoUser('test-user', ['administradores'])
+    # Create a test admin user with correct parameters
+    test_user = CognitoUser('test-user', 'test@example.com', ['administradores'])
     print('Test admin user groups:', test_user.groups)
     print('Test user is_admin():', test_user.is_admin())
     print('Test user is_waiter():', test_user.is_waiter())
@@ -118,19 +118,37 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings_ec2')
 django.setup()
 
 try:
-    from backend.cognito_auth import CognitoJWTAuthentication
-    auth = CognitoJWTAuthentication()
-    print('✅ CognitoJWTAuthentication class loaded successfully')
-    print('User Pool ID:', auth.user_pool_id)
-    print('App Client ID:', auth.app_client_id)
-    print('Region:', auth.region)
+    from backend.cognito_auth import CognitoAuthenticationMiddleware
+    middleware = CognitoAuthenticationMiddleware(None)
+    print('✅ CognitoAuthenticationMiddleware class loaded successfully')
     
-    # Test if we can get JWK keys
-    try:
-        keys = auth.get_jwk_keys()
-        print('✅ JWK keys retrieved:', len(keys), 'keys found')
-    except Exception as e:
-        print('❌ JWK keys error:', str(e))
+    # Test creating a user with admin group
+    from backend.cognito_auth import CognitoUser
+    test_admin = CognitoUser('test-admin', 'test@example.com', ['administradores'])
+    print('✅ Test admin user created')
+    print('- Username:', test_admin.username)
+    print('- Groups:', test_admin.groups)
+    print('- is_admin():', test_admin.is_admin())
+    print('- is_waiter():', test_admin.is_waiter())
+    print('- is_cook():', test_admin.is_cook())
+    
+    # Test creating user with waiter group
+    test_waiter = CognitoUser('test-waiter', 'waiter@example.com', ['meseros'])
+    print('✅ Test waiter user created')
+    print('- Username:', test_waiter.username)
+    print('- Groups:', test_waiter.groups)
+    print('- is_admin():', test_waiter.is_admin())
+    print('- is_waiter():', test_waiter.is_waiter())
+    print('- is_cook():', test_waiter.is_cook())
+    
+    # Test creating user with cook group
+    test_cook = CognitoUser('test-cook', 'cook@example.com', ['cocineros'])
+    print('✅ Test cook user created')
+    print('- Username:', test_cook.username)
+    print('- Groups:', test_cook.groups)
+    print('- is_admin():', test_cook.is_admin())
+    print('- is_waiter():', test_cook.is_waiter())
+    print('- is_cook():', test_cook.is_cook())
         
 except Exception as e:
     print('❌ Error loading JWT authentication:', str(e))
