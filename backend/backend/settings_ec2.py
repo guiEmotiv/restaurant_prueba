@@ -30,7 +30,7 @@ else:
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'your-production-secret-key-change-this')
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*,44.248.47.186,localhost,127.0.0.1').split(',')
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # APPLICATIONS
