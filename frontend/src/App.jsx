@@ -8,6 +8,8 @@ import LoginForm from './components/auth/LoginForm';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleProtectedRoute from './components/auth/RoleProtectedRoute';
 import AuthLoadingScreen from './components/auth/AuthLoadingScreen';
+import NoRoleError from './components/auth/NoRoleError';
+import RoleValidator from './components/auth/RoleValidator';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
 import Dashboard from './pages/Dashboard';
 import Units from './pages/config/Units';
@@ -73,7 +75,6 @@ const AppContent = () => {
   console.log('🔍 AppContent rendering...');
   
   try {
-    // Skip AuthContext entirely - let Authenticator handle everything
     const content = (
       <Layout>
         {console.log('🔍 Inside Layout wrapper...')}
@@ -239,13 +240,17 @@ function App() {
               {console.log('🚀 Inside LoginForm (authenticated)...')}
               <SimpleAuthProvider>
                 {console.log('🚀 Inside SimpleAuthProvider...')}
-                <AppContent />
+                <RoleValidator>
+                  <AppContent />
+                </RoleValidator>
               </SimpleAuthProvider>
             </LoginForm>
           ) : (
             <SimpleAuthProvider>
               {console.log('🚀 Inside SimpleAuthProvider (no auth)...')}
-              <AppContent />
+              <RoleValidator>
+                <AppContent />
+              </RoleValidator>
             </SimpleAuthProvider>
           )}
         </Router>

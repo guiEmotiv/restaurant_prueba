@@ -94,27 +94,27 @@ export const SimpleAuthProvider = ({ children }) => {
         const groups = session.tokens?.accessToken?.payload?.['cognito:groups'] || [];
         logWithTimestamp('🔍 User groups from token:', groups);
         
-        if (Array.isArray(groups)) {
+        if (Array.isArray(groups) && groups.length > 0) {
           if (groups.includes(ROLES.ADMIN)) {
-            logWithTimestamp('✅ User is admin', { username: user.username });
+            logWithTimestamp('✅ User is admin', { username: user.username, groups });
             setUserRole(ROLES.ADMIN);
           } else if (groups.includes(ROLES.WAITER)) {
-            logWithTimestamp('✅ User is waiter', { username: user.username });
+            logWithTimestamp('✅ User is waiter', { username: user.username, groups });
             setUserRole(ROLES.WAITER);
           } else if (groups.includes(ROLES.COOK)) {
-            logWithTimestamp('✅ User is cook', { username: user.username });
+            logWithTimestamp('✅ User is cook', { username: user.username, groups });
             setUserRole(ROLES.COOK);
           } else {
-            logWithTimestamp('⚠️ User has no recognized groups, defaulting to admin', { username: user.username, groups });
-            setUserRole(ROLES.ADMIN);
+            logWithTimestamp('⚠️ User has unrecognized groups, no role assigned', { username: user.username, groups });
+            setUserRole(null); // No role instead of defaulting to admin
           }
         } else {
-          console.log('⚠️ No groups found, defaulting to admin');
-          setUserRole(ROLES.ADMIN);
+          logWithTimestamp('⚠️ No groups found for user', { username: user.username, groups });
+          setUserRole(null); // No role instead of defaulting to admin
         }
       } catch (error) {
-        console.log('❌ Error getting groups from session:', error);
-        setUserRole(ROLES.ADMIN); // Default to admin on error
+        logWithTimestamp('❌ Error getting groups from session:', { error: error.message, username: user.username });
+        setUserRole(null); // No role on error instead of defaulting to admin
       } finally {
         setLoading(false);
       }
@@ -141,6 +141,13 @@ export const SimpleAuthProvider = ({ children }) => {
     if (isAdmin()) return '/'; // Dashboard para administradores
     if (isWaiter()) return '/table-status'; // Estado de mesas para meseros
     if (isCook()) return '/kitchen'; // Vista de cocina para cocineros
+    
+    // Si no hay rol asignado, mostrar error
+    if (!userRole) {
+      console.error('⚠️ Usuario sin role asignado, revisar configuración de Cognito');
+      return '/'; // Fallback temporal
+    }
+    
     return '/'; // Fallback
   };
 
