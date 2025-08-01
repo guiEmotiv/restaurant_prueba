@@ -50,8 +50,9 @@ show_menu() {
     echo "4) Only configure Cognito"
     echo "5) Only deploy application"
     echo "6) Setup Node.js version"
+    echo "7) Setup environment (.env.ec2)"
     echo ""
-    read -p "Choose option (1-6): " -n 1 -r choice
+    read -p "Choose option (1-7): " -n 1 -r choice
     echo ""
     return $choice
 }
@@ -73,6 +74,13 @@ quick_deploy() {
     echo -e "\n${YELLOW}⚡ Starting quick cleanup and deploy...${NC}"
     
     run_script "cleanup-ec2.sh" "Cleaning up system"
+    
+    # Check if .env.ec2 exists, create if missing
+    if [ ! -f "/opt/restaurant-web/.env.ec2" ]; then
+        echo -e "\n${YELLOW}🔧 Setting up environment configuration...${NC}"
+        run_script "setup-env-ec2.sh" "Setting up EC2 environment"
+    fi
+    
     run_script "deploy-optimized.sh" "Deploying application"
     
     echo -e "\n${GREEN}🎉 Quick deploy finished!${NC}"
@@ -121,6 +129,9 @@ main() {
             ;;
         6)
             run_script "setup-node-version.sh" "Setting up Node.js version"
+            ;;
+        7)
+            run_script "setup-env-ec2.sh" "Setting up EC2 environment"
             ;;
         *)
             echo -e "${RED}Invalid option${NC}"
