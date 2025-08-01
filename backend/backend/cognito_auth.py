@@ -98,29 +98,62 @@ class CognitoAuthenticationMiddleware:
             
             issuer = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}"
             
-            # Verify and decode the token
+            # First decode without verification to check token structure
+            unverified_payload = jwt.decode(token, options={"verify_signature": False})
+            logger.info(f"🔍 Token payload claims: {list(unverified_payload.keys())}")
+            
+            # Check if token has 'aud' claim
+            has_aud = 'aud' in unverified_payload
+            logger.info(f"🔍 Token has 'aud' claim: {has_aud}")
+            
+            # Verify and decode the token with appropriate options
             logger.info(f"🔍 JWT verification with issuer: {issuer}")
-            logger.info(f"🔍 JWT verification with audience: {app_client_id}")
+            if has_aud:
+                logger.info(f"🔍 JWT verification with audience: {app_client_id}")
+                payload = jwt.decode(
+                    token,
+                    public_key,
+                    algorithms=['RS256'],
+                    audience=app_client_id,
+                    issuer=issuer,
+                    options={
+                        'verify_exp': True,
+                        'verify_aud': True,
+                        'verify_iss': True
+                    }
+                )
+            else:
+                # For Access Tokens without 'aud' claim, verify client_id in token_use or client_id claim
+                logger.info(f"🔍 JWT verification without audience (Access Token)")
+                payload = jwt.decode(
+                    token,
+                    public_key,
+                    algorithms=['RS256'],
+                    issuer=issuer,
+                    options={
+                        'verify_exp': True,
+                        'verify_aud': False,  # Skip audience verification
+                        'verify_iss': True
+                    }
+                )
+                
+                # Manually verify client ID for Access Tokens
+                token_client_id = payload.get('client_id', '')
+                logger.info(f"🔍 Token client_id: {token_client_id}")
+                if token_client_id != app_client_id:
+                    raise ValueError(f"Token client_id '{token_client_id}' does not match expected '{app_client_id}'")              
+                logger.info(f"✅ Client ID verified successfully")
             
-            payload = jwt.decode(
-                token,
-                public_key,
-                algorithms=['RS256'],
-                audience=app_client_id,
-                issuer=issuer,
-                options={
-                    'verify_exp': True,
-                    'verify_aud': True,
-                    'verify_iss': True
-                }
-            )
+            logger.info(f"✅ Token verified successfully for user: {payload.get('username', payload.get('cognito:username', 'unknown'))}")
+            logger.info(f"🔍 Token type: {payload.get('token_use', 'unknown')}")
+            logger.info(f"🔍 Token groups: {payload.get('cognito:groups', [])}")
             
-            logger.info(f"✅ Token verified successfully for user: {payload.get('username', 'unknown')}")
-            
-            # Extract user information
+            # Extract user information (handle both ID tokens and Access tokens)
             username = payload.get('username', payload.get('cognito:username', ''))
             email = payload.get('email', '')
             groups = payload.get('cognito:groups', [])
+            
+            logger.info(f"✅ User extracted: username={username}, email={email}, groups={groups}")
             
             return CognitoUser(username=username, email=email, groups=groups)
             
