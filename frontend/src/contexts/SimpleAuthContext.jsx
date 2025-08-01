@@ -35,7 +35,8 @@ export const SimpleAuthProvider = ({ children }) => {
   // Define user roles and their permissions
   const ROLES = {
     ADMIN: 'administradores',
-    WAITER: 'meseros'
+    WAITER: 'meseros',
+    COOK: 'cocineros'
   };
 
   const PERMISSIONS = {
@@ -54,9 +55,19 @@ export const SimpleAuthProvider = ({ children }) => {
       canManageConfig: false,
       canManageInventory: false,
       canManageOrders: true,
-      canViewKitchen: true,
+      canViewKitchen: false,
       canViewTableStatus: true,
       canManagePayments: true,
+      canViewHistory: true,
+    },
+    [ROLES.COOK]: {
+      canViewDashboard: false,
+      canManageConfig: false,
+      canManageInventory: false,
+      canManageOrders: true, // Solo cambiar estado
+      canViewKitchen: true,
+      canViewTableStatus: false,
+      canManagePayments: false,
       canViewHistory: false,
     }
   };
@@ -87,6 +98,9 @@ export const SimpleAuthProvider = ({ children }) => {
           } else if (groups.includes(ROLES.WAITER)) {
             logWithTimestamp('✅ User is waiter', { username: user.username });
             setUserRole(ROLES.WAITER);
+          } else if (groups.includes(ROLES.COOK)) {
+            logWithTimestamp('✅ User is cook', { username: user.username });
+            setUserRole(ROLES.COOK);
           } else {
             logWithTimestamp('⚠️ User has no recognized groups, defaulting to admin', { username: user.username, groups });
             setUserRole(ROLES.ADMIN);
@@ -117,6 +131,7 @@ export const SimpleAuthProvider = ({ children }) => {
 
   const isAdmin = () => userRole === ROLES.ADMIN;
   const isWaiter = () => userRole === ROLES.WAITER;
+  const isCook = () => userRole === ROLES.COOK;
 
   const logout = async () => {
     try {
@@ -133,6 +148,7 @@ export const SimpleAuthProvider = ({ children }) => {
     isAuthenticated,
     isAdmin,
     isWaiter,
+    isCook,
     hasPermission,
     logout,
     ROLES,

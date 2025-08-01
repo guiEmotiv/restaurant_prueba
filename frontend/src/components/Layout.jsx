@@ -199,7 +199,8 @@ const Layout = ({ children }) => {
                     <div className="font-medium">{user?.username || 'Usuario'}</div>
                     <div className="text-xs text-gray-500">
                       {userRole === 'administradores' ? 'Administrador' : 
-                       userRole === 'meseros' ? 'Mesero' : 'Sin rol'}
+                       userRole === 'meseros' ? 'Mesero' : 
+                       userRole === 'cocineros' ? 'Cocinero' : 'Sin rol'}
                     </div>
                   </div>
                 </div>

@@ -3,9 +3,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.core.exceptions import ValidationError
 from backend.cognito_permissions import (
-    CognitoAuthenticatedPermission, 
-    CognitoAdminPermission, 
-    CognitoReadOnlyForWaiters
+    CognitoAdminOnlyPermission, 
+    CognitoReadOnlyForNonAdmins
 )
 from .models import Group, Ingredient, Recipe, RecipeItem
 from .serializers import (
@@ -19,7 +18,7 @@ from .serializers import (
 class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.all().order_by('name')
     serializer_class = GroupSerializer
-    permission_classes = [CognitoReadOnlyForWaiters]  # Admins: full access, Waiters: read-only
+    permission_classes = [CognitoAdminOnlyPermission]  # Solo administradores
     
     @action(detail=True, methods=['get'])
     def recipes(self, request, pk=None):
@@ -45,7 +44,7 @@ class GroupViewSet(viewsets.ModelViewSet):
 
 
 class IngredientViewSet(viewsets.ModelViewSet):
-    permission_classes = [CognitoReadOnlyForWaiters]  # Admins: full access, Waiters: read-only
+    permission_classes = [CognitoAdminOnlyPermission]  # Solo administradores
     queryset = Ingredient.objects.all().order_by('-id')
     
     def get_serializer_class(self):
@@ -107,7 +106,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    permission_classes = [CognitoReadOnlyForWaiters]  # Admins: full access, Waiters: read-only
+    permission_classes = [CognitoReadOnlyForNonAdmins]  # Admins: full, otros: solo lectura (necesario para pedidos)
     queryset = Recipe.objects.all().order_by('name')
     
     def get_serializer_class(self):
@@ -218,7 +217,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
 
 class RecipeItemViewSet(viewsets.ModelViewSet):
-    permission_classes = [CognitoReadOnlyForWaiters]  # Admins: full access, Waiters: read-only
+    permission_classes = [CognitoAdminOnlyPermission]  # Solo administradores
     queryset = RecipeItem.objects.all().order_by('recipe__name', 'ingredient__name')
     serializer_class = RecipeItemSerializer
     

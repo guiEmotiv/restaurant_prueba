@@ -4,9 +4,9 @@ from rest_framework.decorators import action
 from django.utils import timezone
 from django.db import transaction
 from backend.cognito_permissions import (
-    CognitoAuthenticatedPermission, 
-    CognitoAdminPermission, 
-    CognitoWaiterOrAdminPermission
+    CognitoAdminOnlyPermission, 
+    CognitoWaiterAndAdminPermission, 
+    CognitoOrderStatusPermission
 )
 from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
 from .serializers import (
@@ -19,7 +19,7 @@ from .serializers import (
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all().order_by('-created_at')
-    permission_classes = [CognitoWaiterOrAdminPermission]  # Both waiters and admins can manage orders
+    permission_classes = [CognitoOrderStatusPermission]  # Administradores, meseros (crear/modificar), cocineros (cambiar estado)
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -235,7 +235,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 class OrderItemViewSet(viewsets.ModelViewSet):
     queryset = OrderItem.objects.all().order_by('-created_at')
     serializer_class = OrderItemSerializer
-    permission_classes = [CognitoWaiterOrAdminPermission]  # Both waiters and admins can manage order items
+    permission_classes = [CognitoOrderStatusPermission]  # Administradores, meseros, cocineros
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -300,7 +300,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
 class OrderItemIngredientViewSet(viewsets.ModelViewSet):
     queryset = OrderItemIngredient.objects.all().order_by('-created_at')
     serializer_class = OrderItemIngredientSerializer
-    permission_classes = [CognitoWaiterOrAdminPermission]  # Both waiters and admins can manage ingredients
+    permission_classes = [CognitoWaiterAndAdminPermission]  # Solo meseros y administradores
     
     def get_queryset(self):
         queryset = OrderItemIngredient.objects.all().order_by('-created_at')
@@ -317,7 +317,7 @@ class OrderItemIngredientViewSet(viewsets.ModelViewSet):
 
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all().order_by('-created_at')
-    permission_classes = [CognitoWaiterOrAdminPermission]  # Both waiters and admins can manage payments
+    permission_classes = [CognitoWaiterAndAdminPermission]  # Solo meseros y administradores (proceso de pago)
     serializer_class = PaymentSerializer
     
     def get_queryset(self):

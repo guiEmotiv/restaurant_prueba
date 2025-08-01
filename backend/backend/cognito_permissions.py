@@ -1,27 +1,18 @@
 """
 Custom permission classes for AWS Cognito authentication
+Groups: administradores, meseros, cocineros
+
+Permisos por grupo:
+- Administradores: full acceso a todas las vistas y módulos
+- Cocineros: vista cocina + modificar estado de pedidos
+- Meseros: estado mesas + historial + crear/modificar pedidos + pagos
 """
 from rest_framework import permissions
 
 
-class CognitoAuthenticatedPermission(permissions.BasePermission):
+class CognitoAdminOnlyPermission(permissions.BasePermission):
     """
-    Custom permission that allows access to authenticated Cognito users
-    """
-    
-    def has_permission(self, request, view):
-        # Check if user is authenticated via Cognito
-        return (
-            request.user and 
-            hasattr(request.user, 'is_authenticated') and 
-            request.user.is_authenticated and
-            hasattr(request.user, 'groups')  # Cognito user has groups
-        )
-
-
-class CognitoAdminPermission(permissions.BasePermission):
-    """
-    Permission that allows access to admin users only
+    Solo administradores tienen acceso
     """
     
     def has_permission(self, request, view):
@@ -34,9 +25,10 @@ class CognitoAdminPermission(permissions.BasePermission):
         )
 
 
-class CognitoWaiterOrAdminPermission(permissions.BasePermission):
+class CognitoCookOnlyPermission(permissions.BasePermission):
     """
-    Permission that allows access to waiters and admins
+    Solo cocineros y administradores tienen acceso
+    Para vista de cocina
     """
     
     def has_permission(self, request, view):
@@ -45,21 +37,50 @@ class CognitoWaiterOrAdminPermission(permissions.BasePermission):
                 request.user.is_authenticated):
             return False
             
-        # Check if user is admin or waiter
+        # Administradores tienen acceso completo
         if hasattr(request.user, 'is_admin') and request.user.is_admin():
             return True
             
+        # Cocineros tienen acceso
+        if hasattr(request.user, 'is_cook') and request.user.is_cook():
+            return True
+            
+        return False
+
+
+class CognitoOrderStatusPermission(permissions.BasePermission):
+    """
+    Para modificar estado de pedidos:
+    - Administradores: full access
+    - Cocineros: pueden modificar estados
+    - Meseros: pueden crear y modificar pedidos
+    """
+    
+    def has_permission(self, request, view):
+        if not (request.user and 
+                hasattr(request.user, 'is_authenticated') and 
+                request.user.is_authenticated):
+            return False
+            
+        # Administradores tienen acceso completo
+        if hasattr(request.user, 'is_admin') and request.user.is_admin():
+            return True
+            
+        # Cocineros pueden modificar estados de pedidos
+        if hasattr(request.user, 'is_cook') and request.user.is_cook():
+            return True
+            
+        # Meseros pueden crear y modificar pedidos
         if hasattr(request.user, 'is_waiter') and request.user.is_waiter():
             return True
             
         return False
 
 
-class CognitoReadOnlyForWaiters(permissions.BasePermission):
+class CognitoWaiterAndAdminPermission(permissions.BasePermission):
     """
-    Permission that allows:
-    - Full access for admins
-    - Read-only access for waiters
+    Solo meseros y administradores:
+    - Para estado de mesas, historial, pedidos, pagos
     """
     
     def has_permission(self, request, view):
@@ -68,12 +89,37 @@ class CognitoReadOnlyForWaiters(permissions.BasePermission):
                 request.user.is_authenticated):
             return False
             
-        # Admins have full access
+        # Administradores tienen acceso completo
         if hasattr(request.user, 'is_admin') and request.user.is_admin():
             return True
             
-        # Waiters have read-only access
+        # Meseros tienen acceso
         if hasattr(request.user, 'is_waiter') and request.user.is_waiter():
+            return True
+            
+        return False
+
+
+class CognitoReadOnlyForNonAdmins(permissions.BasePermission):
+    """
+    Para configuración básica que necesitan ver otros roles:
+    - Administradores: full access
+    - Otros: solo lectura
+    """
+    
+    def has_permission(self, request, view):
+        if not (request.user and 
+                hasattr(request.user, 'is_authenticated') and 
+                request.user.is_authenticated):
+            return False
+            
+        # Administradores tienen acceso completo
+        if hasattr(request.user, 'is_admin') and request.user.is_admin():
+            return True
+            
+        # Otros roles solo lectura
+        if (hasattr(request.user, 'is_waiter') and request.user.is_waiter()) or \
+           (hasattr(request.user, 'is_cook') and request.user.is_cook()):
             return request.method in permissions.SAFE_METHODS
             
         return False

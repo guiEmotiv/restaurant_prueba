@@ -36,6 +36,9 @@ class CognitoUser:
     def is_waiter(self):
         return 'meseros' in self.groups
         
+    def is_cook(self):
+        return 'cocineros' in self.groups
+        
     def has_perm(self, perm, obj=None):
         """Check if user has specific permission (required by Django)"""
         return self.is_admin()  # Admins have all permissions
