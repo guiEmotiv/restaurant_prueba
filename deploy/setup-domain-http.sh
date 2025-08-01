@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Setup Punycode Domain Script
-# Configures xn--elfogndedonsoto-zrb.com with SSL
+# Setup Domain HTTP-only Script
+# Configures xn--elfogndedonsoto-zrb.com without SSL (for testing)
 
-echo "🌐 Setting up Punycode Domain"
-echo "============================="
+echo "🌐 Setting up Domain (HTTP-only)"
+echo "================================"
 
 # Colors for output
 RED='\033[0;31m'
@@ -14,10 +14,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 DOMAIN="xn--elfogndedonsoto-zrb.com"
-EMAIL="admin@$DOMAIN"
 PROJECT_DIR="/opt/restaurant-web"
 
-echo -e "${BLUE}🔧 Configuring domain: $DOMAIN${NC}"
+echo -e "${BLUE}🔧 Configuring domain: $DOMAIN (HTTP-only)${NC}"
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -25,22 +24,16 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Install required packages
-echo -e "\n${YELLOW}📦 Installing required packages...${NC}"
+# Install nginx
+echo -e "\n${YELLOW}📦 Installing Nginx...${NC}"
 apt update
 apt install -y nginx
-
-# Check if certbot is working, if not, fix it
-if ! certbot --version >/dev/null 2>&1; then
-    echo -e "${YELLOW}🔧 Fixing certbot installation...${NC}"
-    ./deploy/fix-certbot.sh
-fi
 
 # Stop any existing nginx
 systemctl stop nginx 2>/dev/null || true
 
-# Create Nginx configuration for the domain
-echo -e "\n${YELLOW}⚙️ Creating Nginx configuration...${NC}"
+# Create simple Nginx configuration for HTTP
+echo -e "\n${YELLOW}⚙️ Creating Nginx configuration (HTTP-only)...${NC}"
 cat > /etc/nginx/sites-available/$DOMAIN << EOF
 server {
     listen 80;
@@ -67,8 +60,6 @@ server {
         # Security headers
         add_header X-Frame-Options "SAMEORIGIN" always;
         add_header X-Content-Type-Options "nosniff" always;
-        add_header Referrer-Policy "no-referrer-when-downgrade" always;
-        add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
     }
     
     # Proxy API requests to Django
@@ -115,20 +106,6 @@ fi
 systemctl start nginx
 systemctl enable nginx
 
-echo -e "\n${YELLOW}🔒 Setting up SSL certificate...${NC}"
-# Get SSL certificate using snap certbot
-CERTBOT_CMD="/snap/bin/certbot"
-if [ ! -f "$CERTBOT_CMD" ]; then
-    CERTBOT_CMD="certbot"
-fi
-
-if $CERTBOT_CMD --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --email $EMAIL --redirect; then
-    echo -e "${GREEN}✅ SSL certificate installed successfully${NC}"
-else
-    echo -e "${YELLOW}⚠️ SSL certificate installation failed, but HTTP is working${NC}"
-    echo -e "${BLUE}💡 You can retry SSL later with: $CERTBOT_CMD --nginx -d $DOMAIN${NC}"
-fi
-
 # Update environment files
 echo -e "\n${YELLOW}📝 Updating environment configuration...${NC}"
 if [ -f "$PROJECT_DIR/.env.ec2" ]; then
@@ -140,7 +117,7 @@ if [ -f "$PROJECT_DIR/.env.ec2" ]; then
     fi
     
     # Update ALLOWED_HOSTS if needed
-    EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "localhost")
+    EC2_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || hostname -I | awk '{print $1}')
     if grep -q "^ALLOWED_HOSTS=" "$PROJECT_DIR/.env.ec2"; then
         sed -i "s/^ALLOWED_HOSTS=.*/ALLOWED_HOSTS=localhost,127.0.0.1,$EC2_PUBLIC_IP,$DOMAIN,www.$DOMAIN/" "$PROJECT_DIR/.env.ec2"
     fi
@@ -148,19 +125,34 @@ if [ -f "$PROJECT_DIR/.env.ec2" ]; then
     echo -e "${GREEN}✅ Environment configuration updated${NC}"
 fi
 
-# Restart nginx to apply all changes
-systemctl restart nginx
+# Update frontend to use HTTP for now
+echo -e "\n${YELLOW}📝 Updating frontend configuration...${NC}"
+cat > "$PROJECT_DIR/frontend/.env.production" << EOF
+# Frontend Production Environment Variables
+# These are baked into the build at compile time
 
-echo -e "\n${GREEN}🎉 Domain setup completed!${NC}"
+# API Configuration - Using HTTP domain (SSL can be added later)
+VITE_API_URL=http://$DOMAIN/api/v1
+
+# AWS Cognito Configuration
+VITE_AWS_REGION=us-west-2
+VITE_AWS_COGNITO_USER_POOL_ID=us-west-2_bdCwF60ZI
+VITE_AWS_COGNITO_APP_CLIENT_ID=4i9hrd7srgbqbtun09p43ncfn0
+EOF
+
+echo -e "\n${GREEN}🎉 Domain setup completed (HTTP-only)!${NC}"
 echo -e "${BLUE}📋 Configuration summary:${NC}"
 echo -e "  🌐 Domain: $DOMAIN"
-echo -e "  🔒 SSL: $([ -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem ] && echo 'Enabled' || echo 'Pending')"
+echo -e "  🔓 SSL: Not configured (HTTP-only)"
 echo -e "  🚀 Nginx: Running"
 
 echo -e "\n${YELLOW}💡 Next steps:${NC}"
 echo -e "1. ${GREEN}Rebuild application:${NC} sudo ./deploy/deploy-optimized.sh"
 echo -e "2. ${GREEN}Check status:${NC} sudo ./deploy/check-domain.sh"
+echo -e "3. ${GREEN}Add SSL later:${NC} sudo ./deploy/fix-certbot.sh && sudo /snap/bin/certbot --nginx -d $DOMAIN"
 
 echo -e "\n${BLUE}🌐 Your application will be available at:${NC}"
-echo -e "   https://$DOMAIN"
-echo -e "   https://www.$DOMAIN"
+echo -e "   http://$DOMAIN"
+echo -e "   http://www.$DOMAIN"
+
+echo -e "\n${YELLOW}⚠️ Note: Using HTTP for now. Add SSL when ready.${NC}"
