@@ -32,7 +32,7 @@ if [ ! -f "populate_ec2_database.sql" ]; then
 fi
 
 echo "📋 Verificando estado actual de la base de datos..."
-python manage.py shell -c "
+python3 manage.py shell -c "
 from django.db import connection
 cursor = connection.cursor()
 cursor.execute('SELECT COUNT(*) FROM unit')
@@ -41,22 +41,19 @@ cursor.execute('SELECT COUNT(*) FROM zone')
 zones = cursor.fetchone()[0]
 cursor.execute('SELECT COUNT(*) FROM \"table\"')
 tables = cursor.fetchone()[0]
-cursor.execute('SELECT COUNT(*) FROM waiter')
-waiters = cursor.fetchone()[0]
 print(f'📊 Estado actual:')
 print(f'   - Unidades: {units}')
 print(f'   - Zonas: {zones}')
 print(f'   - Mesas: {tables}')
-print(f'   - Meseros: {waiters}')
 "
 
 echo ""
 echo "🔄 Aplicando datos del restaurante..."
-python manage.py dbshell < populate_ec2_database.sql
+python3 manage.py dbshell < populate_ec2_database.sql
 
 echo ""
 echo "✅ Verificando datos restaurados..."
-python manage.py shell -c "
+python3 manage.py shell -c "
 from django.db import connection
 cursor = connection.cursor()
 
@@ -65,7 +62,6 @@ tables_data = {
     'unit': 'Unidades de medida',
     'zone': 'Zonas del restaurante', 
     'table': 'Mesas',
-    'waiter': 'Meseros',
     'container': 'Envases',
     'group': 'Grupos de recetas',
     'ingredient': 'Ingredientes',
@@ -94,14 +90,6 @@ for group in groups:
     print(f'📂 {group[0]}')
 
 print('')
-print('👨‍🍳 MESEROS ACTIVOS:')
-print('=' * 40)
-cursor.execute('SELECT name, phone FROM waiter WHERE is_active = 1 ORDER BY name')
-waiters = cursor.fetchall()
-for waiter in waiters:
-    print(f'👤 {waiter[0]} - {waiter[1]}')
-
-print('')
 print('🏢 DISTRIBUCIÓN DE MESAS:')
 print('=' * 40)
 cursor.execute('SELECT z.name, COUNT(t.id) FROM zone z LEFT JOIN \"table\" t ON z.id = t.zone_id GROUP BY z.name ORDER BY z.name')
@@ -111,19 +99,8 @@ for zone in zones:
 "
 
 echo ""
-echo "🎯 Creando usuario administrador..."
-python manage.py shell -c "
-from django.contrib.auth.models import User
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@restaurant.com', 'admin123')
-    print('✅ Usuario admin creado (admin/admin123)')
-else:
-    print('ℹ️  Usuario admin ya existe')
-"
-
-echo ""
 echo "🧹 Aplicando migraciones pendientes..."
-python manage.py migrate --run-syncdb
+python3 manage.py migrate --run-syncdb
 
 echo ""
 echo "🎉 ========================================"
@@ -134,16 +111,10 @@ echo "📋 RESUMEN DE DATOS CARGADOS:"
 echo "   ✓ 9+ Unidades de medida"
 echo "   ✓ 5 Zonas del restaurante"
 echo "   ✓ 30 Mesas distribuidas"
-echo "   ✓ 5 Meseros activos"
 echo "   ✓ 4 Tipos de envases"
 echo "   ✓ 12 Grupos de recetas"
 echo "   ✓ 41 Ingredientes con stock"
 echo "   ✓ 18 Recetas del menú"
 echo "   ✓ 54+ Relaciones ingrediente-receta"
-echo ""
-echo "🔐 CREDENCIALES DE ACCESO:"
-echo "   Usuario: admin"
-echo "   Contraseña: admin123"
-echo "   Panel: http://tu-dominio.com/admin/"
 echo ""
 echo "🚀 El restaurante está listo para operar!"

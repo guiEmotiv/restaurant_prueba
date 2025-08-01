@@ -91,16 +91,9 @@ INSERT INTO "table" VALUES(65,'30','2025-08-01 09:05:16.361178',12);
 COMMIT;
 
 -- ==========================================
--- 👨‍🍳 MESEROS DEL RESTAURANTE
+-- 👨‍🍳 MESEROS DEL RESTAURANTE - OMITIDO
 -- ==========================================
-BEGIN TRANSACTION;
-DELETE FROM waiter;
-INSERT INTO waiter VALUES(1,'Carlos Mendoza','987654321',1,'2025-08-01 09:00:00.000000','2025-08-01 09:00:00.000000');
-INSERT INTO waiter VALUES(2,'Ana Torres','987654322',1,'2025-08-01 09:00:00.000000','2025-08-01 09:00:00.000000');
-INSERT INTO waiter VALUES(3,'Luis García','987654323',1,'2025-08-01 09:00:00.000000','2025-08-01 09:00:00.000000');
-INSERT INTO waiter VALUES(4,'María Rodríguez','987654324',1,'2025-08-01 09:00:00.000000','2025-08-01 09:00:00.000000');
-INSERT INTO waiter VALUES(5,'José Herrera','987654325',1,'2025-08-01 09:00:00.000000','2025-08-01 09:00:00.000000');
-COMMIT;
+-- Los meseros se manejan desde la aplicación web
 
 -- ==========================================
 -- 📦 ENVASES PARA COMIDA PARA LLEVAR
@@ -351,5 +344,5 @@ PRAGMA foreign_keys=ON;
 -- ✓ 54 Relaciones ingrediente-receta
 -- ✓ 1 Configuración operativa
 --
--- TOTAL: 154+ registros de datos reales del restaurante
+-- TOTAL: 149+ registros de datos reales del restaurante (sin meseros)
 -- ==========================================
