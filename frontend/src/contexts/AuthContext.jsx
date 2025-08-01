@@ -108,38 +108,48 @@ export const AuthProvider = ({ children }) => {
     // Only check auth state initially, don't do it automatically
     console.log('🔍 Initializing AuthContext...');
     
-    // Listen for authentication events
+    // Listen for custom authentication success event
+    const handleAuthSuccess = (event) => {
+      console.log('🎯 Custom auth success event received:', event.detail);
+      setTimeout(() => {
+        checkAuthState();
+      }, 500);
+    };
+    
+    window.addEventListener('cognitoAuthSuccess', handleAuthSuccess);
+    
+    // Listen for authentication events from Hub
     const hubListenerCancel = Hub.listen('auth', ({ payload }) => {
-      console.log('🎯 Auth event received:', payload.event);
+      console.log('🎯 Hub auth event received:', payload.event);
       switch (payload.event) {
         case 'signInWithRedirect':
         case 'signedIn':
-          console.log('🔐 User signed in, refreshing auth state');
-          // Add a delay to ensure Cognito session is fully established
+          console.log('🔐 Hub: User signed in, refreshing auth state');
           setTimeout(() => {
             checkAuthState();
           }, 1000);
           break;
         case 'signedOut':
-          console.log('🔓 User signed out');
+          console.log('🔓 Hub: User signed out');
           setUser(null);
           setUserRole(null);
           setIsAuthenticated(false);
           setLoading(false);
           break;
         case 'tokenRefresh':
-          console.log('🔄 Token refreshed');
+          console.log('🔄 Hub: Token refreshed');
           setTimeout(() => {
             checkAuthState();
           }, 500);
           break;
         default:
-          console.log('ℹ️ Other auth event:', payload.event);
+          console.log('ℹ️ Hub: Other auth event:', payload.event);
           break;
       }
     });
 
     return () => {
+      window.removeEventListener('cognitoAuthSuccess', handleAuthSuccess);
       hubListenerCancel();
     };
   }, []);

@@ -75,11 +75,19 @@ const LoginForm = ({ children }) => {
       {({ signOut, user }) => {
         // Log authentication state for debugging
         if (user) {
-          console.log('✅ User authenticated:', {
+          console.log('✅ Authenticator: User authenticated:', {
             username: user.username,
             userId: user.userId,
             signInDetails: user.signInDetails
           });
+          
+          // Manually trigger AuthContext update
+          console.log('🔄 Triggering AuthContext refresh...');
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('cognitoAuthSuccess', { detail: user }));
+          }, 100);
+        } else {
+          console.log('❌ Authenticator: No user found');
         }
         
         return (
