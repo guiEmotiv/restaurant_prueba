@@ -60,10 +60,10 @@ if (isCognitoConfigured) {
 }
 
 const AppContent = () => {
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, isAuthenticated } = useAuth();
   
-  // Show loading screen while checking authentication
-  if (isCognitoConfigured && authLoading) {
+  // Show loading screen only when we're actually checking auth state
+  if (isCognitoConfigured && authLoading && isAuthenticated === null) {
     return <AuthLoadingScreen />;
   }
   

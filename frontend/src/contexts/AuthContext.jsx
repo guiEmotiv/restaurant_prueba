@@ -105,10 +105,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    checkAuthState();
+    // Only check auth state initially, don't do it automatically
+    console.log('🔍 Initializing AuthContext...');
     
     // Listen for authentication events
     const hubListenerCancel = Hub.listen('auth', ({ payload }) => {
+      console.log('🎯 Auth event received:', payload.event);
       switch (payload.event) {
         case 'signInWithRedirect':
         case 'signedIn':
@@ -116,23 +118,23 @@ export const AuthProvider = ({ children }) => {
           // Add a delay to ensure Cognito session is fully established
           setTimeout(() => {
             checkAuthState();
-          }, 500);
+          }, 1000);
           break;
         case 'signedOut':
           console.log('🔓 User signed out');
           setUser(null);
           setUserRole(null);
           setIsAuthenticated(false);
+          setLoading(false);
           break;
         case 'tokenRefresh':
           console.log('🔄 Token refreshed');
-          checkAuthState();
-          break;
-        case 'customOAuthState':
-          console.log('🔄 OAuth state changed');
-          checkAuthState();
+          setTimeout(() => {
+            checkAuthState();
+          }, 500);
           break;
         default:
+          console.log('ℹ️ Other auth event:', payload.event);
           break;
       }
     });
