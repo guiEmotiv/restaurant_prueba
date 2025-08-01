@@ -239,7 +239,7 @@ echo -e "  VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID"
 
 # Clean install
 rm -rf node_modules package-lock.json dist 2>/dev/null || true
-npm install --only=production --silent --no-fund --no-audit
+npm install --silent --no-fund --no-audit
 
 # Build frontend with explicit environment variables
 echo -e "${BLUE}Building frontend with Cognito configuration...${NC}"
@@ -247,7 +247,10 @@ VITE_API_URL=http://$DOMAIN \
 VITE_AWS_REGION=$AWS_REGION \
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID \
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID \
-NODE_ENV=production ./node_modules/.bin/vite build --mode production
+NODE_ENV=production npm run build
+
+# Clean dev dependencies after build
+npm prune --production --silent
 
 if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
     echo -e "${RED}❌ Frontend build failed${NC}"
