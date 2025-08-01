@@ -6,6 +6,7 @@ import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import RoleProtectedRoute from './components/auth/RoleProtectedRoute';
 import AuthLoadingScreen from './components/auth/AuthLoadingScreen';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
 import Dashboard from './pages/Dashboard';
@@ -78,56 +79,56 @@ const AppContent = () => {
         {console.log('🔍 Inside Layout wrapper...')}
         <Routes>
           {console.log('🔍 Inside Routes wrapper...')}
-          {/* Dashboard */}
+          {/* Dashboard - Solo administradores */}
           <Route path="/" element={
-            <>
+            <RoleProtectedRoute requiredPermission="canViewDashboard">
               {console.log('🔍 Rendering Dashboard route...')}
               <Dashboard />
-            </>
+            </RoleProtectedRoute>
           } />
 
-          {/* Configuration routes */}
+          {/* Configuration routes - Solo administradores */}
           <Route path="/units" element={
-            <ProtectedRoute requiredPermission="canManageConfig">
+            <RoleProtectedRoute requiredPermission="canManageConfig">
               <Units />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/zones" element={
-            <ProtectedRoute requiredPermission="canManageConfig">
+            <RoleProtectedRoute requiredPermission="canManageConfig">
               <Zones />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/tables" element={
-            <ProtectedRoute requiredPermission="canManageConfig">
+            <RoleProtectedRoute requiredPermission="canManageConfig">
               <Tables />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/waiters" element={
-            <ProtectedRoute requiredPermission="canManageConfig">
+            <RoleProtectedRoute requiredPermission="canManageConfig">
               <Waiters />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/containers" element={
-            <ProtectedRoute requiredPermission="canManageConfig">
+            <RoleProtectedRoute requiredPermission="canManageConfig">
               <Containers />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
 
-          {/* Inventory routes */}
+          {/* Inventory routes - Solo administradores */}
           <Route path="/groups" element={
-            <ProtectedRoute requiredPermission="canManageInventory">
+            <RoleProtectedRoute requiredPermission="canManageInventory">
               <Groups />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/ingredients" element={
-            <ProtectedRoute requiredPermission="canManageInventory">
+            <RoleProtectedRoute requiredPermission="canManageInventory">
               <Ingredients />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/recipes" element={
-            <ProtectedRoute requiredPermission="canManageInventory">
+            <RoleProtectedRoute requiredPermission="canManageInventory">
               <Recipes />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
 
           {/* Operation routes */}
@@ -162,14 +163,14 @@ const AppContent = () => {
             </ProtectedRoute>
           } />
           <Route path="/kitchen" element={
-            <ProtectedRoute requiredPermission="canViewKitchen">
+            <RoleProtectedRoute requiredPermission="canViewKitchen">
               <Kitchen />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/table-status" element={
-            <ProtectedRoute requiredPermission="canViewTableStatus">
+            <RoleProtectedRoute requiredPermission="canViewTableStatus">
               <TableStatus />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
           <Route path="/table/:tableId/order-ecommerce" element={
             <ProtectedRoute requiredPermission="canManageOrders">
@@ -189,9 +190,9 @@ const AppContent = () => {
 
           {/* Payment routes */}
           <Route path="/payment-history" element={
-            <ProtectedRoute requiredPermission="canViewHistory">
+            <RoleProtectedRoute requiredPermission="canViewHistory">
               <PaymentHistory />  
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           } />
 
           {/* Role-based redirect for unauthorized paths */}
