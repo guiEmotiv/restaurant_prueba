@@ -9,26 +9,25 @@ import {
   ShoppingCart,
   AlertCircle,
   CheckCircle,
-  BarChart3,
   PieChart,
   Activity,
-  Calendar,
   ArrowUp,
   ArrowDown,
   Target,
   Award,
-  Zap,
   Package,
   UserCheck,
   Settings,
   X,
   Save,
   ChefHat,
-  Wine,
   Utensils,
   Timer,
+  MapPin,
+  RefreshCw,
+  Crown,
   TrendingUp as Trend,
-  Eye
+  Star
 } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -36,6 +35,7 @@ const Dashboard = () => {
   console.log('📊 Dashboard de Operación Diaria - Iniciando...');
   
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [operationalDate, setOperationalDate] = useState(() => {
     return new Date().toISOString().split('T')[0];
   });
@@ -63,18 +63,16 @@ const Dashboard = () => {
     // Distribución de ingresos
     revenueByCategory: [],
     revenueByPaymentMethod: [],
-    revenueByHour: [],
     
     // Métricas de eficiencia
     averageServiceTime: 0,
-    peakHours: [],
     tablesRotation: 0,
-    ordersPerHour: [],
     
-    // Performance
-    topSellingItems: [],
-    topTables: [],
+    // Performance específica
+    topSellingDishes: [],
     waiterPerformance: [],
+    zonePerformance: [],
+    topTables: [],
     
     // Estado operacional
     activeOrders: 0,
@@ -84,9 +82,14 @@ const Dashboard = () => {
   });
 
   // Función para cargar datos del dashboard
-  const loadDashboardData = useCallback(async () => {
+  const loadDashboardData = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      
       console.log('📅 Cargando datos para fecha operativa:', operationalDate);
 
       // Cargar todos los datos en paralelo
@@ -96,26 +99,31 @@ const Dashboard = () => {
         tables,
         recipes,
         ingredients,
-        activeOrdersList
+        activeOrdersList,
+        zones,
+        waiters
       ] = await Promise.all([
         apiService.payments.getOperationalSummary(operationalDate),
         apiService.orders.getAll(),
         apiService.tables.getAll(),
         apiService.recipes.getAll(),
         apiService.ingredients.getAll(),
-        apiService.orders.getActive()
+        apiService.orders.getActive(),
+        apiService.zones?.getAll().catch(() => []),
+        apiService.waiters?.getAll().catch(() => [])
       ]);
 
-      // Filtrar órdenes por fecha operativa
-      const todayOrders = orders.filter(order => {
+      // Filtrar SOLO órdenes PAGADAS por fecha operativa
+      const paidOrdersToday = orders.filter(order => {
         const orderDate = order.operational_date || order.created_at.split('T')[0];
-        return orderDate === operationalDate;
+        return orderDate === operationalDate && order.status === 'PAID';
       });
 
-      // Cargar detalles de órdenes pagadas para análisis
-      const paidOrders = todayOrders.filter(o => o.status === 'PAID');
+      console.log(`📊 Órdenes pagadas del día: ${paidOrdersToday.length} de ${orders.length} total`);
+
+      // Cargar detalles completos de órdenes pagadas únicamente
       const orderDetails = await Promise.all(
-        paidOrders.slice(0, 50).map(async (order) => {
+        paidOrdersToday.slice(0, 100).map(async (order) => {
           try {
             return await apiService.orders.getById(order.id);
           } catch (error) {
@@ -126,14 +134,14 @@ const Dashboard = () => {
       );
       const validOrderDetails = orderDetails.filter(o => o !== null);
 
-      // Calcular métricas principales
+      // Calcular métricas principales (SOLO de pedidos pagados)
       const totalRevenue = operationalSummary.total_amount || 0;
-      const totalOrders = operationalSummary.total_orders || 0;
+      const totalOrders = paidOrdersToday.length;
       const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
       // Calcular distribución de ingresos por categoría
       const categoryRevenue = {};
-      const itemsSold = {};
+      const dishSales = {};
       let totalItems = 0;
       
       validOrderDetails.forEach(order => {
@@ -145,22 +153,24 @@ const Dashboard = () => {
             
             categoryRevenue[category] = (categoryRevenue[category] || 0) + itemTotal;
             
-            if (!itemsSold[item.recipe_name]) {
-              itemsSold[item.recipe_name] = {
+            // Contar platos vendidos
+            if (!dishSales[item.recipe_name]) {
+              dishSales[item.recipe_name] = {
                 name: item.recipe_name,
                 quantity: 0,
                 revenue: 0,
-                category: category
+                category: category,
+                price: parseFloat(item.price)
               };
             }
-            itemsSold[item.recipe_name].quantity += item.quantity;
-            itemsSold[item.recipe_name].revenue += itemTotal;
+            dishSales[item.recipe_name].quantity += item.quantity;
+            dishSales[item.recipe_name].revenue += itemTotal;
             totalItems += item.quantity;
           });
         }
       });
 
-      // Convertir a array y ordenar
+      // Convertir a array y ordenar categorías
       const revenueByCategory = Object.entries(categoryRevenue)
         .map(([category, revenue]) => ({
           category,
@@ -169,30 +179,65 @@ const Dashboard = () => {
         }))
         .sort((a, b) => b.revenue - a.revenue);
 
-      // Top 10 items más vendidos
-      const topSellingItems = Object.values(itemsSold)
-        .sort((a, b) => b.revenue - a.revenue)
+      // Top 10 platos más vendidos
+      const topSellingDishes = Object.values(dishSales)
+        .sort((a, b) => b.quantity - a.quantity)
         .slice(0, 10);
 
-      // Distribución por hora
-      const hourlyData = Array(24).fill(null).map(() => ({ orders: 0, revenue: 0 }));
-      todayOrders.forEach(order => {
-        const hour = new Date(order.created_at).getHours();
-        hourlyData[hour].orders++;
-        hourlyData[hour].revenue += parseFloat(order.total_amount || 0);
+      // Análisis por meseros (basado en órdenes pagadas)
+      const waiterStats = {};
+      paidOrdersToday.forEach(order => {
+        const waiterId = order.waiter || 'Sin Asignar';
+        if (!waiterStats[waiterId]) {
+          waiterStats[waiterId] = {
+            waiter: waiterId,
+            orders: 0,
+            revenue: 0,
+            avgTicket: 0
+          };
+        }
+        waiterStats[waiterId].orders++;
+        waiterStats[waiterId].revenue += parseFloat(order.total_amount || 0);
       });
 
-      const revenueByHour = hourlyData.map((data, hour) => ({
-        hour: `${hour.toString().padStart(2, '0')}:00`,
-        ...data
-      }));
+      const waiterPerformance = Object.values(waiterStats)
+        .map(waiter => ({
+          ...waiter,
+          avgTicket: waiter.orders > 0 ? waiter.revenue / waiter.orders : 0
+        }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
 
-      // Identificar horas pico (más de 10 órdenes)
-      const peakHours = revenueByHour
-        .filter(h => h.orders > 10)
-        .map(h => h.hour);
+      // Análisis por zonas (basado en tablas de órdenes pagadas)
+      const zoneStats = {};
+      paidOrdersToday.forEach(order => {
+        const table = tables.find(t => t.number === order.table);
+        const zoneName = table?.zone_name || 'Sin Zona';
+        
+        if (!zoneStats[zoneName]) {
+          zoneStats[zoneName] = {
+            zone: zoneName,
+            orders: 0,
+            revenue: 0,
+            tables: new Set()
+          };
+        }
+        zoneStats[zoneName].orders++;
+        zoneStats[zoneName].revenue += parseFloat(order.total_amount || 0);
+        if (table) {
+          zoneStats[zoneName].tables.add(table.number);
+        }
+      });
 
-      // Calcular métricas de servicio
+      const zonePerformance = Object.values(zoneStats)
+        .map(zone => ({
+          ...zone,
+          tablesUsed: zone.tables.size,
+          avgPerTable: zone.tablesUsed > 0 ? zone.revenue / zone.tablesUsed : 0
+        }))
+        .sort((a, b) => b.revenue - a.revenue);
+
+      // Calcular métricas de servicio (solo órdenes pagadas con tiempo de servicio)
       const serviceOrders = validOrderDetails.filter(o => o.served_at && o.created_at);
       let avgServiceTime = 0;
       if (serviceOrders.length > 0) {
@@ -204,13 +249,13 @@ const Dashboard = () => {
         avgServiceTime = Math.round(totalTime / serviceOrders.length / (1000 * 60));
       }
 
-      // Ocupación de mesas
+      // Ocupación de mesas (basado en órdenes activas)
       const activeTables = new Set(activeOrdersList.map(o => o.table)).size;
       const tableOccupancy = tables.length > 0 ? (activeTables / tables.length) * 100 : 0;
 
-      // Top mesas por ingresos
+      // Top mesas por ingresos (solo órdenes pagadas)
       const tableRevenue = {};
-      todayOrders.forEach(order => {
+      paidOrdersToday.forEach(order => {
         const tableId = order.table || order.table_number;
         if (tableId) {
           tableRevenue[tableId] = (tableRevenue[tableId] || 0) + parseFloat(order.total_amount || 0);
@@ -226,8 +271,8 @@ const Dashboard = () => {
       const lowStockItems = ingredients.filter(i => i.current_stock <= 5 && i.is_active);
 
       // Calcular comparativas (simuladas por ahora)
-      const revenueVsYesterday = Math.random() * 40 - 20; // -20% a +20%
-      const revenueVsLastWeek = Math.random() * 30 - 15; // -15% a +15%
+      const revenueVsYesterday = Math.random() * 40 - 20;
+      const revenueVsLastWeek = Math.random() * 30 - 15;
       const revenueVsAverage = totalRevenue > 5000 ? 15 : -10;
 
       // Distribución por método de pago
@@ -247,9 +292,17 @@ const Dashboard = () => {
           percentage: totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0
         }));
 
-      // Estado de órdenes
-      const pendingOrders = todayOrders.filter(o => o.status === 'PENDING').length;
-      const activeOrders = todayOrders.filter(o => ['PENDING', 'PREPARING'].includes(o.status)).length;
+      // Estado de órdenes activas (no pagadas)
+      const activeOrdersFiltered = orders.filter(order => {
+        const orderDate = order.operational_date || order.created_at.split('T')[0];
+        return orderDate === operationalDate && order.status !== 'PAID';
+      });
+
+      const pendingOrders = activeOrdersFiltered.filter(o => o.status === 'PENDING').length;
+      const activeOrders = activeOrdersFiltered.length;
+
+      // Calcular rotación de mesas correctamente
+      const tablesRotation = tables.length > 0 ? totalOrders / tables.length : 0;
 
       // Actualizar estado
       setDailyMetrics({
@@ -263,17 +316,15 @@ const Dashboard = () => {
         revenueVsAverage,
         revenueByCategory,
         revenueByPaymentMethod,
-        revenueByHour,
         averageServiceTime: avgServiceTime,
-        peakHours,
-        tablesRotation: totalOrders / tables.length,
-        ordersPerHour: revenueByHour.map(h => h.orders),
-        topSellingItems,
+        tablesRotation,
+        topSellingDishes,
+        waiterPerformance,
+        zonePerformance,
         topTables,
-        waiterPerformance: [], // Por implementar
         activeOrders,
         pendingOrders,
-        kitchenLoad: (activeOrders / 10) * 100, // Estimado
+        kitchenLoad: activeOrders > 0 ? (activeOrders / 10) * 100 : 0,
         inventoryAlerts: lowStockItems.length
       });
 
@@ -281,8 +332,14 @@ const Dashboard = () => {
       console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [operationalDate]);
+
+  // Función para refresh manual
+  const handleRefresh = () => {
+    loadDashboardData(true);
+  };
 
   useEffect(() => {
     loadDashboardData();
@@ -348,16 +405,16 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 p-6">
+      <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-32 bg-white rounded-xl"></div>
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="h-32 bg-white rounded-xl"></div>
               ))}
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <div className="h-96 bg-white rounded-xl"></div>
               <div className="h-96 bg-white rounded-xl"></div>
             </div>
@@ -368,16 +425,24 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 -m-6 p-6">
+    <div className="min-h-screen bg-gray-100 -m-4 sm:-m-6 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header con resumen ejecutivo */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Dashboard Operacional</h1>
-              <p className="text-gray-600 mt-1">Análisis detallado del rendimiento diario</p>
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start justify-between mb-6 gap-4">
+            <div className="flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard Operacional</h1>
+              <p className="text-gray-600 mt-1 text-sm sm:text-base">Análisis detallado del rendimiento diario</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? 'Actualizando...' : 'Actualizar'}
+              </button>
               <button
                 onClick={() => setShowConfigModal(true)}
                 className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
@@ -391,79 +456,79 @@ const Dashboard = () => {
                   type="date"
                   value={operationalDate}
                   onChange={(e) => setOperationalDate(e.target.value)}
-                  className="mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
                 />
               </div>
             </div>
           </div>
 
-          {/* Resumen del día con comparativas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          {/* Resumen del día con comparativas - Responsive Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
               <div className="flex items-center justify-between mb-2">
-                <DollarSign className="h-8 w-8 text-green-600" />
-                <span className={`text-sm font-medium ${dailyMetrics.revenueVsYesterday >= 0 ? 'text-green-600' : 'text-red-600'} flex items-center`}>
-                  {dailyMetrics.revenueVsYesterday >= 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
+                <span className={`text-xs sm:text-sm font-medium ${dailyMetrics.revenueVsYesterday >= 0 ? 'text-green-600' : 'text-red-600'} flex items-center`}>
+                  {dailyMetrics.revenueVsYesterday >= 0 ? <ArrowUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ArrowDown className="h-3 w-3 sm:h-4 sm:w-4" />}
                   {formatPercentage(dailyMetrics.revenueVsYesterday)}
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">{formatCurrency(dailyMetrics.totalRevenue)}</h3>
-              <p className="text-sm text-gray-600">Ingresos del día</p>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(dailyMetrics.totalRevenue)}</h3>
+              <p className="text-xs sm:text-sm text-gray-600">Ingresos del día</p>
               <p className="text-xs text-gray-500 mt-1">vs. ayer</p>
             </div>
 
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
               <div className="flex items-center justify-between mb-2">
-                <ShoppingCart className="h-8 w-8 text-blue-600" />
-                <span className="text-sm font-medium text-gray-700">{dailyMetrics.totalOrders}</span>
+                <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
+                <span className="text-xs sm:text-sm font-medium text-gray-700">{dailyMetrics.totalOrders}</span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">{formatCurrency(dailyMetrics.averageTicket)}</h3>
-              <p className="text-sm text-gray-600">Ticket promedio</p>
-              <p className="text-xs text-gray-500 mt-1">{dailyMetrics.totalOrders} órdenes</p>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(dailyMetrics.averageTicket)}</h3>
+              <p className="text-xs sm:text-sm text-gray-600">Ticket promedio</p>
+              <p className="text-xs text-gray-500 mt-1">{dailyMetrics.totalOrders} órdenes pagadas</p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200">
               <div className="flex items-center justify-between mb-2">
-                <Users className="h-8 w-8 text-purple-600" />
-                <span className="text-sm font-medium text-purple-600">{dailyMetrics.tableOccupancy.toFixed(0)}%</span>
+                <Users className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
+                <span className="text-xs sm:text-sm font-medium text-purple-600">{dailyMetrics.tableOccupancy.toFixed(0)}%</span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">{Math.round(dailyMetrics.customerCount)}</h3>
-              <p className="text-sm text-gray-600">Clientes atendidos</p>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{Math.round(dailyMetrics.customerCount)}</h3>
+              <p className="text-xs sm:text-sm text-gray-600">Clientes atendidos</p>
               <p className="text-xs text-gray-500 mt-1">Ocupación actual</p>
             </div>
 
             <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-xl border border-orange-200">
               <div className="flex items-center justify-between mb-2">
-                <Timer className="h-8 w-8 text-orange-600" />
-                <Zap className="h-4 w-4 text-orange-500" />
+                <Timer className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
+                <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">{dailyMetrics.averageServiceTime}min</h3>
-              <p className="text-sm text-gray-600">Tiempo promedio</p>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{dailyMetrics.averageServiceTime}min</h3>
+              <p className="text-xs sm:text-sm text-gray-600">Tiempo promedio</p>
               <p className="text-xs text-gray-500 mt-1">De servicio</p>
             </div>
 
             <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-200">
               <div className="flex items-center justify-between mb-2">
-                <Activity className="h-8 w-8 text-red-600" />
-                <span className="text-sm font-medium text-red-600">{dailyMetrics.activeOrders}</span>
+                <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
+                <span className="text-xs sm:text-sm font-medium text-red-600">{dailyMetrics.activeOrders}</span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">{dailyMetrics.tablesRotation.toFixed(1)}x</h3>
-              <p className="text-sm text-gray-600">Rotación mesas</p>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{dailyMetrics.tablesRotation.toFixed(1)}x</h3>
+              <p className="text-xs sm:text-sm text-gray-600">Rotación mesas</p>
               <p className="text-xs text-gray-500 mt-1">Órdenes activas</p>
             </div>
           </div>
         </div>
 
-        {/* Distribución de ingresos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Distribución de ingresos y top platos - Responsive */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Distribución por categorías */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <PieChart className="h-6 w-6 text-blue-500" />
-              Distribución de Ingresos por Categoría
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <PieChart className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
+              <span className="text-sm sm:text-base">Distribución de Ingresos por Categoría</span>
             </h2>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {dailyMetrics.revenueByCategory.map((category, index) => {
                 const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-red-500', 'bg-indigo-500'];
                 const bgColor = colors[index % colors.length];
@@ -471,18 +536,18 @@ const Dashboard = () => {
                 return (
                   <div key={index} className="relative">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-4 h-4 rounded ${bgColor}`}></div>
-                        <span className="font-medium text-gray-700">{category.category}</span>
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded ${bgColor}`}></div>
+                        <span className="font-medium text-gray-700 text-sm sm:text-base">{category.category}</span>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-gray-900">{formatCurrency(category.revenue)}</p>
-                        <p className="text-sm text-gray-500">{category.percentage.toFixed(1)}%</p>
+                        <p className="font-bold text-gray-900 text-sm sm:text-base">{formatCurrency(category.revenue)}</p>
+                        <p className="text-xs sm:text-sm text-gray-500">{category.percentage.toFixed(1)}%</p>
                       </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
                       <div 
-                        className={`${bgColor} h-3 rounded-full transition-all duration-500`}
+                        className={`${bgColor} h-2 sm:h-3 rounded-full transition-all duration-500`}
                         style={{ width: `${category.percentage}%` }}
                       ></div>
                     </div>
@@ -492,18 +557,18 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Top productos vendidos */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Award className="h-6 w-6 text-yellow-500" />
-              Top 10 Productos Más Vendidos
+          {/* Top platos más vendidos */}
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Award className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />
+              <span className="text-sm sm:text-base">Top 10 Platos Más Vendidos</span>
             </h2>
             
-            <div className="space-y-3">
-              {dailyMetrics.topSellingItems.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
+            <div className="space-y-2 sm:space-y-3 max-h-80 overflow-y-auto">
+              {dailyMetrics.topSellingDishes.map((dish, index) => (
+                <div key={index} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm sm:text-base ${
                       index === 0 ? 'bg-yellow-500' : 
                       index === 1 ? 'bg-gray-400' : 
                       index === 2 ? 'bg-orange-600' : 'bg-gray-300'
@@ -511,12 +576,13 @@ const Dashboard = () => {
                       {index + 1}
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-500">{item.category} • {item.quantity} unidades</p>
+                      <p className="font-medium text-gray-900 text-sm sm:text-base">{dish.name}</p>
+                      <p className="text-xs sm:text-sm text-gray-500">{dish.category} • {dish.quantity} unidades</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-gray-900">{formatCurrency(item.revenue)}</p>
+                    <p className="font-bold text-gray-900 text-sm sm:text-base">{formatCurrency(dish.revenue)}</p>
+                    <p className="text-xs text-gray-500">{formatCurrency(dish.price)} c/u</p>
                   </div>
                 </div>
               ))}
@@ -524,68 +590,109 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Análisis temporal */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-indigo-500" />
-            Análisis de Ventas por Hora
-          </h2>
-          
-          <div className="h-64 relative">
-            <div className="absolute inset-0 flex items-end justify-between gap-1">
-              {dailyMetrics.revenueByHour.map((hour, index) => {
-                const maxRevenue = Math.max(...dailyMetrics.revenueByHour.map(h => h.revenue));
-                const heightPercentage = maxRevenue > 0 ? (hour.revenue / maxRevenue) * 100 : 0;
-                const isPeak = dailyMetrics.peakHours.includes(hour.hour);
-                
-                return (
-                  <div key={index} className="flex-1 flex flex-col items-center group relative">
-                    <div 
-                      className={`w-full rounded-t transition-all duration-300 ${
-                        isPeak 
-                          ? 'bg-gradient-to-t from-orange-600 to-orange-400 hover:from-orange-700 hover:to-orange-500' 
-                          : 'bg-gradient-to-t from-blue-600 to-blue-400 hover:from-blue-700 hover:to-blue-500'
-                      }`}
-                      style={{ height: `${heightPercentage}%` }}
-                    >
-                      <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
-                        <p className="font-bold">{formatCurrency(hour.revenue)}</p>
-                        <p>{hour.orders} órdenes</p>
-                      </div>
+        {/* Análisis de Performance - Responsive Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+          {/* Rendimiento por Meseros */}
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-blue-500" />
+              <span className="text-sm sm:text-base">Top Meseros</span>
+            </h3>
+            <div className="space-y-3">
+              {dailyMetrics.waiterPerformance.slice(0, 5).map((waiter, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm ${
+                      index === 0 ? 'bg-blue-600' : 'bg-gray-400'
+                    }`}>
+                      {index === 0 ? <Crown className="h-4 w-4" /> : index + 1}
                     </div>
-                    <p className="text-xs text-gray-600 mt-2 -rotate-45 transform origin-left">{hour.hour}</p>
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">Mesero {waiter.waiter}</p>
+                      <p className="text-xs text-gray-500">{waiter.orders} órdenes</p>
+                    </div>
                   </div>
-                );
-              })}
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900 text-sm">{formatCurrency(waiter.revenue)}</p>
+                    <p className="text-xs text-gray-500">{formatCurrency(waiter.avgTicket)} promedio</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          
-          <div className="mt-6 flex items-center justify-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-orange-500 rounded"></div>
-              <span className="text-sm text-gray-600">Horas pico</span>
+
+          {/* Rendimiento por Zonas */}
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-green-500" />
+              <span className="text-sm sm:text-base">Análisis por Zonas</span>
+            </h3>
+            <div className="space-y-3">
+              {dailyMetrics.zonePerformance.slice(0, 5).map((zone, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center font-bold text-white text-sm">
+                      {zone.zone.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">{zone.zone}</p>
+                      <p className="text-xs text-gray-500">{zone.tablesUsed} mesas activas</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900 text-sm">{formatCurrency(zone.revenue)}</p>
+                    <p className="text-xs text-gray-500">{formatCurrency(zone.avgPerTable)} por mesa</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-500 rounded"></div>
-              <span className="text-sm text-gray-600">Horas normales</span>
+          </div>
+
+          {/* Mesas Más Productivas */}
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Utensils className="h-5 w-5 text-purple-500" />
+              <span className="text-sm sm:text-base">Mesas Top</span>
+            </h3>
+            <div className="space-y-3">
+              {dailyMetrics.topTables.map((table, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm ${
+                      index === 0 ? 'bg-purple-600' : 
+                      index === 1 ? 'bg-purple-400' : 
+                      index === 2 ? 'bg-purple-300' : 'bg-gray-400'
+                    }`}>
+                      {index === 0 ? <Star className="h-4 w-4" /> : table.table}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">Mesa {table.table}</p>
+                      <p className="text-xs text-gray-500">Hoy</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900 text-sm">{formatCurrency(table.revenue)}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Métricas adicionales */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Métricas adicionales - Responsive */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Métodos de pago */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-green-500" />
-              Métodos de Pago
+              <span className="text-sm sm:text-base">Métodos de Pago</span>
             </h3>
             <div className="space-y-3">
               {dailyMetrics.revenueByPaymentMethod.map((method, index) => (
                 <div key={index} className="flex items-center justify-between">
-                  <span className="text-gray-700">{method.method}</span>
+                  <span className="text-gray-700 text-sm sm:text-base">{method.method}</span>
                   <div className="text-right">
-                    <p className="font-bold text-gray-900">{formatCurrency(method.amount)}</p>
+                    <p className="font-bold text-gray-900 text-sm sm:text-base">{formatCurrency(method.amount)}</p>
                     <p className="text-xs text-gray-500">{method.percentage.toFixed(1)}%</p>
                   </div>
                 </div>
@@ -593,34 +700,38 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Top mesas */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          {/* Estado operacional compacto */}
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Utensils className="h-5 w-5 text-purple-500" />
-              Mesas Más Productivas
+              <Activity className="h-5 w-5 text-blue-500" />
+              <span className="text-sm sm:text-base">Estado Operativo</span>
             </h3>
             <div className="space-y-3">
-              {dailyMetrics.topTables.map((table, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-gray-700">Mesa {table.table}</span>
-                  <span className="font-bold text-gray-900">{formatCurrency(table.revenue)}</span>
-                </div>
-              ))}
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <span className="text-sm font-medium text-blue-900">Órdenes Activas</span>
+                <span className="text-lg font-bold text-blue-600">{dailyMetrics.activeOrders}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <span className="text-sm font-medium text-purple-900">Mesas Ocupadas</span>
+                <span className="text-lg font-bold text-purple-600">
+                  {Math.round((dailyMetrics.tableOccupancy / 100) * 20)}/20
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Alertas operacionales */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:col-span-2 lg:col-span-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
-              Estado Operacional
+              <span className="text-sm sm:text-base">Alertas</span>
             </h3>
             <div className="space-y-3">
               {dailyMetrics.inventoryAlerts > 0 && (
                 <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                   <div className="flex items-center gap-2">
                     <Package className="h-5 w-5 text-red-600" />
-                    <span className="text-red-900 font-medium">Stock bajo</span>
+                    <span className="text-red-900 font-medium text-sm">Stock bajo</span>
                   </div>
                   <span className="text-red-600 font-bold">{dailyMetrics.inventoryAlerts} items</span>
                 </div>
@@ -629,7 +740,7 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                   <div className="flex items-center gap-2">
                     <Clock className="h-5 w-5 text-yellow-600" />
-                    <span className="text-yellow-900 font-medium">Órdenes pendientes</span>
+                    <span className="text-yellow-900 font-medium text-sm">Órdenes pendientes</span>
                   </div>
                   <span className="text-yellow-600 font-bold">{dailyMetrics.pendingOrders}</span>
                 </div>
@@ -638,7 +749,7 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                   <div className="flex items-center gap-2">
                     <ChefHat className="h-5 w-5 text-orange-600" />
-                    <span className="text-orange-900 font-medium">Cocina saturada</span>
+                    <span className="text-orange-900 font-medium text-sm">Cocina saturada</span>
                   </div>
                   <span className="text-orange-600 font-bold">{dailyMetrics.kitchenLoad.toFixed(0)}%</span>
                 </div>
@@ -646,18 +757,18 @@ const Dashboard = () => {
               {dailyMetrics.inventoryAlerts === 0 && dailyMetrics.pendingOrders === 0 && dailyMetrics.kitchenLoad <= 80 && (
                 <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
                   <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span className="text-green-900 font-medium">Todo operando con normalidad</span>
+                  <span className="text-green-900 font-medium text-sm">Todo operando con normalidad</span>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Modal de Configuración */}
+        {/* Modal de Configuración - Responsive */}
         {showConfigModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">
                   Configuración de Horarios
                 </h3>
@@ -669,7 +780,7 @@ const Dashboard = () => {
                 </button>
               </div>
 
-              <div className="p-6 space-y-4">
+              <div className="p-4 sm:p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Hora de Apertura
@@ -695,17 +806,17 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 sm:p-6 border-t border-gray-200">
                 <button
                   onClick={() => setShowConfigModal(false)}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleSaveOperationalConfig}
                   disabled={configLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {configLoading ? (
                     <>
