@@ -69,12 +69,12 @@ MIDDLEWARE = [
 
 # Conditionally add CSRF and Auth middleware based on authentication mode
 if os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true':
-    # For Cognito auth, add CSRF exemption for API endpoints and our auth middleware
+    # For Cognito auth, add CSRF exemption for API endpoints
     MIDDLEWARE.extend([
         'backend.csrf_exempt_middleware.CSRFExemptAPIMiddleware',  # Exempt API from CSRF
         'django.middleware.csrf.CsrfViewMiddleware',  # Still needed for admin/web
         'django.contrib.auth.middleware.AuthenticationMiddleware',  # Required by DRF
-        'backend.cognito_auth.CognitoAuthenticationMiddleware',  # Our custom auth
+        # Note: We use DRF authentication instead of custom middleware
     ])
 else:
     # For non-auth mode, keep standard CSRF and auth
@@ -150,13 +150,16 @@ MEDIA_ROOT = BASE_DIR / 'data' / 'media'
 # REST FRAMEWORK
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Determine permission classes based on authentication mode
+# Determine authentication and permission classes based on authentication mode
 if os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true':
+    DEFAULT_AUTHENTICATION_CLASSES = ['backend.cognito_drf_auth.CognitoJWTAuthentication']
     DEFAULT_PERMISSION_CLASSES = ['rest_framework.permissions.IsAuthenticated']
 else:
+    DEFAULT_AUTHENTICATION_CLASSES = ['rest_framework.authentication.SessionAuthentication']
     DEFAULT_PERMISSION_CLASSES = ['rest_framework.permissions.AllowAny']
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': DEFAULT_AUTHENTICATION_CLASSES,
     'DEFAULT_PERMISSION_CLASSES': DEFAULT_PERMISSION_CLASSES,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -164,8 +167,6 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
-    # Disable CSRF for API requests when using JWT authentication
-    'DEFAULT_AUTHENTICATION_CLASSES': [],  # We handle auth in middleware
 }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
