@@ -9,15 +9,18 @@ const RoleBasedRedirect = () => {
   useEffect(() => {
     if (!loading) {
       // Redirect based on user role
-      if (userRole === 'meseros') {
-        // Waiters go to table status view
-        navigate('/table-status', { replace: true });
-      } else if (userRole === 'administradores') {
-        // Admins go to dashboard
+      if (userRole === 'administradores') {
+        // Administradores: Dashboard con acceso completo
         navigate('/', { replace: true });
-      } else {
-        // Default fallback
+      } else if (userRole === 'meseros') {
+        // Meseros: Estado de mesas (vista principal)
         navigate('/table-status', { replace: true });
+      } else if (userRole === 'cocineros') {
+        // Cocineros: Vista de cocina (única vista)
+        navigate('/kitchen', { replace: true });
+      } else {
+        // Default fallback para usuarios sin rol
+        navigate('/', { replace: true });
       }
     }
   }, [userRole, loading, navigate]);

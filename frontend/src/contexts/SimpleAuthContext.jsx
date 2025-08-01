@@ -41,6 +41,7 @@ export const SimpleAuthProvider = ({ children }) => {
 
   const PERMISSIONS = {
     [ROLES.ADMIN]: {
+      // Administradores: Acceso a TODAS las vistas
       canViewDashboard: true,
       canManageConfig: true,
       canManageInventory: true,
@@ -51,21 +52,23 @@ export const SimpleAuthProvider = ({ children }) => {
       canViewHistory: true,
     },
     [ROLES.WAITER]: {
+      // Meseros: Solo estado de mesas e historial
       canViewDashboard: false,
       canManageConfig: false,
       canManageInventory: false,
       canManageOrders: true,
       canViewKitchen: false,
-      canViewTableStatus: true,
+      canViewTableStatus: true, // Vista principal para meseros
       canManagePayments: true,
-      canViewHistory: true,
+      canViewHistory: true, // Vista secundaria para meseros
     },
     [ROLES.COOK]: {
+      // Cocineros: Solo vista de cocina
       canViewDashboard: false,
       canManageConfig: false,
       canManageInventory: false,
-      canManageOrders: true, // Solo cambiar estado
-      canViewKitchen: true,
+      canManageOrders: false,
+      canViewKitchen: true, // ÚNICA vista para cocineros
       canViewTableStatus: false,
       canManagePayments: false,
       canViewHistory: false,
@@ -133,6 +136,14 @@ export const SimpleAuthProvider = ({ children }) => {
   const isWaiter = () => userRole === ROLES.WAITER;
   const isCook = () => userRole === ROLES.COOK;
 
+  // Función para obtener la ruta por defecto según el rol
+  const getDefaultRoute = () => {
+    if (isAdmin()) return '/'; // Dashboard para administradores
+    if (isWaiter()) return '/table-status'; // Estado de mesas para meseros
+    if (isCook()) return '/kitchen'; // Vista de cocina para cocineros
+    return '/'; // Fallback
+  };
+
   const logout = async () => {
     try {
       await signOut();
@@ -150,6 +161,7 @@ export const SimpleAuthProvider = ({ children }) => {
     isWaiter,
     isCook,
     hasPermission,
+    getDefaultRoute,
     logout,
     ROLES,
     PERMISSIONS
