@@ -4,6 +4,14 @@ import { AlertCircle, Lock } from 'lucide-react';
 
 const ProtectedRoute = ({ children, requiredPermission, fallback = null }) => {
   const { hasPermission, loading, isAuthenticated, userRole } = useAuth();
+  
+  console.log('🔍 ProtectedRoute check:', {
+    isAuthenticated,
+    userRole,
+    loading,
+    requiredPermission,
+    hasPermission: requiredPermission ? hasPermission(requiredPermission) : 'N/A'
+  });
 
   if (loading) {
     return (

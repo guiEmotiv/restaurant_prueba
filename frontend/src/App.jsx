@@ -60,16 +60,14 @@ if (isCognitoConfigured) {
 }
 
 const AppContent = () => {
+  console.log('🔍 AppContent rendering...');
+  
   // Skip AuthContext entirely - let Authenticator handle everything
   const content = (
     <Layout>
       <Routes>
           {/* Dashboard */}
-          <Route path="/" element={
-            <ProtectedRoute requiredPermission="canViewDashboard">
-              <Dashboard />
-            </ProtectedRoute>
-          } />
+          <Route path="/" element={<Dashboard />} />
 
           {/* Configuration routes */}
           <Route path="/units" element={
