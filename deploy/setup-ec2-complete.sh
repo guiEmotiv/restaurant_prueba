@@ -52,8 +52,10 @@ show_menu() {
     echo "6) Setup Node.js version"
     echo "7) Setup environment (.env.ec2)"
     echo "8) Toggle authentication (enable/disable)"
+    echo "9) Ultra cleanup (7GB optimization)"
+    echo "10) Setup minimal domain (no SSL)"
     echo ""
-    read -p "Choose option (1-8): " -n 1 -r choice
+    read -p "Choose option (1-10): " -n 2 -r choice
     echo ""
     return $choice
 }
@@ -136,6 +138,12 @@ main() {
             ;;
         8)
             run_script "toggle-auth.sh" "Toggling authentication settings"
+            ;;
+        9)
+            run_script "cleanup-ultra.sh" "Ultra cleanup for 7GB optimization"
+            ;;
+        10)
+            run_script "setup-minimal-domain.sh" "Setting up minimal domain (no SSL)"
             ;;
         *)
             echo -e "${RED}Invalid option${NC}"
