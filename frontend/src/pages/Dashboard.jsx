@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Package, 
@@ -26,8 +26,6 @@ const Dashboard = () => {
   console.log('🏠 Dashboard component rendering...');
   console.log('🏠 Dashboard mounted successfully');
   
-  try {
-  
   const [stats, setStats] = useState({
     // Métricas básicas
     totalOrders: 0,
@@ -50,17 +48,13 @@ const Dashboard = () => {
     topTables: []
   });
   
-  const [recentOrders, setRecentOrders] = useState([]);
-  const [lowStockIngredients, setLowStockIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(() => {
     // Usar fecha actual como default
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
-  const [operationalDate, setOperationalDate] = useState(null);
   const [operationalInfo, setOperationalInfo] = useState(null);
-  const [operationalSummary, setOperationalSummary] = useState(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [operationalConfig, setOperationalConfig] = useState({
     opening_time: '20:00',
@@ -69,96 +63,14 @@ const Dashboard = () => {
   const [configLoading, setConfigLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [selectedDate]);
-
-  useEffect(() => {
-    loadOperationalConfig();
-  }, []);
-
-  // Actualizar información operacional cada minuto
-  useEffect(() => {
-    const updateOperationalInfo = async () => {
-      try {
-        const operationalInfoData = await apiService.restaurantConfig.getOperationalInfo();
-        setOperationalInfo(operationalInfoData);
-      } catch (error) {
-        console.error('Error updating operational info:', error);
-      }
-    };
-
-    // Actualizar inmediatamente
-    updateOperationalInfo();
-    
-    // Configurar intervalo para actualizar cada minuto
-    const interval = setInterval(updateOperationalInfo, 60000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  // Actualizar hora actual cada segundo
-  useEffect(() => {
-    const timeInterval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    
-    return () => clearInterval(timeInterval);
-  }, []);
-
-  const loadOperationalConfig = async () => {
-    try {
-      const activeConfig = await apiService.restaurantConfig.getActive();
-      if (activeConfig) {
-        setOperationalConfig({
-          opening_time: activeConfig.opening_time,
-          closing_time: activeConfig.closing_time
-        });
-      }
-    } catch (error) {
-      console.log('No hay configuración activa, usando valores por defecto');
-    }
-  };
-
-  const handleSaveOperationalConfig = async () => {
-    setConfigLoading(true);
-    try {
-      // Preparar datos con valores por defecto para campos no visibles
-      const configData = {
-        ...operationalConfig,
-        name: 'Configuración Operativa',
-        operational_cutoff_time: '05:00',
-        is_active: true
-      };
-      
-      // Intentar actualizar configuración existente o crear nueva
-      try {
-        const activeConfig = await apiService.restaurantConfig.getActive();
-        await apiService.restaurantConfig.update(activeConfig.id, configData);
-      } catch {
-        // Si no existe configuración activa, crear una nueva
-        await apiService.restaurantConfig.create(configData);
-      }
-      
-      setShowConfigModal(false);
-      // Recargar datos con nueva configuración
-      await loadDashboardData();
-      await loadOperationalConfig();
-    } catch (error) {
-      console.error('Error saving operational config:', error);
-    } finally {
-      setConfigLoading(false);
-    }
-  };
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       
       // Load all data in parallel
       const [
         allOrdersList,
-        activeOrders,
+        ,
         allIngredients,
         operationalSummary,
         tables,
@@ -178,10 +90,8 @@ const Dashboard = () => {
       const todayRevenue = operationalSummary.total_amount || 0;
       const todayOrders = operationalSummary.total_orders || 0;
       
-      // Actualizar fecha operativa mostrada e información operacional
-      setOperationalDate(operationalSummary.operational_date);
+      // Actualizar información operacional
       setOperationalInfo(operationalInfoData);
-      setOperationalSummary(operationalSummary);
       
       // Filtrar órdenes por fecha operativa seleccionada
       const selectedOperationalDate = selectedDate;
@@ -281,7 +191,7 @@ const Dashboard = () => {
       // Datos para gráficos basados en fecha operativa seleccionada
       const weeklyRevenue = generateWeeklyRevenue(allPayments);
       const hourlyOrders = generateHourlyOrders(filteredOrdersList);
-      const topTables = generateTopTables(filteredOrdersList, tables);
+      const topTables = generateTopTables(filteredOrdersList);
 
 
       // Filtrar órdenes activas por fecha operativa
@@ -304,36 +214,99 @@ const Dashboard = () => {
         topTables
       });
 
-      // Set recent orders (last 5) - usar órdenes filtradas por fecha operativa
-      const sortedOrders = filteredOrdersList
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-        .slice(0, 5);
-      setRecentOrders(sortedOrders);
-
-      // Set low stock ingredients (top 5)
-      setLowStockIngredients(lowStockItems.slice(0, 5));
+      // Los datos ya están procesados y almacenados en stats
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
     }
+  }, [selectedDate]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  useEffect(() => {
+    loadOperationalConfig();
+  }, []);
+
+  // Actualizar información operacional cada minuto
+  useEffect(() => {
+    const updateOperationalInfo = async () => {
+      try {
+        const operationalInfoData = await apiService.restaurantConfig.getOperationalInfo();
+        setOperationalInfo(operationalInfoData);
+      } catch (error) {
+        console.error('Error updating operational info:', error);
+      }
+    };
+
+    // Actualizar inmediatamente
+    updateOperationalInfo();
+    
+    // Configurar intervalo para actualizar cada minuto
+    const interval = setInterval(updateOperationalInfo, 60000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Actualizar hora actual cada segundo
+  useEffect(() => {
+    const timeInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    
+    return () => clearInterval(timeInterval);
+  }, []);
+
+  const loadOperationalConfig = async () => {
+    try {
+      const activeConfig = await apiService.restaurantConfig.getActive();
+      if (activeConfig) {
+        setOperationalConfig({
+          opening_time: activeConfig.opening_time,
+          closing_time: activeConfig.closing_time
+        });
+      }
+    } catch {
+      console.log('No hay configuración activa, usando valores por defecto');
+    }
   };
+
+  const handleSaveOperationalConfig = async () => {
+    setConfigLoading(true);
+    try {
+      // Preparar datos con valores por defecto para campos no visibles
+      const configData = {
+        ...operationalConfig,
+        name: 'Configuración Operativa',
+        operational_cutoff_time: '05:00',
+        is_active: true
+      };
+      
+      // Intentar actualizar configuración existente o crear nueva
+      try {
+        const activeConfig = await apiService.restaurantConfig.getActive();
+        await apiService.restaurantConfig.update(activeConfig.id, configData);
+      } catch {
+        // Si no existe configuración activa, crear una nueva
+        await apiService.restaurantConfig.create(configData);
+      }
+      
+      setShowConfigModal(false);
+      // Recargar datos con nueva configuración
+      await loadDashboardData();
+      await loadOperationalConfig();
+    } catch (error) {
+      console.error('Error saving operational config:', error);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
 
   // Funciones auxiliares
-  const calculateGrowth = (payments, weekAgo) => {
-    const thisWeek = payments.filter(p => new Date(p.created_at) >= weekAgo);
-    const lastWeekEnd = new Date(weekAgo.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const lastWeek = payments.filter(p => 
-      new Date(p.created_at) >= lastWeekEnd && new Date(p.created_at) < weekAgo
-    );
-    
-    const thisWeekRevenue = thisWeek.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-    const lastWeekRevenue = lastWeek.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-    
-    return lastWeekRevenue > 0 ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100 : 0;
-  };
-
   const calculateAvgServiceTime = (orders) => {
     const servedOrders = orders.filter(o => o.served_at && o.created_at);
     if (servedOrders.length === 0) return 0;
@@ -381,7 +354,7 @@ const Dashboard = () => {
     }));
   };
 
-  const generateTopTables = (orders, tables) => {
+  const generateTopTables = (orders) => {
     const tableRevenue = {};
     
     orders.forEach(order => {
@@ -402,41 +375,13 @@ const Dashboard = () => {
     }).format(amount);
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      'CREATED': 'bg-yellow-100 text-yellow-800',
-      'SERVED': 'bg-blue-100 text-blue-800',
-      'PAID': 'bg-green-100 text-green-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getStatusText = (status) => {
-    const statusTexts = {
-      'CREATED': 'Creado',
-      'SERVED': 'Entregado',
-      'PAID': 'Pagado'
-    };
-    return statusTexts[status] || status;
-  };
-
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[...Array(8)].map((_, i) => (
+            {[...Array(4)].map((_, i) => (
               <div key={i} className="bg-white p-6 rounded-lg shadow">
                 <div className="h-4 bg-gray-200 rounded mb-2"></div>
                 <div className="h-8 bg-gray-200 rounded"></div>
@@ -510,17 +455,7 @@ const Dashboard = () => {
       </div>
 
       {/* KPIs principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600">Ingresos Fecha Operativa</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.todayRevenue)}</p>
-              <p className="text-xs text-gray-500">{stats.todayOrders} órdenes</p>
-            </div>
-            <DollarSign className="h-8 w-8 text-green-500" />
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
@@ -568,181 +503,153 @@ const Dashboard = () => {
       </div>
 
 
-      {/* Gráfica de Pie de Métodos de Pago */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-          <CreditCard className="h-6 w-6 text-blue-500" />
-          Distribución de Métodos de Pago
-        </h2>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Pie Chart */}
-          <div className="flex justify-center items-center">
-            <div className="relative">
-              <svg viewBox="0 0 200 200" className="w-64 h-64">
-                {(() => {
-                  const paymentData = operationalSummary?.summary_by_method || [];
-                  const totalAmount = operationalSummary?.total_amount || 0;
-                  
-                  if (paymentData.length === 0 || totalAmount === 0) {
-                    return (
-                      <>
-                        <circle cx="100" cy="100" r="80" fill="#f3f4f6" stroke="#e5e7eb" strokeWidth="2" />
-                        <text x="100" y="105" textAnchor="middle" className="text-sm fill-gray-500">
-                          Sin datos
-                        </text>
-                      </>
-                    );
-                  }
-                  
-                  const colors = {
-                    'CASH': '#10b981',      // green
-                    'CARD': '#3b82f6',      // blue
-                    'TRANSFER': '#8b5cf6',  // purple
-                    'YAPE_PLIN': '#ec4899', // pink
-                    'OTHER': '#f59e0b'      // amber
-                  };
-                  
-                  let currentAngle = -90;
-                  
-                  // Caso especial: un solo método de pago
-                  if (paymentData.length === 1) {
-                    return (
-                      <circle
-                        cx="100"
-                        cy="100"
-                        r="80"
-                        fill={colors[paymentData[0].payment_method] || '#6b7280'}
-                        stroke="white"
-                        strokeWidth="2"
-                        className="hover:opacity-80 transition-opacity cursor-pointer"
-                      />
-                    );
-                  }
-                  
-                  return paymentData.map((payment, index) => {
-                    const percentage = (payment.total / totalAmount);
-                    const angle = percentage * 360;
-                    const startAngle = currentAngle * Math.PI / 180;
-                    const endAngle = (currentAngle + angle) * Math.PI / 180;
-                    
-                    // Calcular puntos del arco
-                    const radius = 80;
-                    const x1 = 100 + radius * Math.cos(startAngle);
-                    const y1 = 100 + radius * Math.sin(startAngle);
-                    const x2 = 100 + radius * Math.cos(endAngle);
-                    const y2 = 100 + radius * Math.sin(endAngle);
-                    
-                    const largeArc = angle > 180 ? 1 : 0;
-                    
-                    const pathData = [
-                      `M 100 100`,
-                      `L ${x1} ${y1}`,
-                      `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
-                      'Z'
-                    ].join(' ');
-                    
-                    currentAngle += angle;
-                    
-                    return (
-                      <path
-                        key={index}
-                        d={pathData}
-                        fill={colors[payment.payment_method] || '#6b7280'}
-                        stroke="white"
-                        strokeWidth="2"
-                        className="hover:opacity-80 transition-opacity cursor-pointer"
-                      />
-                    );
-                  });
-                })()}
-              </svg>
+      {/* Gráficas de Pie por Grupos de Recetas */}
+      {stats.recipeGroups && stats.recipeGroups.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {stats.recipeGroups.map((group, groupIndex) => (
+            <div key={groupIndex} className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                <ChefHat className="h-6 w-6 text-blue-500" />
+                {group.category} - Distribución de Recetas
+              </h2>
               
-              {/* Centro del pie chart con total */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-white rounded-full w-32 h-32 flex flex-col items-center justify-center shadow-inner">
-                  <p className="text-xs text-gray-500">Total</p>
-                  <p className="text-lg font-bold text-gray-900">{formatCurrency(operationalSummary?.total_amount || 0)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Leyenda y estadísticas */}
-          <div className="space-y-4">
-            {(() => {
-              const paymentData = operationalSummary?.summary_by_method || [];
-              const totalAmount = operationalSummary?.total_amount || 0;
-              
-              const colors = {
-                'CASH': '#10b981',
-                'CARD': '#3b82f6',
-                'TRANSFER': '#8b5cf6',
-                'YAPE_PLIN': '#ec4899',
-                'OTHER': '#f59e0b'
-              };
-              
-              const methodNames = {
-                'CASH': 'Efectivo',
-                'CARD': 'Tarjeta',
-                'TRANSFER': 'Transferencia',
-                'YAPE_PLIN': 'Yape/Plin',
-                'OTHER': 'Otro'
-              };
-              
-              const icons = {
-                'CASH': '💵',
-                'CARD': '💳',
-                'TRANSFER': '🏦',
-                'YAPE_PLIN': '📱',
-                'OTHER': '🔄'
-              };
-              
-              return paymentData.map((payment, index) => {
-                const percentage = totalAmount > 0 ? ((payment.total / totalAmount) * 100).toFixed(1) : '0';
-                
-                return (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center">
-                      <div 
-                        className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
-                        style={{ backgroundColor: colors[payment.payment_method] || '#6b7280' }}
-                      ></div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">{icons[payment.payment_method]}</span>
-                          <span className="font-medium text-gray-900">{methodNames[payment.payment_method]}</span>
-                        </div>
-                        <p className="text-sm text-gray-500">{payment.count} transacciones</p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Pie Chart */}
+                <div className="flex justify-center items-center">
+                  <div className="relative">
+                    <svg viewBox="0 0 200 200" className="w-64 h-64">
+                      {(() => {
+                        const recipes = group.recipes || [];
+                        const totalCount = group.totalCount || 0;
+                        
+                        if (recipes.length === 0 || totalCount === 0) {
+                          return (
+                            <>
+                              <circle cx="100" cy="100" r="80" fill="#f3f4f6" stroke="#e5e7eb" strokeWidth="2" />
+                              <text x="100" y="105" textAnchor="middle" className="text-sm fill-gray-500">
+                                Sin datos
+                              </text>
+                            </>
+                          );
+                        }
+                        
+                        // Generar colores dinámicamente para cada receta
+                        const colorPalette = [
+                          '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b',
+                          '#ef4444', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+                          '#14b8a6', '#a855f7', '#e11d48', '#0ea5e9', '#22c55e'
+                        ];
+                        
+                        let currentAngle = -90;
+                        
+                        // Caso especial: una sola receta
+                        if (recipes.length === 1) {
+                          return (
+                            <circle
+                              cx="100"
+                              cy="100"
+                              r="80"
+                              fill={colorPalette[0]}
+                              stroke="white"
+                              strokeWidth="2"
+                              className="hover:opacity-80 transition-opacity cursor-pointer"
+                            />
+                          );
+                        }
+                        
+                        return recipes.map((recipe, index) => {
+                          const percentage = (recipe.count / totalCount);
+                          const angle = percentage * 360;
+                          const startAngle = currentAngle * Math.PI / 180;
+                          const endAngle = (currentAngle + angle) * Math.PI / 180;
+                          
+                          // Calcular puntos del arco
+                          const radius = 80;
+                          const x1 = 100 + radius * Math.cos(startAngle);
+                          const y1 = 100 + radius * Math.sin(startAngle);
+                          const x2 = 100 + radius * Math.cos(endAngle);
+                          const y2 = 100 + radius * Math.sin(endAngle);
+                          
+                          const largeArc = angle > 180 ? 1 : 0;
+                          
+                          const pathData = [
+                            `M 100 100`,
+                            `L ${x1} ${y1}`,
+                            `A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`,
+                            'Z'
+                          ].join(' ');
+                          
+                          currentAngle += angle;
+                          
+                          return (
+                            <path
+                              key={index}
+                              d={pathData}
+                              fill={colorPalette[index % colorPalette.length]}
+                              stroke="white"
+                              strokeWidth="2"
+                              className="hover:opacity-80 transition-opacity cursor-pointer"
+                            />
+                          );
+                        });
+                      })()}
+                    </svg>
+                    
+                    {/* Centro del pie chart con total */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="bg-white rounded-full w-32 h-32 flex flex-col items-center justify-center shadow-inner">
+                        <p className="text-xs text-gray-500">Total</p>
+                        <p className="text-2xl font-bold text-gray-900">{group.totalCount}</p>
+                        <p className="text-xs text-gray-500">unidades</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-gray-900">{formatCurrency(payment.total)}</p>
-                      <p className="text-sm text-gray-500">{percentage}%</p>
-                    </div>
                   </div>
-                );
-              });
-            })()}
-            
-            {/* Resumen adicional */}
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500">Total de transacciones</p>
-                  <p className="text-lg font-semibold text-gray-900">{operationalSummary?.total_orders || 0}</p>
                 </div>
-                <div>
-                  <p className="text-gray-500">Transacción promedio</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {formatCurrency((operationalSummary?.total_amount || 0) / (operationalSummary?.total_orders || 1))}
-                  </p>
+                
+                {/* Leyenda y estadísticas */}
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {(() => {
+                    const recipes = group.recipes || [];
+                    const totalCount = group.totalCount || 0;
+                    
+                    const colorPalette = [
+                      '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b',
+                      '#ef4444', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+                      '#14b8a6', '#a855f7', '#e11d48', '#0ea5e9', '#22c55e'
+                    ];
+                    
+                    return recipes.map((recipe, index) => {
+                      const percentage = totalCount > 0 ? ((recipe.count / totalCount) * 100).toFixed(1) : '0';
+                      
+                      return (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center">
+                            <div 
+                              className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
+                              style={{ backgroundColor: colorPalette[index % colorPalette.length] }}
+                            ></div>
+                            <div>
+                              <span className="font-medium text-gray-900 text-sm">{recipe.name}</span>
+                              <p className="text-xs text-gray-500">{recipe.count} vendidos</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-gray-900 text-sm">{percentage}%</p>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>
-          </div>
+          ))}
         </div>
-      </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <p className="text-center text-gray-500">No hay datos de recetas vendidas para mostrar</p>
+        </div>
+      )}
 
       {/* Modal de Configuración Operativa */}
       {showConfigModal && (
@@ -840,17 +747,6 @@ const Dashboard = () => {
 
     </div>
   );
-  } catch (error) {
-    console.error('❌ Error in Dashboard component:', error);
-    console.error('Stack trace:', error.stack);
-    return (
-      <div style={{ padding: '20px', color: 'red' }}>
-        <h2>Error in Dashboard</h2>
-        <p>{error.message}</p>
-        <pre>{error.stack}</pre>
-      </div>
-    );
-  }
 };
 
 export default Dashboard;
