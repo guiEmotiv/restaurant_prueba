@@ -4,7 +4,7 @@ import { X, Plus, Minus, Save, Trash2, ShoppingCart } from 'lucide-react';
 import Button from '../common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { useAuth } from '../../contexts/SimpleAuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const { showSuccess, showError } = useToast();

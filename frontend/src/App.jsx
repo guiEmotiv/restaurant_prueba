@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Amplify } from 'aws-amplify';
 import { ToastProvider } from './contexts/ToastContext';
-import { SimpleAuthProvider } from './contexts/SimpleAuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
@@ -232,20 +232,20 @@ function App() {
           {isCognitoConfigured ? (
             <LoginForm>
               {console.log('🚀 Inside LoginForm (authenticated)...')}
-              <SimpleAuthProvider>
-                {console.log('🚀 Inside SimpleAuthProvider...')}
+              <AuthProvider>
+                {console.log('🚀 Inside AuthProvider...')}
                 <RoleValidator>
                   <AppContent />
                 </RoleValidator>
-              </SimpleAuthProvider>
+              </AuthProvider>
             </LoginForm>
           ) : (
-            <SimpleAuthProvider>
-              {console.log('🚀 Inside SimpleAuthProvider (no auth)...')}
+            <AuthProvider>
+              {console.log('🚀 Inside AuthProvider (no auth)...')}
               <RoleValidator>
                 <AppContent />
               </RoleValidator>
-            </SimpleAuthProvider>
+            </AuthProvider>
           )}
         </Router>
       </ToastProvider>

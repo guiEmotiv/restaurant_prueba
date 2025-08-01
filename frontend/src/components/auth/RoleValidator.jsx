@@ -1,4 +1,4 @@
-import { useAuth } from '../../contexts/SimpleAuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import NoRoleError from './NoRoleError';
 
 const RoleValidator = ({ children }) => {

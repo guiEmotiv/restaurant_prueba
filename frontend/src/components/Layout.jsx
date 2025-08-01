@@ -20,7 +20,7 @@ import {
   Users,
   LogOut
 } from 'lucide-react';
-import { useAuth } from '../contexts/SimpleAuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const Layout = ({ children }) => {
   console.log('🎨 Layout component rendering...');

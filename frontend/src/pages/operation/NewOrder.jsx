@@ -4,7 +4,7 @@ import { Plus, Save, Trash2, ShoppingCart } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { useAuth } from '../../contexts/SimpleAuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const NewOrder = () => {
   const { showSuccess, showError } = useToast();

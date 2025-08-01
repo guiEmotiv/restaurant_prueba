@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, LogOut, Clock } from 'lucide-react';
-import { useAuth } from '../../contexts/SimpleAuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const NoRoleError = () => {
   const { logout, user } = useAuth();
