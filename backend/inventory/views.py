@@ -18,7 +18,7 @@ from .serializers import (
 class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.all().order_by('name')
     serializer_class = GroupSerializer
-    permission_classes = [CognitoAdminOnlyPermission]  # Solo administradores
+    permission_classes = [CognitoReadOnlyForNonAdmins]  # Admins: full, meseros/cocineros: solo lectura (necesario para pedidos)
     
     @action(detail=True, methods=['get'])
     def recipes(self, request, pk=None):
