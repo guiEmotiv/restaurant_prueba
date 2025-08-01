@@ -11,19 +11,52 @@ logger = logging.getLogger(__name__)
 
 
 class CognitoUser:
-    """Represents a Cognito authenticated user"""
+    """Represents a Cognito authenticated user compatible with Django REST Framework"""
     def __init__(self, username, email, groups=None):
         self.username = username
         self.email = email
         self.groups = groups or []
         self.is_authenticated = True
         self.is_anonymous = False
+        self.is_active = True  # Always active for Cognito users
+        
+        # Add Django User model compatibility
+        self.pk = username  # Primary key
+        self.id = username  # ID field
+        self.first_name = ''
+        self.last_name = ''
+        
+        # Set staff/superuser status after groups are set
+        self.is_staff = 'administradores' in self.groups  # Staff access for admins
+        self.is_superuser = 'administradores' in self.groups  # Superuser access for admins
     
     def is_admin(self):
         return 'administradores' in self.groups
     
     def is_waiter(self):
         return 'meseros' in self.groups
+        
+    def has_perm(self, perm, obj=None):
+        """Check if user has specific permission (required by Django)"""
+        return self.is_admin()  # Admins have all permissions
+        
+    def has_perms(self, perm_list, obj=None):
+        """Check if user has all permissions in list (required by Django)"""
+        return self.is_admin()  # Admins have all permissions
+        
+    def has_module_perms(self, app_label):
+        """Check if user has permissions for app (required by Django)"""
+        return self.is_admin()  # Admins have all permissions
+        
+    def get_username(self):
+        """Return username (required by Django)"""
+        return self.username
+        
+    def __str__(self):
+        return self.username
+        
+    def __repr__(self):
+        return f'<CognitoUser: {self.username}>'
 
 
 class CognitoAuthenticationMiddleware:
@@ -165,6 +198,7 @@ class CognitoAuthenticationMiddleware:
             raise ValueError(f"Invalid token: {e}")
         except Exception as e:
             logger.warning(f"❌ Token verification failed: {e}")
+            logger.warning(f"❌ Full error details: {type(e).__name__}: {str(e)}")
             raise ValueError(f"Token verification failed: {e}")
     
     def get_public_key(self, kid):
