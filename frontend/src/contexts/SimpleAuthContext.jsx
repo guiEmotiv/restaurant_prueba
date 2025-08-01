@@ -1,5 +1,6 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 const SimpleAuthContext = createContext();
 
@@ -13,6 +14,8 @@ export const useAuth = () => {
 
 export const SimpleAuthProvider = ({ children }) => {
   const { user, signOut } = useAuthenticator((context) => [context.user]);
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Define user roles and their permissions
   const ROLES = {
@@ -43,24 +46,49 @@ export const SimpleAuthProvider = ({ children }) => {
     }
   };
 
-  const getUserRole = () => {
-    if (!user) return null;
-    
-    // Try to get groups from token
-    try {
-      const groups = user.signInDetails?.loginId || [];
-      if (Array.isArray(groups)) {
-        if (groups.includes(ROLES.ADMIN)) return ROLES.ADMIN;
-        if (groups.includes(ROLES.WAITER)) return ROLES.WAITER;
+  // Get user role from Cognito groups
+  useEffect(() => {
+    const getUserRole = async () => {
+      if (!user) {
+        setUserRole(null);
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.log('Could not get user groups:', error);
-    }
-    
-    return null;
-  };
 
-  const userRole = getUserRole();
+      try {
+        setLoading(true);
+        console.log('🔍 Getting user role for:', user.username);
+        
+        const session = await fetchAuthSession();
+        const groups = session.tokens?.accessToken?.payload?.['cognito:groups'] || [];
+        console.log('🔍 User groups from token:', groups);
+        
+        if (Array.isArray(groups)) {
+          if (groups.includes(ROLES.ADMIN)) {
+            console.log('✅ User is admin');
+            setUserRole(ROLES.ADMIN);
+          } else if (groups.includes(ROLES.WAITER)) {
+            console.log('✅ User is waiter');
+            setUserRole(ROLES.WAITER);
+          } else {
+            console.log('⚠️ User has no recognized groups, defaulting to admin');
+            setUserRole(ROLES.ADMIN);
+          }
+        } else {
+          console.log('⚠️ No groups found, defaulting to admin');
+          setUserRole(ROLES.ADMIN);
+        }
+      } catch (error) {
+        console.log('❌ Error getting groups from session:', error);
+        setUserRole(ROLES.ADMIN); // Default to admin on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getUserRole();
+  }, [user]);
+
   const isAuthenticated = !!user;
 
   const hasPermission = (permission) => {
@@ -84,7 +112,7 @@ export const SimpleAuthProvider = ({ children }) => {
   const value = {
     user,
     userRole,
-    loading: false, // Authenticator handles loading
+    loading,
     isAuthenticated,
     isAdmin,
     isWaiter,
