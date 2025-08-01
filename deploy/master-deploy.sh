@@ -111,7 +111,10 @@ DJANGO_SECRET_KEY=$(python3 -c "import secrets; print(''.join(secrets.choice('ab
 # Get EC2 IP
 EC2_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "127.0.0.1")
 
-# Create optimized .env.ec2
+# ==============================================================================
+# 1. ROOT .env.ec2 - Main configuration file
+# ==============================================================================
+echo -e "${BLUE}Creating root .env.ec2...${NC}"
 cat > "$PROJECT_DIR/.env.ec2" << EOF
 # Restaurant Web - Production Configuration
 # Generated: $(date)
@@ -142,9 +145,44 @@ EOF
 
 chmod 600 "$PROJECT_DIR/.env.ec2"
 
+# ==============================================================================
+# 2. BACKEND .env - Link to root .env.ec2 for consistency
+# ==============================================================================
+echo -e "${BLUE}Creating backend .env...${NC}"
+cat > "$BACKEND_DIR/.env" << EOF
+# Backend Production Configuration
+# This file links to root .env.ec2 for production
+
+# Django Configuration
+DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY
+DEBUG=False
+ALLOWED_HOSTS=localhost,127.0.0.1,$EC2_IP,$DOMAIN,www.$DOMAIN
+DATABASE_URL=sqlite:///data/restaurant.sqlite3
+TIME_ZONE=America/Lima
+LANGUAGE_CODE=es-pe
+
+# AWS Cognito Configuration - ENABLED
+USE_COGNITO_AUTH=True
+AWS_REGION=$AWS_REGION
+COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
+COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
+
+# Domain Configuration
+EC2_PUBLIC_IP=$EC2_IP
+DOMAIN_NAME=$DOMAIN
+EOF
+
+chmod 600 "$BACKEND_DIR/.env"
+
+# ==============================================================================
+# 3. FRONTEND .env.production - Will be created during build phase
+# ==============================================================================
 # Note: Frontend .env.production will be created during build phase with real values
 
-echo -e "${GREEN}✅ Environment configured${NC}"
+echo -e "${GREEN}✅ All environment files configured${NC}"
+echo -e "${BLUE}  - Root: .env.ec2${NC}"
+echo -e "${BLUE}  - Backend: backend/.env${NC}"
+echo -e "${BLUE}  - Frontend: frontend/.env.production (during build)${NC}"
 
 # ==============================================================================
 # PHASE 4: CONFIGURE NGINX
@@ -222,20 +260,29 @@ echo -e "\n${YELLOW}🏗️ PHASE 5: Build and Deploy${NC}"
 cd "$FRONTEND_DIR"
 
 # Always recreate .env.production with correct Cognito variables
-echo -e "${YELLOW}Creating .env.production with Cognito config...${NC}"
+echo -e "${YELLOW}Creating frontend .env.production with Cognito config...${NC}"
 cat > .env.production << EOF
 # Frontend Production Environment - Auto-generated
+# Generated: $(date)
+
+# API Configuration
 VITE_API_URL=http://$DOMAIN
+
+# AWS Cognito Configuration - MUST match backend
 VITE_AWS_REGION=$AWS_REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
 EOF
 
-echo -e "${BLUE}Environment variables for build:${NC}"
+# Also create .env.local for consistency
+cp .env.production .env.local
+
+echo -e "${BLUE}Frontend environment variables:${NC}"
 echo -e "  VITE_API_URL=http://$DOMAIN"
 echo -e "  VITE_AWS_REGION=$AWS_REGION"
 echo -e "  VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID"
 echo -e "  VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID"
+echo -e "${GREEN}✅ Files created: .env.production, .env.local${NC}"
 
 # Clean install
 rm -rf node_modules package-lock.json dist 2>/dev/null || true
@@ -275,10 +322,26 @@ echo -e "\n${YELLOW}💾 PHASE 6: Configure Database${NC}"
 echo -e "${BLUE}Verifying backend Cognito configuration...${NC}"
 CONFIG_CHECK=$(docker-compose -f docker-compose.ec2.yml exec -T web python -c "
 import os
+from pathlib import Path
+
+print('=== Environment Variables ===')
 print('COGNITO_USER_POOL_ID:', os.getenv('COGNITO_USER_POOL_ID', 'NOT_SET'))
 print('COGNITO_APP_CLIENT_ID:', os.getenv('COGNITO_APP_CLIENT_ID', 'NOT_SET'))
 print('USE_COGNITO_AUTH:', os.getenv('USE_COGNITO_AUTH', 'NOT_SET'))
 print('AWS_REGION:', os.getenv('AWS_REGION', 'NOT_SET'))
+
+print('\\n=== Files Check ===')
+print('.env.ec2 exists:', Path('/app/.env.ec2').exists())
+print('backend/.env exists:', Path('/app/.env').exists())
+
+# Try to load settings
+try:
+    from django.conf import settings
+    print('\\n=== Django Settings ===')
+    print('COGNITO_ENABLED:', getattr(settings, 'COGNITO_ENABLED', 'NOT_SET'))
+    print('USE_COGNITO_AUTH:', getattr(settings, 'USE_COGNITO_AUTH', 'NOT_SET'))
+except:
+    print('Could not load Django settings')
 " 2>/dev/null || echo "Could not verify backend config")
 echo "$CONFIG_CHECK"
 
