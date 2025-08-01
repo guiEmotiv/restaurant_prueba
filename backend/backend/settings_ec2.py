@@ -73,6 +73,7 @@ if os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true':
     MIDDLEWARE.extend([
         'backend.csrf_exempt_middleware.CSRFExemptAPIMiddleware',  # Exempt API from CSRF
         'django.middleware.csrf.CsrfViewMiddleware',  # Still needed for admin/web
+        'django.contrib.auth.middleware.AuthenticationMiddleware',  # Required by DRF
         'backend.cognito_auth.CognitoAuthenticationMiddleware',  # Our custom auth
     ])
 else:
