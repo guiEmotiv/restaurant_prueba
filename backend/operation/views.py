@@ -3,6 +3,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
 from django.db import transaction
+from backend.cognito_permissions import (
+    CognitoAuthenticatedPermission, 
+    CognitoAdminPermission, 
+    CognitoWaiterOrAdminPermission
+)
 from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
 from .serializers import (
     OrderSerializer, OrderDetailSerializer, OrderCreateSerializer,
@@ -14,6 +19,7 @@ from .serializers import (
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all().order_by('-created_at')
+    permission_classes = [CognitoWaiterOrAdminPermission]  # Both waiters and admins can manage orders
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -229,6 +235,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 class OrderItemViewSet(viewsets.ModelViewSet):
     queryset = OrderItem.objects.all().order_by('-created_at')
     serializer_class = OrderItemSerializer
+    permission_classes = [CognitoWaiterOrAdminPermission]  # Both waiters and admins can manage order items
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -293,6 +300,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
 class OrderItemIngredientViewSet(viewsets.ModelViewSet):
     queryset = OrderItemIngredient.objects.all().order_by('-created_at')
     serializer_class = OrderItemIngredientSerializer
+    permission_classes = [CognitoWaiterOrAdminPermission]  # Both waiters and admins can manage ingredients
     
     def get_queryset(self):
         queryset = OrderItemIngredient.objects.all().order_by('-created_at')
@@ -309,6 +317,7 @@ class OrderItemIngredientViewSet(viewsets.ModelViewSet):
 
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all().order_by('-created_at')
+    permission_classes = [CognitoWaiterOrAdminPermission]  # Both waiters and admins can manage payments
     serializer_class = PaymentSerializer
     
     def get_queryset(self):

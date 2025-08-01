@@ -1,6 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from backend.cognito_permissions import (
+    CognitoAuthenticatedPermission, 
+    CognitoAdminPermission, 
+    CognitoReadOnlyForWaiters
+)
 from .models import Unit, Zone, Table, RestaurantOperationalConfig, Waiter, Container
 from .serializers import (
     UnitSerializer, ZoneSerializer, 
@@ -12,6 +17,7 @@ from .serializers import (
 class UnitViewSet(viewsets.ModelViewSet):
     queryset = Unit.objects.all().order_by('name')
     serializer_class = UnitSerializer
+    permission_classes = [CognitoReadOnlyForWaiters]  # Admins: full access, Waiters: read-only
     
     @action(detail=True, methods=['get'])
     def ingredients(self, request, pk=None):
@@ -26,6 +32,7 @@ class UnitViewSet(viewsets.ModelViewSet):
 class ZoneViewSet(viewsets.ModelViewSet):
     queryset = Zone.objects.all().order_by('name')
     serializer_class = ZoneSerializer
+    permission_classes = [CognitoReadOnlyForWaiters]  # Admins: full access, Waiters: read-only
     
     @action(detail=True, methods=['get'])
     def tables(self, request, pk=None):
@@ -38,6 +45,7 @@ class ZoneViewSet(viewsets.ModelViewSet):
 
 class TableViewSet(viewsets.ModelViewSet):
     queryset = Table.objects.all().order_by('zone__name', 'table_number')
+    permission_classes = [CognitoAuthenticatedPermission]  # Both admins and waiters need access to tables
     
     def get_serializer_class(self):
         if self.action in ['retrieve', 'create', 'update', 'partial_update']:
@@ -69,6 +77,14 @@ class TableViewSet(viewsets.ModelViewSet):
 class RestaurantOperationalConfigViewSet(viewsets.ModelViewSet):
     queryset = RestaurantOperationalConfig.objects.all().order_by('-created_at')
     serializer_class = RestaurantOperationalConfigSerializer
+    permission_classes = [CognitoAdminPermission]  # Only admins can manage restaurant config
+    
+    def get_permissions(self):
+        """Custom permissions for specific actions"""
+        if self.action == 'operational_info':
+            # Allow both waiters and admins to access operational info (needed for dashboard)
+            return [CognitoAuthenticatedPermission()]
+        return super().get_permissions()
     
     @action(detail=False, methods=['get'])
     def active(self, request):
@@ -121,6 +137,7 @@ class RestaurantOperationalConfigViewSet(viewsets.ModelViewSet):
 class WaiterViewSet(viewsets.ModelViewSet):
     serializer_class = WaiterSerializer
     pagination_class = None  # Disable pagination
+    permission_classes = [CognitoAdminPermission]  # Only admins can manage waiters
     
     def get_queryset(self):
         queryset = Waiter.objects.all().order_by('name')
@@ -135,6 +152,7 @@ class WaiterViewSet(viewsets.ModelViewSet):
 class ContainerViewSet(viewsets.ModelViewSet):
     serializer_class = ContainerSerializer
     pagination_class = None  # Disable pagination
+    permission_classes = [CognitoReadOnlyForWaiters]  # Admins: full access, Waiters: read-only
     
     def get_queryset(self):
         queryset = Container.objects.all().order_by('name')
