@@ -65,14 +65,24 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
 ]
 
-# Add Cognito middleware only if authentication is enabled
+# Conditionally add CSRF and Auth middleware based on authentication mode
 if os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true':
-    MIDDLEWARE.append('backend.cognito_auth.CognitoAuthenticationMiddleware')
+    # For Cognito auth, add CSRF exemption for API endpoints and our auth middleware
+    MIDDLEWARE.extend([
+        'backend.csrf_exempt_middleware.CSRFExemptAPIMiddleware',  # Exempt API from CSRF
+        'django.middleware.csrf.CsrfViewMiddleware',  # Still needed for admin/web
+        'backend.cognito_auth.CognitoAuthenticationMiddleware',  # Our custom auth
+    ])
+else:
+    # For non-auth mode, keep standard CSRF and auth
+    MIDDLEWARE.extend([
+        'django.middleware.csrf.CsrfViewMiddleware',
+        'django.contrib.auth.middleware.AuthenticationMiddleware',
+    ])
 
+# Always add these at the end
 MIDDLEWARE.extend([
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -153,6 +163,8 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
+    # Disable CSRF for API requests when using JWT authentication
+    'DEFAULT_AUTHENTICATION_CLASSES': [],  # We handle auth in middleware
 }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -196,6 +208,17 @@ CORS_ALLOW_ALL_ORIGINS = True  # For development - restrict in production
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+
+# CSRF Settings - disable for API when using JWT authentication
+if os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true':
+    # For JWT authentication, we don't need CSRF protection on API endpoints
+    CSRF_EXEMPT_URLS = [r'^api/v1/.*$']
+    CSRF_COOKIE_SECURE = False  # Allow HTTP for development
+    CSRF_COOKIE_HTTPONLY = False
+else:
+    # Standard CSRF protection for non-JWT authentication
+    CSRF_COOKIE_SECURE = not DEBUG
+    CSRF_COOKIE_HTTPONLY = True
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # LOGGING
