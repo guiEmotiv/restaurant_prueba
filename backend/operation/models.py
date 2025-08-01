@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 from decimal import Decimal
-from config.models import Table, Waiter, Container
+from config.models import Table, Container
 from inventory.models import Recipe, Ingredient
 
 
@@ -14,7 +14,7 @@ class Order(models.Model):
     ]
 
     table = models.ForeignKey(Table, on_delete=models.PROTECT)
-    waiter = models.ForeignKey(Waiter, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Mesero")
+    waiter = models.CharField(max_length=150, blank=True, null=True, verbose_name="Mesero", help_text="Usuario que creó la orden")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='CREATED')
     total_amount = models.DecimalField(
         max_digits=10, 

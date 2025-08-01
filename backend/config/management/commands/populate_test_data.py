@@ -284,6 +284,10 @@ class Command(BaseCommand):
                             quantity=quantity
                         )
         
+        # Create sample orders for testing
+        self.stdout.write('🍽️ Creating sample orders...')
+        self.create_sample_orders()
+        
         self.stdout.write(self.style.SUCCESS('🎉 Successfully populated comprehensive test data!'))
         
         # Print detailed summary
@@ -296,6 +300,74 @@ class Command(BaseCommand):
         self.stdout.write(f'🥕 Ingredients: {Ingredient.objects.count()}')
         self.stdout.write(f'👨‍🍳 Recipes: {Recipe.objects.count()}')
         self.stdout.write(f'🥘 Recipe Items: {RecipeItem.objects.count()}')
+        self.stdout.write(f'📝 Orders: {Order.objects.count()}')
+        self.stdout.write(f'🍽️  Order Items: {OrderItem.objects.count()}')
+        self.stdout.write(f'💳 Payments: {Payment.objects.count()}')
         
         self.stdout.write(self.style.SUCCESS('\n✨ Ready to test the restaurant management system!'))
         self.stdout.write('🔐 Login with: admin / admin123')
+        
+    def create_sample_orders(self):
+        """Create sample orders with different statuses for testing"""
+        from datetime import datetime, timedelta
+        import random
+        
+        # Get some recipes and tables
+        recipes = list(Recipe.objects.all())
+        tables = list(Table.objects.all())
+        
+        if not recipes or not tables:
+            return
+        
+        # Create orders for the last 3 days
+        today = datetime.now().date()
+        for days_ago in range(3):
+            order_date = today - timedelta(days=days_ago)
+            
+            # Create 3-5 orders per day
+            for order_num in range(random.randint(3, 5)):
+                table = random.choice(tables)
+                
+                # Create order
+                order = Order.objects.create(
+                    table=table,
+                    waiter='admin',  # Username of the user who created the order
+                    status=random.choice(['CREATED', 'SERVED', 'PAID']),
+                    operational_date=order_date,
+                    created_at=datetime.combine(order_date, datetime.min.time()) + timedelta(
+                        hours=random.randint(12, 22),
+                        minutes=random.randint(0, 59)
+                    )
+                )
+                
+                # Add 1-4 items per order
+                total_amount = 0
+                for _ in range(random.randint(1, 4)):
+                    recipe = random.choice(recipes)
+                    quantity = random.randint(1, 3)
+                    unit_price = recipe.base_price
+                    total_price = unit_price * quantity
+                    total_amount += total_price
+                    
+                    OrderItem.objects.create(
+                        order=order,
+                        recipe=recipe,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        total_price=total_price,
+                        status='CREATED',  # OrderItems always start as CREATED
+                        is_takeaway=random.choice([True, False]) if random.random() < 0.3 else False,
+                        has_taper=False,
+                        notes=random.choice(['', 'Sin cebolla', 'Extra picante', 'Poco sal']) if random.random() < 0.2 else ''
+                    )
+                
+                # If order is PAID, create payment
+                if order.status == 'PAID':
+                    Payment.objects.create(
+                        order=order,
+                        amount=total_amount,
+                        payment_method=random.choice(['CASH', 'CARD', 'YAPE_PLIN']),
+                        operational_date=order_date,
+                        payer_name='Cliente',
+                        created_at=order.created_at + timedelta(minutes=random.randint(30, 90))
+                    )

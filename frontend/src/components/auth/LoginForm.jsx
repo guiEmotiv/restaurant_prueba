@@ -67,40 +67,35 @@ const LoginForm = ({ children }) => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="w-full max-w-md">
-        <Authenticator
-          components={customComponents}
-          formFields={customFormFields}
-          // Hide sign up tab - users should be created by admin
-          hideSignUp={true}
-          className="amplify-authenticator"
-        >
-          {({ user }) => {
-            // Log authentication state for debugging
-            if (user) {
-              console.log('✅ Authenticator: User authenticated:');
-              console.log('  Username:', user.username);
-              console.log('  UserId:', user.userId);
-              console.log('  Full user object:', user);
-              console.log('  SignInDetails:', user.signInDetails);
-              console.log('  Rendering children...');
-            } else {
-              console.log('❌ Authenticator: No user found - showing login');
-            }
-            
-            console.log('🔐 LoginForm about to render children inside authenticated wrapper...');
-            
-            return (
-              <div className="min-h-screen bg-gray-50">
-                {console.log('🔐 LoginForm rendering children...')}
-                {children}
-              </div>
-            );
-          }}
-        </Authenticator>
-      </div>
-    </div>
+    <Authenticator
+      components={customComponents}
+      formFields={customFormFields}
+      // Hide sign up tab - users should be created by admin
+      hideSignUp={true}
+    >
+      {({ user }) => {
+        // Log authentication state for debugging
+        if (user) {
+          console.log('✅ Authenticator: User authenticated:');
+          console.log('  Username:', user.username);
+          console.log('  UserId:', user.userId);
+          console.log('  Full user object:', user);
+          console.log('  SignInDetails:', user.signInDetails);
+          console.log('  Rendering children...');
+        } else {
+          console.log('❌ Authenticator: No user found - showing login');
+        }
+        
+        console.log('🔐 LoginForm about to render children inside authenticated wrapper...');
+        
+        return (
+          <div className="min-h-screen bg-gray-50">
+            {console.log('🔐 LoginForm rendering children...')}
+            {children}
+          </div>
+        );
+      }}
+    </Authenticator>
   );
 };
 

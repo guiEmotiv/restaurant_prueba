@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom styles for AWS Amplify Authenticator */
+.amplify-authenticator {
+  --authenticator-font-family: inherit;
+}
+
+/* Center the login form when not authenticated */
+.amplify-authenticator[data-amplify-authenticator-state="unauthenticated"] {
+  display: flex !important;
+  min-height: 100vh !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: #f9fafb !important;
+}
+
+.amplify-authenticator[data-amplify-authenticator-state="unauthenticated"] .amplify-card {
+  width: 100% !important;
+  max-width: 28rem !important;
+}
