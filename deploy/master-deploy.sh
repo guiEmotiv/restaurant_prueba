@@ -124,7 +124,8 @@ DATABASE_URL=sqlite:///data/restaurant.sqlite3
 TIME_ZONE=America/Lima
 LANGUAGE_CODE=es-pe
 
-# AWS Cognito Configuration (Backend)
+# AWS Cognito Configuration (Backend) - ENABLED
+USE_COGNITO_AUTH=True
 AWS_REGION=$AWS_REGION
 COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
@@ -261,24 +262,14 @@ sleep 15
 # ==============================================================================
 echo -e "\n${YELLOW}💾 PHASE 6: Configure Database${NC}"
 
-# Apply migrations
+# Create and apply migrations
+docker-compose -f docker-compose.ec2.yml exec -T web python manage.py makemigrations
 docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
 
 # Collect static files
 docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput --clear
 
-# Create superuser
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py shell -c "
-from django.contrib.auth.models import User
-if not User.objects.filter(is_superuser=True).exists():
-    User.objects.create_superuser('admin', 'admin@$DOMAIN', 'admin123')
-    print('✅ Superuser created: admin/admin123')
-else:
-    print('✅ Superuser already exists')
-"
-
-# Populate test data
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py populate_test_data 2>/dev/null || echo "Test data population completed"
+# Note: No superuser or test data creation - using AWS Cognito authentication
 
 echo -e "${GREEN}✅ Database configured${NC}"
 
@@ -347,5 +338,6 @@ echo -e "${YELLOW}💡 Next Steps:${NC}"
 echo -e "1. Create Cognito users in AWS Console"
 echo -e "2. Assign users to groups: administradores, meseros"
 echo -e "3. Access application at: ${GREEN}http://$DOMAIN${NC}"
+echo -e "4. Login with your Cognito credentials"
 echo -e ""
 echo -e "${GREEN}✨ Restaurant Web Application is READY!${NC}"

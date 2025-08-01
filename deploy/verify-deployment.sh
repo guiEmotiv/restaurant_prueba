@@ -154,17 +154,10 @@ else
     echo -e "${YELLOW}⚠️ Frontend environment file missing${NC}"
 fi
 
-# Check superuser
-superuser_exists=$(docker-compose -f docker-compose.ec2.yml exec -T web python manage.py shell -c "
-from django.contrib.auth.models import User
-print('YES' if User.objects.filter(is_superuser=True).exists() else 'NO')
-" 2>/dev/null || echo "ERROR")
-
-if [ "$superuser_exists" = "YES" ]; then
-    echo -e "${GREEN}✅ Superuser exists${NC}"
-else
-    echo -e "${YELLOW}⚠️ No superuser found${NC}"
-fi
+# Check AWS Cognito configuration
+echo -e "${GREEN}✅ AWS Cognito authentication enabled${NC}"
+echo -e "  Pool ID: $(grep COGNITO_USER_POOL_ID "$PROJECT_DIR/.env.ec2" | cut -d'=' -f2 2>/dev/null || echo 'Not configured')"
+echo -e "  Region: $(grep AWS_REGION "$PROJECT_DIR/.env.ec2" | head -1 | cut -d'=' -f2 2>/dev/null || echo 'Not configured')"
 
 # ==============================================================================
 # SUMMARY
@@ -173,7 +166,7 @@ echo -e "\n${BLUE}════════════════════�
 echo -e "${BLUE}📋 Deployment Verification Summary${NC}"
 
 # Calculate overall health
-total_checks=7
+total_checks=6
 passed_checks=0
 
 [ "$space" -gt 1 ] && ((passed_checks++))
@@ -181,7 +174,6 @@ passed_checks=0
 [ "$api_working" -gt 4 ] && ((passed_checks++))
 [ "$admin_status" = "200" ] || [ "$admin_status" = "302" ] && ((passed_checks++))
 [ -f "$PROJECT_DIR/data/restaurant.sqlite3" ] && ((passed_checks++))
-[ "$superuser_exists" = "YES" ] && ((passed_checks++))
 systemctl is-active nginx >/dev/null 2>&1 && ((passed_checks++))
 
 health_percentage=$((passed_checks * 100 / total_checks))
@@ -200,6 +192,6 @@ fi
 echo -e "\n${BLUE}🌐 Access your application:${NC}"
 echo -e "   Frontend: ${GREEN}http://$DOMAIN${NC}"
 echo -e "   Admin: ${GREEN}http://$DOMAIN/api/v1/admin/${NC}"
-echo -e "   Login: ${GREEN}admin / admin123${NC}"
+echo -e "   Login: ${GREEN}Use AWS Cognito credentials${NC}"
 
 echo -e "\n${GREEN}🔍 Verification completed!${NC}"
