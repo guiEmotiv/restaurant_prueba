@@ -102,27 +102,51 @@ curl -v http://xn--elfogndedonsoto-zrb.com/
 
 ## 🚨 **Troubleshooting**
 
-### ❌ Si algo sale mal:
+### 🔍 **Diagnóstico rápido**:
+```bash
+sudo ./deploy/diagnose.sh
+```
+Este script te muestra todo lo que necesitas saber sobre tu sistema.
 
-1. **Frontend no carga**:
-   ```bash
-   sudo ./deploy/frontend-only.sh
-   ```
+### ❌ **Errores comunes y soluciones**:
 
-2. **API no responde**:
-   ```bash
-   sudo ./deploy/backend-only.sh
-   ```
+#### 1. **"vite: not found" o "node: not found"**
+```bash
+# Instalar Node.js
+sudo ./deploy/install-nodejs.sh
 
-3. **Todo está roto**:
-   ```bash
-   sudo ./deploy/quick-restart.sh
-   ```
+# O manualmente:
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
 
-4. **Nada funciona**:
-   ```bash
-   sudo ./deploy/build-deploy.sh
-   ```
+#### 2. **Frontend no carga**:
+```bash
+sudo ./deploy/frontend-only.sh
+```
+
+#### 3. **API no responde**:
+```bash
+sudo ./deploy/backend-only.sh
+```
+
+#### 4. **Contenedores colgados**:
+```bash
+sudo ./deploy/quick-restart.sh
+```
+
+#### 5. **Todo está roto**:
+```bash
+sudo ./deploy/build-deploy.sh
+```
+
+#### 6. **"npm run build failed"**:
+```bash
+# Ir al directorio frontend y diagnosticar
+cd /opt/restaurant-web/frontend
+sudo npm install
+sudo npm run build
+```
 
 ---
 
