@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Seguridad / entorno
 # ──────────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-key")
-DEBUG      = bool(int(os.getenv("DEBUG", "0")))
+DEBUG      = os.getenv("DEBUG", "0").lower() in ("1", "true", "yes", "on")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
 # AWS Cognito Configuration
