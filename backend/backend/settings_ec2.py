@@ -265,12 +265,16 @@ AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
 COGNITO_USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID', '')
 COGNITO_APP_CLIENT_ID = os.getenv('COGNITO_APP_CLIENT_ID', '')
 
+# Set COGNITO_ENABLED for the middleware
+COGNITO_ENABLED = USE_COGNITO_AUTH
+
 # Validate required Cognito settings only if authentication is enabled
 if USE_COGNITO_AUTH:
     if not COGNITO_USER_POOL_ID:
         print("⚠️  COGNITO_USER_POOL_ID not set. Authentication will fail.")
     if not COGNITO_APP_CLIENT_ID:
         print("⚠️  COGNITO_APP_CLIENT_ID not set. Authentication will fail.")
+    print(f"✅ AWS Cognito authentication ENABLED - Pool: {COGNITO_USER_POOL_ID}")
 else:
     print("ℹ️  Running without AWS Cognito authentication (USE_COGNITO_AUTH=False)")
 
