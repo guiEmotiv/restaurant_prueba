@@ -4,6 +4,8 @@ import '@aws-amplify/ui-react/styles.css';
 import { ChefHat } from 'lucide-react';
 
 const LoginForm = ({ children }) => {
+  console.log('🔐 LoginForm rendering with children:', typeof children);
+  
   // Configurar traducciones en español
   translations.es = {
     'Sign In': 'Iniciar Sesión',
@@ -85,8 +87,11 @@ const LoginForm = ({ children }) => {
           console.log('❌ Authenticator: No user found - showing login');
         }
         
+        console.log('🔐 LoginForm about to render children inside authenticated wrapper...');
+        
         return (
           <div className="min-h-screen bg-gray-50">
+            {console.log('🔐 LoginForm rendering children...')}
             {children}
           </div>
         );

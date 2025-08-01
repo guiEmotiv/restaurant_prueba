@@ -62,12 +62,20 @@ if (isCognitoConfigured) {
 const AppContent = () => {
   console.log('🔍 AppContent rendering...');
   
-  // Skip AuthContext entirely - let Authenticator handle everything
-  const content = (
-    <Layout>
-      <Routes>
+  try {
+    // Skip AuthContext entirely - let Authenticator handle everything
+    const content = (
+      <Layout>
+        {console.log('🔍 Inside Layout wrapper...')}
+        <Routes>
+          {console.log('🔍 Inside Routes wrapper...')}
           {/* Dashboard */}
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={
+            <>
+              {console.log('🔍 Rendering Dashboard route...')}
+              <Dashboard />
+            </>
+          } />
 
           {/* Configuration routes */}
           <Route path="/units" element={
@@ -186,26 +194,62 @@ const AppContent = () => {
         </Routes>
     </Layout>
   );
+  
+  console.log('🔍 Content created successfully');
+  return content;
+  } catch (error) {
+    console.error('❌ Error in AppContent:', error);
+    console.error('Stack trace:', error.stack);
+    return (
+      <div style={{ padding: '20px', color: 'red' }}>
+        <h2>Error rendering app</h2>
+        <p>{error.message}</p>
+        <pre>{error.stack}</pre>
+      </div>
+    );
+  }
 };
 
 function App() {
-  return (
-    <ToastProvider>
-      <Router>
-        {isCognitoConfigured ? (
-          <LoginForm>
+  console.log('🚀 App component rendering...');
+  console.log('🚀 Cognito configured:', isCognitoConfigured);
+  console.log('🚀 Window location:', window.location.href);
+  console.log('🚀 Document ready state:', document.readyState);
+  
+  try {
+    return (
+      <ToastProvider>
+        {console.log('🚀 Inside ToastProvider...')}
+        <Router>
+          {console.log('🚀 Inside Router...')}
+          {isCognitoConfigured ? (
+            <LoginForm>
+              {console.log('🚀 Inside LoginForm (authenticated)...')}
+              <SimpleAuthProvider>
+                {console.log('🚀 Inside SimpleAuthProvider...')}
+                <AppContent />
+              </SimpleAuthProvider>
+            </LoginForm>
+          ) : (
             <SimpleAuthProvider>
+              {console.log('🚀 Inside SimpleAuthProvider (no auth)...')}
               <AppContent />
             </SimpleAuthProvider>
-          </LoginForm>
-        ) : (
-          <SimpleAuthProvider>
-            <AppContent />
-          </SimpleAuthProvider>
-        )}
-      </Router>
-    </ToastProvider>
-  );
+          )}
+        </Router>
+      </ToastProvider>
+    );
+  } catch (error) {
+    console.error('❌ Error in App component:', error);
+    console.error('Stack trace:', error.stack);
+    return (
+      <div style={{ padding: '20px', color: 'red' }}>
+        <h2>Critical error</h2>
+        <p>{error.message}</p>
+        <pre>{error.stack}</pre>
+      </div>
+    );
+  }
 }
 
 export default App;

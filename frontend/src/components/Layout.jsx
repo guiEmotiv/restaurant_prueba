@@ -24,13 +24,19 @@ import { useAuth } from '../contexts/SimpleAuthContext';
 
 const Layout = ({ children }) => {
   console.log('🎨 Layout component rendering...');
+  console.log('🎨 Layout children type:', typeof children);
+  console.log('🎨 Layout children:', children);
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
-  const { user, userRole, logout, hasPermission } = useAuth();
   
-  console.log('🎨 Layout auth state:', { user: user?.username, userRole, hasPermission: !!hasPermission });
+  try {
+    const authContext = useAuth();
+    const { user, userRole, logout, hasPermission } = authContext;
+    
+    console.log('🎨 Layout auth state:', { user: user?.username, userRole, hasPermission: !!hasPermission });
+    console.log('🎨 Full auth context:', authContext);
 
   // Define navigation items with permissions
   const allNavigation = [
@@ -215,6 +221,7 @@ const Layout = ({ children }) => {
           <main className={`p-4 lg:p-8 pt-20 lg:pt-16 transition-all duration-300 ${
             isSidebarOpen ? 'lg:ml-0' : 'lg:ml-0'
           }`}>
+            {console.log('🎨 About to render children in main...')}
             {children}
           </main>
         </div>
@@ -230,6 +237,17 @@ const Layout = ({ children }) => {
       
     </div>
   );
+  } catch (error) {
+    console.error('❌ Error in Layout component:', error);
+    console.error('Stack trace:', error.stack);
+    return (
+      <div style={{ padding: '20px', color: 'red' }}>
+        <h2>Error in Layout</h2>
+        <p>{error.message}</p>
+        <pre>{error.stack}</pre>
+      </div>
+    );
+  }
 };
 
 export default Layout;

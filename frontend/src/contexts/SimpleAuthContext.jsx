@@ -13,9 +13,15 @@ export const useAuth = () => {
 };
 
 export const SimpleAuthProvider = ({ children }) => {
+  console.log('🔐 SimpleAuthProvider rendering...');
+  console.log('🔐 Children type:', typeof children);
+  console.log('🔐 Children:', children);
+  
   const { user, signOut } = useAuthenticator((context) => [context.user]);
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  console.log('🔐 SimpleAuthProvider - user:', user?.username, 'loading:', loading);
 
   // Define user roles and their permissions
   const ROLES = {
@@ -124,8 +130,12 @@ export const SimpleAuthProvider = ({ children }) => {
     PERMISSIONS
   };
 
+  console.log('🔐 About to render context provider with value:', value);
+  console.log('🔐 About to render children inside provider...');
+  
   return (
     <SimpleAuthContext.Provider value={value}>
+      {console.log('🔐 Inside context provider, rendering children...')}
       {children}
     </SimpleAuthContext.Provider>
   );

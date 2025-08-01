@@ -24,6 +24,9 @@ import { apiService } from '../services/api';
 
 const Dashboard = () => {
   console.log('🏠 Dashboard component rendering...');
+  console.log('🏠 Dashboard mounted successfully');
+  
+  try {
   
   const [stats, setStats] = useState({
     // Métricas básicas
@@ -445,8 +448,11 @@ const Dashboard = () => {
     );
   }
 
+  console.log('🏠 Dashboard about to render JSX...');
+  
   return (
     <div className="space-y-6">
+      {console.log('🏠 Dashboard JSX rendering...')}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -834,6 +840,17 @@ const Dashboard = () => {
 
     </div>
   );
+  } catch (error) {
+    console.error('❌ Error in Dashboard component:', error);
+    console.error('Stack trace:', error.stack);
+    return (
+      <div style={{ padding: '20px', color: 'red' }}>
+        <h2>Error in Dashboard</h2>
+        <p>{error.message}</p>
+        <pre>{error.stack}</pre>
+      </div>
+    );
+  }
 };
 
 export default Dashboard;
