@@ -51,8 +51,8 @@ case $choice in
 # Frontend Production Environment Variables
 # These are baked into the build at compile time
 
-# API Configuration
-VITE_API_URL=http://localhost:8000/api/v1
+# API Configuration - Using HTTPS domain
+VITE_API_URL=https://elfogomdedonsoto.com/api/v1
 
 # AWS Cognito Configuration - ENABLED
 VITE_AWS_REGION=us-west-2
@@ -73,8 +73,8 @@ EOF
 # Frontend Production Environment Variables
 # These are baked into the build at compile time
 
-# API Configuration
-VITE_API_URL=http://localhost:8000/api/v1
+# API Configuration - Using HTTPS domain
+VITE_API_URL=https://elfogomdedonsoto.com/api/v1
 
 # AWS Cognito Configuration - DISABLED FOR TESTING
 # VITE_AWS_REGION=us-west-2

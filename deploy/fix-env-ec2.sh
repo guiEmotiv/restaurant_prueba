@@ -35,7 +35,7 @@ cat > "$ENV_FILE" << EOF
 # Django Configuration
 DJANGO_SECRET_KEY=$SECRET_KEY
 DEBUG=False
-ALLOWED_HOSTS=localhost,127.0.0.1,$REAL_IP
+ALLOWED_HOSTS=localhost,127.0.0.1,$REAL_IP,elfogomdedonsoto.com,www.elfogomdedonsoto.com
 
 # Database (SQLite for production)
 DATABASE_URL=sqlite:///data/restaurant.sqlite3
@@ -57,8 +57,8 @@ VITE_AWS_COGNITO_APP_CLIENT_ID=4i9hrd7srgbqbtun09p43ncfn0
 # EC2 Specific
 EC2_PUBLIC_IP=$REAL_IP
 
-# Optional: Domain name (leave empty if not using custom domain)
-DOMAIN_NAME=
+# Domain Configuration
+DOMAIN_NAME=elfogomdedonsoto.com
 EOF
 
 # Set proper permissions
