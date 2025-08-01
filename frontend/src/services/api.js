@@ -37,7 +37,19 @@ const api = axios.create({
 // Add request interceptor for authentication and debugging
 api.interceptors.request.use(
   async (config) => {
-    console.log(`📡 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    const timestamp = new Date().toISOString();
+    console.log(`[⚖️ ${timestamp}] 📡 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    
+    // Store API request logs
+    const apiLogs = JSON.parse(sessionStorage.getItem('api-debug-logs') || '[]');
+    apiLogs.push({
+      timestamp,
+      type: 'request',
+      method: config.method?.toUpperCase(),
+      url: `${config.baseURL}${config.url}`,
+      headers: config.headers
+    });
+    sessionStorage.setItem('api-debug-logs', JSON.stringify(apiLogs.slice(-50)));
     
     // Add JWT token for authentication
     try {
@@ -83,21 +95,16 @@ api.interceptors.response.use(
     console.error('  Error:', error.message);
     console.error('  Response:', error.response?.data);
     
-    // Handle authentication errors
+    // Handle authentication errors - DON'T auto-reload
     if (error.response?.status === 401) {
-      console.log('🚨 Authentication failed - redirecting to login');
-      // Clear any cached session data and redirect to login
-      try {
-        import('aws-amplify/auth').then(({ signOut }) => {
-          signOut().then(() => {
-            window.location.reload();
-          }).catch(() => {
-            window.location.reload();
-          });
-        });
-      } catch {
-        window.location.reload();
-      }
+      console.log('🚨 Authentication failed - user needs to login again');
+      console.log('⚠️ Token may be expired or invalid');
+      // Just log the error, let the auth context handle the flow
+    }
+    
+    // Handle CORS or network errors
+    if (!error.response) {
+      console.error('🚨 Network error - server may be unreachable');
     }
     
     return Promise.reject(error);

@@ -13,9 +13,18 @@ export const useAuth = () => {
 };
 
 export const SimpleAuthProvider = ({ children }) => {
-  console.log('🔐 SimpleAuthProvider rendering...');
-  console.log('🔐 Children type:', typeof children);
-  console.log('🔐 Children:', children);
+  const logWithTimestamp = (message, data) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${message}`, data);
+    const logs = JSON.parse(sessionStorage.getItem('auth-debug-logs') || '[]');
+    logs.push({ timestamp, message, data });
+    sessionStorage.setItem('auth-debug-logs', JSON.stringify(logs.slice(-50)));
+  };
+  
+  logWithTimestamp('🔐 SimpleAuthProvider rendering...', {
+    childrenType: typeof children,
+    hasChildren: !!children
+  });
   
   const { user, signOut } = useAuthenticator((context) => [context.user]);
   const [userRole, setUserRole] = useState(null);
@@ -69,17 +78,17 @@ export const SimpleAuthProvider = ({ children }) => {
         console.log('📋 Full session:', session);
         console.log('📋 Access token payload:', session.tokens?.accessToken?.payload);
         const groups = session.tokens?.accessToken?.payload?.['cognito:groups'] || [];
-        console.log('🔍 User groups from token:', groups);
+        logWithTimestamp('🔍 User groups from token:', groups);
         
         if (Array.isArray(groups)) {
           if (groups.includes(ROLES.ADMIN)) {
-            console.log('✅ User is admin');
+            logWithTimestamp('✅ User is admin', { username: user.username });
             setUserRole(ROLES.ADMIN);
           } else if (groups.includes(ROLES.WAITER)) {
-            console.log('✅ User is waiter');
+            logWithTimestamp('✅ User is waiter', { username: user.username });
             setUserRole(ROLES.WAITER);
           } else {
-            console.log('⚠️ User has no recognized groups, defaulting to admin');
+            logWithTimestamp('⚠️ User has no recognized groups, defaulting to admin', { username: user.username, groups });
             setUserRole(ROLES.ADMIN);
           }
         } else {

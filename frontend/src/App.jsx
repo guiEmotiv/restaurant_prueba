@@ -29,19 +29,28 @@ import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
 import TableOrderEdit from './pages/operation/TableOrderEdit';
 import TablePaymentEcommerce from './pages/operation/TablePaymentEcommerce';
 
-// Debug environment variables
-console.log('API Configuration Debug:');
-console.log('  VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('  API_BASE_URL:', import.meta.env.VITE_API_URL || 'http://44.248.47.186/api/v1');
-console.log('  MODE:', import.meta.env.MODE);
-console.log('  PROD:', import.meta.env.PROD);
-console.log('  Timestamp:', new Date().toISOString());
+// Debug environment variables with persistent logging
+const logWithTimestamp = (message, data) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`, data);
+  // Store in sessionStorage for persistent debugging
+  const logs = JSON.parse(sessionStorage.getItem('app-debug-logs') || '[]');
+  logs.push({ timestamp, message, data });
+  sessionStorage.setItem('app-debug-logs', JSON.stringify(logs.slice(-50))); // Keep last 50 logs
+};
 
-// Debug Cognito environment variables
-console.log('Cognito Configuration Debug:');
-console.log('  VITE_AWS_REGION:', import.meta.env.VITE_AWS_REGION);
-console.log('  VITE_AWS_COGNITO_USER_POOL_ID:', import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID);
-console.log('  VITE_AWS_COGNITO_APP_CLIENT_ID:', import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID);
+logWithTimestamp('API Configuration Debug:', {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  API_BASE_URL: import.meta.env.VITE_API_URL || 'http://44.248.47.186/api/v1',
+  MODE: import.meta.env.MODE,
+  PROD: import.meta.env.PROD
+});
+
+logWithTimestamp('Cognito Configuration Debug:', {
+  VITE_AWS_REGION: import.meta.env.VITE_AWS_REGION,
+  VITE_AWS_COGNITO_USER_POOL_ID: import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID,
+  VITE_AWS_COGNITO_APP_CLIENT_ID: import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID
+});
 
 // Configure AWS Amplify
 Amplify.configure(amplifyConfig);
@@ -211,10 +220,12 @@ const AppContent = () => {
 };
 
 function App() {
-  console.log('🚀 App component rendering...');
-  console.log('🚀 Cognito configured:', isCognitoConfigured);
-  console.log('🚀 Window location:', window.location.href);
-  console.log('🚀 Document ready state:', document.readyState);
+  logWithTimestamp('🚀 App component rendering...', {
+    cognitoConfigured: isCognitoConfigured,
+    location: window.location.href,
+    readyState: document.readyState,
+    userAgent: navigator.userAgent
+  });
   
   try {
     return (
