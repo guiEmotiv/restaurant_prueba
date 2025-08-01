@@ -15,7 +15,6 @@ import Dashboard from './pages/Dashboard';
 import Units from './pages/config/Units';
 import Zones from './pages/config/Zones';
 import Tables from './pages/config/Tables';
-import Waiters from './pages/config/Waiters';
 import Containers from './pages/config/Containers';
 import Groups from './pages/inventory/Groups';
 import Ingredients from './pages/inventory/Ingredients';
@@ -102,11 +101,6 @@ const AppContent = () => {
           <Route path="/tables" element={
             <RoleProtectedRoute requiredPermission="canManageConfig">
               <Tables />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/waiters" element={
-            <RoleProtectedRoute requiredPermission="canManageConfig">
-              <Waiters />
             </RoleProtectedRoute>
           } />
           <Route path="/containers" element={

@@ -4,16 +4,18 @@ import { Plus, Save, Trash2, ShoppingCart } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/SimpleAuthContext';
 
 const NewOrder = () => {
   const { showSuccess, showError } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const params = useParams();
   const orderId = params.id;
   
   const [formData, setFormData] = useState({
     table: '',
-    waiter: '',
+    waiter: user?.username || '',
     status: 'CREATED'
   });
   
@@ -22,9 +24,6 @@ const NewOrder = () => {
   const [availableTables, setAvailableTables] = useState([]);
   const [availableZones, setAvailableZones] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
-  const [availableWaiters, setAvailableWaiters] = useState([]);
-  const [availableContainers, setAvailableContainers] = useState([]);
-  const [defaultContainer, setDefaultContainer] = useState(null);
   const [selectedZoneFilter, setSelectedZoneFilter] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState('');
   const [deletedItemIds, setDeletedItemIds] = useState([]);
@@ -40,6 +39,16 @@ const NewOrder = () => {
       addOrderItem();
     }
   }, [orderId]);
+
+  // Update waiter field when user changes
+  useEffect(() => {
+    if (user?.username && !orderId) {
+      setFormData(prev => ({
+        ...prev,
+        waiter: user.username
+      }));
+    }
+  }, [user, orderId]);
 
   const loadExistingOrder = async () => {
     try {
@@ -88,27 +97,17 @@ const NewOrder = () => {
 
   const loadAvailableData = async () => {
     try {
-      const [recipesData, tablesData, zonesData, groupsData, waitersData, containersData] = await Promise.all([
+      const [recipesData, tablesData, zonesData, groupsData] = await Promise.all([
         apiService.recipes.getAll(),
         apiService.tables.getAll(),
         apiService.zones.getAll(),
-        apiService.groups.getAll(),
-        apiService.waiters.getAll(),
-        apiService.containers.getAll({ is_active: true })
+        apiService.groups.getAll()
       ]);
       
       setAvailableRecipes(Array.isArray(recipesData) ? recipesData : []);
       setAvailableTables(Array.isArray(tablesData) ? tablesData : []);
       setAvailableZones(Array.isArray(zonesData) ? zonesData : []);
       setAvailableGroups(Array.isArray(groupsData) ? groupsData : []);
-      setAvailableWaiters(Array.isArray(waitersData) ? waitersData.filter(w => w.is_active) : []);
-      
-      const containers = Array.isArray(containersData) ? containersData : [];
-      setAvailableContainers(containers);
-      
-      const defaultCont = containers.find(c => c.name.toLowerCase().includes('taper')) || 
-                         containers.sort((a, b) => parseFloat(a.price) - parseFloat(b.price))[0];
-      setDefaultContainer(defaultCont);
     } catch (error) {
       console.error('Error loading available data:', error);
     }
@@ -226,7 +225,7 @@ const NewOrder = () => {
             
             if (value === true) {
               newItem.has_taper = true;
-              newItem.selected_container = defaultContainer?.id || null;
+              newItem.selected_container = null;
             } else {
               newItem.has_taper = false;
               newItem.selected_container = null;
@@ -470,25 +469,18 @@ const NewOrder = () => {
           {/* Controles principales con espaciado */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <select
-                name="waiter"
-                value={formData.waiter}
-                onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                  errors.waiter ? 'border-red-500' : 'border-gray-300'
-                }`}
-                disabled={!!orderId || existingOrder?.status === 'PAID'}
-              >
-                <option value="">Mesero</option>
-                {availableWaiters.map(waiter => (
-                  <option key={waiter.id} value={waiter.id}>
-                    {waiter.name}
-                  </option>
-                ))}
-              </select>
-              {errors.waiter && (
-                <p className="mt-1 text-sm text-red-600">{errors.waiter}</p>
-              )}
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mesero
+              </label>
+              <input
+                type="text"
+                value={user?.username || 'Usuario no identificado'}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 text-sm"
+                readOnly
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Asignado automáticamente al usuario actual
+              </p>
             </div>
             
             <div>
@@ -708,11 +700,6 @@ const NewOrder = () => {
                             <span className="ml-2">Para llevar</span>
                           </label>
                           
-                          {item.is_takeaway && defaultContainer && (
-                            <div className="text-sm text-gray-600">
-                              +{formatCurrency(defaultContainer.price)}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>

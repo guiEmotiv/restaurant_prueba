@@ -4,9 +4,11 @@ import { X, Plus, Minus, Save, Trash2, ShoppingCart } from 'lucide-react';
 import Button from '../common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/SimpleAuthContext';
 
 const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const { showSuccess, showError } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     table: '',
@@ -19,9 +21,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const [availableTables, setAvailableTables] = useState([]);
   const [availableZones, setAvailableZones] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
-  const [availableWaiters, setAvailableWaiters] = useState([]);
-  const [availableContainers, setAvailableContainers] = useState([]);
-  const [defaultContainer, setDefaultContainer] = useState(null);
   const [selectedZoneFilter, setSelectedZoneFilter] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState('');
   const [deletedItemIds, setDeletedItemIds] = useState([]); // Llevar registro de items eliminados
@@ -49,7 +48,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
   const resetForm = () => {
     setFormData({
       table: '',
-      waiter: '',
+      waiter: user?.username || '',
       status: 'CREATED'
     });
     setOrderItems([]);
@@ -88,45 +87,20 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
       .sort((a, b) => a.table_number.localeCompare(b.table_number));
   };
 
-  // Obtener el nombre del grupo seleccionado
-  const getSelectedGroupName = () => {
-    if (!selectedGroupFilter) return 'Todos los grupos';
-    const group = availableGroups.find(g => g.id === parseInt(selectedGroupFilter));
-    return group ? group.name : 'Grupo desconocido';
-  };
-
-  // Obtener el nombre de la zona seleccionada
-  const getSelectedZoneName = () => {
-    if (!selectedZoneFilter) return 'Todas las zonas';
-    const zone = availableZones.find(z => z.id === parseInt(selectedZoneFilter));
-    return zone ? zone.name : 'Zona desconocida';
-  };
 
   const loadAvailableData = async () => {
     try {
-      const [recipesData, tablesData, zonesData, groupsData, waitersData, containersData] = await Promise.all([
+      const [recipesData, tablesData, zonesData, groupsData] = await Promise.all([
         apiService.recipes.getAll(), // Sin show_all, el backend filtra automáticamente
         apiService.tables.getAll(),
         apiService.zones.getAll(),
-        apiService.groups.getAll(),
-        apiService.waiters.getAll(),
-        apiService.containers.getAll({ is_active: true })
+        apiService.groups.getAll()
       ]);
       // El backend ya filtra recetas activas con stock suficiente
       setAvailableRecipes(Array.isArray(recipesData) ? recipesData : []);
       setAvailableTables(Array.isArray(tablesData) ? tablesData : []);
       setAvailableZones(Array.isArray(zonesData) ? zonesData : []);
       setAvailableGroups(Array.isArray(groupsData) ? groupsData : []);
-      setAvailableWaiters(Array.isArray(waitersData) ? waitersData.filter(w => w.is_active) : []);
-      
-      // Configurar envases
-      const containers = Array.isArray(containersData) ? containersData : [];
-      setAvailableContainers(containers);
-      
-      // Buscar envase por defecto (puede ser el más barato o uno llamado "taper")
-      const defaultCont = containers.find(c => c.name.toLowerCase().includes('taper')) || 
-                         containers.sort((a, b) => parseFloat(a.price) - parseFloat(b.price))[0];
-      setDefaultContainer(defaultCont);
     } catch (error) {
       console.error('Error loading available data:', error);
     }
@@ -239,7 +213,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
             if (value === true) {
               // Cuando se marca para llevar, automáticamente poner taper y container por defecto
               newItem.has_taper = true;
-              newItem.selected_container = defaultContainer?.id || null;
+              newItem.selected_container = null;
             } else {
               // Cuando se desmarca para llevar, quitar taper
               newItem.has_taper = false;
@@ -255,7 +229,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
             
             if (value === true) {
               // Cuando se marca envase, usar el container por defecto
-              newItem.selected_container = defaultContainer?.id || null;
+              newItem.selected_container = null;
             } else {
               // Cuando se desmarca envase, quitar container
               newItem.selected_container = null;
@@ -364,7 +338,6 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         return !isNaN(parsedId) && parsedId > 0;
       });
       
-      let savedOrder;
       if (order?.id) {
         // Actualizar pedido existente - table y waiter requeridos por serializer
         const orderData = {
@@ -372,7 +345,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           waiter: parseInt(formData.waiter),
           status: formData.status
         };
-        savedOrder = await apiService.orders.update(order.id, orderData);
+        await apiService.orders.update(order.id, orderData);
         
         // Manejar actualización de items - COMPLETO
         
@@ -463,7 +436,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
           throw new Error('Algunos items tienen datos inválidos');
         }
         
-        savedOrder = await apiService.orders.create(orderData);
+        await apiService.orders.create(orderData);
       }
       
       // Verificar si después de la actualización todos los items están SERVED (solo para edición)
@@ -603,26 +576,15 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
               <div className="space-y-4">
                 {/* Campo de mesero - arriba de todo */}
                 <div>
-                  <select
-                    name="waiter"
-                    value={formData.waiter}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm ${
-                      errors.waiter ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  >
-                    <option value="">Seleccionar mesero</option>
-                    {availableWaiters.map(waiter => (
-                      <option key={waiter.id} value={waiter.id}>
-                        {waiter.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.waiter && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.waiter}
-                    </p>
-                  )}
+                  <input
+                    type="text"
+                    value={user?.username || 'Usuario no identificado'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600 text-sm"
+                    readOnly
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Asignado automáticamente al usuario actual
+                  </p>
                 </div>
 
                 {/* Filtros de mesa y zona */}
@@ -821,10 +783,10 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                                     checked={item.has_taper}
                                     onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
                                     className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                    disabled={!item.can_edit || !defaultContainer}
+                                    disabled={!item.can_edit}
                                   />
                                   <span className="ml-2 text-xs text-gray-700">
-                                    Con envase {defaultContainer ? `(+S/ ${defaultContainer.price})` : '(Sin stock)'}
+                                    Con envase
                                   </span>
                                 </label>
                               )}
@@ -911,10 +873,10 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
                                     checked={item.has_taper}
                                     onChange={(e) => updateOrderItem(index, 'has_taper', e.target.checked)}
                                     className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                    disabled={!item.can_edit || !defaultContainer}
+                                    disabled={!item.can_edit}
                                   />
                                   <span className="ml-1 text-xs text-gray-700">
-                                    Envase {defaultContainer ? `(+S/ ${defaultContainer.price})` : '(Sin stock)'}
+                                    Envase
                                   </span>
                                 </label>
                               )}
