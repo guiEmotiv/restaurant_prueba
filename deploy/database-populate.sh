@@ -44,6 +44,9 @@ show_help() {
     done
 }
 
+# Store original directory
+ORIGINAL_DIR=$(pwd)
+
 # Detect environment
 if [ -d "/opt/restaurant-web" ] && [ -f "/opt/restaurant-web/.env.ec2" ]; then
     RUNNING_ON_EC2=true
@@ -55,11 +58,11 @@ if [ -d "/opt/restaurant-web" ] && [ -f "/opt/restaurant-web/.env.ec2" ]; then
         COMPOSE_FILE="docker-compose.yml"
     fi
 elif [ -f "backend/manage.py" ]; then
-    # Running from project root
-    cd backend
+    # Running from project root - will change to backend later
+    PROJECT_ROOT=true
 elif [ -f "manage.py" ]; then
     # Already in backend directory
-    :
+    PROJECT_ROOT=false
 else
     echo -e "${RED}❌ Error: No se encontró el proyecto Django${NC}"
     echo "Ejecutar desde la raíz del proyecto o directorio backend/"
@@ -71,7 +74,13 @@ FORCE=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --backup-file)
-            BACKUP_FILE="$2"
+            BACKUP_FILE_PARAM="$2"
+            # Resolve absolute path from original directory
+            if [[ "$BACKUP_FILE_PARAM" = /* ]]; then
+                BACKUP_FILE="$BACKUP_FILE_PARAM"
+            else
+                BACKUP_FILE="$ORIGINAL_DIR/$BACKUP_FILE_PARAM"
+            fi
             POPULATE_TYPE="backup"
             shift 2
             ;;
@@ -144,7 +153,12 @@ if [ -z "$POPULATE_TYPE" ]; then
                 if [[ "$backup_choice" =~ ^[0-9]+$ ]] && [ "$backup_choice" -ge 1 ] && [ "$backup_choice" -lt $counter ]; then
                     BACKUP_FILE="${backup_files[$((backup_choice-1))]}"
                 else
-                    BACKUP_FILE="$backup_choice"
+                    # Resolve relative path from original directory
+                    if [[ "$backup_choice" = /* ]]; then
+                        BACKUP_FILE="$backup_choice"
+                    else
+                        BACKUP_FILE="$ORIGINAL_DIR/$backup_choice"
+                    fi
                 fi
             fi
             ;;
@@ -157,6 +171,11 @@ if [ -z "$POPULATE_TYPE" ]; then
             exit 1
             ;;
     esac
+fi
+
+# Now change to backend directory if needed
+if [ "$RUNNING_ON_EC2" != true ] && [ "$PROJECT_ROOT" = true ]; then
+    cd backend
 fi
 
 echo ""
@@ -246,7 +265,8 @@ populate_from_backup() {
         # SQLite file - use specialized restore script
         echo -e "${YELLOW}📋 Usando script especializado para SQLite...${NC}"
         
-        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        # Get script directory relative to original directory
+        SCRIPT_DIR="$ORIGINAL_DIR/deploy"
         SQLITE_SCRIPT="$SCRIPT_DIR/database-restore-sqlite.sh"
         
         if [ -f "$SQLITE_SCRIPT" ]; then
