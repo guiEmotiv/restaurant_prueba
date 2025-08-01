@@ -102,7 +102,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'id', 'table', 'table_number', 'zone_name', 'waiter', 'waiter_name', 'status',
             'total_amount', 'containers_total', 'grand_total', 'total_paid', 'pending_amount', 'is_fully_paid',
             'items_count', 'created_at',
-            'served_at', 'paid_at', 'operational_date'
+            'served_at', 'paid_at'
         ]
         read_only_fields = [
             'id', 'total_amount', 'containers_total', 'grand_total', 'created_at',
@@ -135,9 +135,9 @@ class ContainerSaleSerializer(serializers.ModelSerializer):
         model = ContainerSale
         fields = [
             'id', 'order', 'container', 'container_name', 'quantity', 
-            'unit_price', 'total_price', 'created_at', 'operational_date'
+            'unit_price', 'total_price', 'created_at'
         ]
-        read_only_fields = ['id', 'unit_price', 'total_price', 'created_at', 'operational_date']
+        read_only_fields = ['id', 'unit_price', 'total_price', 'created_at']
 
 
 class OrderDetailSerializer(OrderSerializer):
@@ -352,9 +352,9 @@ class PaymentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order', 'order_table', 'order_total', 'payment_method',
             'tax_amount', 'amount', 'payer_name', 'split_group', 'notes', 
-            'payment_items', 'created_at', 'operational_date'
+            'payment_items', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at', 'operational_date']
+        read_only_fields = ['id', 'created_at']
     
     def validate(self, data):
         order = data['order']

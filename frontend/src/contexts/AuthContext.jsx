@@ -21,7 +21,8 @@ export const AuthProvider = ({ children }) => {
   // Define user roles and their permissions
   const ROLES = {
     ADMIN: 'administradores',
-    WAITER: 'meseros'
+    WAITER: 'meseros',
+    COOK: 'cocineros'
   };
 
   const PERMISSIONS = {
@@ -44,6 +45,16 @@ export const AuthProvider = ({ children }) => {
       canViewTableStatus: true,
       canManagePayments: true,
       canViewHistory: false,
+    },
+    [ROLES.COOK]: {
+      canViewDashboard: false,
+      canManageConfig: false,
+      canManageInventory: false,
+      canManageOrders: false,
+      canViewKitchen: true,
+      canViewTableStatus: false,
+      canManagePayments: false,
+      canViewHistory: false,
     }
   };
 
@@ -57,6 +68,8 @@ export const AuthProvider = ({ children }) => {
         return ROLES.ADMIN;
       } else if (groups.includes(ROLES.WAITER)) {
         return ROLES.WAITER;
+      } else if (groups.includes(ROLES.COOK)) {
+        return ROLES.COOK;
       }
       return null;
     } catch (error) {
@@ -182,6 +195,7 @@ export const AuthProvider = ({ children }) => {
 
   const isAdmin = () => userRole === ROLES.ADMIN;
   const isWaiter = () => userRole === ROLES.WAITER;
+  const isCook = () => userRole === ROLES.COOK;
 
   const refreshAuth = async () => {
     await checkAuthState();
@@ -194,6 +208,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     isAdmin,
     isWaiter,
+    isCook,
     hasPermission,
     logout,
     refreshAuth,

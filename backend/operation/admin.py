@@ -72,6 +72,6 @@ class PaymentItemAdmin(admin.ModelAdmin):
 @admin.register(ContainerSale)
 class ContainerSaleAdmin(admin.ModelAdmin):
     list_display = ['order', 'container', 'quantity', 'unit_price', 'total_price', 'created_at']
-    list_filter = ['container', 'created_at', 'operational_date']
+    list_filter = ['container', 'created_at']
     search_fields = ['order__id', 'container__name']
-    readonly_fields = ['unit_price', 'total_price', 'created_at', 'operational_date']
+    readonly_fields = ['unit_price', 'total_price', 'created_at']

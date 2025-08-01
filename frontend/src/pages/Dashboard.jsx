@@ -115,7 +115,7 @@ const Dashboard = () => {
 
       // Filtrar SOLO órdenes PAGADAS por fecha operativa
       const paidOrdersToday = orders.filter(order => {
-        const orderDate = order.operational_date || order.created_at.split('T')[0];
+        const orderDate = order.created_at.split('T')[0];
         return orderDate === operationalDate && order.status === 'PAID';
       });
 
@@ -270,10 +270,10 @@ const Dashboard = () => {
       // Alertas de inventario
       const lowStockItems = ingredients.filter(i => i.current_stock <= 5 && i.is_active);
 
-      // Calcular comparativas (simuladas por ahora)
-      const revenueVsYesterday = Math.random() * 40 - 20;
-      const revenueVsLastWeek = Math.random() * 30 - 15;
-      const revenueVsAverage = totalRevenue > 5000 ? 15 : -10;
+      // Calcular comparativas basadas en datos reales
+      const revenueVsYesterday = 0; // Por implementar cuando haya datos históricos
+      const revenueVsLastWeek = 0;  // Por implementar cuando haya datos históricos  
+      const revenueVsAverage = 0;   // Por implementar cuando haya datos históricos
 
       // Distribución por método de pago
       const paymentMethods = operationalSummary.payments || [];
@@ -294,7 +294,7 @@ const Dashboard = () => {
 
       // Estado de órdenes activas (no pagadas)
       const activeOrdersFiltered = orders.filter(order => {
-        const orderDate = order.operational_date || order.created_at.split('T')[0];
+        const orderDate = order.created_at.split('T')[0];
         return orderDate === operationalDate && order.status !== 'PAID';
       });
 
@@ -438,10 +438,10 @@ const Dashboard = () => {
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
+                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title={refreshing ? 'Actualizando...' : 'Actualizar datos'}
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                {refreshing ? 'Actualizando...' : 'Actualizar'}
               </button>
               <button
                 onClick={() => setShowConfigModal(true)}
@@ -467,10 +467,12 @@ const Dashboard = () => {
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
               <div className="flex items-center justify-between mb-2">
                 <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-                <span className={`text-xs sm:text-sm font-medium ${dailyMetrics.revenueVsYesterday >= 0 ? 'text-green-600' : 'text-red-600'} flex items-center`}>
-                  {dailyMetrics.revenueVsYesterday >= 0 ? <ArrowUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ArrowDown className="h-3 w-3 sm:h-4 sm:w-4" />}
-                  {formatPercentage(dailyMetrics.revenueVsYesterday)}
-                </span>
+                {dailyMetrics.revenueVsYesterday !== 0 && (
+                  <span className={`text-xs sm:text-sm font-medium ${dailyMetrics.revenueVsYesterday >= 0 ? 'text-green-600' : 'text-red-600'} flex items-center`}>
+                    {dailyMetrics.revenueVsYesterday >= 0 ? <ArrowUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ArrowDown className="h-3 w-3 sm:h-4 sm:w-4" />}
+                    {formatPercentage(dailyMetrics.revenueVsYesterday)}
+                  </span>
+                )}
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(dailyMetrics.totalRevenue)}</h3>
               <p className="text-xs sm:text-sm text-gray-600">Ingresos del día</p>

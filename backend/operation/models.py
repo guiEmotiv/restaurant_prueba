@@ -25,8 +25,6 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     served_at = models.DateTimeField(null=True, blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
-    # Fecha operativa: fecha de negocio (ej: si abre 8pm hoy hasta 3am mañana, toda la operación es fecha de hoy)
-    operational_date = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = 'order'
@@ -36,17 +34,6 @@ class Order(models.Model):
     def __str__(self):
         return f"Orden #{self.id} - Mesa {self.table.table_number}"
 
-    def save(self, *args, **kwargs):
-        # Establecer fecha operativa si no existe
-        if not self.operational_date:
-            self.operational_date = self.get_operational_date()
-        super().save(*args, **kwargs)
-    
-    @staticmethod
-    def get_operational_date():
-        """Obtiene la fecha operativa actual usando fecha actual del servidor"""
-        from django.utils import timezone
-        return timezone.now().date()
 
     def calculate_total(self):
         """Calcula el total de items (incluyendo envases distribuidos)"""
