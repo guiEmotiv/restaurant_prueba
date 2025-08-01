@@ -52,7 +52,7 @@ case $choice in
 # These are baked into the build at compile time
 
 # API Configuration - Using HTTPS domain
-VITE_API_URL=https://elfogomdedonsoto.com/api/v1
+VITE_API_URL=https://xn--elfogndedonsoto-zrb.com/api/v1
 
 # AWS Cognito Configuration - ENABLED
 VITE_AWS_REGION=us-west-2
@@ -74,7 +74,7 @@ EOF
 # These are baked into the build at compile time
 
 # API Configuration - Using HTTPS domain
-VITE_API_URL=https://elfogomdedonsoto.com/api/v1
+VITE_API_URL=https://xn--elfogndedonsoto-zrb.com/api/v1
 
 # AWS Cognito Configuration - DISABLED FOR TESTING
 # VITE_AWS_REGION=us-west-2

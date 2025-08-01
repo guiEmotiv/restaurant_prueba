@@ -13,7 +13,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-DOMAIN="elfogomdedonsoto.com"
+DOMAIN="xn--elfogndedonsoto-zrb.com"
 PROJECT_DIR="/opt/restaurant-web"
 
 echo -e "${BLUE}🔍 Checking domain: $DOMAIN${NC}"
