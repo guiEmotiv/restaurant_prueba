@@ -124,7 +124,9 @@ fi
 # Update frontend config for HTTP
 echo -e "\n${YELLOW}🌐 Setting frontend for HTTP...${NC}"
 cat > "$PROJECT_DIR/frontend/.env.production" << EOF
-VITE_API_URL=http://$DOMAIN/api/v1
+# Frontend Production Environment Variables
+# Note: Do NOT include /api/v1 here as it's added automatically in api.js
+VITE_API_URL=http://$DOMAIN
 VITE_AWS_REGION=us-west-2
 VITE_AWS_COGNITO_USER_POOL_ID=us-west-2_bdCwF60ZI
 VITE_AWS_COGNITO_APP_CLIENT_ID=4i9hrd7srgbqbtun09p43ncfn0
