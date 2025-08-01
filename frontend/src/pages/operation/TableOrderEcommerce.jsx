@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/SimpleAuthContext';
 
 const TableOrderEcommerce = () => {
   const { tableId } = useParams();
