@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Unit, Zone, Table, RestaurantOperationalConfig, Waiter, Container
+from .models import Unit, Zone, Table, Container
 
 
 @admin.register(Unit)
@@ -24,33 +24,6 @@ class TableAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at']
 
 
-@admin.register(RestaurantOperationalConfig)
-class RestaurantOperationalConfigAdmin(admin.ModelAdmin):
-    list_display = ['name', 'opening_time', 'closing_time', 'is_active', 'created_at']
-    list_filter = ['is_active']
-    search_fields = ['name']
-    readonly_fields = ['created_at', 'updated_at']
-    fieldsets = (
-        ('Información General', {
-            'fields': ('name', 'is_active')
-        }),
-        ('Horarios Operativos', {
-            'fields': ('opening_time', 'closing_time', 'operational_cutoff_time'),
-            'description': 'Defina los horarios de operación del restaurante'
-        }),
-        ('Fechas', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        })
-    )
-
-
-@admin.register(Waiter)
-class WaiterAdmin(admin.ModelAdmin):
-    list_display = ['name', 'phone', 'is_active', 'created_at']
-    list_filter = ['is_active']
-    search_fields = ['name', 'phone']
-    readonly_fields = ['created_at', 'updated_at']
 
 
 @admin.register(Container)

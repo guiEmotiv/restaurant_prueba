@@ -44,9 +44,9 @@ class Order(models.Model):
     
     @staticmethod
     def get_operational_date():
-        """Obtiene la fecha operativa actual basada en configuración del restaurante"""
-        from config.models import RestaurantOperationalConfig
-        return RestaurantOperationalConfig.get_operational_date()
+        """Obtiene la fecha operativa actual usando fecha actual del servidor"""
+        from django.utils import timezone
+        return timezone.now().date()
 
     def calculate_total(self):
         """Calcula el total de items (incluyendo envases distribuidos)"""

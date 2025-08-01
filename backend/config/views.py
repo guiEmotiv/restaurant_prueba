@@ -6,11 +6,10 @@ from backend.cognito_permissions import (
     CognitoWaiterAndAdminPermission, 
     CognitoReadOnlyForNonAdmins
 )
-from .models import Unit, Zone, Table, RestaurantOperationalConfig, Waiter, Container
+from .models import Unit, Zone, Table, Container
 from .serializers import (
     UnitSerializer, ZoneSerializer, 
-    TableSerializer, TableDetailSerializer,
-    RestaurantOperationalConfigSerializer, WaiterSerializer, ContainerSerializer
+    TableSerializer, TableDetailSerializer, ContainerSerializer
 )
 
 
@@ -74,79 +73,6 @@ class TableViewSet(viewsets.ModelViewSet):
                        status=status.HTTP_404_NOT_FOUND)
 
 
-class RestaurantOperationalConfigViewSet(viewsets.ModelViewSet):
-    queryset = RestaurantOperationalConfig.objects.all().order_by('-created_at')
-    serializer_class = RestaurantOperationalConfigSerializer
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
-    
-    def get_permissions(self):
-        """Custom permissions for specific actions"""
-        if self.action == 'operational_info':
-            # Permitir acceso completo para todos los usuarios autenticados
-            return []
-        return super().get_permissions()
-    
-    @action(detail=False, methods=['get'])
-    def active(self, request):
-        """Obtener la configuración operativa activa"""
-        config = RestaurantOperationalConfig.get_active_config()
-        if config:
-            serializer = self.get_serializer(config)
-            return Response(serializer.data)
-        return Response({'message': 'No hay configuración activa'}, 
-                       status=status.HTTP_404_NOT_FOUND)
-    
-    @action(detail=True, methods=['post'])
-    def activate(self, request, pk=None):
-        """Activar una configuración específica"""
-        config = self.get_object()
-        config.is_active = True
-        config.save()  # El save() automáticamente desactiva las otras
-        serializer = self.get_serializer(config)
-        return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
-    def operational_info(self, request):
-        """Información operativa actual del restaurante"""
-        from django.utils import timezone
-        
-        config = RestaurantOperationalConfig.get_active_config()
-        now = timezone.now()
-        local_now = timezone.localtime(now)
-        operational_date = RestaurantOperationalConfig.get_operational_date()
-        
-        data = {
-            'current_datetime': now,
-            'current_local_datetime': local_now,
-            'operational_date': operational_date,
-            'has_config': bool(config)
-        }
-        
-        if config:
-            data.update({
-                'is_currently_open': config.is_currently_open(now),
-                'business_hours': config.get_business_hours_text(),
-                'opening_time': config.opening_time,
-                'closing_time': config.closing_time,
-                'operational_cutoff_time': config.operational_cutoff_time
-            })
-        
-        return Response(data)
-
-
-class WaiterViewSet(viewsets.ModelViewSet):
-    serializer_class = WaiterSerializer
-    pagination_class = None  # Disable pagination
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
-    
-    def get_queryset(self):
-        queryset = Waiter.objects.all().order_by('name')
-        # Filtrar por activos si se especifica
-        is_active = self.request.query_params.get('is_active')
-        if is_active is not None:
-            is_active_bool = is_active.lower() in ('true', '1', 'yes')
-            queryset = queryset.filter(is_active=is_active_bool)
-        return queryset
 
 
 class ContainerViewSet(viewsets.ModelViewSet):

@@ -199,20 +199,6 @@ export const apiService = {
     },
   },
 
-  waiters: {
-    getAll: async (params = {}) => {
-      const queryParams = new URLSearchParams(params).toString();
-      const url = queryParams ? `/waiters/?${queryParams}` : '/waiters/';
-      const response = await api.get(url);
-      console.log('🔍 WAITERS Raw response:', response.data);
-      // Return data directly since pagination is disabled
-      return Array.isArray(response.data) ? response.data : [];
-    },
-    getById: (id) => apiService.getById('waiters', id),
-    create: (data) => apiService.create('waiters', data),
-    update: (id, data) => apiService.update('waiters', id, data),
-    delete: (id) => apiService.delete('waiters', id),
-  },
 
   // Inventory endpoints
   groups: {
