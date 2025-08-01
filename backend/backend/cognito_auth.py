@@ -71,9 +71,24 @@ class CognitoAuthenticationMiddleware:
     def verify_cognito_token(self, token):
         """Verify JWT token from Cognito"""
         try:
+            # Configure expected values
+            user_pool_id = getattr(settings, 'COGNITO_USER_POOL_ID', '')
+            app_client_id = getattr(settings, 'COGNITO_APP_CLIENT_ID', '')
+            region = getattr(settings, 'AWS_REGION', 'us-east-1')
+            
+            logger.info(f"🔍 Token verification config:")
+            logger.info(f"  User Pool ID: {user_pool_id}")
+            logger.info(f"  App Client ID: {app_client_id}")
+            logger.info(f"  Region: {region}")
+            
+            if not user_pool_id or not app_client_id:
+                raise ValueError(f"Missing Cognito configuration: pool_id={user_pool_id}, client_id={app_client_id}")
+            
             # Decode token header to get kid
             unverified_header = jwt.get_unverified_header(token)
             kid = unverified_header.get('kid')
+            
+            logger.info(f"🔍 Token header kid: {kid}")
             
             if not kid:
                 raise ValueError("Token missing 'kid' in header")
@@ -81,14 +96,12 @@ class CognitoAuthenticationMiddleware:
             # Get public key from Cognito JWKS endpoint
             public_key = self.get_public_key(kid)
             
-            # Configure expected values
-            user_pool_id = getattr(settings, 'COGNITO_USER_POOL_ID', '')
-            app_client_id = getattr(settings, 'COGNITO_APP_CLIENT_ID', '')
-            region = getattr(settings, 'AWS_REGION', 'us-east-1')
-            
             issuer = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}"
             
             # Verify and decode the token
+            logger.info(f"🔍 JWT verification with issuer: {issuer}")
+            logger.info(f"🔍 JWT verification with audience: {app_client_id}")
+            
             payload = jwt.decode(
                 token,
                 public_key,
@@ -102,6 +115,8 @@ class CognitoAuthenticationMiddleware:
                 }
             )
             
+            logger.info(f"✅ Token verified successfully for user: {payload.get('username', 'unknown')}")
+            
             # Extract user information
             username = payload.get('username', payload.get('cognito:username', ''))
             email = payload.get('email', '')
@@ -109,11 +124,14 @@ class CognitoAuthenticationMiddleware:
             
             return CognitoUser(username=username, email=email, groups=groups)
             
-        except jwt.ExpiredSignatureError:
+        except jwt.ExpiredSignatureError as e:
+            logger.warning(f"❌ Token expired: {e}")
             raise ValueError("Token has expired")
         except jwt.InvalidTokenError as e:
+            logger.warning(f"❌ Invalid token: {e}")
             raise ValueError(f"Invalid token: {e}")
         except Exception as e:
+            logger.warning(f"❌ Token verification failed: {e}")
             raise ValueError(f"Token verification failed: {e}")
     
     def get_public_key(self, kid):
@@ -123,14 +141,21 @@ class CognitoAuthenticationMiddleware:
             region = getattr(settings, 'AWS_REGION', 'us-east-1')
             jwks_url = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
             
+            logger.info(f"🔍 Fetching JWKS from: {jwks_url}")
+            
             try:
                 response = requests.get(jwks_url, timeout=10)
                 response.raise_for_status()
                 self.jwks_client = response.json()
+                logger.info(f"✅ JWKS fetched successfully, {len(self.jwks_client.get('keys', []))} keys found")
             except requests.RequestException as e:
+                logger.error(f"❌ Failed to fetch JWKS: {e}")
                 raise ValueError(f"Failed to fetch JWKS: {e}")
         
         # Find the key with matching kid
+        available_kids = [key.get('kid') for key in self.jwks_client.get('keys', [])]
+        logger.info(f"🔍 Looking for kid '{kid}' in available kids: {available_kids}")
+        
         for key in self.jwks_client.get('keys', []):
             if key.get('kid') == kid:
                 # Convert JWK to PEM format
@@ -155,8 +180,10 @@ class CognitoAuthenticationMiddleware:
                     format=serialization.PublicFormat.SubjectPublicKeyInfo
                 )
                 
+                logger.info(f"✅ Found matching public key for kid: {kid}")
                 return pem
         
+        logger.error(f"❌ Public key not found for kid: {kid}")
         raise ValueError(f"Public key not found for kid: {kid}")
 
 

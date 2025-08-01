@@ -318,13 +318,13 @@ sleep 15
 # ==============================================================================
 echo -e "\n${YELLOW}💾 PHASE 6: Configure Database${NC}"
 
-# Verify backend configuration
+# Verify backend configuration with detailed logging
 echo -e "${BLUE}Verifying backend Cognito configuration...${NC}"
 CONFIG_CHECK=$(docker-compose -f docker-compose.ec2.yml exec -T web python -c "
 import os
 from pathlib import Path
 
-print('=== Environment Variables ===')
+print('=== Environment Variables in Container ===')
 print('COGNITO_USER_POOL_ID:', os.getenv('COGNITO_USER_POOL_ID', 'NOT_SET'))
 print('COGNITO_APP_CLIENT_ID:', os.getenv('COGNITO_APP_CLIENT_ID', 'NOT_SET'))
 print('USE_COGNITO_AUTH:', os.getenv('USE_COGNITO_AUTH', 'NOT_SET'))
@@ -334,14 +334,28 @@ print('\\n=== Files Check ===')
 print('.env.ec2 exists:', Path('/app/.env.ec2').exists())
 print('backend/.env exists:', Path('/app/.env').exists())
 
+# Show contents of env files
+if Path('/app/.env.ec2').exists():
+    print('\\n=== .env.ec2 Contents ===')
+    with open('/app/.env.ec2', 'r') as f:
+        for line in f:
+            if 'COGNITO' in line or 'AWS_REGION' in line or 'USE_COGNITO' in line:
+                print('  ', line.strip())
+
 # Try to load settings
 try:
+    import django
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings_ec2')
+    django.setup()
     from django.conf import settings
     print('\\n=== Django Settings ===')
     print('COGNITO_ENABLED:', getattr(settings, 'COGNITO_ENABLED', 'NOT_SET'))
     print('USE_COGNITO_AUTH:', getattr(settings, 'USE_COGNITO_AUTH', 'NOT_SET'))
-except:
-    print('Could not load Django settings')
+    print('COGNITO_USER_POOL_ID:', getattr(settings, 'COGNITO_USER_POOL_ID', 'NOT_SET'))
+    print('COGNITO_APP_CLIENT_ID:', getattr(settings, 'COGNITO_APP_CLIENT_ID', 'NOT_SET'))
+    print('AWS_REGION:', getattr(settings, 'AWS_REGION', 'NOT_SET'))
+except Exception as e:
+    print('Could not load Django settings:', str(e))
 " 2>/dev/null || echo "Could not verify backend config")
 echo "$CONFIG_CHECK"
 
@@ -364,14 +378,17 @@ echo -e "\n${YELLOW}🔍 PHASE 7: Final Verification${NC}"
 # Wait for services to be ready
 sleep 10
 
-# Test API (expect 403 with Cognito enabled)
+# Test API (expect 401 with Cognito enabled, no auth header)
+echo -e "${BLUE}Testing API without authentication...${NC}"
 for i in {1..3}; do
     API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/zones/ 2>/dev/null || echo "000")
-    if [ "$API_STATUS" = "200" ] || [ "$API_STATUS" = "403" ]; then
-        if [ "$API_STATUS" = "403" ]; then
-            echo -e "${GREEN}✅ API working with Cognito auth (Status: $API_STATUS)${NC}"
+    if [ "$API_STATUS" = "200" ] || [ "$API_STATUS" = "401" ] || [ "$API_STATUS" = "403" ]; then
+        if [ "$API_STATUS" = "401" ]; then
+            echo -e "${GREEN}✅ API working with Cognito auth - requires authentication (Status: $API_STATUS)${NC}"
+        elif [ "$API_STATUS" = "403" ]; then
+            echo -e "${GREEN}✅ API working with Cognito auth - forbidden (Status: $API_STATUS)${NC}"
         else
-            echo -e "${GREEN}✅ API working (Status: $API_STATUS)${NC}"
+            echo -e "${GREEN}✅ API working without auth (Status: $API_STATUS)${NC}"
         fi
         break
     else
@@ -381,6 +398,10 @@ for i in {1..3}; do
         fi
     fi
 done
+
+# Show recent backend logs for debugging
+echo -e "${BLUE}Recent backend logs (last 20 lines):${NC}"
+docker-compose -f docker-compose.ec2.yml logs --tail=20 web || echo "Could not fetch logs"
 
 # Test domain
 DOMAIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://$DOMAIN/ 2>/dev/null || echo "000")
@@ -426,3 +447,9 @@ echo -e "2. Login with your existing Cognito credentials"
 echo -e "3. Users and groups already configured in AWS"
 echo -e ""
 echo -e "${GREEN}✨ Restaurant Web Application is READY!${NC}"
+echo -e ""
+echo -e "${YELLOW}🔍 Debug Information:${NC}"
+echo -e "1. Check backend logs: docker-compose -f docker-compose.ec2.yml logs web"
+echo -e "2. Access debug page: http://$DOMAIN/debug.html"
+echo -e "3. Test API manually: curl -v http://$DOMAIN/api/v1/zones/"
+echo -e "4. Check container environment: docker-compose -f docker-compose.ec2.yml exec web env | grep COGNITO"
