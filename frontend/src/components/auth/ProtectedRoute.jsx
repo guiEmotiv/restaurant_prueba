@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/SimpleAuthContext';
 import { AlertCircle, Lock } from 'lucide-react';
 
 const ProtectedRoute = ({ children, requiredPermission, fallback = null }) => {

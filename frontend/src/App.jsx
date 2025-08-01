@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Amplify } from 'aws-amplify';
 import { ToastProvider } from './contexts/ToastContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SimpleAuthProvider } from './contexts/SimpleAuthContext';
 import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
@@ -60,14 +60,7 @@ if (isCognitoConfigured) {
 }
 
 const AppContent = () => {
-  const { loading: authLoading, isAuthenticated } = useAuth();
-  
-  // Show loading screen only when we're actually checking auth state
-  if (isCognitoConfigured && authLoading && isAuthenticated === null) {
-    return <AuthLoadingScreen />;
-  }
-  
-  // Skip authentication if Cognito is not configured
+  // Skip AuthContext entirely - let Authenticator handle everything
   const content = (
     <Layout>
       <Routes>
@@ -195,19 +188,24 @@ const AppContent = () => {
         </Routes>
     </Layout>
   );
-  
-  // Wrap with LoginForm only if Cognito is configured
-  return isCognitoConfigured ? <LoginForm>{content}</LoginForm> : content;
 };
 
 function App() {
   return (
     <ToastProvider>
-      <AuthProvider>
-        <Router>
-          <AppContent />
-        </Router>
-      </AuthProvider>
+      <Router>
+        {isCognitoConfigured ? (
+          <LoginForm>
+            <SimpleAuthProvider>
+              <AppContent />
+            </SimpleAuthProvider>
+          </LoginForm>
+        ) : (
+          <SimpleAuthProvider>
+            <AppContent />
+          </SimpleAuthProvider>
+        )}
+      </Router>
     </ToastProvider>
   );
 }
