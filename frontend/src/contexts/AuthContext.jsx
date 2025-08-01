@@ -70,11 +70,12 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       
       // Add a small delay to ensure session is fully established
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       const currentUser = await getCurrentUser();
       
       if (currentUser) {
+        console.log('✅ Found authenticated user:', currentUser.username);
         setUser(currentUser);
         setIsAuthenticated(true);
         
@@ -84,15 +85,17 @@ export const AuthProvider = ({ children }) => {
         
         console.log('✅ Auth state updated:', {
           username: currentUser.username,
-          role: role
+          role: role,
+          isAuthenticated: true
         });
       } else {
+        console.log('❌ No authenticated user found');
         setUser(null);
         setUserRole(null);
         setIsAuthenticated(false);
       }
     } catch (error) {
-      console.log('No authenticated user:', error);
+      console.log('❌ Auth check failed:', error.message);
       setUser(null);
       setUserRole(null);
       setIsAuthenticated(false);

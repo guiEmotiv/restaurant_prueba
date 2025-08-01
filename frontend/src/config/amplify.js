@@ -5,41 +5,19 @@ const amplifyConfig = {
   Auth: {
     Cognito: {
       // Region where your Cognito User Pool was created
-      region: import.meta.env.VITE_AWS_REGION || 'us-east-1',
+      region: import.meta.env.VITE_AWS_REGION || 'us-west-2',
       
       // Cognito User Pool ID
-      userPoolId: import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID || 'us-east-1_XXXXXXXXX',
+      userPoolId: import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID || 'us-west-2_bdCwF60ZI',
       
       // Cognito User Pool App Client ID  
-      userPoolClientId: import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID || 'xxxxxxxxxxxxxxxxxxxxxxxxxx',
-      
-      // Identity pool is optional
-      identityPoolId: '',
+      userPoolClientId: import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID || '4i9hrd7srgbqbtun09p43ncfn0',
       
       // Mandatory for user pool only
       loginWith: {
         username: true,
         email: false,
         phone: false
-      },
-      
-      // Sign up attributes
-      signUpVerificationMethod: 'code',
-      
-      // User attributes
-      userAttributes: {
-        email: {
-          required: true
-        }
-      },
-      
-      // Password policy
-      passwordFormat: {
-        minLength: 8,
-        requireLowercase: true,
-        requireUppercase: true,
-        requireNumbers: true,
-        requireSpecialCharacters: true
       }
     }
   }
