@@ -195,9 +195,8 @@ def restore_selective_data(backup_path, tables_to_restore, clean_first=False):
     backup_conn.row_factory = sqlite3.Row
     backup_cursor = backup_conn.cursor()
     
-    # Connect to target database
-    target_conn = connection.connection
-    target_cursor = target_conn.cursor()
+    # Use Django's database connection
+    from django.db import connection as django_connection
     
     total_restored = 0
     
@@ -206,15 +205,16 @@ def restore_selective_data(backup_path, tables_to_restore, clean_first=False):
             for table_name in tables_to_restore:
                 print(f'\\n📋 Procesando: {table_name}')
                 
-                # Check if table exists in target
-                target_cursor.execute(\"\"\"
-                    SELECT name FROM sqlite_master 
-                    WHERE type='table' AND name=?
-                \"\"\", (table_name,))
-                
-                if not target_cursor.fetchone():
-                    print(f'   ⚠️  Tabla {table_name} no existe en destino, saltando...')
-                    continue
+                # Check if table exists in target using Django connection
+                with django_connection.cursor() as target_cursor:
+                    target_cursor.execute(\"\"\"
+                        SELECT name FROM sqlite_master 
+                        WHERE type='table' AND name=%s
+                    \"\"\", [table_name])
+                    
+                    if not target_cursor.fetchone():
+                        print(f'   ⚠️  Tabla {table_name} no existe en destino, saltando...')
+                        continue
                 
                 # Check if table has data in backup
                 try:
@@ -234,37 +234,40 @@ def restore_selective_data(backup_path, tables_to_restore, clean_first=False):
                 # Clean target table if requested
                 if clean_first:
                     print(f'   🧹 Limpiando tabla {table_name}')
-                    target_cursor.execute(f'DELETE FROM \"{table_name}\"')
+                    with django_connection.cursor() as target_cursor:
+                        target_cursor.execute(f'DELETE FROM \"{table_name}\"')
                 
                 # Get table structure from target
-                target_cursor.execute(f'PRAGMA table_info(\"{table_name}\")')
-                columns_info = target_cursor.fetchall()
-                column_names = [col[1] for col in columns_info]
+                with django_connection.cursor() as target_cursor:
+                    target_cursor.execute(f'PRAGMA table_info(\"{table_name}\")')
+                    columns_info = target_cursor.fetchall()
+                    column_names = [col[1] for col in columns_info]
                 
                 # Fetch all data from backup
                 backup_cursor.execute(f'SELECT * FROM \"{table_name}\"')
                 backup_rows = backup_cursor.fetchall()
                 
                 # Insert data into target
-                placeholders = ','.join(['?' for _ in column_names])
+                placeholders = ','.join(['%s' for _ in column_names])
                 insert_sql = f'INSERT OR REPLACE INTO \"{table_name}\" ({','.join([f'\"{col}\"' for col in column_names])}) VALUES ({placeholders})'
                 
                 inserted_count = 0
-                for row in backup_rows:
-                    try:
-                        # Convert Row to tuple, handling only available columns
-                        row_values = []
-                        for col_name in column_names:
-                            try:
-                                row_values.append(row[col_name])
-                            except (IndexError, KeyError):
-                                row_values.append(None)
-                        
-                        target_cursor.execute(insert_sql, row_values)
-                        inserted_count += 1
-                    except Exception as e:
-                        print(f'   ⚠️  Error insertando registro en {table_name}: {e}')
-                        continue
+                with django_connection.cursor() as target_cursor:
+                    for row in backup_rows:
+                        try:
+                            # Convert Row to list, handling only available columns
+                            row_values = []
+                            for col_name in column_names:
+                                try:
+                                    row_values.append(row[col_name])
+                                except (IndexError, KeyError):
+                                    row_values.append(None)
+                            
+                            target_cursor.execute(insert_sql, row_values)
+                            inserted_count += 1
+                        except Exception as e:
+                            print(f'   ⚠️  Error insertando registro en {table_name}: {e}')
+                            continue
                 
                 print(f'   ✅ {table_name}: {inserted_count} registros copiados')
                 total_restored += inserted_count
@@ -282,7 +285,9 @@ def restore_selective_data(backup_path, tables_to_restore, clean_first=False):
 def verify_restored_data(tables_to_restore):
     print('\\n🔍 Verificando datos restaurados...')
     
-    with connection.cursor() as cursor:
+    from django.db import connection as django_connection
+    
+    with django_connection.cursor() as cursor:
         for table_name in tables_to_restore:
             try:
                 cursor.execute(f'SELECT COUNT(*) FROM \"{table_name}\"')
