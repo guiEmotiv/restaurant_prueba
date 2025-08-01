@@ -16,14 +16,48 @@ NC='\033[0m' # No Color
 PROJECT_DIR="/opt/restaurant-web"
 ENV_FILE="$PROJECT_DIR/.env.ec2"
 
-# Get EC2 public IP automatically
+# Get EC2 public IP using multiple methods
 get_ec2_ip() {
-    local ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null)
-    if [ -n "$ip" ]; then
+    local ip=""
+    
+    # Method 1: Try EC2 metadata service
+    ip=$(curl -s --max-time 5 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null)
+    if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         echo "$ip"
-    else
-        echo "your-ec2-ip"
+        return
     fi
+    
+    # Method 2: Try another metadata endpoint
+    ip=$(curl -s --max-time 5 http://169.254.169.254/latest/meta-data/local-ipv4 2>/dev/null)
+    if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        echo "$ip"
+        return
+    fi
+    
+    # Method 3: Get from current SSH connection
+    ip=$(who am i | awk '{print $5}' | sed 's/[()]//g' 2>/dev/null)
+    if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        echo "$ip"
+        return
+    fi
+    
+    # Method 4: Try external service
+    ip=$(curl -s --max-time 5 https://ipv4.icanhazip.com 2>/dev/null)
+    if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        echo "$ip"
+        return
+    fi
+    
+    # Method 5: Get local IP and warn user
+    ip=$(hostname -I | awk '{print $1}' 2>/dev/null)
+    if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        echo -e "${YELLOW}⚠️ Using local IP: $ip (you may need to update with public IP)${NC}"
+        echo "$ip"
+        return
+    fi
+    
+    # Fallback: Return placeholder
+    echo "YOUR_EC2_PUBLIC_IP"
 }
 
 # Generate a secure Django secret key
