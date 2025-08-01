@@ -67,13 +67,16 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 # Add Cognito middleware only if authentication is enabled
 if os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true':
-    MIDDLEWARE.insert(6, 'backend.cognito_auth.CognitoAuthenticationMiddleware')
+    MIDDLEWARE.append('backend.cognito_auth.CognitoAuthenticationMiddleware')
+
+MIDDLEWARE.extend([
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+])
 
 ROOT_URLCONF = 'backend.urls'
 WSGI_APPLICATION = 'backend.wsgi.application'

@@ -47,6 +47,9 @@ class CognitoAuthenticationMiddleware:
         # Get token from Authorization header
         auth_header = request.META.get('HTTP_AUTHORIZATION', '')
         if not auth_header.startswith('Bearer '):
+            # Return 401 for API endpoints that require authentication
+            if request.path.startswith('/api/v1/'):
+                return JsonResponse({'detail': 'Las credenciales de autenticación no se proveyeron.'}, status=401)
             request.user = AnonymousUser()
             return self.get_response(request)
         
@@ -58,6 +61,9 @@ class CognitoAuthenticationMiddleware:
             request.user = user
         except Exception as e:
             logger.warning(f"Token verification failed: {e}")
+            # Return 401 for API endpoints with invalid tokens
+            if request.path.startswith('/api/v1/'):
+                return JsonResponse({'detail': 'Token de autenticación inválido.'}, status=401)
             request.user = AnonymousUser()
         
         return self.get_response(request)
