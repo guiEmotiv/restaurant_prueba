@@ -60,6 +60,8 @@ export const SimpleAuthProvider = ({ children }) => {
         console.log('🔍 Getting user role for:', user.username);
         
         const session = await fetchAuthSession();
+        console.log('📋 Full session:', session);
+        console.log('📋 Access token payload:', session.tokens?.accessToken?.payload);
         const groups = session.tokens?.accessToken?.payload?.['cognito:groups'] || [];
         console.log('🔍 User groups from token:', groups);
         

@@ -23,6 +23,8 @@ import {
 import { apiService } from '../services/api';
 
 const Dashboard = () => {
+  console.log('🏠 Dashboard component rendering...');
+  
   const [stats, setStats] = useState({
     // Métricas básicas
     totalOrders: 0,

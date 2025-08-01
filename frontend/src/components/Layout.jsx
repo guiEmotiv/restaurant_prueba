@@ -23,10 +23,14 @@ import {
 import { useAuth } from '../contexts/SimpleAuthContext';
 
 const Layout = ({ children }) => {
+  console.log('🎨 Layout component rendering...');
+  
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
   const { user, userRole, logout, hasPermission } = useAuth();
+  
+  console.log('🎨 Layout auth state:', { user: user?.username, userRole, hasPermission: !!hasPermission });
 
   // Define navigation items with permissions
   const allNavigation = [

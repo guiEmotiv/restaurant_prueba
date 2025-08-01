@@ -75,11 +75,12 @@ const LoginForm = ({ children }) => {
       {({ signOut, user }) => {
         // Log authentication state for debugging
         if (user) {
-          console.log('✅ Authenticator: User authenticated:', {
-            username: user.username,
-            userId: user.userId,
-            groups: user.signInDetails?.loginId || 'No groups info'
-          });
+          console.log('✅ Authenticator: User authenticated:');
+          console.log('  Username:', user.username);
+          console.log('  UserId:', user.userId);
+          console.log('  Full user object:', user);
+          console.log('  SignInDetails:', user.signInDetails);
+          console.log('  Rendering children...');
         } else {
           console.log('❌ Authenticator: No user found - showing login');
         }
