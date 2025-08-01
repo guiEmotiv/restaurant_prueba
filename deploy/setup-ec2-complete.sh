@@ -51,8 +51,9 @@ show_menu() {
     echo "5) Only deploy application"
     echo "6) Setup Node.js version"
     echo "7) Setup environment (.env.ec2)"
+    echo "8) Toggle authentication (enable/disable)"
     echo ""
-    read -p "Choose option (1-7): " -n 1 -r choice
+    read -p "Choose option (1-8): " -n 1 -r choice
     echo ""
     return $choice
 }
@@ -132,6 +133,9 @@ main() {
             ;;
         7)
             run_script "setup-env-ec2.sh" "Setting up EC2 environment"
+            ;;
+        8)
+            run_script "toggle-auth.sh" "Toggling authentication settings"
             ;;
         *)
             echo -e "${RED}Invalid option${NC}"
