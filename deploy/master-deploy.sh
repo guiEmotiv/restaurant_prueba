@@ -142,15 +142,7 @@ EOF
 
 chmod 600 "$PROJECT_DIR/.env.ec2"
 
-# Create optimized frontend .env.production
-cat > "$FRONTEND_DIR/.env.production" << EOF
-# Frontend Production Environment
-# IMPORTANT: Do NOT include /api/v1 here (added automatically in api.js)
-VITE_API_URL=http://$DOMAIN
-VITE_AWS_REGION=$AWS_REGION
-VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
-VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
-EOF
+# Create optimized frontend .env.production (will be created during build phase)
 
 echo -e "${GREEN}✅ Environment configured${NC}"
 
@@ -228,6 +220,20 @@ echo -e "\n${YELLOW}🏗️ PHASE 5: Build and Deploy${NC}"
 
 # Build frontend efficiently
 cd "$FRONTEND_DIR"
+
+# Ensure .env.production exists with correct Cognito variables
+if [ ! -f ".env.production" ]; then
+    echo -e "${YELLOW}Creating .env.production with Cognito config...${NC}"
+    cat > .env.production << EOF
+# Frontend Production Environment
+# IMPORTANT: Do NOT include /api/v1 here (added automatically in api.js)
+VITE_API_URL=http://$DOMAIN
+VITE_AWS_REGION=$AWS_REGION
+VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
+VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
+EOF
+fi
+
 if [ -f "package-lock.json" ] && [ -d "node_modules" ]; then
     npm ci --only=production --silent --no-fund --no-audit
 else
@@ -237,7 +243,8 @@ fi
 # Install vite for build
 npm install vite --save-dev --silent --no-fund --no-audit
 
-# Build frontend
+# Build frontend with environment variables
+echo -e "${BLUE}Building frontend with Cognito configuration...${NC}"
 NODE_ENV=production ./node_modules/.bin/vite build --mode production
 
 # Clean build deps immediately
