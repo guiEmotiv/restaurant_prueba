@@ -142,7 +142,7 @@ EOF
 
 chmod 600 "$PROJECT_DIR/.env.ec2"
 
-# Create optimized frontend .env.production (will be created during build phase)
+# Note: Frontend .env.production will be created during build phase with real values
 
 echo -e "${GREEN}✅ Environment configured${NC}"
 
@@ -221,34 +221,33 @@ echo -e "\n${YELLOW}🏗️ PHASE 5: Build and Deploy${NC}"
 # Build frontend efficiently
 cd "$FRONTEND_DIR"
 
-# Ensure .env.production exists with correct Cognito variables
-if [ ! -f ".env.production" ]; then
-    echo -e "${YELLOW}Creating .env.production with Cognito config...${NC}"
-    cat > .env.production << EOF
-# Frontend Production Environment
-# IMPORTANT: Do NOT include /api/v1 here (added automatically in api.js)
+# Always recreate .env.production with correct Cognito variables
+echo -e "${YELLOW}Creating .env.production with Cognito config...${NC}"
+cat > .env.production << EOF
+# Frontend Production Environment - Auto-generated
 VITE_API_URL=http://$DOMAIN
 VITE_AWS_REGION=$AWS_REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
 EOF
-fi
 
-if [ -f "package-lock.json" ] && [ -d "node_modules" ]; then
-    npm ci --only=production --silent --no-fund --no-audit
-else
-    npm install --only=production --silent --no-fund --no-audit
-fi
+echo -e "${BLUE}Environment variables for build:${NC}"
+echo -e "  VITE_API_URL=http://$DOMAIN"
+echo -e "  VITE_AWS_REGION=$AWS_REGION"
+echo -e "  VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID"
+echo -e "  VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID"
 
-# Install vite for build
-npm install vite --save-dev --silent --no-fund --no-audit
+# Clean install
+rm -rf node_modules package-lock.json dist 2>/dev/null || true
+npm install --only=production --silent --no-fund --no-audit
 
-# Build frontend with environment variables
+# Build frontend with explicit environment variables
 echo -e "${BLUE}Building frontend with Cognito configuration...${NC}"
+VITE_API_URL=http://$DOMAIN \
+VITE_AWS_REGION=$AWS_REGION \
+VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID \
+VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID \
 NODE_ENV=production ./node_modules/.bin/vite build --mode production
-
-# Clean build deps immediately
-npm prune --production --silent
 
 if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
     echo -e "${RED}❌ Frontend build failed${NC}"
@@ -268,6 +267,17 @@ sleep 15
 # PHASE 6: CONFIGURE DATABASE
 # ==============================================================================
 echo -e "\n${YELLOW}💾 PHASE 6: Configure Database${NC}"
+
+# Verify backend configuration
+echo -e "${BLUE}Verifying backend Cognito configuration...${NC}"
+CONFIG_CHECK=$(docker-compose -f docker-compose.ec2.yml exec -T web python -c "
+import os
+print('COGNITO_USER_POOL_ID:', os.getenv('COGNITO_USER_POOL_ID', 'NOT_SET'))
+print('COGNITO_APP_CLIENT_ID:', os.getenv('COGNITO_APP_CLIENT_ID', 'NOT_SET'))
+print('USE_COGNITO_AUTH:', os.getenv('USE_COGNITO_AUTH', 'NOT_SET'))
+print('AWS_REGION:', os.getenv('AWS_REGION', 'NOT_SET'))
+" 2>/dev/null || echo "Could not verify backend config")
+echo "$CONFIG_CHECK"
 
 # Create and apply migrations
 docker-compose -f docker-compose.ec2.yml exec -T web python manage.py makemigrations
