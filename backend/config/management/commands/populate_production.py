@@ -146,27 +146,29 @@ class Command(BaseCommand):
 
     def create_recipes(self):
         recipes_data = [
-            ('Parrillada Mixta', 'Carnes', 45.00, 150.0),
-            ('Lomo Saltado', 'Carnes', 28.00, 140.0),
-            ('Pollo a la Brasa', 'Carnes', 25.00, 120.0),
-            ('Costillas BBQ', 'Carnes', 32.00, 130.0),
-            ('Coca Cola Personal', 'Bebidas', 5.00, 80.0),
-            ('Cerveza Pilsen', 'Bebidas', 8.00, 60.0),
-            ('Agua Mineral', 'Bebidas', 3.50, 70.0),
-            ('Papas Fritas', 'Verduras', 8.00, 200.0),
-            ('Ensalada Mixta', 'Verduras', 12.00, 150.0),
-            ('Arroz Chaufa', 'Cereales', 15.00, 180.0),
+            # (nombre, grupo, precio, profit_percentage, tiempo_preparacion_minutos)
+            ('Parrillada Mixta', 'Carnes', 45.00, 150.0, 25),
+            ('Lomo Saltado', 'Carnes', 28.00, 140.0, 15),
+            ('Pollo a la Brasa', 'Carnes', 25.00, 120.0, 30),
+            ('Costillas BBQ', 'Carnes', 32.00, 130.0, 20),
+            ('Coca Cola Personal', 'Bebidas', 5.00, 80.0, 2),
+            ('Cerveza Pilsen', 'Bebidas', 8.00, 60.0, 2),
+            ('Agua Mineral', 'Bebidas', 3.50, 70.0, 1),
+            ('Papas Fritas', 'Verduras', 8.00, 200.0, 10),
+            ('Ensalada Mixta', 'Verduras', 12.00, 150.0, 8),
+            ('Arroz Chaufa', 'Cereales', 15.00, 180.0, 12),
         ]
         
-        for name, group_name, price, profit in recipes_data:
+        for name, group_name, price, profit, prep_time in recipes_data:
             group = Group.objects.get(name=group_name)
             recipe = Recipe.objects.create(
                 name=name,
                 group=group,
                 base_price=Decimal(str(price)),
                 profit_percentage=Decimal(str(profit)),
+                preparation_time=prep_time,
                 is_active=True,
-                version=1
+                version='1.0'
             )
             
             # Agregar algunos ingredientes a las recetas principales
