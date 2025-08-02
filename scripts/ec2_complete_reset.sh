@@ -22,7 +22,7 @@ import sqlite3
 import os
 
 # Buscar base de datos
-db_paths = ['/app/db.sqlite3', '/app/backend/db.sqlite3', '/code/db.sqlite3', '/code/backend/db.sqlite3']
+db_paths = ['/app/restaurant.sqlite3', '/app/backend/restaurant.sqlite3', '/code/restaurant.sqlite3', '/code/backend/restaurant.sqlite3']
 db_file = None
 for path in db_paths:
     if os.path.exists(path):

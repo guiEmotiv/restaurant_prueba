@@ -7,7 +7,7 @@ echo ""
 
 # Verificar primero dónde está la base de datos
 echo "📂 Buscando archivo de base de datos..."
-docker exec restaurant-web-web-1 find / -name "db.sqlite3" 2>/dev/null | head -5
+docker exec restaurant-web-web-1 find / -name "restaurant.sqlite3" 2>/dev/null | head -5
 
 echo ""
 echo "🗑️  Limpiando base de datos directamente..."
@@ -19,11 +19,11 @@ import os
 
 # Posibles ubicaciones de la base de datos
 db_paths = [
-    '/app/db.sqlite3',
-    '/app/backend/db.sqlite3',
-    '/code/db.sqlite3',
-    '/code/backend/db.sqlite3',
-    'db.sqlite3'
+    '/app/restaurant.sqlite3',
+    '/app/backend/restaurant.sqlite3',
+    '/code/restaurant.sqlite3',
+    '/code/backend/restaurant.sqlite3',
+    'restaurant.sqlite3'
 ]
 
 db_file = None
