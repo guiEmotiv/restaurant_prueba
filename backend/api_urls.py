@@ -3,7 +3,7 @@ from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # Import ViewSets
-from config.views import UnitViewSet, ZoneViewSet, TableViewSet, ContainerViewSet
+from config.views import UnitViewSet, ZoneViewSet, TableViewSet, ContainerViewSet, operational_info
 from inventory.views import GroupViewSet, IngredientViewSet, RecipeViewSet, RecipeItemViewSet
 from operation.views import (
     OrderViewSet, OrderItemViewSet, OrderItemIngredientViewSet, PaymentViewSet
@@ -32,6 +32,7 @@ router.register(r'payments', PaymentViewSet, basename='payment')
 
 urlpatterns = [
     path('', include(router.urls)),  # Remove api/ prefix from here
+    path('restaurant-config/operational_info/', operational_info, name='operational-info'),
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]

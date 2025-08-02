@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from backend.cognito_permissions import (
     CognitoAdminOnlyPermission, 
     CognitoWaiterAndAdminPermission, 
@@ -88,3 +89,18 @@ class ContainerViewSet(viewsets.ModelViewSet):
             is_active_bool = is_active.lower() in ('true', '1', 'yes')
             queryset = queryset.filter(is_active=is_active_bool)
         return queryset
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def operational_info(request):
+    """
+    Retorna información operativa básica del restaurante.
+    Simplificado después de remover RestaurantOperationalConfig.
+    """
+    return Response({
+        'has_config': True,
+        'is_currently_open': True,  # Siempre abierto ya que no tenemos configuración horaria
+        'business_hours': '24/7',   # Siempre disponible
+        'message': 'Restaurante operativo'
+    })
