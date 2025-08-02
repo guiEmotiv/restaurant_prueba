@@ -6,11 +6,11 @@ echo "🌱 POBLACION DE BASE DE DATOS"
 echo "=========================="
 echo ""
 
-# Detectar entorno
-if [ -f "/.dockerenv" ] || [ -n "${DOCKER_CONTAINER}" ]; then
-    echo "🐳 Detectado: Contenedor Docker (Producción)"
+# Detectar entorno (múltiples métodos)
+if [ -f "/.dockerenv" ] || [ -n "${DOCKER_CONTAINER}" ] || [ -d "/opt/restaurant-web" ] || [ "$(whoami)" = "ubuntu" ]; then
+    echo "🐳 Detectado: Servidor EC2 (Producción)"
     ENV_TYPE="production"
-    MANAGE_CMD="python manage.py"
+    MANAGE_CMD="docker exec restaurant-web-web-1 python manage.py"
 else
     echo "💻 Detectado: Desarrollo local"
     ENV_TYPE="development"
@@ -31,11 +31,7 @@ echo ""
 echo "🔄 Poblando base de datos..."
 
 # Usar el comando Django correcto según el entorno
-if [ "$ENV_TYPE" = "production" ]; then
-    python manage.py populate_production
-else
-    cd backend && python manage.py populate_production
-fi
+$MANAGE_CMD populate_production
 
 # Verificar resultado
 if [ $? -eq 0 ]; then

@@ -35,8 +35,8 @@ def get_table_info(db_path, table_name):
 
 def main():
     # Rutas de las bases de datos
-    dev_db = Path(__file__).parent.parent / 'backend' / 'db.sqlite3'
-    prod_db = Path(__file__).parent.parent / 'data' / 'restaurant.sqlite3'
+    dev_db = Path(__file__).parent.parent / 'backend' / 'restaurant_dev.sqlite3'
+    prod_db = Path(__file__).parent.parent / 'data' / 'restaurant_prod.sqlite3'
     
     print("🔍 COMPARACIÓN DE BASES DE DATOS")
     print("=" * 50)
