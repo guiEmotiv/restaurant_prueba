@@ -24,10 +24,10 @@ import {
   Utensils,
   Timer,
   MapPin,
-  RefreshCw,
   Crown,
   TrendingUp as Trend,
-  Star
+  Star,
+  Calendar
 } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -35,8 +35,7 @@ const Dashboard = () => {
   console.log('📊 Dashboard de Operación Diaria - Iniciando...');
   
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const operationalDate = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Estado para métricas del día
   const [dailyMetrics, setDailyMetrics] = useState({
@@ -74,15 +73,11 @@ const Dashboard = () => {
   });
 
   // Función para cargar datos del dashboard
-  const loadDashboardData = useCallback(async (isRefresh = false) => {
+  const loadDashboardData = useCallback(async () => {
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      setLoading(true);
       
-      console.log('📅 Cargando datos para fecha operativa:', operationalDate);
+      console.log('📅 Cargando datos para fecha operativa:', selectedDate);
 
       // Cargar todos los datos en paralelo
       const [
@@ -95,7 +90,7 @@ const Dashboard = () => {
         zones,
         waiters
       ] = await Promise.all([
-        apiService.payments.getOperationalSummary(operationalDate),
+        apiService.payments.getOperationalSummary(selectedDate),
         apiService.orders.getAll(),
         apiService.tables.getAll(),
         apiService.recipes.getAll(),
@@ -105,10 +100,10 @@ const Dashboard = () => {
         apiService.waiters?.getAll().catch(() => [])
       ]);
 
-      // Filtrar SOLO órdenes PAGADAS por fecha operativa
+      // Filtrar SOLO órdenes PAGADAS por fecha seleccionada
       const paidOrdersToday = orders.filter(order => {
         const orderDate = order.created_at.split('T')[0];
-        return orderDate === operationalDate && order.status === 'PAID';
+        return orderDate === selectedDate && order.status === 'PAID';
       });
 
       console.log(`📊 Órdenes pagadas del día: ${paidOrdersToday.length} de ${orders.length} total`);
@@ -284,10 +279,11 @@ const Dashboard = () => {
           percentage: totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0
         }));
 
-      // Estado de órdenes activas (no pagadas)
+      // Estado de órdenes activas (no pagadas) - solo día actual
+      const today = new Date().toISOString().split('T')[0];
       const activeOrdersFiltered = orders.filter(order => {
         const orderDate = order.created_at.split('T')[0];
-        return orderDate === operationalDate && order.status !== 'PAID';
+        return orderDate === today && order.status !== 'PAID';
       });
 
       const pendingOrders = activeOrdersFiltered.filter(o => o.status === 'PENDING').length;
@@ -324,14 +320,16 @@ const Dashboard = () => {
       console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, [operationalDate]);
+  }, [selectedDate]);
 
-  // Función para refresh manual
-  const handleRefresh = () => {
-    loadDashboardData(true);
-  };
+  // Auto-refresh cada 30 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadDashboardData]);
 
   useEffect(() => {
     loadDashboardData();
@@ -383,14 +381,16 @@ const Dashboard = () => {
               <p className="text-gray-600 mt-1 text-sm sm:text-base">Análisis detallado del rendimiento diario</p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title={refreshing ? 'Actualizando...' : 'Actualizar datos'}
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              </button>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  max={new Date().toISOString().split('T')[0]}
+                />
+              </div>
             </div>
           </div>
 
@@ -400,10 +400,12 @@ const Dashboard = () => {
               <div className="flex items-center justify-between mb-2">
                 <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
                 <span className="text-xs sm:text-sm font-medium text-gray-500 flex items-center">
-                  0%
+                  {dailyMetrics.totalRevenue > 0 ? '0%' : ''}
                 </span>
               </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(dailyMetrics.totalRevenue)}</h3>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
+                {dailyMetrics.totalRevenue > 0 ? formatCurrency(dailyMetrics.totalRevenue) : '-'}
+              </h3>
               <p className="text-xs sm:text-sm text-gray-600">Ingresos del día</p>
               <p className="text-xs text-gray-500 mt-1">vs. ayer</p>
             </div>
@@ -413,7 +415,9 @@ const Dashboard = () => {
                 <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
                 <span className="text-xs sm:text-sm font-medium text-gray-700">{dailyMetrics.totalOrders}</span>
               </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(dailyMetrics.averageTicket)}</h3>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
+                {dailyMetrics.totalOrders > 0 ? formatCurrency(dailyMetrics.averageTicket) : '-'}
+              </h3>
               <p className="text-xs sm:text-sm text-gray-600">Ticket promedio</p>
               <p className="text-xs text-gray-500 mt-1">{dailyMetrics.totalOrders} órdenes pagadas</p>
             </div>
@@ -423,7 +427,9 @@ const Dashboard = () => {
                 <Users className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
                 <span className="text-xs sm:text-sm font-medium text-purple-600">{dailyMetrics.tableOccupancy.toFixed(0)}%</span>
               </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{Math.round(dailyMetrics.customerCount)}</h3>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
+                {dailyMetrics.totalOrders > 0 ? Math.round(dailyMetrics.customerCount) : '-'}
+              </h3>
               <p className="text-xs sm:text-sm text-gray-600">Clientes atendidos</p>
               <p className="text-xs text-gray-500 mt-1">Ocupación actual</p>
             </div>
@@ -433,7 +439,9 @@ const Dashboard = () => {
                 <Timer className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
                 <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
               </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{dailyMetrics.averageServiceTime}min</h3>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
+                {dailyMetrics.averageServiceTime > 0 ? `${dailyMetrics.averageServiceTime}min` : '-'}
+              </h3>
               <p className="text-xs sm:text-sm text-gray-600">Tiempo promedio</p>
               <p className="text-xs text-gray-500 mt-1">De servicio</p>
             </div>
@@ -443,7 +451,9 @@ const Dashboard = () => {
                 <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
                 <span className="text-xs sm:text-sm font-medium text-red-600">{dailyMetrics.activeOrders}</span>
               </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{dailyMetrics.tablesRotation.toFixed(1)}x</h3>
+              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
+                {dailyMetrics.totalOrders > 0 ? `${dailyMetrics.tablesRotation.toFixed(1)}x` : '-'}
+              </h3>
               <p className="text-xs sm:text-sm text-gray-600">Rotación mesas</p>
               <p className="text-xs text-gray-500 mt-1">Órdenes activas</p>
             </div>
@@ -460,7 +470,7 @@ const Dashboard = () => {
             </h2>
             
             <div className="space-y-3 sm:space-y-4">
-              {dailyMetrics.revenueByCategory.map((category, index) => {
+              {dailyMetrics.revenueByCategory.length > 0 ? dailyMetrics.revenueByCategory.map((category, index) => {
                 const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-red-500', 'bg-indigo-500'];
                 const bgColor = colors[index % colors.length];
                 
@@ -484,7 +494,11 @@ const Dashboard = () => {
                     </div>
                   </div>
                 );
-              })}
+              }) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No hay datos de ingresos para esta fecha</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -496,7 +510,7 @@ const Dashboard = () => {
             </h2>
             
             <div className="space-y-2 sm:space-y-3 max-h-80 overflow-y-auto">
-              {dailyMetrics.topSellingDishes.map((dish, index) => (
+              {dailyMetrics.topSellingDishes.length > 0 ? dailyMetrics.topSellingDishes.map((dish, index) => (
                 <div key={index} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm sm:text-base ${
@@ -516,7 +530,11 @@ const Dashboard = () => {
                     <p className="text-xs text-gray-500">{formatCurrency(dish.price)} c/u</p>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No hay platos vendidos para esta fecha</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

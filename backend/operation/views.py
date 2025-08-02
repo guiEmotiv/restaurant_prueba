@@ -365,9 +365,9 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 from datetime import datetime
                 operational_date = datetime.strptime(date_param, '%Y-%m-%d').date()
             except ValueError:
-                operational_date = Order.get_operational_date()
+                operational_date = timezone.now().date()
         else:
-            operational_date = Order.get_operational_date()
+            operational_date = timezone.now().date()
         
         # Filtrar pagos por fecha operativa
         payments = Payment.objects.filter(operational_date=operational_date)

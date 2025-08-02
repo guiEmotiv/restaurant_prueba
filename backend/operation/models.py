@@ -307,9 +307,9 @@ class Payment(models.Model):
         return f"Pago {self.order} - {self.payment_method} - {self.amount}"
 
     def save(self, *args, **kwargs):
-        # Heredar fecha operativa de la orden
-        if not self.operational_date and self.order:
-            self.operational_date = self.order.operational_date
+        # Usar fecha actual como fecha operativa
+        if not self.operational_date:
+            self.operational_date = timezone.now().date()
         super().save(*args, **kwargs)
         # Verificar si la orden está completamente pagada
         self._check_order_fully_paid()
@@ -383,9 +383,9 @@ class ContainerSale(models.Model):
         # Calcular precio total
         self.total_price = self.unit_price * self.quantity
         
-        # Heredar fecha operativa de la orden
-        if not self.operational_date and self.order:
-            self.operational_date = self.order.operational_date
+        # Usar fecha actual como fecha operativa
+        if not self.operational_date:
+            self.operational_date = timezone.now().date()
         
         super().save(*args, **kwargs)
         
