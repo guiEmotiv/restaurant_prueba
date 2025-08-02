@@ -50,7 +50,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    'backend.cors_middleware.CustomCORSMiddleware',  # Custom CORS middleware
+    # 'corsheaders.middleware.CorsMiddleware',  # Temporarily disabled
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
 ]
