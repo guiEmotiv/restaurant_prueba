@@ -188,7 +188,7 @@ const TableOrderEcommerce = () => {
 
       const orderData = {
         table: parseInt(tableId),
-        waiter_name: user?.username || 'Sistema',
+        waiter: user?.username || 'Sistema',
         items: itemsArray
       };
 

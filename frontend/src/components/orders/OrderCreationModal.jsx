@@ -3,9 +3,11 @@ import { X, Plus, Minus, AlertTriangle, Check, Package2, ShoppingBag } from 'luc
 import Button from '../common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
   const { showSuccess, showError } = useToast();
+  const { user } = useAuth();
   const [step, setStep] = useState(1); // 1: Select Table, 2: Add Items
   const [selectedTable, setSelectedTable] = useState(null);
   const [availableTables, setAvailableTables] = useState([]);
@@ -160,6 +162,7 @@ const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
       
       const orderData = {
         table: selectedTable.id,
+        waiter: user?.username || 'Sistema',
         items: itemsArray
       };
 

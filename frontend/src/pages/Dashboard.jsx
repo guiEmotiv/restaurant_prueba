@@ -394,20 +394,16 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Resumen del día con comparativas - Responsive Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+          {/* Resumen del día - Responsive Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
               <div className="flex items-center justify-between mb-2">
                 <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-                <span className="text-xs sm:text-sm font-medium text-gray-500 flex items-center">
-                  {dailyMetrics.totalRevenue > 0 ? '0%' : ''}
-                </span>
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
                 {dailyMetrics.totalRevenue > 0 ? formatCurrency(dailyMetrics.totalRevenue) : '-'}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Ingresos del día</p>
-              <p className="text-xs text-gray-500 mt-1">vs. ayer</p>
             </div>
 
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
@@ -446,7 +442,7 @@ const Dashboard = () => {
               <p className="text-xs text-gray-500 mt-1">De servicio</p>
             </div>
 
-            <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-200">
+            <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-200 hidden lg:block">
               <div className="flex items-center justify-between mb-2">
                 <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
                 <span className="text-xs sm:text-sm font-medium text-red-600">{dailyMetrics.activeOrders}</span>
@@ -540,7 +536,7 @@ const Dashboard = () => {
         </div>
 
         {/* Análisis de Performance - Responsive Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Rendimiento por Meseros */}
           <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -629,7 +625,7 @@ const Dashboard = () => {
         </div>
 
         {/* Métricas adicionales - Responsive */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Métodos de pago */}
           <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -670,7 +666,7 @@ const Dashboard = () => {
           </div>
 
           {/* Alertas operacionales */}
-          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:col-span-2 lg:col-span-1">
+          <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
               <span className="text-sm sm:text-base">Alertas</span>

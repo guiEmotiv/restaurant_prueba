@@ -342,7 +342,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         // Actualizar pedido existente - table y waiter requeridos por serializer
         const orderData = {
           table: parseInt(formData.table),
-          waiter: parseInt(formData.waiter),
+          waiter: user?.username || formData.waiter,
           status: formData.status
         };
         await apiService.orders.update(order.id, orderData);
@@ -420,7 +420,7 @@ const OrderModal = ({ isOpen, onClose, order = null, onSave }) => {
         
         const orderData = {
           table: parseInt(formData.table),
-          waiter: parseInt(formData.waiter),
+          waiter: user?.username || formData.waiter,
           items: processedItems
         };
         

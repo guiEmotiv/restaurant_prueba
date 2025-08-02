@@ -294,7 +294,7 @@ const NewOrder = () => {
       if (orderId) {
         const orderData = {
           table: parseInt(formData.table),
-          waiter: parseInt(formData.waiter),
+          waiter: user?.username || formData.waiter,
           status: formData.status
         };
         
@@ -338,7 +338,7 @@ const NewOrder = () => {
         
         const orderData = {
           table: parseInt(formData.table),
-          waiter: parseInt(formData.waiter),
+          waiter: user?.username || formData.waiter,
           items: processedItems
         };
         
