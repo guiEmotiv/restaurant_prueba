@@ -36,15 +36,7 @@ const Dashboard = () => {
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [operationalDate, setOperationalDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
-  });
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [configLoading, setConfigLoading] = useState(false);
-  const [operationalConfig, setOperationalConfig] = useState({
-    opening_time: '20:00',
-    closing_time: '03:00'
-  });
+  const operationalDate = new Date().toISOString().split('T')[0];
 
   // Estado para métricas del día
   const [dailyMetrics, setDailyMetrics] = useState({
@@ -345,50 +337,6 @@ const Dashboard = () => {
     loadDashboardData();
   }, [loadDashboardData]);
 
-  useEffect(() => {
-    loadOperationalConfig();
-  }, []);
-
-  const loadOperationalConfig = async () => {
-    try {
-      const activeConfig = await apiService.restaurantConfig.getActive();
-      if (activeConfig) {
-        setOperationalConfig({
-          opening_time: activeConfig.opening_time,
-          closing_time: activeConfig.closing_time
-        });
-      }
-    } catch {
-      console.log('No hay configuración activa');
-    }
-  };
-
-  const handleSaveOperationalConfig = async () => {
-    setConfigLoading(true);
-    try {
-      const configData = {
-        ...operationalConfig,
-        name: 'Configuración Operativa',
-        operational_cutoff_time: '05:00',
-        is_active: true
-      };
-      
-      try {
-        const activeConfig = await apiService.restaurantConfig.getActive();
-        await apiService.restaurantConfig.update(activeConfig.id, configData);
-      } catch {
-        await apiService.restaurantConfig.create(configData);
-      }
-      
-      setShowConfigModal(false);
-      await loadDashboardData();
-      await loadOperationalConfig();
-    } catch (error) {
-      console.error('Error saving config:', error);
-    } finally {
-      setConfigLoading(false);
-    }
-  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-PE', {
@@ -443,22 +391,6 @@ const Dashboard = () => {
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
-              <button
-                onClick={() => setShowConfigModal(true)}
-                className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                title="Configuración"
-              >
-                <Settings className="h-5 w-5" />
-              </button>
-              <div className="text-right">
-                <label className="block text-sm font-medium text-gray-700">Fecha Operativa</label>
-                <input
-                  type="date"
-                  value={operationalDate}
-                  onChange={(e) => setOperationalDate(e.target.value)}
-                  className="mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
-                />
-              </div>
             </div>
           </div>
 
@@ -467,12 +399,9 @@ const Dashboard = () => {
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
               <div className="flex items-center justify-between mb-2">
                 <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-                {dailyMetrics.revenueVsYesterday !== 0 && (
-                  <span className={`text-xs sm:text-sm font-medium ${dailyMetrics.revenueVsYesterday >= 0 ? 'text-green-600' : 'text-red-600'} flex items-center`}>
-                    {dailyMetrics.revenueVsYesterday >= 0 ? <ArrowUp className="h-3 w-3 sm:h-4 sm:w-4" /> : <ArrowDown className="h-3 w-3 sm:h-4 sm:w-4" />}
-                    {formatPercentage(dailyMetrics.revenueVsYesterday)}
-                  </span>
-                )}
+                <span className="text-xs sm:text-sm font-medium text-gray-500 flex items-center">
+                  0%
+                </span>
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">{formatCurrency(dailyMetrics.totalRevenue)}</h3>
               <p className="text-xs sm:text-sm text-gray-600">Ingresos del día</p>
@@ -766,76 +695,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Modal de Configuración - Responsive */}
-        {showConfigModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Configuración de Horarios
-                </h3>
-                <button
-                  onClick={() => setShowConfigModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-
-              <div className="p-4 sm:p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Hora de Apertura
-                  </label>
-                  <input
-                    type="time"
-                    value={operationalConfig.opening_time}
-                    onChange={(e) => setOperationalConfig(prev => ({ ...prev, opening_time: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Hora de Cierre
-                  </label>
-                  <input
-                    type="time"
-                    value={operationalConfig.closing_time}
-                    onChange={(e) => setOperationalConfig(prev => ({ ...prev, closing_time: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 sm:p-6 border-t border-gray-200">
-                <button
-                  onClick={() => setShowConfigModal(false)}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 text-center"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSaveOperationalConfig}
-                  disabled={configLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {configLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      Guardar
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
