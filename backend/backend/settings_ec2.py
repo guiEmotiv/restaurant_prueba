@@ -188,11 +188,25 @@ if DOMAIN_NAME:
     CORS_ALLOWED_ORIGINS.extend([
         f"http://{DOMAIN_NAME}",
         f"https://{DOMAIN_NAME}",
+        f"http://www.{DOMAIN_NAME}",
         f"https://www.{DOMAIN_NAME}",
     ])
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = True  # For development - restrict in production
+
+# Allow specific headers including 'expires'
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'expires',  # Added to fix CORS error
+]
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SECURITY SETTINGS
