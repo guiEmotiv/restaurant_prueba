@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
-      - ./.env.ec2:/app/.env.ec2:ro
+      - ./.env.ec2:/app/.env.ec2
     environment:
       - DJANGO_SETTINGS_MODULE=backend.settings_ec2
     env_file:

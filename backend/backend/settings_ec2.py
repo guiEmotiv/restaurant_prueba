@@ -8,21 +8,9 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env.ec2 file
-# Try multiple locations for .env.ec2 file
-env_files = [
-    Path('/app/.env.ec2'),           # Docker mounted location
-    BASE_DIR.parent / '.env.ec2',    # Project root location
-    Path('/.env.ec2'),               # Container root location
-]
-
-for env_file in env_files:
-    if env_file.exists():
-        load_dotenv(env_file)
-        print(f"✅ Loaded .env.ec2 from {env_file}")
-        break
-else:
-    print("⚠️  .env.ec2 file not found in any location, using system environment variables")
+# Environment variables are loaded by Docker Compose via env_file
+# We don't need to manually load .env.ec2 since Docker handles it
+print("ℹ️  Using environment variables loaded by Docker Compose")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SECURITY SETTINGS
