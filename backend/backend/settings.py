@@ -147,7 +147,7 @@ if DOMAIN_NAME:
 
 CORS_ALLOW_CREDENTIALS = True
 
-# Allow specific headers including 'expires'
+# Allow specific headers including 'Expires'
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -158,7 +158,10 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
-    'expires',  # Added to fix CORS error
+    'expires',  # lowercase version
+    'Expires',  # uppercase version - this is what the frontend sends
+    'cache-control',
+    'pragma',
 ]
 
 
