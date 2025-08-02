@@ -134,15 +134,12 @@ class Command(BaseCommand):
         ]
         
         for name, group_name, unit_name, stock, min_stock, cost in ingredients_data:
-            group = Group.objects.get(name=group_name)
             unit = Unit.objects.get(name=unit_name)
             Ingredient.objects.create(
                 name=name,
-                group=group,
                 unit=unit,
                 current_stock=Decimal(str(stock)),
-                min_stock=Decimal(str(min_stock)),
-                unit_cost=Decimal(str(cost)),
+                unit_price=Decimal(str(cost)),
                 is_active=True
             )
         self.stdout.write('✅ Ingredientes creados')
