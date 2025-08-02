@@ -88,7 +88,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     table_number = serializers.CharField(source='table.table_number', read_only=True)
     zone_name = serializers.CharField(source='table.zone.name', read_only=True)
-    waiter_name = serializers.CharField(source='waiter.name', read_only=True)
+    waiter_name = serializers.CharField(source='waiter', read_only=True)
     items_count = serializers.SerializerMethodField()
     total_paid = serializers.SerializerMethodField()
     pending_amount = serializers.SerializerMethodField()

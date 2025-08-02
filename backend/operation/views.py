@@ -134,7 +134,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         order_items = OrderItem.objects.filter(
             status='CREATED',
             order__status='CREATED'
-        ).select_related('recipe', 'recipe__group', 'order', 'order__table', 'order__table__zone', 'order__waiter').order_by('created_at')
+        ).select_related('recipe', 'recipe__group', 'order', 'order__table', 'order__table__zone').order_by('created_at')
         
         # Organizar items por receta
         kitchen_board = defaultdict(list)
@@ -151,7 +151,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'order_id': item.order.id,
                 'order_table': item.order.table.table_number,
                 'order_zone': item.order.table.zone.name,
-                'waiter_name': item.order.waiter.name if item.order.waiter else 'Sin mesero',
+                'waiter_name': item.order.waiter if item.order.waiter else 'Sin mesero',
                 'status': item.status,
                 'notes': item.notes,
                 'is_takeaway': item.is_takeaway,

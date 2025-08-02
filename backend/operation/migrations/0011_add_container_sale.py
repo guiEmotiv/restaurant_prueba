@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('config', '0008_add_container'),
-        ('operation', '0010_add_waiter_and_quantity'),
+        ('operation', '0010_add_waiter_and_quantity_fixed'),
     ]
 
     operations = [
