@@ -79,10 +79,16 @@ ASGI_APPLICATION = "backend.asgi.application"
 # Base de datos PostgreSQL 17
 # Usa múltiples esquemas y fija el search_path.
 # ──────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────
+# Base de datos - Configuración por entorno
+# ──────────────────────────────────────────────────────────────
+db_name = os.getenv('DATABASE_NAME', 'restaurant_dev.sqlite3')
+db_path = os.getenv('DATABASE_PATH', str(BASE_DIR))
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": Path(db_path) / db_name,
     }
 }
 

@@ -96,10 +96,14 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # DATABASE
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+# Configuración de base de datos centralizada
+db_name = os.getenv('DATABASE_NAME', 'restaurant_prod.sqlite3')
+db_path = os.getenv('DATABASE_PATH', '/app/data')
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': '/app/data/restaurant.sqlite3',
+        'NAME': os.path.join(db_path, db_name),
     }
 }
 
