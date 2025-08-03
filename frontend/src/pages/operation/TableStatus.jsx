@@ -133,7 +133,7 @@ const TableStatus = () => {
               <Table className="h-5 w-5" />
               Estado de Mesas
             </h1>
-            <p className="text-xs sm:text-sm text-gray-600">Selecciona una mesa para crear pedido o ver pedidos activos</p>
+            <p className="text-xs sm:text-sm text-gray-600">Gestiona cuentas separadas por mesa - cada cliente puede tener su propia cuenta</p>
           </div>
           
           {/* Filtro por zona y leyenda */}
@@ -160,8 +160,13 @@ const TableStatus = () => {
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="text-gray-600 hidden sm:inline">Ocupada</span>
-                <span className="text-gray-600 sm:hidden">Ocup.</span>
+                <span className="text-gray-600 hidden sm:inline">1 cuenta</span>
+                <span className="text-gray-600 sm:hidden">1 cta</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse"></div>
+                <span className="text-gray-600 hidden sm:inline">Múltiples</span>
+                <span className="text-gray-600 sm:hidden">Múlt.</span>
               </div>
             </div>
           </div>
@@ -221,7 +226,9 @@ const TableStatus = () => {
                         
                         {tableStatus.ordersCount > 0 && (
                           <div className="absolute -top-1 -right-1">
-                            <div className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                            <div className={`text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse ${
+                              tableStatus.ordersCount > 1 ? 'bg-orange-500' : 'bg-red-500'
+                            }`}>
                               {tableStatus.ordersCount}
                             </div>
                           </div>
@@ -229,7 +236,12 @@ const TableStatus = () => {
                         
                         {/* Hover text */}
                         <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                          {tableStatus.status === 'available' ? 'Crear pedido' : `Ver ${tableStatus.ordersCount} pedido(s)`}
+                          {tableStatus.status === 'available' 
+                            ? 'Crear pedido' 
+                            : tableStatus.ordersCount > 1 
+                              ? `${tableStatus.ordersCount} cuentas separadas`
+                              : 'Ver pedido activo'
+                          }
                         </div>
                       </div>
                     </button>

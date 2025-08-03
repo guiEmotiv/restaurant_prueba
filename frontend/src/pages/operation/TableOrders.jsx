@@ -108,7 +108,12 @@ const TableOrders = () => {
               Mesa {table?.table_number} - {table?.zone_name}
             </h1>
             <p className="text-gray-600">
-              {orders.length} {orders.length === 1 ? 'pedido activo' : 'pedidos activos'}
+              {orders.length === 0 
+                ? 'Sin pedidos activos'
+                : orders.length === 1 
+                  ? '1 cuenta activa' 
+                  : `${orders.length} cuentas separadas`
+              }
             </p>
           </div>
         </div>
@@ -118,7 +123,7 @@ const TableOrders = () => {
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Nuevo Pedido
+          Nueva Cuenta
         </Button>
       </div>
 
@@ -127,17 +132,17 @@ const TableOrders = () => {
         <div className="bg-white rounded-lg shadow p-8 text-center">
           <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No hay pedidos activos
+            Mesa disponible
           </h3>
           <p className="text-gray-600 mb-4">
-            Esta mesa no tiene pedidos pendientes
+            Esta mesa no tiene cuentas activas. Puedes crear una nueva cuenta para comenzar a tomar pedidos.
           </p>
           <Button
             onClick={handleNewOrder}
             className="flex items-center gap-2 mx-auto"
           >
             <Plus className="h-4 w-4" />
-            Crear Nuevo Pedido
+            Crear Primera Cuenta
           </Button>
         </div>
       ) : (
@@ -153,8 +158,11 @@ const TableOrders = () => {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Pedido #{order.id} {index === 0 && <span className="text-sm text-blue-600 ml-2">(Más reciente)</span>}
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
+                        Cuenta #{order.id}
+                      </span>
+                      {index === 0 && <span className="text-sm text-green-600">(Más reciente)</span>}
                     </h3>
                     <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
                       <div className="flex items-center gap-1">
@@ -199,7 +207,7 @@ const TableOrders = () => {
                 {/* Action Button */}
                 <div className="flex items-center justify-between pt-4 border-t">
                   <span className="text-sm text-gray-600">
-                    Click para {summary.canPay ? 'procesar pago' : 'ver detalles'}
+                    {summary.canPay ? 'Cuenta lista para cobrar' : 'Gestionar cuenta'}
                   </span>
                   <Button
                     size="sm"
@@ -213,12 +221,12 @@ const TableOrders = () => {
                     {summary.canPay ? (
                       <>
                         <DollarSign className="h-4 w-4" />
-                        Procesar Pago
+                        Cobrar Cuenta
                       </>
                     ) : (
                       <>
                         <ShoppingCart className="h-4 w-4" />
-                        Ver Pedido
+                        Gestionar
                       </>
                     )}
                   </Button>
