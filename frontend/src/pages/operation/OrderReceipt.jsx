@@ -149,6 +149,12 @@ const OrderReceipt = () => {
             <p className="text-sm text-gray-600">Estado</p>
             <p className="font-semibold text-green-600">Pagado</p>
           </div>
+          {order.waiter && (
+            <div>
+              <p className="text-sm text-gray-600">Atendido por</p>
+              <p className="font-semibold">{order.waiter}</p>
+            </div>
+          )}
         </div>
 
         {/* Items */}

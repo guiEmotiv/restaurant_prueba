@@ -131,9 +131,11 @@ class OrderViewSet(viewsets.ModelViewSet):
         from collections import defaultdict
         
         # Obtener todos los order items que están pendientes (CREATED)
+        # No filtrar por el estado de la orden, solo por el estado del item
         order_items = OrderItem.objects.filter(
-            status='CREATED',
-            order__status='CREATED'
+            status='CREATED'
+        ).exclude(
+            order__status='PAID'  # Excluir solo órdenes ya pagadas
         ).select_related('recipe', 'recipe__group', 'order', 'order__table', 'order__table__zone').order_by('created_at')
         
         # Organizar items por receta
