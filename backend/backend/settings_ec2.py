@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     
     # Third party
     'rest_framework',
-    'corsheaders',
+    # 'corsheaders',  # Disabled - handling CORS in nginx
     'drf_spectacular',
     
     # Restaurant Apps
@@ -50,7 +50,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
+    # 'corsheaders.middleware.CorsMiddleware',  # Disabled - handling CORS in nginx
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
 ]
@@ -165,26 +165,8 @@ REST_FRAMEWORK = {
 # CORS SETTINGS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Allow all origins in production since we're behind nginx
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
-
-# Allow specific headers including 'Expires'
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-    'expires',  # lowercase version
-    'Expires',  # uppercase version - this is what the frontend sends
-    'cache-control',
-    'pragma',
-]
+# CORS is handled by nginx in production, not Django
+# django-cors-headers is disabled in INSTALLED_APPS and MIDDLEWARE
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SECURITY SETTINGS
