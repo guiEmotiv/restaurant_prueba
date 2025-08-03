@@ -230,8 +230,13 @@ const Dashboard = () => {
         avgServiceTime = Math.round(totalTime / serviceOrders.length / (1000 * 60));
       }
 
-      // Ocupación de mesas (basado en órdenes activas)
-      const activeTables = new Set(activeOrdersList.map(o => o.table)).size;
+      // Ocupación de mesas (basado en órdenes activas del día actual)
+      const today = new Date().toISOString().split('T')[0];
+      const activeOrdersToday = orders.filter(order => {
+        const orderDate = order.created_at.split('T')[0];
+        return orderDate === today && order.status !== 'PAID';
+      });
+      const activeTables = new Set(activeOrdersToday.map(o => o.table)).size;
       const tableOccupancy = tables.length > 0 ? (activeTables / tables.length) * 100 : 0;
 
       // Top mesas por ingresos (solo órdenes pagadas)
@@ -277,15 +282,9 @@ const Dashboard = () => {
           percentage: totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0
         }));
 
-      // Estado de órdenes activas (no pagadas) - solo día actual
-      const today = new Date().toISOString().split('T')[0];
-      const activeOrdersFiltered = orders.filter(order => {
-        const orderDate = order.created_at.split('T')[0];
-        return orderDate === today && order.status !== 'PAID';
-      });
-
-      const pendingOrders = activeOrdersFiltered.filter(o => o.status === 'PENDING').length;
-      const activeOrders = activeOrdersFiltered.length;
+      // Estado de órdenes activas (no pagadas) - usar los ya filtrados
+      const pendingOrders = activeOrdersToday.filter(o => o.status === 'PENDING').length;
+      const activeOrders = activeOrdersToday.length;
 
       // Calcular rotación de mesas correctamente
       const tablesRotation = tables.length > 0 ? totalOrders / tables.length : 0;
