@@ -79,7 +79,9 @@ const Dashboard = () => {
       
       console.log('📅 Cargando datos para fecha operativa:', selectedDate);
 
-      // Cargar datos básicos necesarios para el dashboard
+      // Cargar datos básicos necesarios para el dashboard con manejo de errores individual
+      console.log('🔄 Iniciando carga de datos...');
+      
       const [
         orders,
         tables,
@@ -87,20 +89,64 @@ const Dashboard = () => {
         ingredients,
         payments
       ] = await Promise.all([
-        apiService.orders.getAll(),
-        apiService.tables.getAll(),
-        apiService.recipes.getAll(),
-        apiService.ingredients.getAll(),
-        apiService.payments.getAll()
+        apiService.orders.getAll().catch(err => {
+          console.error('❌ Error cargando orders:', err);
+          return [];
+        }),
+        apiService.tables.getAll().catch(err => {
+          console.error('❌ Error cargando tables:', err);
+          return [];
+        }),
+        apiService.recipes.getAll().catch(err => {
+          console.error('❌ Error cargando recipes:', err);
+          return [];
+        }),
+        apiService.ingredients.getAll().catch(err => {
+          console.error('❌ Error cargando ingredients:', err);
+          return [];
+        }),
+        apiService.payments.getAll().catch(err => {
+          console.error('❌ Error cargando payments:', err);
+          return [];
+        })
       ]);
 
+      console.log('✅ Datos cargados:', {
+        orders: orders.length,
+        tables: tables.length,
+        recipes: recipes.length,
+        ingredients: ingredients.length,
+        payments: payments.length
+      });
+
       // Filtrar SOLO órdenes PAGADAS por fecha seleccionada
+      console.log('📋 Debugging orders data:', {
+        totalOrders: orders.length,
+        selectedDate,
+        firstOrder: orders[0],
+        orderStatuses: [...new Set(orders.map(o => o.status))],
+        orderDates: [...new Set(orders.map(o => o.created_at?.split('T')[0]))]
+      });
+
       const paidOrdersToday = orders.filter(order => {
         const orderDate = order.created_at.split('T')[0];
-        return orderDate === selectedDate && order.status === 'PAID';
+        const isPaid = order.status === 'PAID';
+        const isToday = orderDate === selectedDate;
+        return isToday && isPaid;
       });
 
       console.log(`📊 Órdenes pagadas del día: ${paidOrdersToday.length} de ${orders.length} total`);
+      
+      // Si no hay órdenes pagadas para la fecha, mostrar información de debugging
+      if (paidOrdersToday.length === 0) {
+        console.log('⚠️ No se encontraron órdenes pagadas para la fecha seleccionada');
+        console.log('📋 Verificando todas las órdenes disponibles:', orders.map(o => ({
+          id: o.id,
+          date: o.created_at?.split('T')[0],
+          status: o.status,
+          total: o.total_amount
+        })));
+      }
 
       // Cargar detalles completos de órdenes pagadas únicamente
       const orderDetails = await Promise.all(
@@ -116,9 +162,20 @@ const Dashboard = () => {
       const validOrderDetails = orderDetails.filter(o => o !== null);
 
       // Calcular métricas principales basadas en órdenes pagadas del día
-      const totalRevenue = paidOrdersToday.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
+      const totalRevenue = paidOrdersToday.reduce((sum, order) => {
+        const amount = parseFloat(order.total_amount || 0);
+        console.log(`💰 Orden ${order.id}: ${amount}`);
+        return sum + amount;
+      }, 0);
       const totalOrders = paidOrdersToday.length;
       const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      
+      console.log('📈 Métricas calculadas:', {
+        totalRevenue,
+        totalOrders,
+        averageTicket,
+        validOrderDetails: validOrderDetails.length
+      });
 
       // Calcular distribución de ingresos por categoría
       const categoryRevenue = {};
@@ -289,8 +346,8 @@ const Dashboard = () => {
       // Calcular rotación de mesas correctamente
       const tablesRotation = tables.length > 0 ? totalOrders / tables.length : 0;
 
-      // Actualizar estado
-      setDailyMetrics({
+      // Preparar métricas finales
+      const finalMetrics = {
         totalRevenue,
         totalOrders,
         averageTicket,
@@ -311,7 +368,12 @@ const Dashboard = () => {
         pendingOrders,
         kitchenLoad: activeOrders > 0 ? (activeOrders / 10) * 100 : 0,
         inventoryAlerts: lowStockItems.length
-      });
+      };
+      
+      console.log('🎯 Métricas finales a mostrar:', finalMetrics);
+      
+      // Actualizar estado
+      setDailyMetrics(finalMetrics);
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -406,7 +468,6 @@ const Dashboard = () => {
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
               <div className="flex items-center justify-between mb-2">
                 <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
-                <span className="text-xs sm:text-sm font-medium text-gray-700">{dailyMetrics.totalOrders}</span>
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
                 {dailyMetrics.totalOrders > 0 ? formatCurrency(dailyMetrics.averageTicket) : '-'}
@@ -417,7 +478,6 @@ const Dashboard = () => {
             <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200">
               <div className="flex items-center justify-between mb-2">
                 <Users className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
-                <span className="text-xs sm:text-sm font-medium text-purple-600">{dailyMetrics.tableOccupancy.toFixed(0)}%</span>
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
                 {dailyMetrics.totalOrders > 0 ? Math.round(dailyMetrics.customerCount) : '-'}
@@ -439,7 +499,6 @@ const Dashboard = () => {
             <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-200 hidden lg:block">
               <div className="flex items-center justify-between mb-2">
                 <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
-                <span className="text-xs sm:text-sm font-medium text-red-600">{dailyMetrics.activeOrders}</span>
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
                 {dailyMetrics.totalOrders > 0 ? `${dailyMetrics.tablesRotation.toFixed(1)}x` : '-'}
