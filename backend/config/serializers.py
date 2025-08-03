@@ -23,11 +23,20 @@ class ZoneSerializer(serializers.ModelSerializer):
 
 class TableSerializer(serializers.ModelSerializer):
     zone_name = serializers.CharField(source='zone.name', read_only=True)
+    active_orders_count = serializers.SerializerMethodField()
+    has_active_orders = serializers.SerializerMethodField()
     
     class Meta:
         model = Table
-        fields = ['id', 'zone', 'zone_name', 'table_number', 'created_at']
+        fields = ['id', 'zone', 'zone_name', 'table_number', 'created_at', 
+                  'active_orders_count', 'has_active_orders']
         read_only_fields = ['id', 'created_at']
+    
+    def get_active_orders_count(self, obj):
+        return obj.order_set.filter(status='CREATED').count()
+    
+    def get_has_active_orders(self, obj):
+        return obj.order_set.filter(status='CREATED').exists()
 
 
 class TableDetailSerializer(TableSerializer):

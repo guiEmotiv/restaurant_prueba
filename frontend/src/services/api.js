@@ -194,6 +194,10 @@ export const apiService = {
       const response = await api.get(`/tables/${id}/current_order/`);
       return response.data;
     },
+    getActiveOrders: async (id) => {
+      const response = await api.get(`/tables/${id}/active_orders/`);
+      return response.data;
+    },
   },
 
 

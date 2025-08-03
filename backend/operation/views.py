@@ -190,10 +190,19 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def served(self, request):
-        """Vista para pagos - órdenes servidas listas para pagar"""
+        """Vista para pagos - órdenes con todos los items entregados listas para pagar"""
+        # Obtener órdenes no pagadas que tienen todos sus items entregados
+        from django.db.models import Count, Q, F
+        
         orders = Order.objects.filter(
-            status='SERVED'
-        ).order_by('-served_at')
+            status='CREATED'  # Solo órdenes no pagadas
+        ).annotate(
+            total_items=Count('orderitem'),
+            served_items=Count('orderitem', filter=Q(orderitem__status='SERVED'))
+        ).filter(
+            total_items__gt=0,  # Que tengan items
+            total_items=F('served_items')  # Todos los items entregados
+        ).order_by('-created_at')
         
         serializer = OrderDetailSerializer(orders, many=True)
         return Response(serializer.data)

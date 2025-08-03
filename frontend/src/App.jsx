@@ -30,6 +30,7 @@ import TableStatus from './pages/operation/TableStatus';
 import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
 import TableOrderEdit from './pages/operation/TableOrderEdit';
 import TablePaymentEcommerce from './pages/operation/TablePaymentEcommerce';
+import TableOrders from './pages/operation/TableOrders';
 
 // Debug environment variables with persistent logging
 const logWithTimestamp = (message, data) => {
@@ -175,6 +176,11 @@ const AppContent = () => {
           <Route path="/table/:tableId/order-edit" element={
             <ProtectedRoute requiredPermission="canManageOrders">
               <TableOrderEdit />
+            </ProtectedRoute>
+          } />
+          <Route path="/table/:tableId/orders" element={
+            <ProtectedRoute requiredPermission="canManageOrders">
+              <TableOrders />
             </ProtectedRoute>
           } />
           <Route path="/table/:tableId/payment-ecommerce" element={

@@ -38,13 +38,8 @@ const TableStatus = () => {
   };
 
   const getTableStatus = (table) => {
-    // Buscar pedidos activos (CREATED o SERVED) para esta mesa
-    const activeOrders = orders.filter(order => 
-      order.table === table.id && 
-      (order.status === 'CREATED' || order.status === 'SERVED')
-    );
-
-    if (activeOrders.length > 0) {
+    // Usar la información del backend directamente
+    if (table.has_active_orders) {
       return {
         status: 'occupied',
         color: 'bg-red-500',
@@ -52,7 +47,7 @@ const TableStatus = () => {
         borderColor: 'border-red-500',
         icon: AlertCircle,
         label: 'Ocupada',
-        orders: activeOrders
+        ordersCount: table.active_orders_count || 1
       };
     } else {
       return {
@@ -62,7 +57,7 @@ const TableStatus = () => {
         borderColor: 'border-green-500',
         icon: CheckCircle,
         label: 'Disponible',
-        orders: []
+        ordersCount: 0
       };
     }
   };
@@ -76,24 +71,23 @@ const TableStatus = () => {
     const tableStatus = getTableStatus(table);
     
     if (tableStatus.status === 'occupied') {
-      // Si la mesa está ocupada, siempre ir a modificar pedido
-      // El usuario decidirá desde ahí si procesar pago o agregar más items
-      try {
-        const activeOrder = tableStatus.orders[0]; // Tomamos el primer pedido activo
-        if (activeOrder) {
-          navigate(`/table/${table.id}/order-edit`, {
-            state: { orderId: activeOrder.id }
-          });
-        }
-      } catch (error) {
-        console.error('Error navigating to order edit:', error);
-        // En caso de error, ir a la vista de pedidos tradicional
-        navigate('/orders', { 
-          state: { 
-            filterTable: table.id,
-            filterZone: table.zone 
+      // Si la mesa tiene pedidos activos
+      if (tableStatus.ordersCount === 1) {
+        // Si solo hay un pedido, obtenerlo y navegar directo a edición
+        try {
+          const activeOrders = await apiService.tables.getActiveOrders(table.id);
+          if (activeOrders && activeOrders.length > 0) {
+            navigate(`/table/${table.id}/order-edit`, {
+              state: { orderId: activeOrders[0].id }
+            });
           }
-        });
+        } catch (error) {
+          console.error('Error getting active orders:', error);
+          showError('Error al obtener los pedidos activos');
+        }
+      } else {
+        // Si hay múltiples pedidos, mostrar lista para seleccionar
+        navigate(`/table/${table.id}/orders`);
       }
     } else {
       // Si la mesa está disponible, ir a crear nuevo pedido tipo e-commerce
@@ -225,17 +219,17 @@ const TableStatus = () => {
                           </div>
                         )}
                         
-                        {tableStatus.orders.length > 0 && (
+                        {tableStatus.ordersCount > 0 && (
                           <div className="absolute -top-1 -right-1">
                             <div className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                              {tableStatus.orders.length}
+                              {tableStatus.ordersCount}
                             </div>
                           </div>
                         )}
                         
                         {/* Hover text */}
                         <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                          {tableStatus.status === 'available' ? 'Crear pedido' : `Ver ${tableStatus.orders.length} pedido(s)`}
+                          {tableStatus.status === 'available' ? 'Crear pedido' : `Ver ${tableStatus.ordersCount} pedido(s)`}
                         </div>
                       </div>
                     </button>

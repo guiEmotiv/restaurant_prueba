@@ -63,15 +63,24 @@ class TableViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def current_order(self, request, pk=None):
-        """Obtener la orden actual de una mesa (no pagada)"""
+        """Obtener la orden actual de una mesa (no pagada) - DEPRECATED: usar active_orders"""
         table = self.get_object()
-        order = table.order_set.filter(status__in=['CREATED', 'READY', 'SERVED']).first()
+        order = table.order_set.filter(status='CREATED').first()
         if order:
             from operation.serializers import OrderDetailSerializer
             serializer = OrderDetailSerializer(order)
             return Response(serializer.data)
         return Response({'message': 'No hay orden activa para esta mesa'}, 
                        status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=True, methods=['get'])
+    def active_orders(self, request, pk=None):
+        """Obtener todas las órdenes activas (no pagadas) de una mesa"""
+        table = self.get_object()
+        orders = table.order_set.filter(status='CREATED').order_by('-created_at')
+        from operation.serializers import OrderDetailSerializer
+        serializer = OrderDetailSerializer(orders, many=True)
+        return Response(serializer.data)
 
 
 
