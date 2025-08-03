@@ -330,6 +330,17 @@ const TableOrderEdit = () => {
 
             {/* Botones de acción */}
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* Botón Nueva Cuenta */}
+              <button
+                onClick={() => navigate(`/table/${tableId}/order-ecommerce`)}
+                className="bg-purple-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm"
+                title="Crear nueva cuenta para esta mesa"
+              >
+                <Users className="h-4 w-4" />
+                <span className="font-medium hidden sm:inline">Nueva Cuenta</span>
+                <span className="font-medium sm:hidden">+Cuenta</span>
+              </button>
+
               {/* Botón Agregar Items - siempre visible */}
               <button
                 onClick={() => setShowNewItems(!showNewItems)}
