@@ -165,33 +165,8 @@ REST_FRAMEWORK = {
 # CORS SETTINGS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
-]
-
-# In production, add your domain and EC2 IP
-EC2_PUBLIC_IP = os.getenv('EC2_PUBLIC_IP', 'localhost')
-DOMAIN_NAME = os.getenv('DOMAIN_NAME', '')
-
-# Add EC2 IP
-if EC2_PUBLIC_IP != 'localhost':
-    CORS_ALLOWED_ORIGINS.extend([
-        f"http://{EC2_PUBLIC_IP}",
-        f"https://{EC2_PUBLIC_IP}",
-    ])
-
-# Add domain name
-if DOMAIN_NAME:
-    CORS_ALLOWED_ORIGINS.extend([
-        f"http://{DOMAIN_NAME}",
-        f"https://{DOMAIN_NAME}",
-        f"http://www.{DOMAIN_NAME}",
-        f"https://www.{DOMAIN_NAME}",
-    ])
-
+# Allow all origins in production since we're behind nginx
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Allow specific headers including 'Expires'
