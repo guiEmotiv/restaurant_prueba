@@ -35,7 +35,14 @@ const Dashboard = () => {
   console.log('📊 Dashboard de Operación Diaria - Iniciando...');
   
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  // Usar zona horaria de Perú para la fecha por defecto
+  const getPeruDate = () => {
+    const now = new Date();
+    const peruTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Lima"}));
+    return peruTime.toISOString().split('T')[0];
+  };
+  
+  const [selectedDate, setSelectedDate] = useState(getPeruDate());
 
   // Estado para métricas del día
   const [dailyMetrics, setDailyMetrics] = useState({
@@ -119,20 +126,29 @@ const Dashboard = () => {
         payments: payments.length
       });
 
-      // Filtrar SOLO órdenes PAGADAS por fecha seleccionada
+      // Filtrar SOLO órdenes PAGADAS por fecha de pago (no fecha de creación)
       console.log('📋 Debugging orders data:', {
         totalOrders: orders.length,
         selectedDate,
         firstOrder: orders[0],
         orderStatuses: [...new Set(orders.map(o => o.status))],
-        orderDates: [...new Set(orders.map(o => o.created_at?.split('T')[0]))]
+        orderCreatedDates: [...new Set(orders.map(o => o.created_at?.split('T')[0]))],
+        orderPaidDates: [...new Set(orders.map(o => o.paid_at?.split('T')[0]).filter(Boolean))]
       });
 
+      // Usar fecha de pago (paid_at) en lugar de fecha de creación para el filtro
       const paidOrdersToday = orders.filter(order => {
-        const orderDate = order.created_at.split('T')[0];
         const isPaid = order.status === 'PAID';
-        const isToday = orderDate === selectedDate;
-        return isToday && isPaid;
+        if (!isPaid || !order.paid_at) return false;
+        
+        // Usar fecha de pago para el filtro del dashboard, considerando zona horaria de Perú
+        const paidDateTime = new Date(order.paid_at);
+        const paidDatePeru = new Date(paidDateTime.toLocaleString("en-US", {timeZone: "America/Lima"}));
+        const paidDate = paidDatePeru.toISOString().split('T')[0];
+        const isSelectedDate = paidDate === selectedDate;
+        
+        console.log(`🔍 Orden ${order.id}: paid=${isPaid}, paidDate=${paidDate}, selected=${selectedDate}, match=${isSelectedDate}`);
+        return isSelectedDate;
       });
 
       console.log(`📊 Órdenes pagadas del día: ${paidOrdersToday.length} de ${orders.length} total`);
@@ -208,14 +224,23 @@ const Dashboard = () => {
         }
       });
 
-      // Convertir a array y ordenar categorías
+      // Convertir a array y ordenar categorías con porcentajes normalizados
+      const totalCategoryRevenue = Object.values(categoryRevenue).reduce((sum, rev) => sum + rev, 0);
       const revenueByCategory = Object.entries(categoryRevenue)
         .map(([category, revenue]) => ({
           category,
           revenue,
-          percentage: totalRevenue > 0 ? (revenue / totalRevenue) * 100 : 0
+          percentage: totalCategoryRevenue > 0 ? (revenue / totalCategoryRevenue) * 100 : 0
         }))
         .sort((a, b) => b.revenue - a.revenue);
+      
+      // Verificar que los porcentajes sumen 100%
+      const totalPercentage = revenueByCategory.reduce((sum, cat) => sum + cat.percentage, 0);
+      console.log('📊 Verificación porcentajes por categoría:', {
+        totalCategoryRevenue,
+        totalPercentage: totalPercentage.toFixed(1),
+        categories: revenueByCategory.map(c => `${c.category}: ${c.percentage.toFixed(1)}%`)
+      });
 
       // Top 10 platos más vendidos
       const topSellingDishes = Object.values(dishSales)
@@ -330,14 +355,24 @@ const Dashboard = () => {
         paymentMethodCounts[method] = (paymentMethodCounts[method] || 0) + parseFloat(payment.amount || 0);
       });
 
+      // Normalizar porcentajes de métodos de pago para que sumen 100%
+      const totalPaymentAmount = Object.values(paymentMethodCounts).reduce((sum, amount) => sum + amount, 0);
       const revenueByPaymentMethod = Object.entries(paymentMethodCounts)
         .map(([method, amount]) => ({
           method: method === 'CASH' ? 'Efectivo' : 
                  method === 'CARD' ? 'Tarjeta' : 
                  method === 'TRANSFER' ? 'Transferencia' : method,
           amount,
-          percentage: totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0
+          percentage: totalPaymentAmount > 0 ? (amount / totalPaymentAmount) * 100 : 0
         }));
+      
+      // Verificar que los porcentajes sumen 100%
+      const totalPaymentPercentage = revenueByPaymentMethod.reduce((sum, method) => sum + method.percentage, 0);
+      console.log('💳 Verificación porcentajes por método de pago:', {
+        totalPaymentAmount,
+        totalPaymentPercentage: totalPaymentPercentage.toFixed(1),
+        methods: revenueByPaymentMethod.map(m => `${m.method}: ${m.percentage.toFixed(1)}%`)
+      });
 
       // Estado de órdenes activas (no pagadas) - usar los ya filtrados
       const pendingOrders = activeOrdersToday.filter(o => o.status === 'PENDING').length;
@@ -396,6 +431,7 @@ const Dashboard = () => {
 
 
   const formatCurrency = (amount) => {
+    if (!amount || isNaN(amount) || amount === 0) return 'S/ 0.00';
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: 'PEN'
@@ -403,9 +439,21 @@ const Dashboard = () => {
   };
 
   const formatPercentage = (value) => {
+    if (!value || isNaN(value)) return '0.0%';
     const formatted = Math.abs(value).toFixed(1);
     if (value > 0) return `+${formatted}%`;
     return `${value.toFixed(1)}%`;
+  };
+
+  const safeNumber = (value, defaultValue = 0) => {
+    if (value === null || value === undefined || isNaN(value)) return defaultValue;
+    return Number(value);
+  };
+
+  const displayValue = (value, unit = '', defaultText = '-') => {
+    const safe = safeNumber(value);
+    if (safe === 0) return defaultText;
+    return `${safe}${unit}`;
   };
 
   if (loading) {
@@ -437,7 +485,7 @@ const Dashboard = () => {
           <div className="flex flex-col sm:flex-row items-start justify-between mb-6 gap-4">
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard Operacional</h1>
-              <p className="text-gray-600 mt-1 text-sm sm:text-base">Análisis detallado del rendimiento diario</p>
+              <p className="text-gray-600 mt-1 text-sm sm:text-base">Resultados finales del día - Solo pedidos pagados</p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-2">
@@ -447,7 +495,7 @@ const Dashboard = () => {
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  max={new Date().toISOString().split('T')[0]}
+                  max={getPeruDate()}
                 />
               </div>
             </div>
@@ -460,7 +508,7 @@ const Dashboard = () => {
                 <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {dailyMetrics.totalRevenue > 0 ? formatCurrency(dailyMetrics.totalRevenue) : '-'}
+                {formatCurrency(safeNumber(dailyMetrics.totalRevenue))}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Ingresos del día</p>
             </div>
@@ -470,7 +518,7 @@ const Dashboard = () => {
                 <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {dailyMetrics.totalOrders > 0 ? formatCurrency(dailyMetrics.averageTicket) : '-'}
+                {formatCurrency(safeNumber(dailyMetrics.averageTicket))}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Ticket promedio</p>
             </div>
@@ -480,7 +528,7 @@ const Dashboard = () => {
                 <Users className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {dailyMetrics.totalOrders > 0 ? Math.round(dailyMetrics.customerCount) : '-'}
+                {displayValue(Math.round(safeNumber(dailyMetrics.customerCount)))}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Clientes atendidos</p>
             </div>
@@ -488,10 +536,9 @@ const Dashboard = () => {
             <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-xl border border-orange-200">
               <div className="flex items-center justify-between mb-2">
                 <Timer className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
-                <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {dailyMetrics.averageServiceTime > 0 ? `${dailyMetrics.averageServiceTime}min` : '-'}
+                {displayValue(safeNumber(dailyMetrics.averageServiceTime), 'min')}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Tiempo promedio de servicio</p>
             </div>
@@ -501,7 +548,7 @@ const Dashboard = () => {
                 <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {dailyMetrics.totalOrders > 0 ? `${dailyMetrics.tablesRotation.toFixed(1)}x` : '-'}
+                {displayValue(safeNumber(dailyMetrics.tablesRotation).toFixed(1), 'x')}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Rotación de mesas</p>
             </div>
