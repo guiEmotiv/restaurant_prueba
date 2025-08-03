@@ -79,25 +79,19 @@ const Dashboard = () => {
       
       console.log('📅 Cargando datos para fecha operativa:', selectedDate);
 
-      // Cargar todos los datos en paralelo
+      // Cargar datos básicos necesarios para el dashboard
       const [
-        operationalSummary,
         orders,
         tables,
         recipes,
         ingredients,
-        activeOrdersList,
-        zones,
-        waiters
+        payments
       ] = await Promise.all([
-        apiService.payments.getOperationalSummary(selectedDate),
         apiService.orders.getAll(),
         apiService.tables.getAll(),
         apiService.recipes.getAll(),
         apiService.ingredients.getAll(),
-        apiService.orders.getActive(),
-        apiService.zones?.getAll().catch(() => []),
-        apiService.waiters?.getAll().catch(() => [])
+        apiService.payments.getAll()
       ]);
 
       // Filtrar SOLO órdenes PAGADAS por fecha seleccionada
@@ -121,8 +115,8 @@ const Dashboard = () => {
       );
       const validOrderDetails = orderDetails.filter(o => o !== null);
 
-      // Calcular métricas principales (SOLO de pedidos pagados)
-      const totalRevenue = operationalSummary.total_amount || 0;
+      // Calcular métricas principales basadas en órdenes pagadas del día
+      const totalRevenue = paidOrdersToday.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
       const totalOrders = paidOrdersToday.length;
       const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
@@ -262,10 +256,14 @@ const Dashboard = () => {
       const revenueVsLastWeek = 0;  // Por implementar cuando haya datos históricos  
       const revenueVsAverage = 0;   // Por implementar cuando haya datos históricos
 
-      // Distribución por método de pago
-      const paymentMethods = operationalSummary.payments || [];
+      // Distribución por método de pago basada en pagos del día seleccionado
+      const paymentsToday = payments.filter(payment => {
+        const paymentDate = payment.created_at.split('T')[0];
+        return paymentDate === selectedDate;
+      });
+      
       const paymentMethodCounts = {};
-      paymentMethods.forEach(payment => {
+      paymentsToday.forEach(payment => {
         const method = payment.payment_method || 'CASH';
         paymentMethodCounts[method] = (paymentMethodCounts[method] || 0) + parseFloat(payment.amount || 0);
       });
@@ -415,7 +413,6 @@ const Dashboard = () => {
                 {dailyMetrics.totalOrders > 0 ? formatCurrency(dailyMetrics.averageTicket) : '-'}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Ticket promedio</p>
-              <p className="text-xs text-gray-500 mt-1">{dailyMetrics.totalOrders} órdenes pagadas</p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200">
@@ -427,7 +424,6 @@ const Dashboard = () => {
                 {dailyMetrics.totalOrders > 0 ? Math.round(dailyMetrics.customerCount) : '-'}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Clientes atendidos</p>
-              <p className="text-xs text-gray-500 mt-1">Ocupación actual</p>
             </div>
 
             <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-xl border border-orange-200">
@@ -438,8 +434,7 @@ const Dashboard = () => {
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
                 {dailyMetrics.averageServiceTime > 0 ? `${dailyMetrics.averageServiceTime}min` : '-'}
               </h3>
-              <p className="text-xs sm:text-sm text-gray-600">Tiempo promedio</p>
-              <p className="text-xs text-gray-500 mt-1">De servicio</p>
+              <p className="text-xs sm:text-sm text-gray-600">Tiempo promedio de servicio</p>
             </div>
 
             <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-200 hidden lg:block">
@@ -450,8 +445,7 @@ const Dashboard = () => {
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
                 {dailyMetrics.totalOrders > 0 ? `${dailyMetrics.tablesRotation.toFixed(1)}x` : '-'}
               </h3>
-              <p className="text-xs sm:text-sm text-gray-600">Rotación mesas</p>
-              <p className="text-xs text-gray-500 mt-1">Órdenes activas</p>
+              <p className="text-xs sm:text-sm text-gray-600">Rotación de mesas</p>
             </div>
           </div>
         </div>
