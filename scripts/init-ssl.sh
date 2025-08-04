@@ -13,8 +13,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuración
-DOMAIN="elfogondedonsoto.com"
-EMAIL="admin@elfogondedonsoto.com"  # Cambiar por email real
+DOMAIN="xn--elfogndedonsoto-zrb.com"
+EMAIL="elfogondedonsoto@gmail.com"
 COMPOSE_FILE="docker-compose.ssl.yml"
 
 echo -e "${BLUE}🔒 Inicializando configuración SSL para ${DOMAIN}${NC}"
@@ -112,9 +112,9 @@ cd /opt/restaurant-web
 docker-compose -f docker-compose.ssl.yml run --rm certbot renew --quiet
 if [ $? -eq 0 ]; then
     # Copiar certificados actualizados
-    cp data/certbot/conf/live/elfogondedonsoto.com/fullchain.pem nginx/ssl-certs/
-    cp data/certbot/conf/live/elfogondedonsoto.com/privkey.pem nginx/ssl-certs/
-    cp data/certbot/conf/live/elfogondedonsoto.com/chain.pem nginx/ssl-certs/
+    cp data/certbot/conf/live/xn--elfogndedonsoto-zrb.com/fullchain.pem nginx/ssl-certs/
+    cp data/certbot/conf/live/xn--elfogndedonsoto-zrb.com/privkey.pem nginx/ssl-certs/
+    cp data/certbot/conf/live/xn--elfogndedonsoto-zrb.com/chain.pem nginx/ssl-certs/
     # Reiniciar Nginx
     docker-compose -f docker-compose.ssl.yml restart nginx
     echo "$(date): Certificados SSL renovados exitosamente" >> /var/log/ssl-renewal.log

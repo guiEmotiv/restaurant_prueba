@@ -19,7 +19,7 @@ DOMAIN="xn--elfogndedonsoto-zrb.com"
 PROJECT_DIR="/opt/restaurant-web"
 BACKEND_DIR="$PROJECT_DIR/backend"
 FRONTEND_DIR="$PROJECT_DIR/frontend"
-EMAIL="admin@elfogondedonsoto.com"  # ⚠️ CAMBIAR POR EMAIL REAL
+EMAIL="elfogondedonsoto@gmail.com"
 
 # AWS Cognito Configuration
 AWS_REGION="us-west-2"

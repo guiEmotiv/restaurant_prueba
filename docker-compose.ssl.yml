@@ -25,7 +25,7 @@ services:
     volumes:
       - ./data/certbot/conf:/etc/letsencrypt
       - ./data/certbot/www:/var/www/certbot
-    command: certonly --webroot --webroot-path=/var/www/certbot --email tu-email@ejemplo.com --agree-tos --no-eff-email -d xn--elfogndedonsoto-zrb.com -d www.xn--elfogndedonsoto-zrb.com
+    command: certonly --webroot --webroot-path=/var/www/certbot --email elfogondedonsoto@gmail.com --agree-tos --no-eff-email -d xn--elfogndedonsoto-zrb.com -d www.xn--elfogndedonsoto-zrb.com
     depends_on:
       - nginx
     networks:
