@@ -20,7 +20,7 @@ RUN openssl dhparam -out /etc/nginx/ssl/dhparam.pem 2048
 RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/privkey.pem \
     -out /etc/nginx/ssl/fullchain.pem \
-    -subj "/C=PE/ST=Lima/L=Lima/O=Restaurant/OU=IT/CN=elfogondedonsoto.com" \
+    -subj "/C=PE/ST=Lima/L=Lima/O=Restaurant/OU=IT/CN=xn--elfogndedonsoto-zrb.com" \
     && cp /etc/nginx/ssl/fullchain.pem /etc/nginx/ssl/chain.pem
 
 # Exponer puertos

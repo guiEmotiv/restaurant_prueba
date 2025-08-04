@@ -15,7 +15,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOMAIN="elfogondedonsoto.com"
+DOMAIN="xn--elfogndedonsoto-zrb.com"
 PROJECT_DIR="/opt/restaurant-web"
 BACKEND_DIR="$PROJECT_DIR/backend"
 FRONTEND_DIR="$PROJECT_DIR/frontend"
@@ -114,11 +114,33 @@ fi
 
 echo -e "${GREEN}✅ Frontend built ($(du -sh dist | cut -f1))${NC}"
 
-# Stop existing containers
+# Stop existing containers and free ports
 cd "$PROJECT_DIR"
 echo -e "${YELLOW}🛑 Deteniendo servicios existentes...${NC}"
 docker-compose -f docker-compose.ec2.yml down 2>/dev/null || true
 docker-compose -f docker-compose.ssl.yml down 2>/dev/null || true
+
+# Check and free ports 80 and 443
+echo -e "${YELLOW}🔍 Verificando puertos 80 y 443...${NC}"
+if lsof -i :80 | grep -q LISTEN; then
+    echo -e "${YELLOW}⚠️ Puerto 80 en uso. Deteniendo procesos...${NC}"
+    # Kill any process using port 80 (usually nginx or apache)
+    fuser -k 80/tcp 2>/dev/null || true
+    sleep 2
+fi
+
+if lsof -i :443 | grep -q LISTEN; then
+    echo -e "${YELLOW}⚠️ Puerto 443 en uso. Deteniendo procesos...${NC}"
+    # Kill any process using port 443
+    fuser -k 443/tcp 2>/dev/null || true
+    sleep 2
+fi
+
+# Stop system nginx if running
+systemctl stop nginx 2>/dev/null || true
+systemctl stop apache2 2>/dev/null || true
+
+echo -e "${GREEN}✅ Puertos liberados${NC}"
 
 # Create directories for SSL
 echo -e "${YELLOW}📁 Creando estructura de directorios SSL...${NC}"
