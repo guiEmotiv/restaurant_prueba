@@ -301,25 +301,27 @@ const Dashboard = () => {
         .sort((a, b) => b.revenue - a.revenue);
 
       // Calcular métricas de servicio (solo órdenes pagadas con tiempo de servicio)
-      const serviceOrders = validOrderDetails.filter(o => o.served_at && o.created_at);
+      const serviceOrders = validOrderDetails.filter(o => o.served_at && o.created_at && o.paid_at);
       let avgServiceTime = 0;
       if (serviceOrders.length > 0) {
         const totalTime = serviceOrders.reduce((sum, order) => {
           const start = new Date(order.created_at);
-          const end = new Date(order.served_at);
+          const end = new Date(order.paid_at); // Usar paid_at para tiempo completo de servicio
           return sum + (end - start);
         }, 0);
         avgServiceTime = Math.round(totalTime / serviceOrders.length / (1000 * 60));
       }
+      console.log(`⏱️ Tiempo promedio de servicio: ${avgServiceTime} minutos (${serviceOrders.length} órdenes con tiempos válidos)`);
 
-      // Ocupación de mesas (basado en órdenes activas del día actual)
+      // Ocupación de mesas (basado en órdenes activas en tiempo real)
       const today = new Date().toISOString().split('T')[0];
-      const activeOrdersToday = orders.filter(order => {
+      const activeOrdersNow = orders.filter(order => {
         const orderDate = order.created_at.split('T')[0];
-        return orderDate === today && order.status !== 'PAID';
+        return orderDate === today && (order.status === 'PENDING' || order.status === 'IN_PREPARATION' || order.status === 'READY');
       });
-      const activeTables = new Set(activeOrdersToday.map(o => o.table)).size;
+      const activeTables = new Set(activeOrdersNow.map(o => o.table).filter(t => t)).size;
       const tableOccupancy = tables.length > 0 ? (activeTables / tables.length) * 100 : 0;
+      console.log(`🏽️ Ocupación de mesas: ${activeTables}/${tables.length} = ${tableOccupancy.toFixed(1)}%`);
 
       // Top mesas por ingresos (solo órdenes pagadas)
       const tableRevenue = {};
@@ -375,11 +377,13 @@ const Dashboard = () => {
       });
 
       // Estado de órdenes activas (no pagadas) - usar los ya filtrados
-      const pendingOrders = activeOrdersToday.filter(o => o.status === 'PENDING').length;
-      const activeOrders = activeOrdersToday.length;
+      const pendingOrders = activeOrdersNow.filter(o => o.status === 'PENDING').length;
+      const activeOrders = activeOrdersNow.length;
 
-      // Calcular rotación de mesas correctamente
-      const tablesRotation = tables.length > 0 ? totalOrders / tables.length : 0;
+      // Calcular rotación de mesas (promedio de órdenes por mesa)
+      const tablesWithOrders = new Set(paidOrdersToday.map(o => o.table).filter(t => t)).size;
+      const tablesRotation = tablesWithOrders > 0 ? totalOrders / tablesWithOrders : 0;
+      console.log(`🔄 Rotación de mesas: ${totalOrders} órdenes / ${tablesWithOrders} mesas = ${tablesRotation.toFixed(1)}x`);
 
       // Preparar métricas finales
       const finalMetrics = {
@@ -387,7 +391,7 @@ const Dashboard = () => {
         totalOrders,
         averageTicket,
         tableOccupancy,
-        customerCount: totalOrders * 2.5, // Estimado
+        customerCount: totalOrders * 2.5, // Estimado promedio de personas por orden
         revenueVsYesterday,
         revenueVsLastWeek,
         revenueVsAverage,
@@ -417,13 +421,7 @@ const Dashboard = () => {
     }
   }, [selectedDate]);
 
-  // Auto-refresh cada 30 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadDashboardData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [loadDashboardData]);
+  // Sin auto-refresh - los datos son en tiempo real cuando el usuario navega
 
   useEffect(() => {
     loadDashboardData();
@@ -485,7 +483,7 @@ const Dashboard = () => {
           <div className="flex flex-col sm:flex-row items-start justify-between mb-6 gap-4">
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard Operacional</h1>
-              <p className="text-gray-600 mt-1 text-sm sm:text-base">Resultados finales del día - Solo pedidos pagados</p>
+              <p className="text-gray-600 mt-1 text-sm sm:text-base">Métricas operacionales del día</p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-2">
@@ -540,7 +538,7 @@ const Dashboard = () => {
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
                 {displayValue(safeNumber(dailyMetrics.averageServiceTime), 'min')}
               </h3>
-              <p className="text-xs sm:text-sm text-gray-600">Tiempo promedio de servicio</p>
+              <p className="text-xs sm:text-sm text-gray-600">Tiempo promedio</p>
             </div>
 
             <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-200 hidden lg:block">
@@ -591,7 +589,7 @@ const Dashboard = () => {
                 );
               }) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No hay datos de ingresos para esta fecha</p>
+                  <p className="text-gray-500">Sin datos</p>
                 </div>
               )}
             </div>
@@ -627,7 +625,7 @@ const Dashboard = () => {
                 </div>
               )) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No hay platos vendidos para esta fecha</p>
+                  <p className="text-gray-500">Sin ventas</p>
                 </div>
               )}
             </div>
