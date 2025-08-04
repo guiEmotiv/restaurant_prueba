@@ -370,7 +370,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
     def dashboard_data(self, request):
         """Datos completos para el dashboard operacional"""
         from django.db.models import Sum, Count, Q, F
-        from datetime import datetime
+        from datetime import datetime, date
         
         # Obtener fecha del parámetro o usar hoy
         date_param = request.query_params.get('date')
@@ -382,16 +382,13 @@ class PaymentViewSet(viewsets.ModelViewSet):
         else:
             selected_date = timezone.now().date()
         
-        # Convertir a timezone de Lima para comparaciones
-        lima_tz = timezone.get_current_timezone()
-        start_datetime = datetime.combine(selected_date, datetime.min.time())
-        end_datetime = datetime.combine(selected_date, datetime.max.time())
+        # No necesitamos las variables de timezone aquí, solo filtramos por fecha
         
         # Filtrar órdenes PAID por fecha de paid_at
         paid_orders = Order.objects.filter(
             status='PAID',
             paid_at__date=selected_date
-        ).select_related('table__zone').prefetch_related('orderitem_set__recipe')
+        ).select_related('table__zone').prefetch_related('orderitem_set__recipe__group')
         
         # Métricas básicas
         total_orders = paid_orders.count()
