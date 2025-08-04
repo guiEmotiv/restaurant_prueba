@@ -5,11 +5,17 @@ from django.utils import timezone
 from django.db.models import Sum, Count, Q, F, Avg
 from django.http import HttpResponse
 from datetime import datetime, date
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
 from decimal import Decimal
 from .models import Order, OrderItem, Payment
+
+# Importaciones opcionales para Excel
+try:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
 
 class DashboardViewSet(viewsets.ViewSet):
     """
@@ -23,232 +29,305 @@ class DashboardViewSet(viewsets.ViewSet):
         Endpoint consolidado para el dashboard con todos los datos finales
         Solo pedidos PAID, sin métricas en tiempo real
         """
-        # Obtener fecha del parámetro o usar hoy (zona horaria Lima)
-        date_param = request.query_params.get('date')
-        if date_param:
-            try:
-                selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
-            except ValueError:
+        try:
+            print(f"🔍 Dashboard report started - Request: {request.method} {request.path}")
+            
+            # Obtener fecha del parámetro o usar hoy (zona horaria Lima)
+            date_param = request.query_params.get('date')
+            if date_param:
+                try:
+                    selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+                    print(f"✅ Parsed date from parameter: {selected_date}")
+                except ValueError:
+                    selected_date = timezone.now().date()
+                    print(f"⚠️ Invalid date format, using today: {selected_date}")
+            else:
                 selected_date = timezone.now().date()
-        else:
-            selected_date = timezone.now().date()
-        
-        # Filtrar órdenes PAID por fecha de paid_at
-        paid_orders = Order.objects.filter(
-            status='PAID',
-            paid_at__date=selected_date
-        ).select_related(
-            'table__zone'
-        ).prefetch_related(
-            'orderitem_set__recipe__group',
-            'payments',
-            'container_sales__container'
-        ).order_by('paid_at')
-        
-        # Métricas básicas del día
-        total_orders = paid_orders.count()
-        total_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-        average_ticket = total_revenue / total_orders if total_orders > 0 else Decimal('0')
-        
-        # Análisis por categorías
-        category_stats = {}
-        dish_stats = {}
-        waiter_revenue = {}
-        zone_revenue = {}
-        table_revenue = {}
-        payment_method_totals = {}
-        hourly_sales = {}
-        
-        # Procesar cada orden pagada
-        orders_detail = []
-        for order in paid_orders:
-            # Calcular tiempo de servicio
-            service_time = None
-            if order.created_at and order.paid_at:
-                service_time = int((order.paid_at - order.created_at).total_seconds() / 60)
+                print(f"✅ Using current date: {selected_date}")
             
-            # Hora de la venta para análisis por hora
-            hour = order.paid_at.hour if order.paid_at else 0
-            hourly_sales[hour] = hourly_sales.get(hour, Decimal('0')) + order.total_amount
+            print(f"🔍 Filtering orders for date: {selected_date}")
             
-            # Detalle de la orden para Excel
-            order_detail = {
-                'order_id': order.id,
-                'table': order.table.number if order.table else 'N/A',
-                'zone': order.table.zone.name if order.table and order.table.zone else 'N/A',
-                'waiter': order.waiter or 'Sin asignar',
-                'created_at': order.created_at,
-                'paid_at': order.paid_at,
-                'service_time_minutes': service_time,
-                'total_amount': float(order.total_amount),
-                'items': []
-            }
+            # Filtrar órdenes PAID por fecha de paid_at
+            print("🔍 Starting order query...")
+            paid_orders = Order.objects.filter(
+                status='PAID',
+                paid_at__date=selected_date
+            ).select_related(
+                'table__zone'
+            ).prefetch_related(
+                'orderitem_set__recipe__group',
+                'payments',
+                'container_sales__container'
+            ).order_by('paid_at')
             
-            # Stats por mesero
-            waiter_key = order.waiter or 'Sin asignar'
-            if waiter_key not in waiter_revenue:
-                waiter_revenue[waiter_key] = {'orders': 0, 'revenue': Decimal('0')}
-            waiter_revenue[waiter_key]['orders'] += 1
-            waiter_revenue[waiter_key]['revenue'] += order.total_amount
+            print(f"✅ Found {paid_orders.count()} paid orders")
             
-            # Stats por zona
-            zone_key = order.table.zone.name if order.table and order.table.zone else 'Sin zona'
-            if zone_key not in zone_revenue:
-                zone_revenue[zone_key] = {'orders': 0, 'revenue': Decimal('0'), 'tables': set()}
-            zone_revenue[zone_key]['orders'] += 1
-            zone_revenue[zone_key]['revenue'] += order.total_amount
-            if order.table:
-                zone_revenue[zone_key]['tables'].add(order.table.number)
+            # Métricas básicas del día
+            print("🔍 Calculating basic metrics...")
+            total_orders = paid_orders.count()
+            total_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+            average_ticket = total_revenue / total_orders if total_orders > 0 else Decimal('0')
             
-            # Stats por mesa
-            if order.table:
-                table_key = f"Mesa {order.table.number}"
-                table_revenue[table_key] = table_revenue.get(table_key, Decimal('0')) + order.total_amount
+            print(f"✅ Metrics: {total_orders} orders, {total_revenue} revenue, {average_ticket} avg ticket")
             
-            # Procesar items de la orden
-            for item in order.orderitem_set.all():
-                category = item.recipe.group.name if item.recipe and item.recipe.group else 'Sin categoría'
+            # Análisis por categorías
+            print("🔍 Processing categories and dishes...")
+            category_stats = {}
+            dish_stats = {}
+            waiter_revenue = {}
+            zone_revenue = {}
+            table_revenue = {}
+            payment_method_totals = {}
+            hourly_sales = {}
+            
+            # Procesar cada orden pagada
+            orders_detail = []
+            print(f"🔍 Processing {len(paid_orders)} orders...")
+            
+            for order in paid_orders:
+                print(f"🔍 Processing order {order.id}")
                 
-                # Stats por categoría
-                if category not in category_stats:
-                    category_stats[category] = {'revenue': Decimal('0'), 'quantity': 0}
-                category_stats[category]['revenue'] += item.total_price
-                category_stats[category]['quantity'] += item.quantity
+                # Calcular tiempo de servicio
+                service_time = None
+                try:
+                    if order.created_at and order.paid_at:
+                        service_time = int((order.paid_at - order.created_at).total_seconds() / 60)
+                except Exception as e:
+                    print(f"⚠️ Error calculating service time for order {order.id}: {e}")
                 
-                # Stats por plato
-                dish_key = item.recipe.name if item.recipe else 'Sin receta'
-                if dish_key not in dish_stats:
-                    dish_stats[dish_key] = {
-                        'category': category,
-                        'quantity': 0,
-                        'revenue': Decimal('0'),
-                        'unit_price': item.unit_price
-                    }
-                dish_stats[dish_key]['quantity'] += item.quantity
-                dish_stats[dish_key]['revenue'] += item.total_price
+                # Hora de la venta para análisis por hora
+                try:
+                    hour = order.paid_at.hour if order.paid_at else 0
+                    hourly_sales[hour] = hourly_sales.get(hour, Decimal('0')) + order.total_amount
+                except Exception as e:
+                    print(f"⚠️ Error processing hourly sales for order {order.id}: {e}")
                 
-                # Detalle del item para Excel
-                order_detail['items'].append({
-                    'recipe': dish_key,
+                # Detalle de la orden para Excel
+                order_detail = {
+                    'order_id': order.id,
+                    'table': order.table.number if order.table else 'N/A',
+                    'zone': order.table.zone.name if order.table and order.table.zone else 'N/A',
+                    'waiter': order.waiter or 'Sin asignar',
+                    'created_at': order.created_at,
+                    'paid_at': order.paid_at,
+                    'service_time_minutes': service_time,
+                    'total_amount': float(order.total_amount),
+                    'items': []
+                }
+                
+                # Stats por mesero
+                try:
+                    waiter_key = order.waiter or 'Sin asignar'
+                    if waiter_key not in waiter_revenue:
+                        waiter_revenue[waiter_key] = {'orders': 0, 'revenue': Decimal('0')}
+                    waiter_revenue[waiter_key]['orders'] += 1
+                    waiter_revenue[waiter_key]['revenue'] += order.total_amount
+                except Exception as e:
+                    print(f"⚠️ Error processing waiter stats for order {order.id}: {e}")
+                
+                # Stats por zona
+                try:
+                    zone_key = order.table.zone.name if order.table and order.table.zone else 'Sin zona'
+                    if zone_key not in zone_revenue:
+                        zone_revenue[zone_key] = {'orders': 0, 'revenue': Decimal('0'), 'tables': set()}
+                    zone_revenue[zone_key]['orders'] += 1
+                    zone_revenue[zone_key]['revenue'] += order.total_amount
+                    if order.table:
+                        zone_revenue[zone_key]['tables'].add(order.table.number)
+                except Exception as e:
+                    print(f"⚠️ Error processing zone stats for order {order.id}: {e}")
+                
+                # Stats por mesa
+                try:
+                    if order.table:
+                        table_key = f"Mesa {order.table.number}"
+                        table_revenue[table_key] = table_revenue.get(table_key, Decimal('0')) + order.total_amount
+                except Exception as e:
+                    print(f"⚠️ Error processing table stats for order {order.id}: {e}")
+                
+                # Procesar items de la orden
+                try:
+                    for item in order.orderitem_set.all():
+                        category = item.recipe.group.name if item.recipe and item.recipe.group else 'Sin categoría'
+                        
+                        # Stats por categoría
+                        if category not in category_stats:
+                            category_stats[category] = {'revenue': Decimal('0'), 'quantity': 0}
+                        category_stats[category]['revenue'] += item.total_price
+                        category_stats[category]['quantity'] += item.quantity
+                        
+                        # Stats por plato
+                        dish_key = item.recipe.name if item.recipe else 'Sin receta'
+                        if dish_key not in dish_stats:
+                            dish_stats[dish_key] = {
+                                'category': category,
+                                'quantity': 0,
+                                'revenue': Decimal('0'),
+                                'unit_price': item.unit_price
+                            }
+                        dish_stats[dish_key]['quantity'] += item.quantity
+                        dish_stats[dish_key]['revenue'] += item.total_price
+                        
+                        # Detalle del item para Excel
+                        order_detail['items'].append({
+                            'recipe': dish_key,
+                            'category': category,
+                            'quantity': item.quantity,
+                            'unit_price': float(item.unit_price),
+                            'total_price': float(item.total_price),
+                            'notes': item.notes or '',
+                            'is_takeaway': item.is_takeaway
+                        })
+                except Exception as e:
+                    print(f"⚠️ Error processing order items for order {order.id}: {e}")
+                
+                # Procesar pagos
+                try:
+                    for payment in order.payments.all():
+                        method = payment.payment_method
+                        payment_method_totals[method] = payment_method_totals.get(method, Decimal('0')) + payment.amount
+                except Exception as e:
+                    print(f"⚠️ Error processing payments for order {order.id}: {e}")
+                
+                orders_detail.append(order_detail)
+            
+            print("✅ Finished processing orders, calculating final stats...")
+            
+            # Calcular porcentajes
+            total_category_revenue = sum(cat['revenue'] for cat in category_stats.values())
+            category_breakdown = []
+            for category, stats in sorted(category_stats.items(), key=lambda x: x[1]['revenue'], reverse=True):
+                percentage = (stats['revenue'] / total_category_revenue * 100) if total_category_revenue > 0 else 0
+                category_breakdown.append({
                     'category': category,
-                    'quantity': item.quantity,
-                    'unit_price': float(item.unit_price),
-                    'total_price': float(item.total_price),
-                    'notes': item.notes or '',
-                    'is_takeaway': item.is_takeaway
+                    'revenue': float(stats['revenue']),
+                    'quantity': stats['quantity'],
+                    'percentage': float(percentage)
                 })
             
-            # Procesar pagos
-            for payment in order.payments.all():
-                method = payment.payment_method
-                payment_method_totals[method] = payment_method_totals.get(method, Decimal('0')) + payment.amount
+            # Top 10 platos
+            top_dishes = []
+            for dish, stats in sorted(dish_stats.items(), key=lambda x: x[1]['quantity'], reverse=True)[:10]:
+                top_dishes.append({
+                    'name': dish,
+                    'category': stats['category'],
+                    'quantity': stats['quantity'],
+                    'revenue': float(stats['revenue']),
+                    'unit_price': float(stats['unit_price'])
+                })
             
-            orders_detail.append(order_detail)
-        
-        # Calcular porcentajes
-        total_category_revenue = sum(cat['revenue'] for cat in category_stats.values())
-        category_breakdown = []
-        for category, stats in sorted(category_stats.items(), key=lambda x: x[1]['revenue'], reverse=True):
-            percentage = (stats['revenue'] / total_category_revenue * 100) if total_category_revenue > 0 else 0
-            category_breakdown.append({
-                'category': category,
-                'revenue': float(stats['revenue']),
-                'quantity': stats['quantity'],
-                'percentage': float(percentage)
-            })
-        
-        # Top 10 platos
-        top_dishes = []
-        for dish, stats in sorted(dish_stats.items(), key=lambda x: x[1]['quantity'], reverse=True)[:10]:
-            top_dishes.append({
-                'name': dish,
-                'category': stats['category'],
-                'quantity': stats['quantity'],
-                'revenue': float(stats['revenue']),
-                'unit_price': float(stats['unit_price'])
-            })
-        
-        # Top 5 meseros
-        waiter_performance = []
-        for waiter, stats in sorted(waiter_revenue.items(), key=lambda x: x[1]['revenue'], reverse=True)[:5]:
-            avg_ticket = stats['revenue'] / stats['orders'] if stats['orders'] > 0 else Decimal('0')
-            waiter_performance.append({
-                'waiter': waiter,
-                'orders': stats['orders'],
-                'revenue': float(stats['revenue']),
-                'average_ticket': float(avg_ticket)
-            })
-        
-        # Performance por zonas
-        zone_performance = []
-        for zone, stats in sorted(zone_revenue.items(), key=lambda x: x[1]['revenue'], reverse=True):
-            tables_used = len(stats['tables'])
-            avg_per_table = stats['revenue'] / tables_used if tables_used > 0 else Decimal('0')
-            zone_performance.append({
-                'zone': zone,
-                'orders': stats['orders'],
-                'revenue': float(stats['revenue']),
-                'tables_used': tables_used,
-                'average_per_table': float(avg_per_table)
-            })
-        
-        # Top 5 mesas
-        top_tables = []
-        for table, revenue in sorted(table_revenue.items(), key=lambda x: x[1], reverse=True)[:5]:
-            top_tables.append({
-                'table': table,
-                'revenue': float(revenue)
-            })
-        
-        # Distribución por método de pago
-        total_payments = sum(payment_method_totals.values())
-        payment_methods = []
-        for method, amount in payment_method_totals.items():
-            percentage = (amount / total_payments * 100) if total_payments > 0 else 0
-            payment_methods.append({
-                'method': method,
-                'amount': float(amount),
-                'percentage': float(percentage)
-            })
-        
-        # Ventas por hora
-        hourly_breakdown = []
-        for hour in range(24):
-            revenue = hourly_sales.get(hour, Decimal('0'))
-            if revenue > 0:
-                hourly_breakdown.append({
-                    'hour': f"{hour:02d}:00",
+            # Top 5 meseros
+            waiter_performance = []
+            for waiter, stats in sorted(waiter_revenue.items(), key=lambda x: x[1]['revenue'], reverse=True)[:5]:
+                avg_ticket = stats['revenue'] / stats['orders'] if stats['orders'] > 0 else Decimal('0')
+                waiter_performance.append({
+                    'waiter': waiter,
+                    'orders': stats['orders'],
+                    'revenue': float(stats['revenue']),
+                    'average_ticket': float(avg_ticket)
+                })
+            
+            # Performance por zonas
+            zone_performance = []
+            for zone, stats in sorted(zone_revenue.items(), key=lambda x: x[1]['revenue'], reverse=True):
+                tables_used = len(stats['tables'])
+                avg_per_table = stats['revenue'] / tables_used if tables_used > 0 else Decimal('0')
+                zone_performance.append({
+                    'zone': zone,
+                    'orders': stats['orders'],
+                    'revenue': float(stats['revenue']),
+                    'tables_used': tables_used,
+                    'average_per_table': float(avg_per_table)
+                })
+            
+            # Top 5 mesas
+            top_tables = []
+            for table, revenue in sorted(table_revenue.items(), key=lambda x: x[1], reverse=True)[:5]:
+                top_tables.append({
+                    'table': table,
                     'revenue': float(revenue)
                 })
+            
+            # Distribución por método de pago
+            total_payments = sum(payment_method_totals.values())
+            payment_methods = []
+            for method, amount in payment_method_totals.items():
+                percentage = (amount / total_payments * 100) if total_payments > 0 else 0
+                payment_methods.append({
+                    'method': method,
+                    'amount': float(amount),
+                    'percentage': float(percentage)
+                })
+            
+            # Ventas por hora
+            hourly_breakdown = []
+            for hour in range(24):
+                revenue = hourly_sales.get(hour, Decimal('0'))
+                if revenue > 0:
+                    hourly_breakdown.append({
+                        'hour': f"{hour:02d}:00",
+                        'revenue': float(revenue)
+                    })
+            
+            print("✅ Dashboard data compiled successfully")
+            
+            # Respuesta consolidada
+            response_data = {
+                'date': selected_date.isoformat(),
+                'summary': {
+                    'total_orders': total_orders,
+                    'total_revenue': float(total_revenue),
+                    'average_ticket': float(average_ticket)
+                },
+                'category_breakdown': category_breakdown,
+                'top_dishes': top_dishes,
+                'waiter_performance': waiter_performance,
+                'zone_performance': zone_performance,
+                'top_tables': top_tables,
+                'payment_methods': payment_methods,
+                'hourly_sales': hourly_breakdown,
+                'orders_detail': orders_detail  # Para exportación detallada
+            }
+            
+            print(f"✅ Returning response with {len(orders_detail)} orders")
+            return Response(response_data)
         
-        # Respuesta consolidada
-        return Response({
-            'date': selected_date.isoformat(),
-            'summary': {
-                'total_orders': total_orders,
-                'total_revenue': float(total_revenue),
-                'average_ticket': float(average_ticket)
-            },
-            'category_breakdown': category_breakdown,
-            'top_dishes': top_dishes,
-            'waiter_performance': waiter_performance,
-            'zone_performance': zone_performance,
-            'top_tables': top_tables,
-            'payment_methods': payment_methods,
-            'hourly_sales': hourly_breakdown,
-            'orders_detail': orders_detail  # Para exportación detallada
-        })
+        except Exception as e:
+            print(f"❌ CRITICAL ERROR in dashboard report: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'error': f'Error processing dashboard request: {str(e)}',
+                'date': None,
+                'summary': {'total_orders': 0, 'total_revenue': 0, 'average_ticket': 0},
+                'category_breakdown': [], 'top_dishes': [], 'waiter_performance': [],
+                'zone_performance': [], 'top_tables': [], 'payment_methods': [], 'hourly_sales': [],
+                'orders_detail': []
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=False, methods=['get'])
     def export_excel(self, request):
         """
         Exporta el reporte del dashboard a Excel con todo el detalle
         """
-        # Obtener datos usando el mismo método
-        response_data = self.report(request).data
+        if not EXCEL_AVAILABLE:
+            return Response({
+                'error': 'Excel export not available - openpyxl library not installed'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         
-        # Crear libro de Excel
-        wb = openpyxl.Workbook()
+        try:
+            print("🔍 Starting Excel export...")
+            
+            # Obtener datos usando el mismo método
+            report_response = self.report(request)
+            if report_response.status_code != 200:
+                return report_response
+            
+            response_data = report_response.data
+            print(f"✅ Got dashboard data for Excel export: {response_data.get('date')}")
+            
+            # Crear libro de Excel
+            wb = openpyxl.Workbook()
         
         # Estilos
         header_font = Font(bold=True, color="FFFFFF", size=12)
@@ -410,13 +489,22 @@ class DashboardViewSet(viewsets.ViewSet):
             ws_performance.cell(row=idx, column=4, value=zone['tables_used'])
             ws_performance.cell(row=idx, column=5, value=f"S/ {zone['average_per_table']:.2f}")
         
-        # Preparar respuesta HTTP
-        response = HttpResponse(
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        filename = f"dashboard_ventas_{response_data['date']}.xlsx"
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        # Guardar y retornar
-        wb.save(response)
-        return response
+            # Preparar respuesta HTTP
+            response = HttpResponse(
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            filename = f"dashboard_ventas_{response_data['date']}.xlsx"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+            # Guardar y retornar
+            wb.save(response)
+            print("✅ Excel file generated successfully")
+            return response
+            
+        except Exception as e:
+            print(f"❌ Error generating Excel file: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'error': f'Error generating Excel file: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
