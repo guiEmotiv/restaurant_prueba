@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend/dist:/var/www/html:ro
+      - ./nginx/ssl-certs:/etc/nginx/ssl:ro
+      - ./data/certbot/conf:/etc/letsencrypt:ro
+      - ./data/certbot/www:/var/www/certbot:ro
+      - ./data/nginx/logs:/var/log/nginx
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - restaurant_network
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    command: certonly --webroot --webroot-path=/var/www/certbot --email tu-email@ejemplo.com --agree-tos --no-eff-email -d elfogondedonsoto.com -d www.elfogondedonsoto.com
+    depends_on:
+      - nginx
+    networks:
+      - restaurant_network
+
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ec2
+    expose:
+      - "8000"
+    volumes:
+      - ./data:/app/data
+      - ./.env.ec2:/app/.env.ec2
+    environment:
+      - DJANGO_SETTINGS_MODULE=backend.settings_ec2
+    env_file:
+      - .env.ec2
+    restart: unless-stopped
+    networks:
+      - restaurant_network
+
+  # Servicio para renovación automática de certificados
+  certbot-renew:
+    image: certbot/certbot:latest
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    command: renew --webroot --webroot-path=/var/www/certbot
+    depends_on:
+      - nginx
+    restart: "no"
+    networks:
+      - restaurant_network
+
+networks:
+  restaurant_network:
+    driver: bridge
+
+volumes:
+  ssl_certs:
+  certbot_conf:
+  certbot_www:
+  nginx_logs:
