@@ -148,11 +148,12 @@ const Dashboard = () => {
               
               <button
                 onClick={handleDownloadExcel}
-                disabled={downloading}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                disabled={true}
+                className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed flex items-center gap-2"
+                title="Funcionalidad Excel temporalmente deshabilitada"
               >
                 <Download className="h-4 w-4" />
-                {downloading ? 'Descargando...' : 'Excel'}
+                Excel (Próximamente)
               </button>
             </div>
           </div>

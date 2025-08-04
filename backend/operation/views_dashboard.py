@@ -3,23 +3,14 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
 from django.db.models import Sum, Count, Q, F, Avg
-from django.http import HttpResponse
+from django.http import JsonResponse
 from datetime import datetime, date
 from decimal import Decimal
 from .models import Order, OrderItem, Payment
 
-# Importaciones opcionales para Excel
-try:
-    import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.utils import get_column_letter
-    EXCEL_AVAILABLE = True
-except ImportError:
-    EXCEL_AVAILABLE = False
-
 class DashboardViewSet(viewsets.ViewSet):
     """
-    ViewSet para el dashboard consolidado con exportación a Excel
+    ViewSet para el dashboard consolidado - versión simplificada y funcional
     """
     permission_classes = []  # Acceso completo para usuarios autenticados
     
@@ -56,77 +47,41 @@ class DashboardViewSet(viewsets.ViewSet):
                 'table__zone'
             ).prefetch_related(
                 'orderitem_set__recipe__group',
-                'payments',
-                'container_sales__container'
+                'payments'
             ).order_by('paid_at')
             
-            print(f"✅ Found {paid_orders.count()} paid orders")
+            orders_count = paid_orders.count()
+            print(f"✅ Found {orders_count} paid orders")
             
             # Métricas básicas del día
             print("🔍 Calculating basic metrics...")
-            total_orders = paid_orders.count()
+            total_orders = orders_count
             total_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
             average_ticket = total_revenue / total_orders if total_orders > 0 else Decimal('0')
             
             print(f"✅ Metrics: {total_orders} orders, {total_revenue} revenue, {average_ticket} avg ticket")
             
-            # Análisis por categorías
-            print("🔍 Processing categories and dishes...")
+            # Inicializar estadísticas
             category_stats = {}
             dish_stats = {}
             waiter_revenue = {}
             zone_revenue = {}
             table_revenue = {}
             payment_method_totals = {}
-            hourly_sales = {}
             
             # Procesar cada orden pagada
-            orders_detail = []
-            print(f"🔍 Processing {len(paid_orders)} orders...")
+            print(f"🔍 Processing {total_orders} orders...")
             
             for order in paid_orders:
-                print(f"🔍 Processing order {order.id}")
-                
-                # Calcular tiempo de servicio
-                service_time = None
                 try:
-                    if order.created_at and order.paid_at:
-                        service_time = int((order.paid_at - order.created_at).total_seconds() / 60)
-                except Exception as e:
-                    print(f"⚠️ Error calculating service time for order {order.id}: {e}")
-                
-                # Hora de la venta para análisis por hora
-                try:
-                    hour = order.paid_at.hour if order.paid_at else 0
-                    hourly_sales[hour] = hourly_sales.get(hour, Decimal('0')) + order.total_amount
-                except Exception as e:
-                    print(f"⚠️ Error processing hourly sales for order {order.id}: {e}")
-                
-                # Detalle de la orden para Excel
-                order_detail = {
-                    'order_id': order.id,
-                    'table': order.table.number if order.table else 'N/A',
-                    'zone': order.table.zone.name if order.table and order.table.zone else 'N/A',
-                    'waiter': order.waiter or 'Sin asignar',
-                    'created_at': order.created_at,
-                    'paid_at': order.paid_at,
-                    'service_time_minutes': service_time,
-                    'total_amount': float(order.total_amount),
-                    'items': []
-                }
-                
-                # Stats por mesero
-                try:
+                    # Stats por mesero
                     waiter_key = order.waiter or 'Sin asignar'
                     if waiter_key not in waiter_revenue:
                         waiter_revenue[waiter_key] = {'orders': 0, 'revenue': Decimal('0')}
                     waiter_revenue[waiter_key]['orders'] += 1
                     waiter_revenue[waiter_key]['revenue'] += order.total_amount
-                except Exception as e:
-                    print(f"⚠️ Error processing waiter stats for order {order.id}: {e}")
-                
-                # Stats por zona
-                try:
+                    
+                    # Stats por zona
                     zone_key = order.table.zone.name if order.table and order.table.zone else 'Sin zona'
                     if zone_key not in zone_revenue:
                         zone_revenue[zone_key] = {'orders': 0, 'revenue': Decimal('0'), 'tables': set()}
@@ -134,19 +89,13 @@ class DashboardViewSet(viewsets.ViewSet):
                     zone_revenue[zone_key]['revenue'] += order.total_amount
                     if order.table:
                         zone_revenue[zone_key]['tables'].add(order.table.number)
-                except Exception as e:
-                    print(f"⚠️ Error processing zone stats for order {order.id}: {e}")
-                
-                # Stats por mesa
-                try:
+                    
+                    # Stats por mesa
                     if order.table:
                         table_key = f"Mesa {order.table.number}"
                         table_revenue[table_key] = table_revenue.get(table_key, Decimal('0')) + order.total_amount
-                except Exception as e:
-                    print(f"⚠️ Error processing table stats for order {order.id}: {e}")
-                
-                # Procesar items de la orden
-                try:
+                    
+                    # Procesar items de la orden
                     for item in order.orderitem_set.all():
                         category = item.recipe.group.name if item.recipe and item.recipe.group else 'Sin categoría'
                         
@@ -167,33 +116,19 @@ class DashboardViewSet(viewsets.ViewSet):
                             }
                         dish_stats[dish_key]['quantity'] += item.quantity
                         dish_stats[dish_key]['revenue'] += item.total_price
-                        
-                        # Detalle del item para Excel
-                        order_detail['items'].append({
-                            'recipe': dish_key,
-                            'category': category,
-                            'quantity': item.quantity,
-                            'unit_price': float(item.unit_price),
-                            'total_price': float(item.total_price),
-                            'notes': item.notes or '',
-                            'is_takeaway': item.is_takeaway
-                        })
-                except Exception as e:
-                    print(f"⚠️ Error processing order items for order {order.id}: {e}")
-                
-                # Procesar pagos
-                try:
+                    
+                    # Procesar pagos
                     for payment in order.payments.all():
                         method = payment.payment_method
                         payment_method_totals[method] = payment_method_totals.get(method, Decimal('0')) + payment.amount
+                        
                 except Exception as e:
-                    print(f"⚠️ Error processing payments for order {order.id}: {e}")
-                
-                orders_detail.append(order_detail)
+                    print(f"⚠️ Error processing order {order.id}: {e}")
+                    continue
             
             print("✅ Finished processing orders, calculating final stats...")
             
-            # Calcular porcentajes
+            # Calcular porcentajes para categorías
             total_category_revenue = sum(cat['revenue'] for cat in category_stats.values())
             category_breakdown = []
             for category, stats in sorted(category_stats.items(), key=lambda x: x[1]['revenue'], reverse=True):
@@ -259,16 +194,6 @@ class DashboardViewSet(viewsets.ViewSet):
                     'percentage': float(percentage)
                 })
             
-            # Ventas por hora
-            hourly_breakdown = []
-            for hour in range(24):
-                revenue = hourly_sales.get(hour, Decimal('0'))
-                if revenue > 0:
-                    hourly_breakdown.append({
-                        'hour': f"{hour:02d}:00",
-                        'revenue': float(revenue)
-                    })
-            
             print("✅ Dashboard data compiled successfully")
             
             # Respuesta consolidada
@@ -284,12 +209,10 @@ class DashboardViewSet(viewsets.ViewSet):
                 'waiter_performance': waiter_performance,
                 'zone_performance': zone_performance,
                 'top_tables': top_tables,
-                'payment_methods': payment_methods,
-                'hourly_sales': hourly_breakdown,
-                'orders_detail': orders_detail  # Para exportación detallada
+                'payment_methods': payment_methods
             }
             
-            print(f"✅ Returning response with {len(orders_detail)} orders")
+            print(f"✅ Returning response with {total_orders} orders processed")
             return Response(response_data)
         
         except Exception as e:
@@ -301,210 +224,14 @@ class DashboardViewSet(viewsets.ViewSet):
                 'date': None,
                 'summary': {'total_orders': 0, 'total_revenue': 0, 'average_ticket': 0},
                 'category_breakdown': [], 'top_dishes': [], 'waiter_performance': [],
-                'zone_performance': [], 'top_tables': [], 'payment_methods': [], 'hourly_sales': [],
-                'orders_detail': []
+                'zone_performance': [], 'top_tables': [], 'payment_methods': []
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=False, methods=['get'])
     def export_excel(self, request):
         """
-        Exporta el reporte del dashboard a Excel con todo el detalle
+        Placeholder para exportación a Excel - funcionalidad deshabilitada temporalmente
         """
-        if not EXCEL_AVAILABLE:
-            return Response({
-                'error': 'Excel export not available - openpyxl library not installed'
-            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        
-        try:
-            print("🔍 Starting Excel export...")
-            
-            # Obtener datos usando el mismo método
-            report_response = self.report(request)
-            if report_response.status_code != 200:
-                return report_response
-            
-            response_data = report_response.data
-            print(f"✅ Got dashboard data for Excel export: {response_data.get('date')}")
-            
-            # Crear libro de Excel
-            wb = openpyxl.Workbook()
-        
-        # Estilos
-        header_font = Font(bold=True, color="FFFFFF", size=12)
-        header_fill = PatternFill("solid", fgColor="366092")
-        header_alignment = Alignment(horizontal="center", vertical="center")
-        border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
-        )
-        
-        # Hoja 1: Resumen General
-        ws_summary = wb.active
-        ws_summary.title = "Resumen"
-        
-        # Título
-        ws_summary.merge_cells('A1:D1')
-        ws_summary['A1'] = f"Dashboard de Ventas - {response_data['date']}"
-        ws_summary['A1'].font = Font(bold=True, size=16)
-        ws_summary['A1'].alignment = Alignment(horizontal="center")
-        
-        # Resumen
-        ws_summary['A3'] = "Métrica"
-        ws_summary['B3'] = "Valor"
-        ws_summary['A3'].font = header_font
-        ws_summary['B3'].font = header_font
-        
-        summary_data = [
-            ("Total de Órdenes", response_data['summary']['total_orders']),
-            ("Ingresos Totales", f"S/ {response_data['summary']['total_revenue']:.2f}"),
-            ("Ticket Promedio", f"S/ {response_data['summary']['average_ticket']:.2f}")
-        ]
-        
-        for idx, (metric, value) in enumerate(summary_data, start=4):
-            ws_summary[f'A{idx}'] = metric
-            ws_summary[f'B{idx}'] = value
-        
-        # Hoja 2: Detalle de Órdenes
-        ws_orders = wb.create_sheet("Detalle de Órdenes")
-        
-        # Headers
-        order_headers = [
-            "ID Orden", "Mesa", "Zona", "Mesero", "Hora Creación", "Hora Pago",
-            "Tiempo Servicio (min)", "Plato", "Categoría", "Cantidad", 
-            "Precio Unitario", "Precio Total", "Notas", "Para Llevar", "Total Orden"
-        ]
-        
-        for col, header in enumerate(order_headers, start=1):
-            cell = ws_orders.cell(row=1, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = header_alignment
-            cell.border = border
-        
-        # Datos de órdenes
-        row = 2
-        for order in response_data['orders_detail']:
-            order_total = order['total_amount']
-            for item in order['items']:
-                ws_orders.cell(row=row, column=1, value=order['order_id'])
-                ws_orders.cell(row=row, column=2, value=order['table'])
-                ws_orders.cell(row=row, column=3, value=order['zone'])
-                ws_orders.cell(row=row, column=4, value=order['waiter'])
-                ws_orders.cell(row=row, column=5, value=order['created_at'])
-                ws_orders.cell(row=row, column=6, value=order['paid_at'])
-                ws_orders.cell(row=row, column=7, value=order['service_time_minutes'])
-                ws_orders.cell(row=row, column=8, value=item['recipe'])
-                ws_orders.cell(row=row, column=9, value=item['category'])
-                ws_orders.cell(row=row, column=10, value=item['quantity'])
-                ws_orders.cell(row=row, column=11, value=f"S/ {item['unit_price']:.2f}")
-                ws_orders.cell(row=row, column=12, value=f"S/ {item['total_price']:.2f}")
-                ws_orders.cell(row=row, column=13, value=item['notes'])
-                ws_orders.cell(row=row, column=14, value="Sí" if item['is_takeaway'] else "No")
-                ws_orders.cell(row=row, column=15, value=f"S/ {order_total:.2f}")
-                row += 1
-        
-        # Ajustar ancho de columnas
-        for column in ws_orders.columns:
-            max_length = 0
-            column_letter = get_column_letter(column[0].column)
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = (max_length + 2) * 1.2
-            ws_orders.column_dimensions[column_letter].width = adjusted_width
-        
-        # Hoja 3: Análisis por Categorías
-        ws_categories = wb.create_sheet("Categorías")
-        
-        cat_headers = ["Categoría", "Ingresos", "Cantidad", "Porcentaje"]
-        for col, header in enumerate(cat_headers, start=1):
-            cell = ws_categories.cell(row=1, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = header_alignment
-        
-        for idx, cat in enumerate(response_data['category_breakdown'], start=2):
-            ws_categories.cell(row=idx, column=1, value=cat['category'])
-            ws_categories.cell(row=idx, column=2, value=f"S/ {cat['revenue']:.2f}")
-            ws_categories.cell(row=idx, column=3, value=cat['quantity'])
-            ws_categories.cell(row=idx, column=4, value=f"{cat['percentage']:.1f}%")
-        
-        # Hoja 4: Top Platos
-        ws_dishes = wb.create_sheet("Top Platos")
-        
-        dish_headers = ["Ranking", "Plato", "Categoría", "Cantidad", "Ingresos", "Precio Unitario"]
-        for col, header in enumerate(dish_headers, start=1):
-            cell = ws_dishes.cell(row=1, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = header_alignment
-        
-        for idx, dish in enumerate(response_data['top_dishes'], start=2):
-            ws_dishes.cell(row=idx, column=1, value=idx-1)
-            ws_dishes.cell(row=idx, column=2, value=dish['name'])
-            ws_dishes.cell(row=idx, column=3, value=dish['category'])
-            ws_dishes.cell(row=idx, column=4, value=dish['quantity'])
-            ws_dishes.cell(row=idx, column=5, value=f"S/ {dish['revenue']:.2f}")
-            ws_dishes.cell(row=idx, column=6, value=f"S/ {dish['unit_price']:.2f}")
-        
-        # Hoja 5: Performance
-        ws_performance = wb.create_sheet("Performance")
-        
-        # Meseros
-        ws_performance['A1'] = "Performance por Meseros"
-        ws_performance['A1'].font = Font(bold=True, size=14)
-        
-        waiter_headers = ["Mesero", "Órdenes", "Ingresos", "Ticket Promedio"]
-        for col, header in enumerate(waiter_headers, start=1):
-            cell = ws_performance.cell(row=3, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-        
-        for idx, waiter in enumerate(response_data['waiter_performance'], start=4):
-            ws_performance.cell(row=idx, column=1, value=waiter['waiter'])
-            ws_performance.cell(row=idx, column=2, value=waiter['orders'])
-            ws_performance.cell(row=idx, column=3, value=f"S/ {waiter['revenue']:.2f}")
-            ws_performance.cell(row=idx, column=4, value=f"S/ {waiter['average_ticket']:.2f}")
-        
-        # Zonas
-        start_row = len(response_data['waiter_performance']) + 7
-        ws_performance.cell(row=start_row, column=1, value="Performance por Zonas")
-        ws_performance.cell(row=start_row, column=1).font = Font(bold=True, size=14)
-        
-        zone_headers = ["Zona", "Órdenes", "Ingresos", "Mesas Usadas", "Promedio por Mesa"]
-        for col, header in enumerate(zone_headers, start=1):
-            cell = ws_performance.cell(row=start_row+2, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-        
-        for idx, zone in enumerate(response_data['zone_performance'], start=start_row+3):
-            ws_performance.cell(row=idx, column=1, value=zone['zone'])
-            ws_performance.cell(row=idx, column=2, value=zone['orders'])
-            ws_performance.cell(row=idx, column=3, value=f"S/ {zone['revenue']:.2f}")
-            ws_performance.cell(row=idx, column=4, value=zone['tables_used'])
-            ws_performance.cell(row=idx, column=5, value=f"S/ {zone['average_per_table']:.2f}")
-        
-            # Preparar respuesta HTTP
-            response = HttpResponse(
-                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
-            filename = f"dashboard_ventas_{response_data['date']}.xlsx"
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            
-            # Guardar y retornar
-            wb.save(response)
-            print("✅ Excel file generated successfully")
-            return response
-            
-        except Exception as e:
-            print(f"❌ Error generating Excel file: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return Response({
-                'error': f'Error generating Excel file: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            'error': 'Excel export temporarily disabled - use dashboard view for data'
+        }, status=status.HTTP_501_NOT_IMPLEMENTED)
