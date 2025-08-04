@@ -361,6 +361,36 @@ export const apiService = {
     },
   },
 
+  // Dashboard endpoints
+  dashboard: {
+    getReport: async (date = null) => {
+      const url = date ? `/dashboard/report/?date=${date}` : '/dashboard/report/';
+      const response = await api.get(url);
+      return response.data;
+    },
+    downloadExcel: async (date = null) => {
+      const url = date ? `/dashboard/export_excel/?date=${date}` : '/dashboard/export_excel/';
+      const response = await api.get(url, {
+        responseType: 'blob'
+      });
+      
+      // Crear enlace de descarga
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `dashboard_ventas_${date || new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      return response;
+    }
+  },
+
   // Restaurant config endpoints
   restaurantConfig: {
     getAll: () => apiService.getAll('restaurant-config'),

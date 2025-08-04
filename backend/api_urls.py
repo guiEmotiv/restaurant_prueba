@@ -8,6 +8,7 @@ from inventory.views import GroupViewSet, IngredientViewSet, RecipeViewSet, Reci
 from operation.views import (
     OrderViewSet, OrderItemViewSet, OrderItemIngredientViewSet, PaymentViewSet
 )
+from operation.views_dashboard import DashboardViewSet
 
 # Create router and register viewsets
 router = DefaultRouter()
@@ -29,6 +30,7 @@ router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'order-items', OrderItemViewSet, basename='orderitem')
 router.register(r'order-item-ingredients', OrderItemIngredientViewSet, basename='orderitemingredient')
 router.register(r'payments', PaymentViewSet, basename='payment')
+router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 
 urlpatterns = [
     path('', include(router.urls)),  # Remove api/ prefix from here
