@@ -150,8 +150,12 @@ mkdir -p data/nginx/logs
 mkdir -p nginx/ssl-certs
 chown -R 1000:1000 data/ 2>/dev/null || true
 
-# Start Docker containers with SSL
-echo -e "${YELLOW}🐳 Iniciando contenedores con HTTPS...${NC}"
+# Use temporary HTTP-only configuration first
+echo -e "${YELLOW}📝 Configurando Nginx temporal (solo HTTP)...${NC}"
+cp nginx/conf.d/restaurant-temp.conf nginx/conf.d/restaurant.conf
+
+# Start Docker containers with temporary HTTP config
+echo -e "${YELLOW}🐳 Iniciando contenedores (HTTP temporal)...${NC}"
 docker-compose -f docker-compose.ssl.yml up -d --build
 
 # Wait for containers
@@ -207,6 +211,159 @@ echo -e "${YELLOW}📋 Copiando certificados SSL...${NC}"
 cp data/certbot/conf/live/$DOMAIN/fullchain.pem nginx/ssl-certs/
 cp data/certbot/conf/live/$DOMAIN/privkey.pem nginx/ssl-certs/
 cp data/certbot/conf/live/$DOMAIN/chain.pem nginx/ssl-certs/
+
+# Restore HTTPS configuration
+echo -e "${YELLOW}🔄 Restaurando configuración HTTPS...${NC}"
+cp nginx/conf.d/restaurant-temp.conf /tmp/restaurant-temp.conf
+cat > nginx/conf.d/restaurant.conf << 'EOF'
+# Upstream para el backend Django
+upstream django_backend {
+    server web:8000;
+    keepalive 32;
+}
+
+# Configuración para el dominio (reemplazar con tu dominio real)
+server {
+    listen 80;
+    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+    
+    # Redirección permanente a HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+# Configuración HTTPS principal
+server {
+    listen 443 ssl http2;
+    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+
+    # Configuración SSL
+    ssl_certificate /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    
+    # Configuraciones SSL optimizadas
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA;
+    ssl_prefer_server_ciphers off;
+    ssl_dhparam /etc/nginx/ssl/dhparam.pem;
+    
+    # SSL optimizations
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    ssl_session_tickets off;
+    
+    # OCSP stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    ssl_trusted_certificate /etc/nginx/ssl/chain.pem;
+    
+    # Security headers
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Logs específicos del dominio
+    access_log /var/log/nginx/restaurant_access.log;
+    error_log /var/log/nginx/restaurant_error.log;
+
+    # Configuraciones del servidor
+    client_max_body_size 100M;
+    client_body_timeout 60s;
+    client_header_timeout 60s;
+
+    # Configuración de proxy para el backend Django
+    location /api/ {
+        # Rate limiting para API
+        limit_req zone=api burst=20 nodelay;
+        
+        proxy_pass http://django_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # Configuración para admin de Django
+    location /admin/ {
+        # Rate limiting más estricto para admin
+        limit_req zone=login burst=5 nodelay;
+        
+        proxy_pass http://django_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Servir archivos estáticos del frontend directamente desde Nginx
+    location /assets/ {
+        alias /var/www/html/assets/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header Vary Accept-Encoding;
+        
+        # Compresión para archivos estáticos
+        gzip_static on;
+    }
+
+    # Favicon y robots.txt
+    location = /favicon.ico {
+        alias /var/www/html/favicon.ico;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location = /robots.txt {
+        alias /var/www/html/robots.txt;
+        expires 1d;
+    }
+
+    # Health check para el load balancer
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+
+    # Configuración para Let's Encrypt
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Todas las demás rutas van al frontend (React Router)
+    location / {
+        root /var/www/html;
+        try_files $uri $uri/ /index.html;
+        
+        # Headers para el frontend
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+    }
+
+    # Configuración para WebSocket (si es necesario en el futuro)
+    location /ws/ {
+        proxy_pass http://django_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
 
 # Restart Nginx with real certificates
 echo -e "${YELLOW}🔄 Reiniciando Nginx con certificados de producción...${NC}"
