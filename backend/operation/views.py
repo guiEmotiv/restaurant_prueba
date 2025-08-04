@@ -367,6 +367,173 @@ class PaymentViewSet(viewsets.ModelViewSet):
         })
     
     @action(detail=False, methods=['get'])
+    def dashboard_data(self, request):
+        """Datos completos para el dashboard operacional"""
+        from django.db.models import Sum, Count, Q, F
+        from datetime import datetime
+        
+        # Obtener fecha del parámetro o usar hoy
+        date_param = request.query_params.get('date')
+        if date_param:
+            try:
+                selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+            except ValueError:
+                selected_date = timezone.now().date()
+        else:
+            selected_date = timezone.now().date()
+        
+        # Convertir a timezone de Lima para comparaciones
+        lima_tz = timezone.get_current_timezone()
+        start_datetime = datetime.combine(selected_date, datetime.min.time())
+        end_datetime = datetime.combine(selected_date, datetime.max.time())
+        
+        # Filtrar órdenes PAID por fecha de paid_at
+        paid_orders = Order.objects.filter(
+            status='PAID',
+            paid_at__date=selected_date
+        ).select_related('table__zone').prefetch_related('orderitem_set__recipe')
+        
+        # Métricas básicas
+        total_orders = paid_orders.count()
+        total_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
+        average_ticket = total_revenue / total_orders if total_orders > 0 else 0
+        
+        # Distribución por categoría
+        category_revenue = {}
+        dish_sales = {}
+        waiter_stats = {}
+        zone_stats = {}
+        table_revenue = {}
+        
+        for order in paid_orders:
+            # Stats por mesero
+            waiter_id = order.waiter or 'Sin Asignar'
+            if waiter_id not in waiter_stats:
+                waiter_stats[waiter_id] = {'orders': 0, 'revenue': 0}
+            waiter_stats[waiter_id]['orders'] += 1
+            waiter_stats[waiter_id]['revenue'] += float(order.total_amount)
+            
+            # Stats por zona
+            zone_name = order.table.zone.name if order.table and order.table.zone else 'Sin Zona'
+            if zone_name not in zone_stats:
+                zone_stats[zone_name] = {'orders': 0, 'revenue': 0, 'tables': set()}
+            zone_stats[zone_name]['orders'] += 1
+            zone_stats[zone_name]['revenue'] += float(order.total_amount)
+            if order.table:
+                zone_stats[zone_name]['tables'].add(order.table.number)
+            
+            # Stats por mesa
+            table_num = order.table.number if order.table else 'Sin Mesa'
+            if table_num not in table_revenue:
+                table_revenue[table_num] = 0
+            table_revenue[table_num] += float(order.total_amount)
+            
+            # Stats por categoría y platos
+            for item in order.orderitem_set.all():
+                if item.recipe:
+                    category = item.recipe.group.name if item.recipe.group else 'Sin Categoría'
+                    category_revenue[category] = category_revenue.get(category, 0) + float(item.total_price)
+                    
+                    recipe_name = item.recipe.name
+                    if recipe_name not in dish_sales:
+                        dish_sales[recipe_name] = {
+                            'quantity': 0,
+                            'revenue': 0,
+                            'category': category,
+                            'price': float(item.unit_price)
+                        }
+                    dish_sales[recipe_name]['quantity'] += item.quantity
+                    dish_sales[recipe_name]['revenue'] += float(item.total_price)
+        
+        # Calcular tiempo promedio de servicio
+        service_times = []
+        for order in paid_orders:
+            if order.created_at and order.paid_at:
+                service_time = (order.paid_at - order.created_at).total_seconds() / 60
+                service_times.append(service_time)
+        
+        average_service_time = sum(service_times) / len(service_times) if service_times else 0
+        
+        # Ocupación actual de mesas (órdenes activas hoy)
+        today = timezone.now().date()
+        active_orders = Order.objects.filter(
+            created_at__date=today,
+            status__in=['CREATED']
+        )
+        active_tables = active_orders.values_list('table', flat=True).distinct().count()
+        
+        # Métodos de pago del día seleccionado
+        payments_today = Payment.objects.filter(
+            created_at__date=selected_date
+        )
+        payment_methods = payments_today.values('payment_method').annotate(
+            total=Sum('amount')
+        )
+        
+        # Formatear respuesta
+        return Response({
+            'date': selected_date.isoformat(),
+            'summary': {
+                'total_revenue': float(total_revenue),
+                'total_orders': total_orders,
+                'average_ticket': float(average_ticket),
+                'average_service_time': round(average_service_time),
+                'active_orders': active_orders.count(),
+                'active_tables': active_tables,
+                'customer_count': total_orders * 2.5  # Estimado
+            },
+            'revenue_by_category': [
+                {
+                    'category': cat,
+                    'revenue': rev,
+                    'percentage': (rev / float(total_revenue) * 100) if total_revenue > 0 else 0
+                }
+                for cat, rev in sorted(category_revenue.items(), key=lambda x: x[1], reverse=True)
+            ],
+            'top_dishes': [
+                {
+                    'name': name,
+                    'quantity': data['quantity'],
+                    'revenue': data['revenue'],
+                    'category': data['category'],
+                    'price': data['price']
+                }
+                for name, data in sorted(dish_sales.items(), key=lambda x: x[1]['quantity'], reverse=True)[:10]
+            ],
+            'waiter_performance': [
+                {
+                    'waiter': waiter,
+                    'orders': stats['orders'],
+                    'revenue': stats['revenue'],
+                    'avg_ticket': stats['revenue'] / stats['orders'] if stats['orders'] > 0 else 0
+                }
+                for waiter, stats in sorted(waiter_stats.items(), key=lambda x: x[1]['revenue'], reverse=True)[:5]
+            ],
+            'zone_performance': [
+                {
+                    'zone': zone,
+                    'orders': stats['orders'],
+                    'revenue': stats['revenue'],
+                    'tables_used': len(stats['tables']),
+                    'avg_per_table': stats['revenue'] / len(stats['tables']) if stats['tables'] else 0
+                }
+                for zone, stats in sorted(zone_stats.items(), key=lambda x: x[1]['revenue'], reverse=True)
+            ],
+            'top_tables': [
+                {'table': table, 'revenue': revenue}
+                for table, revenue in sorted(table_revenue.items(), key=lambda x: x[1], reverse=True)[:5]
+            ],
+            'payment_methods': [
+                {
+                    'method': pm['payment_method'],
+                    'amount': float(pm['total'] or 0),
+                    'percentage': (float(pm['total'] or 0) / float(total_revenue) * 100) if total_revenue > 0 else 0
+                }
+                for pm in payment_methods
+            ]
+        })
+    
+    @action(detail=False, methods=['get'])
     def operational_summary(self, request):
         """Resumen de pagos por fecha operativa"""
         # Obtener fecha operativa desde parámetro o usar la actual

@@ -35,6 +35,8 @@ const Dashboard = () => {
   console.log('📊 Dashboard de Operación Diaria - Iniciando...');
   
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
   // Usar zona horaria de Perú para la fecha por defecto
   const getPeruDate = () => {
     const now = new Date();
@@ -43,390 +45,33 @@ const Dashboard = () => {
   };
   
   const [selectedDate, setSelectedDate] = useState(getPeruDate());
+  const [dashboardData, setDashboardData] = useState(null);
 
-  // Estado para métricas del día
-  const [dailyMetrics, setDailyMetrics] = useState({
-    // Resumen ejecutivo
-    totalRevenue: 0,
-    totalOrders: 0,
-    averageTicket: 0,
-    tableOccupancy: 0,
-    customerCount: 0,
-    
-    // Comparativas
-    revenueVsYesterday: 0,
-    revenueVsLastWeek: 0,
-    revenueVsAverage: 0,
-    
-    // Distribución de ingresos
-    revenueByCategory: [],
-    revenueByPaymentMethod: [],
-    
-    // Métricas de eficiencia
-    averageServiceTime: 0,
-    tablesRotation: 0,
-    
-    // Performance específica
-    topSellingDishes: [],
-    waiterPerformance: [],
-    zonePerformance: [],
-    topTables: [],
-    
-    // Estado operacional
-    activeOrders: 0,
-    pendingOrders: 0,
-    kitchenLoad: 0,
-    inventoryAlerts: 0
-  });
-
-  // Función para cargar datos del dashboard
+  // Función para cargar datos del dashboard usando el nuevo endpoint
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      console.log('📅 Cargando datos para fecha operativa:', selectedDate);
+      console.log('📅 Cargando datos del dashboard para:', selectedDate);
 
-      // Cargar datos básicos necesarios para el dashboard con manejo de errores individual
-      console.log('🔄 Iniciando carga de datos...');
+      // Usar el nuevo endpoint del backend
+      const data = await apiService.payments.getDashboardData(selectedDate);
       
-      const [
-        orders,
-        tables,
-        recipes,
-        ingredients,
-        payments
-      ] = await Promise.all([
-        apiService.orders.getAll().catch(err => {
-          console.error('❌ Error cargando orders:', err);
-          return [];
-        }),
-        apiService.tables.getAll().catch(err => {
-          console.error('❌ Error cargando tables:', err);
-          return [];
-        }),
-        apiService.recipes.getAll().catch(err => {
-          console.error('❌ Error cargando recipes:', err);
-          return [];
-        }),
-        apiService.ingredients.getAll().catch(err => {
-          console.error('❌ Error cargando ingredients:', err);
-          return [];
-        }),
-        apiService.payments.getAll().catch(err => {
-          console.error('❌ Error cargando payments:', err);
-          return [];
-        })
-      ]);
-
-      console.log('✅ Datos cargados:', {
-        orders: orders.length,
-        tables: tables.length,
-        recipes: recipes.length,
-        ingredients: ingredients.length,
-        payments: payments.length
-      });
-
-      // Filtrar SOLO órdenes PAGADAS por fecha de pago (no fecha de creación)
-      console.log('📋 Debugging orders data:', {
-        totalOrders: orders.length,
-        selectedDate,
-        firstOrder: orders[0],
-        orderStatuses: [...new Set(orders.map(o => o.status))],
-        orderCreatedDates: [...new Set(orders.map(o => o.created_at?.split('T')[0]))],
-        orderPaidDates: [...new Set(orders.map(o => o.paid_at?.split('T')[0]).filter(Boolean))]
-      });
-
-      // Usar fecha de pago (paid_at) en lugar de fecha de creación para el filtro
-      const paidOrdersToday = orders.filter(order => {
-        const isPaid = order.status === 'PAID';
-        if (!isPaid || !order.paid_at) return false;
-        
-        // Usar fecha de pago para el filtro del dashboard, considerando zona horaria de Perú
-        const paidDateTime = new Date(order.paid_at);
-        const paidDatePeru = new Date(paidDateTime.toLocaleString("en-US", {timeZone: "America/Lima"}));
-        const paidDate = paidDatePeru.toISOString().split('T')[0];
-        const isSelectedDate = paidDate === selectedDate;
-        
-        console.log(`🔍 Orden ${order.id}: paid=${isPaid}, paidDate=${paidDate}, selected=${selectedDate}, match=${isSelectedDate}`);
-        return isSelectedDate;
-      });
-
-      console.log(`📊 Órdenes pagadas del día: ${paidOrdersToday.length} de ${orders.length} total`);
-      
-      // Si no hay órdenes pagadas para la fecha, mostrar información de debugging
-      if (paidOrdersToday.length === 0) {
-        console.log('⚠️ No se encontraron órdenes pagadas para la fecha seleccionada');
-        console.log('📋 Verificando todas las órdenes disponibles:', orders.map(o => ({
-          id: o.id,
-          date: o.created_at?.split('T')[0],
-          status: o.status,
-          total: o.total_amount
-        })));
-      }
-
-      // Cargar detalles completos de órdenes pagadas únicamente
-      const orderDetails = await Promise.all(
-        paidOrdersToday.slice(0, 100).map(async (order) => {
-          try {
-            return await apiService.orders.getById(order.id);
-          } catch (error) {
-            console.error(`Error loading order ${order.id}:`, error);
-            return null;
-          }
-        })
-      );
-      const validOrderDetails = orderDetails.filter(o => o !== null);
-
-      // Calcular métricas principales basadas en órdenes pagadas del día
-      const totalRevenue = paidOrdersToday.reduce((sum, order) => {
-        const amount = parseFloat(order.total_amount || 0);
-        console.log(`💰 Orden ${order.id}: ${amount}`);
-        return sum + amount;
-      }, 0);
-      const totalOrders = paidOrdersToday.length;
-      const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-      
-      console.log('📈 Métricas calculadas:', {
-        totalRevenue,
-        totalOrders,
-        averageTicket,
-        validOrderDetails: validOrderDetails.length
-      });
-
-      // Calcular distribución de ingresos por categoría
-      const categoryRevenue = {};
-      const dishSales = {};
-      let totalItems = 0;
-      
-      validOrderDetails.forEach(order => {
-        if (order.items) {
-          order.items.forEach(item => {
-            const recipe = recipes.find(r => r.name === item.recipe_name || r.id === item.recipe);
-            const category = recipe?.group_name || 'Sin Categoría';
-            const itemTotal = parseFloat(item.price) * item.quantity;
-            
-            categoryRevenue[category] = (categoryRevenue[category] || 0) + itemTotal;
-            
-            // Contar platos vendidos
-            if (!dishSales[item.recipe_name]) {
-              dishSales[item.recipe_name] = {
-                name: item.recipe_name,
-                quantity: 0,
-                revenue: 0,
-                category: category,
-                price: parseFloat(item.price)
-              };
-            }
-            dishSales[item.recipe_name].quantity += item.quantity;
-            dishSales[item.recipe_name].revenue += itemTotal;
-            totalItems += item.quantity;
-          });
-        }
-      });
-
-      // Convertir a array y ordenar categorías con porcentajes normalizados
-      const totalCategoryRevenue = Object.values(categoryRevenue).reduce((sum, rev) => sum + rev, 0);
-      const revenueByCategory = Object.entries(categoryRevenue)
-        .map(([category, revenue]) => ({
-          category,
-          revenue,
-          percentage: totalCategoryRevenue > 0 ? (revenue / totalCategoryRevenue) * 100 : 0
-        }))
-        .sort((a, b) => b.revenue - a.revenue);
-      
-      // Verificar que los porcentajes sumen 100%
-      const totalPercentage = revenueByCategory.reduce((sum, cat) => sum + cat.percentage, 0);
-      console.log('📊 Verificación porcentajes por categoría:', {
-        totalCategoryRevenue,
-        totalPercentage: totalPercentage.toFixed(1),
-        categories: revenueByCategory.map(c => `${c.category}: ${c.percentage.toFixed(1)}%`)
-      });
-
-      // Top 10 platos más vendidos
-      const topSellingDishes = Object.values(dishSales)
-        .sort((a, b) => b.quantity - a.quantity)
-        .slice(0, 10);
-
-      // Análisis por meseros (basado en órdenes pagadas)
-      const waiterStats = {};
-      paidOrdersToday.forEach(order => {
-        const waiterId = order.waiter || 'Sin Asignar';
-        if (!waiterStats[waiterId]) {
-          waiterStats[waiterId] = {
-            waiter: waiterId,
-            orders: 0,
-            revenue: 0,
-            avgTicket: 0
-          };
-        }
-        waiterStats[waiterId].orders++;
-        waiterStats[waiterId].revenue += parseFloat(order.total_amount || 0);
-      });
-
-      const waiterPerformance = Object.values(waiterStats)
-        .map(waiter => ({
-          ...waiter,
-          avgTicket: waiter.orders > 0 ? waiter.revenue / waiter.orders : 0
-        }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
-
-      // Análisis por zonas (basado en tablas de órdenes pagadas)
-      const zoneStats = {};
-      paidOrdersToday.forEach(order => {
-        const table = tables.find(t => t.number === order.table);
-        const zoneName = table?.zone_name || 'Sin Zona';
-        
-        if (!zoneStats[zoneName]) {
-          zoneStats[zoneName] = {
-            zone: zoneName,
-            orders: 0,
-            revenue: 0,
-            tables: new Set()
-          };
-        }
-        zoneStats[zoneName].orders++;
-        zoneStats[zoneName].revenue += parseFloat(order.total_amount || 0);
-        if (table) {
-          zoneStats[zoneName].tables.add(table.number);
-        }
-      });
-
-      const zonePerformance = Object.values(zoneStats)
-        .map(zone => ({
-          ...zone,
-          tablesUsed: zone.tables.size,
-          avgPerTable: zone.tablesUsed > 0 ? zone.revenue / zone.tablesUsed : 0
-        }))
-        .sort((a, b) => b.revenue - a.revenue);
-
-      // Calcular métricas de servicio (solo órdenes pagadas con tiempo de servicio)
-      const serviceOrders = validOrderDetails.filter(o => o.served_at && o.created_at && o.paid_at);
-      let avgServiceTime = 0;
-      if (serviceOrders.length > 0) {
-        const totalTime = serviceOrders.reduce((sum, order) => {
-          const start = new Date(order.created_at);
-          const end = new Date(order.paid_at); // Usar paid_at para tiempo completo de servicio
-          return sum + (end - start);
-        }, 0);
-        avgServiceTime = Math.round(totalTime / serviceOrders.length / (1000 * 60));
-      }
-      console.log(`⏱️ Tiempo promedio de servicio: ${avgServiceTime} minutos (${serviceOrders.length} órdenes con tiempos válidos)`);
-
-      // Ocupación de mesas (basado en órdenes activas en tiempo real)
-      const today = new Date().toISOString().split('T')[0];
-      const activeOrdersNow = orders.filter(order => {
-        const orderDate = order.created_at.split('T')[0];
-        return orderDate === today && (order.status === 'PENDING' || order.status === 'IN_PREPARATION' || order.status === 'READY');
-      });
-      const activeTables = new Set(activeOrdersNow.map(o => o.table).filter(t => t)).size;
-      const tableOccupancy = tables.length > 0 ? (activeTables / tables.length) * 100 : 0;
-      console.log(`🏽️ Ocupación de mesas: ${activeTables}/${tables.length} = ${tableOccupancy.toFixed(1)}%`);
-
-      // Top mesas por ingresos (solo órdenes pagadas)
-      const tableRevenue = {};
-      paidOrdersToday.forEach(order => {
-        const tableId = order.table || order.table_number;
-        if (tableId) {
-          tableRevenue[tableId] = (tableRevenue[tableId] || 0) + parseFloat(order.total_amount || 0);
-        }
-      });
-
-      const topTables = Object.entries(tableRevenue)
-        .map(([table, revenue]) => ({ table, revenue }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
-
-      // Alertas de inventario
-      const lowStockItems = ingredients.filter(i => i.current_stock <= 5 && i.is_active);
-
-      // Calcular comparativas basadas en datos reales
-      const revenueVsYesterday = 0; // Por implementar cuando haya datos históricos
-      const revenueVsLastWeek = 0;  // Por implementar cuando haya datos históricos  
-      const revenueVsAverage = 0;   // Por implementar cuando haya datos históricos
-
-      // Distribución por método de pago basada en pagos del día seleccionado
-      const paymentsToday = payments.filter(payment => {
-        const paymentDate = payment.created_at.split('T')[0];
-        return paymentDate === selectedDate;
-      });
-      
-      const paymentMethodCounts = {};
-      paymentsToday.forEach(payment => {
-        const method = payment.payment_method || 'CASH';
-        paymentMethodCounts[method] = (paymentMethodCounts[method] || 0) + parseFloat(payment.amount || 0);
-      });
-
-      // Normalizar porcentajes de métodos de pago para que sumen 100%
-      const totalPaymentAmount = Object.values(paymentMethodCounts).reduce((sum, amount) => sum + amount, 0);
-      const revenueByPaymentMethod = Object.entries(paymentMethodCounts)
-        .map(([method, amount]) => ({
-          method: method === 'CASH' ? 'Efectivo' : 
-                 method === 'CARD' ? 'Tarjeta' : 
-                 method === 'TRANSFER' ? 'Transferencia' : method,
-          amount,
-          percentage: totalPaymentAmount > 0 ? (amount / totalPaymentAmount) * 100 : 0
-        }));
-      
-      // Verificar que los porcentajes sumen 100%
-      const totalPaymentPercentage = revenueByPaymentMethod.reduce((sum, method) => sum + method.percentage, 0);
-      console.log('💳 Verificación porcentajes por método de pago:', {
-        totalPaymentAmount,
-        totalPaymentPercentage: totalPaymentPercentage.toFixed(1),
-        methods: revenueByPaymentMethod.map(m => `${m.method}: ${m.percentage.toFixed(1)}%`)
-      });
-
-      // Estado de órdenes activas (no pagadas) - usar los ya filtrados
-      const pendingOrders = activeOrdersNow.filter(o => o.status === 'PENDING').length;
-      const activeOrders = activeOrdersNow.length;
-
-      // Calcular rotación de mesas (promedio de órdenes por mesa)
-      const tablesWithOrders = new Set(paidOrdersToday.map(o => o.table).filter(t => t)).size;
-      const tablesRotation = tablesWithOrders > 0 ? totalOrders / tablesWithOrders : 0;
-      console.log(`🔄 Rotación de mesas: ${totalOrders} órdenes / ${tablesWithOrders} mesas = ${tablesRotation.toFixed(1)}x`);
-
-      // Preparar métricas finales
-      const finalMetrics = {
-        totalRevenue,
-        totalOrders,
-        averageTicket,
-        tableOccupancy,
-        customerCount: totalOrders * 2.5, // Estimado promedio de personas por orden
-        revenueVsYesterday,
-        revenueVsLastWeek,
-        revenueVsAverage,
-        revenueByCategory,
-        revenueByPaymentMethod,
-        averageServiceTime: avgServiceTime,
-        tablesRotation,
-        topSellingDishes,
-        waiterPerformance,
-        zonePerformance,
-        topTables,
-        activeOrders,
-        pendingOrders,
-        kitchenLoad: activeOrders > 0 ? (activeOrders / 10) * 100 : 0,
-        inventoryAlerts: lowStockItems.length
-      };
-      
-      console.log('🎯 Métricas finales a mostrar:', finalMetrics);
-      
-      // Actualizar estado
-      setDailyMetrics(finalMetrics);
+      console.log('✅ Datos recibidos del backend:', data);
+      setDashboardData(data);
 
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      console.error('❌ Error loading dashboard data:', error);
+      setError('Error al cargar los datos del dashboard');
     } finally {
       setLoading(false);
     }
   }, [selectedDate]);
 
-  // Sin auto-refresh - los datos son en tiempo real cuando el usuario navega
-
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
-
 
   const formatCurrency = (amount) => {
     if (!amount || isNaN(amount) || amount === 0) return 'S/ 0.00';
@@ -438,20 +83,7 @@ const Dashboard = () => {
 
   const formatPercentage = (value) => {
     if (!value || isNaN(value)) return '0.0%';
-    const formatted = Math.abs(value).toFixed(1);
-    if (value > 0) return `+${formatted}%`;
     return `${value.toFixed(1)}%`;
-  };
-
-  const safeNumber = (value, defaultValue = 0) => {
-    if (value === null || value === undefined || isNaN(value)) return defaultValue;
-    return Number(value);
-  };
-
-  const displayValue = (value, unit = '', defaultText = '-') => {
-    const safe = safeNumber(value);
-    if (safe === 0) return defaultText;
-    return `${safe}${unit}`;
   };
 
   if (loading) {
@@ -475,6 +107,44 @@ const Dashboard = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+            <div className="flex items-center gap-2 text-red-800">
+              <AlertCircle className="h-5 w-5" />
+              <p>{error}</p>
+            </div>
+            <button 
+              onClick={loadDashboardData}
+              className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return (
+      <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+            <div className="flex items-center gap-2 text-yellow-800">
+              <AlertCircle className="h-5 w-5" />
+              <p>No hay datos disponibles para mostrar</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { summary, revenue_by_category, top_dishes, waiter_performance, zone_performance, top_tables, payment_methods } = dashboardData;
+
   return (
     <div className="min-h-screen bg-gray-100 -m-4 sm:-m-6 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -483,7 +153,7 @@ const Dashboard = () => {
           <div className="flex flex-col sm:flex-row items-start justify-between mb-6 gap-4">
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard Operacional</h1>
-              <p className="text-gray-600 mt-1 text-sm sm:text-base">Métricas operacionales del día</p>
+              <p className="text-gray-600 mt-1 text-sm sm:text-base">Métricas del día - Solo pedidos pagados</p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-2">
@@ -496,6 +166,12 @@ const Dashboard = () => {
                   max={getPeruDate()}
                 />
               </div>
+              <button
+                onClick={loadDashboardData}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                Actualizar
+              </button>
             </div>
           </div>
 
@@ -506,9 +182,10 @@ const Dashboard = () => {
                 <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {formatCurrency(safeNumber(dailyMetrics.totalRevenue))}
+                {formatCurrency(summary.total_revenue)}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Ingresos del día</p>
+              <p className="text-xs text-gray-500 mt-1">{summary.total_orders} órdenes</p>
             </div>
 
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
@@ -516,7 +193,7 @@ const Dashboard = () => {
                 <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {formatCurrency(safeNumber(dailyMetrics.averageTicket))}
+                {formatCurrency(summary.average_ticket)}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Ticket promedio</p>
             </div>
@@ -526,7 +203,7 @@ const Dashboard = () => {
                 <Users className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {displayValue(Math.round(safeNumber(dailyMetrics.customerCount)))}
+                {Math.round(summary.customer_count)}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Clientes atendidos</p>
             </div>
@@ -536,34 +213,24 @@ const Dashboard = () => {
                 <Timer className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600" />
               </div>
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {displayValue(safeNumber(dailyMetrics.averageServiceTime), 'min')}
+                {summary.average_service_time > 0 ? `${summary.average_service_time}min` : '-'}
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">Tiempo promedio</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-200 hidden lg:block">
-              <div className="flex items-center justify-between mb-2">
-                <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
-              </div>
-              <h3 className="text-lg sm:text-2xl font-bold text-gray-900">
-                {displayValue(safeNumber(dailyMetrics.tablesRotation).toFixed(1), 'x')}
-              </h3>
-              <p className="text-xs sm:text-sm text-gray-600">Rotación de mesas</p>
             </div>
           </div>
         </div>
 
-        {/* Distribución de ingresos y top platos - Responsive */}
+        {/* Distribución de ingresos y top platos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Distribución por categorías */}
           <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <PieChart className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
-              <span className="text-sm sm:text-base">Distribución de Ingresos por Categoría</span>
+              <span className="text-sm sm:text-base">Ingresos por Categoría</span>
             </h2>
             
             <div className="space-y-3 sm:space-y-4">
-              {dailyMetrics.revenueByCategory.length > 0 ? dailyMetrics.revenueByCategory.map((category, index) => {
+              {revenue_by_category.length > 0 ? revenue_by_category.map((category, index) => {
                 const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-red-500', 'bg-indigo-500'];
                 const bgColor = colors[index % colors.length];
                 
@@ -576,7 +243,7 @@ const Dashboard = () => {
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-gray-900 text-sm sm:text-base">{formatCurrency(category.revenue)}</p>
-                        <p className="text-xs sm:text-sm text-gray-500">{category.percentage.toFixed(1)}%</p>
+                        <p className="text-xs sm:text-sm text-gray-500">{formatPercentage(category.percentage)}</p>
                       </div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
@@ -599,11 +266,11 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <Award className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />
-              <span className="text-sm sm:text-base">Top 10 Platos Más Vendidos</span>
+              <span className="text-sm sm:text-base">Top 10 Platos</span>
             </h2>
             
             <div className="space-y-2 sm:space-y-3 max-h-80 overflow-y-auto">
-              {dailyMetrics.topSellingDishes.length > 0 ? dailyMetrics.topSellingDishes.map((dish, index) => (
+              {top_dishes.length > 0 ? top_dishes.map((dish, index) => (
                 <div key={index} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-sm sm:text-base ${
@@ -632,7 +299,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Análisis de Performance - Responsive Grid */}
+        {/* Análisis de Performance */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Rendimiento por Meseros */}
           <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
@@ -641,7 +308,7 @@ const Dashboard = () => {
               <span className="text-sm sm:text-base">Top Meseros</span>
             </h3>
             <div className="space-y-3">
-              {dailyMetrics.waiterPerformance.slice(0, 5).map((waiter, index) => (
+              {waiter_performance.map((waiter, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm ${
@@ -656,10 +323,13 @@ const Dashboard = () => {
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-gray-900 text-sm">{formatCurrency(waiter.revenue)}</p>
-                    <p className="text-xs text-gray-500">{formatCurrency(waiter.avgTicket)} promedio</p>
+                    <p className="text-xs text-gray-500">{formatCurrency(waiter.avg_ticket)} promedio</p>
                   </div>
                 </div>
               ))}
+              {waiter_performance.length === 0 && (
+                <p className="text-center text-gray-500 py-4">Sin datos</p>
+              )}
             </div>
           </div>
 
@@ -670,7 +340,7 @@ const Dashboard = () => {
               <span className="text-sm sm:text-base">Análisis por Zonas</span>
             </h3>
             <div className="space-y-3">
-              {dailyMetrics.zonePerformance.slice(0, 5).map((zone, index) => (
+              {zone_performance.map((zone, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center font-bold text-white text-sm">
@@ -678,15 +348,18 @@ const Dashboard = () => {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900 text-sm">{zone.zone}</p>
-                      <p className="text-xs text-gray-500">{zone.tablesUsed} mesas activas</p>
+                      <p className="text-xs text-gray-500">{zone.tables_used} mesas activas</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-gray-900 text-sm">{formatCurrency(zone.revenue)}</p>
-                    <p className="text-xs text-gray-500">{formatCurrency(zone.avgPerTable)} por mesa</p>
+                    <p className="text-xs text-gray-500">{formatCurrency(zone.avg_per_table)} por mesa</p>
                   </div>
                 </div>
               ))}
+              {zone_performance.length === 0 && (
+                <p className="text-center text-gray-500 py-4">Sin datos</p>
+              )}
             </div>
           </div>
 
@@ -697,7 +370,7 @@ const Dashboard = () => {
               <span className="text-sm sm:text-base">Mesas Top</span>
             </h3>
             <div className="space-y-3">
-              {dailyMetrics.topTables.map((table, index) => (
+              {top_tables.map((table, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm ${
@@ -709,7 +382,6 @@ const Dashboard = () => {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900 text-sm">Mesa {table.table}</p>
-                      <p className="text-xs text-gray-500">Hoy</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -717,11 +389,14 @@ const Dashboard = () => {
                   </div>
                 </div>
               ))}
+              {top_tables.length === 0 && (
+                <p className="text-center text-gray-500 py-4">Sin datos</p>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Métricas adicionales - Responsive */}
+        {/* Métricas adicionales */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Métodos de pago */}
           <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
@@ -730,78 +405,63 @@ const Dashboard = () => {
               <span className="text-sm sm:text-base">Métodos de Pago</span>
             </h3>
             <div className="space-y-3">
-              {dailyMetrics.revenueByPaymentMethod.map((method, index) => (
+              {payment_methods.map((method, index) => (
                 <div key={index} className="flex items-center justify-between">
-                  <span className="text-gray-700 text-sm sm:text-base">{method.method}</span>
+                  <span className="text-gray-700 text-sm sm:text-base">
+                    {method.method === 'CASH' ? 'Efectivo' : 
+                     method.method === 'CARD' ? 'Tarjeta' : 
+                     method.method === 'TRANSFER' ? 'Transferencia' : 
+                     method.method === 'YAPE_PLIN' ? 'Yape/Plin' : method.method}
+                  </span>
                   <div className="text-right">
                     <p className="font-bold text-gray-900 text-sm sm:text-base">{formatCurrency(method.amount)}</p>
-                    <p className="text-xs text-gray-500">{method.percentage.toFixed(1)}%</p>
+                    <p className="text-xs text-gray-500">{formatPercentage(method.percentage)}</p>
                   </div>
                 </div>
               ))}
+              {payment_methods.length === 0 && (
+                <p className="text-center text-gray-500 py-4">Sin pagos registrados</p>
+              )}
             </div>
           </div>
 
-          {/* Estado operacional compacto */}
+          {/* Estado operacional */}
           <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <Activity className="h-5 w-5 text-blue-500" />
-              <span className="text-sm sm:text-base">Estado Operativo</span>
+              <span className="text-sm sm:text-base">Estado Actual</span>
             </h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                 <span className="text-sm font-medium text-blue-900">Órdenes Activas</span>
-                <span className="text-lg font-bold text-blue-600">{dailyMetrics.activeOrders}</span>
+                <span className="text-lg font-bold text-blue-600">{summary.active_orders}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
                 <span className="text-sm font-medium text-purple-900">Mesas Ocupadas</span>
-                <span className="text-lg font-bold text-purple-600">
-                  {Math.round((dailyMetrics.tableOccupancy / 100) * 20)}/20
-                </span>
+                <span className="text-lg font-bold text-purple-600">{summary.active_tables}</span>
               </div>
             </div>
           </div>
 
-          {/* Alertas operacionales */}
+          {/* Resumen rápido */}
           <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-red-500" />
-              <span className="text-sm sm:text-base">Alertas</span>
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              <span className="text-sm sm:text-base">Resumen</span>
             </h3>
             <div className="space-y-3">
-              {dailyMetrics.inventoryAlerts > 0 && (
-                <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-red-600" />
-                    <span className="text-red-900 font-medium text-sm">Stock bajo</span>
-                  </div>
-                  <span className="text-red-600 font-bold">{dailyMetrics.inventoryAlerts} items</span>
-                </div>
-              )}
-              {dailyMetrics.pendingOrders > 0 && (
-                <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-yellow-600" />
-                    <span className="text-yellow-900 font-medium text-sm">Órdenes pendientes</span>
-                  </div>
-                  <span className="text-yellow-600 font-bold">{dailyMetrics.pendingOrders}</span>
-                </div>
-              )}
-              {dailyMetrics.kitchenLoad > 80 && (
-                <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <ChefHat className="h-5 w-5 text-orange-600" />
-                    <span className="text-orange-900 font-medium text-sm">Cocina saturada</span>
-                  </div>
-                  <span className="text-orange-600 font-bold">{dailyMetrics.kitchenLoad.toFixed(0)}%</span>
-                </div>
-              )}
-              {dailyMetrics.inventoryAlerts === 0 && dailyMetrics.pendingOrders === 0 && dailyMetrics.kitchenLoad <= 80 && (
-                <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span className="text-green-900 font-medium text-sm">Todo operando con normalidad</span>
-                </div>
-              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Órdenes pagadas</span>
+                <span className="font-bold text-gray-900">{summary.total_orders}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Ticket promedio</span>
+                <span className="font-bold text-gray-900">{formatCurrency(summary.average_ticket)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Total del día</span>
+                <span className="font-bold text-green-600">{formatCurrency(summary.total_revenue)}</span>
+              </div>
             </div>
           </div>
         </div>

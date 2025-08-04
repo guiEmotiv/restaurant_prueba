@@ -354,6 +354,11 @@ export const apiService = {
       const response = await api.get(url);
       return response.data;
     },
+    getDashboardData: async (date = null) => {
+      const url = date ? `/payments/dashboard_data/?date=${date}` : '/payments/dashboard_data/';
+      const response = await api.get(url);
+      return response.data;
+    },
   },
 
   // Restaurant config endpoints
