@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Restaurant Web - Build and Deploy Script (Phases 5-7)
-# Build frontend, deploy containers, configure database, verify deployment
-# Run this after setup-initial.sh
+# Restaurant Web - Unified Build & Deploy Script with HTTPS
+# Build frontend, deploy containers with SSL, configure database, verify deployment
+# This script replaces both build-deploy.sh and setup-ssl-production.sh
 
-echo "🚀 Restaurant Web - Build & Deploy (Phases 5-7)"
-echo "=============================================="
+echo "🚀 Restaurant Web - Unified Build & Deploy with HTTPS"
+echo "===================================================="
 
 # Colors for output
 RED='\033[0;31m'
@@ -15,10 +15,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOMAIN="xn--elfogndedonsoto-zrb.com"
+DOMAIN="elfogondedonsoto.com"
 PROJECT_DIR="/opt/restaurant-web"
 BACKEND_DIR="$PROJECT_DIR/backend"
 FRONTEND_DIR="$PROJECT_DIR/frontend"
+EMAIL="admin@elfogondedonsoto.com"  # ⚠️ CAMBIAR POR EMAIL REAL
 
 # AWS Cognito Configuration
 AWS_REGION="us-west-2"
@@ -30,6 +31,18 @@ if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}❌ Please run as root (sudo)${NC}"
     exit 1
 fi
+
+# Check if we're in the right directory
+if [ ! -d "$PROJECT_DIR" ]; then
+    echo -e "${RED}❌ Project directory not found: $PROJECT_DIR${NC}"
+    exit 1
+fi
+
+cd $PROJECT_DIR
+
+# Update code from git
+echo -e "${YELLOW}📥 Actualizando código desde repositorio...${NC}"
+git pull origin main
 
 # Check if initial setup was run
 if [ ! -f "$PROJECT_DIR/.env.ec2" ]; then
@@ -61,7 +74,7 @@ cat > .env.production << EOF
 # Generated: $(date)
 
 # API Configuration
-VITE_API_URL=http://$DOMAIN
+VITE_API_URL=https://$DOMAIN
 
 # AWS Cognito Configuration - MUST match backend
 VITE_AWS_REGION=$AWS_REGION
@@ -73,7 +86,7 @@ EOF
 cp .env.production .env.local
 
 echo -e "${BLUE}Frontend environment variables:${NC}"
-echo -e "  VITE_API_URL=http://$DOMAIN"
+echo -e "  VITE_API_URL=https://$DOMAIN"
 echo -e "  VITE_AWS_REGION=$AWS_REGION"
 echo -e "  VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID"
 echo -e "  VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID"
@@ -85,7 +98,7 @@ npm install --silent --no-fund --no-audit
 
 # Build frontend with explicit environment variables
 echo -e "${BLUE}Building frontend with Cognito configuration...${NC}"
-VITE_API_URL=http://$DOMAIN \
+VITE_API_URL=https://$DOMAIN \
 VITE_AWS_REGION=$AWS_REGION \
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID \
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID \
@@ -101,23 +114,128 @@ fi
 
 echo -e "${GREEN}✅ Frontend built ($(du -sh dist | cut -f1))${NC}"
 
-# Start Docker containers
+# Stop existing containers
 cd "$PROJECT_DIR"
-docker-compose -f docker-compose.ec2.yml up -d --build
+echo -e "${YELLOW}🛑 Deteniendo servicios existentes...${NC}"
+docker-compose -f docker-compose.ec2.yml down 2>/dev/null || true
+docker-compose -f docker-compose.ssl.yml down 2>/dev/null || true
+
+# Create directories for SSL
+echo -e "${YELLOW}📁 Creando estructura de directorios SSL...${NC}"
+mkdir -p data/certbot/conf
+mkdir -p data/certbot/www
+mkdir -p data/nginx/logs
+mkdir -p nginx/ssl-certs
+chown -R 1000:1000 data/ 2>/dev/null || true
+
+# Start Docker containers with SSL
+echo -e "${YELLOW}🐳 Iniciando contenedores con HTTPS...${NC}"
+docker-compose -f docker-compose.ssl.yml up -d --build
 
 # Wait for containers
-sleep 15
+sleep 20
 
 show_space "After build"
 
 # ==============================================================================
-# PHASE 6: CONFIGURE DATABASE
+# PHASE 6: CONFIGURE SSL CERTIFICATES
 # ==============================================================================
-echo -e "\n${YELLOW}💾 PHASE 6: Configure Database${NC}"
+echo -e "\n${YELLOW}🔐 PHASE 6: Configure SSL Certificates${NC}"
+
+# Verify Nginx is responding on port 80
+echo -e "${BLUE}Verificando que Nginx responde...${NC}"
+for i in {1..6}; do
+    if curl -f http://localhost/health &>/dev/null; then
+        echo -e "${GREEN}✅ Nginx respondiendo correctamente${NC}"
+        break
+    else
+        echo -e "${YELLOW}⏳ Esperando Nginx... (intento $i/6)${NC}"
+        if [ $i -eq 6 ]; then
+            echo -e "${RED}❌ Error: Nginx no responde${NC}"
+            docker-compose -f docker-compose.ssl.yml logs nginx
+            exit 1
+        fi
+        sleep 10
+    fi
+done
+
+# Get SSL certificates
+echo -e "${YELLOW}🔐 Obteniendo certificados SSL de Let's Encrypt...${NC}"
+docker-compose -f docker-compose.ssl.yml run --rm certbot certonly \
+    --webroot \
+    --webroot-path=/var/www/certbot \
+    --email $EMAIL \
+    --agree-tos \
+    --no-eff-email \
+    --force-renewal \
+    -d $DOMAIN \
+    -d www.$DOMAIN
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ Error obteniendo certificados SSL${NC}"
+    echo -e "${YELLOW}Verifica:${NC}"
+    echo -e "${YELLOW}1. DNS: $DOMAIN apunta a esta IP${NC}"
+    echo -e "${YELLOW}2. Puertos 80 y 443 están abiertos${NC}"
+    echo -e "${YELLOW}3. No hay otros servicios en estos puertos${NC}"
+    exit 1
+fi
+
+# Copy certificates to Nginx location
+echo -e "${YELLOW}📋 Copiando certificados SSL...${NC}"
+cp data/certbot/conf/live/$DOMAIN/fullchain.pem nginx/ssl-certs/
+cp data/certbot/conf/live/$DOMAIN/privkey.pem nginx/ssl-certs/
+cp data/certbot/conf/live/$DOMAIN/chain.pem nginx/ssl-certs/
+
+# Restart Nginx with real certificates
+echo -e "${YELLOW}🔄 Reiniciando Nginx con certificados de producción...${NC}"
+docker-compose -f docker-compose.ssl.yml restart nginx
+
+sleep 10
+
+# Verify HTTPS
+echo -e "${YELLOW}🔍 Verificando configuración HTTPS...${NC}"
+if curl -f https://localhost/health &>/dev/null; then
+    echo -e "${GREEN}✅ HTTPS configurado correctamente!${NC}"
+else
+    echo -e "${RED}❌ Error: HTTPS no está funcionando${NC}"
+    docker-compose -f docker-compose.ssl.yml logs nginx
+    exit 1
+fi
+
+# Configure automatic renewal
+echo -e "${YELLOW}⚙️ Configurando renovación automática de certificados...${NC}"
+cat > /usr/local/bin/ssl-renewal.sh << EOF
+#!/bin/bash
+cd $PROJECT_DIR
+docker-compose -f docker-compose.ssl.yml run --rm certbot renew --quiet
+if [ \$? -eq 0 ]; then
+    # Copy updated certificates
+    cp data/certbot/conf/live/$DOMAIN/fullchain.pem nginx/ssl-certs/
+    cp data/certbot/conf/live/$DOMAIN/privkey.pem nginx/ssl-certs/
+    cp data/certbot/conf/live/$DOMAIN/chain.pem nginx/ssl-certs/
+    # Restart Nginx
+    docker-compose -f docker-compose.ssl.yml restart nginx
+    echo "\$(date): Certificados SSL renovados exitosamente" >> /var/log/ssl-renewal.log
+else
+    echo "\$(date): Error renovando certificados SSL" >> /var/log/ssl-renewal.log
+fi
+EOF
+
+chmod +x /usr/local/bin/ssl-renewal.sh
+
+# Configure cron job for renewal (daily at 3:00 AM)
+(crontab -l 2>/dev/null; echo "0 3 * * * /usr/local/bin/ssl-renewal.sh") | crontab -
+
+echo -e "${GREEN}✅ SSL configurado y renovación automática habilitada${NC}"
+
+# ==============================================================================
+# PHASE 7: CONFIGURE DATABASE
+# ==============================================================================
+echo -e "\n${YELLOW}💾 PHASE 7: Configure Database${NC}"
 
 # Verify backend configuration with detailed logging
 echo -e "${BLUE}Verifying backend Cognito configuration...${NC}"
-CONFIG_CHECK=$(docker-compose -f docker-compose.ec2.yml exec -T web python -c "
+CONFIG_CHECK=$(docker-compose -f docker-compose.ssl.yml exec -T web python -c "
 import os
 from pathlib import Path
 
@@ -157,20 +275,20 @@ except Exception as e:
 echo "$CONFIG_CHECK"
 
 # Create and apply migrations
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py makemigrations
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
+docker-compose -f docker-compose.ssl.yml exec -T web python manage.py makemigrations
+docker-compose -f docker-compose.ssl.yml exec -T web python manage.py migrate
 
 # Collect static files
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput --clear
+docker-compose -f docker-compose.ssl.yml exec -T web python manage.py collectstatic --noinput --clear
 
 # Note: No superuser or test data creation - using AWS Cognito authentication
 
 echo -e "${GREEN}✅ Database configured${NC}"
 
 # ==============================================================================
-# PHASE 7: FINAL VERIFICATION
+# PHASE 8: FINAL VERIFICATION
 # ==============================================================================
-echo -e "\n${YELLOW}🔍 PHASE 7: Final Verification${NC}"
+echo -e "\n${YELLOW}🔍 PHASE 8: Final Verification${NC}"
 
 # Wait for services to be ready
 sleep 10
@@ -198,14 +316,24 @@ done
 
 # Show recent backend logs for debugging
 echo -e "${BLUE}Recent backend logs (last 20 lines):${NC}"
-docker-compose -f docker-compose.ec2.yml logs --tail=20 web || echo "Could not fetch logs"
+docker-compose -f docker-compose.ssl.yml logs --tail=20 web || echo "Could not fetch logs"
 
-# Test domain
-DOMAIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://$DOMAIN/ 2>/dev/null || echo "000")
-if [ "$DOMAIN_STATUS" = "200" ]; then
-    echo -e "${GREEN}✅ Domain working (Status: $DOMAIN_STATUS)${NC}"
+# Test HTTPS domain
+echo -e "${BLUE}Testing HTTPS domain...${NC}"
+HTTPS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://$DOMAIN/ 2>/dev/null || echo "000")
+if [ "$HTTPS_STATUS" = "200" ]; then
+    echo -e "${GREEN}✅ HTTPS Domain working (Status: $HTTPS_STATUS)${NC}"
 else
-    echo -e "${YELLOW}⚠️ Domain Status: $DOMAIN_STATUS${NC}"
+    echo -e "${YELLOW}⚠️ HTTPS Domain Status: $HTTPS_STATUS${NC}"
+fi
+
+# Test HTTP redirect
+echo -e "${BLUE}Testing HTTP to HTTPS redirect...${NC}"
+HTTP_REDIRECT=$(curl -s -o /dev/null -w "%{http_code}" http://$DOMAIN/ 2>/dev/null || echo "000")
+if [ "$HTTP_REDIRECT" = "301" ] || [ "$HTTP_REDIRECT" = "302" ]; then
+    echo -e "${GREEN}✅ HTTP redirect working (Status: $HTTP_REDIRECT)${NC}"
+else
+    echo -e "${YELLOW}⚠️ HTTP redirect Status: $HTTP_REDIRECT${NC}"
 fi
 
 # Clean up final
@@ -216,12 +344,12 @@ show_space "Final space"
 # ==============================================================================
 # DEPLOYMENT COMPLETE
 # ==============================================================================
-echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED!${NC}"
-echo -e "${BLUE}════════════════════════════════════${NC}"
-echo -e "${BLUE}🌐 Application URLs:${NC}"
-echo -e "   Frontend: ${GREEN}http://$DOMAIN${NC}"
-echo -e "   API: ${GREEN}http://$DOMAIN/api/v1/${NC}"
-echo -e "   Admin: ${GREEN}http://$DOMAIN/api/v1/admin/${NC}"
+echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT WITH HTTPS COMPLETED!${NC}"
+echo -e "${BLUE}═══════════════════════════════════════════${NC}"
+echo -e "${BLUE}🌐 Application URLs (HTTPS):${NC}"
+echo -e "   Frontend: ${GREEN}https://$DOMAIN${NC}"
+echo -e "   API: ${GREEN}https://$DOMAIN/api/v1/${NC}"
+echo -e "   Admin: ${GREEN}https://$DOMAIN/api/v1/admin/${NC}"
 echo -e ""
 echo -e "${BLUE}🔐 Login Access:${NC}"
 echo -e "   Use AWS Cognito credentials${NC}"
@@ -232,17 +360,20 @@ echo -e "   User Pool: ${COGNITO_USER_POOL_ID}"
 echo -e "   Region: ${AWS_REGION}"
 echo -e ""
 echo -e "${YELLOW}✅ Ready to use:${NC}"
-echo -e "1. Access application at: ${GREEN}http://$DOMAIN${NC}"
+echo -e "1. Access application at: ${GREEN}https://$DOMAIN${NC}"
 echo -e "2. Login with your existing Cognito credentials"
 echo -e "3. Users and groups already configured in AWS"
+echo -e "4. SSL certificates auto-renew daily at 3:00 AM"
 echo -e ""
-echo -e "${GREEN}✨ Restaurant Web Application is READY!${NC}"
+echo -e "${GREEN}✨ Restaurant Web Application with HTTPS is READY!${NC}"
 echo -e ""
 echo -e "${YELLOW}🔍 Troubleshooting:${NC}"
-echo -e "1. Check backend logs: docker-compose -f docker-compose.ec2.yml logs web"
-echo -e "2. Test API manually: curl -v http://$DOMAIN/api/v1/zones/"
-echo -e "3. Check container environment: docker-compose -f docker-compose.ec2.yml exec web env | grep COGNITO"
-echo -e "4. Verify user groups in AWS Cognito console"
+echo -e "1. Check backend logs: docker-compose -f docker-compose.ssl.yml logs web"
+echo -e "2. Check nginx logs: docker-compose -f docker-compose.ssl.yml logs nginx"
+echo -e "3. Test API manually: curl -v https://$DOMAIN/api/v1/zones/"
+echo -e "4. Check container environment: docker-compose -f docker-compose.ssl.yml exec web env | grep COGNITO"
+echo -e "5. Verify user groups in AWS Cognito console"
+echo -e "6. Check SSL certificates: openssl x509 -in nginx/ssl-certs/fullchain.pem -text -noout"
 echo -e ""
 echo -e "${BLUE}🔍 User Permission Debug:${NC}"
 echo -e "If you get 'No tienes permiso' errors:"
