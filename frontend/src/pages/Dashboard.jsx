@@ -13,7 +13,6 @@ import {
   Utensils,
   Activity,
   CreditCard,
-  RefreshCw,
   AlertCircle
 } from 'lucide-react';
 import { apiService } from '../services/api';
@@ -78,8 +77,8 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Cargando dashboard...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando datos detallados...</p>
         </div>
       </div>
     );
@@ -124,7 +123,7 @@ const Dashboard = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Dashboard de Ventas</h1>
-              <p className="text-gray-600 mt-1">Reporte consolidado - Solo pedidos pagados</p>
+              <p className="text-gray-600 mt-1">Datos detallados en tiempo real - Solo pedidos pagados</p>
             </div>
             
             <div className="flex items-center gap-3">
@@ -140,20 +139,13 @@ const Dashboard = () => {
               </div>
               
               <button
-                onClick={loadDashboardData}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </button>
-              
-              <button
                 onClick={handleDownloadExcel}
                 disabled={downloading}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                title="Descargar reporte en Excel/CSV"
+                title="Descargar reporte detallado completo"
               >
                 <Download className="h-4 w-4" />
-                {downloading ? 'Descargando...' : 'Descargar'}
+                {downloading ? 'Descargando...' : 'Descargar Completo'}
               </button>
             </div>
           </div>
