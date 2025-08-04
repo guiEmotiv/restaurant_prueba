@@ -148,19 +148,19 @@ const Dashboard = () => {
               
               <button
                 onClick={handleDownloadExcel}
-                disabled={true}
-                className="px-4 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed flex items-center gap-2"
-                title="Funcionalidad Excel temporalmente deshabilitada"
+                disabled={downloading}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                title="Descargar reporte en Excel/CSV"
               >
                 <Download className="h-4 w-4" />
-                Excel (Próximamente)
+                {downloading ? 'Descargando...' : 'Descargar'}
               </button>
             </div>
           </div>
           
           {/* Métricas principales */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6 rounded-xl text-white">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+            <div className="bg-green-600 p-6 rounded-xl text-white">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-green-100 text-sm">Ingresos Totales</p>
@@ -170,7 +170,7 @@ const Dashboard = () => {
               </div>
             </div>
             
-            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-xl text-white">
+            <div className="bg-blue-600 p-6 rounded-xl text-white">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-100 text-sm">Órdenes Pagadas</p>
@@ -180,13 +180,28 @@ const Dashboard = () => {
               </div>
             </div>
             
-            <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-6 rounded-xl text-white">
+            <div className="bg-purple-600 p-6 rounded-xl text-white">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-purple-100 text-sm">Ticket Promedio</p>
                   <p className="text-2xl font-bold">{formatCurrency(summary.average_ticket)}</p>
                 </div>
                 <Users className="h-8 w-8 text-purple-200" />
+              </div>
+            </div>
+            
+            <div className="bg-orange-600 p-6 rounded-xl text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100 text-sm">Tiempo Promedio</p>
+                  <p className="text-2xl font-bold">
+                    {summary.average_service_time 
+                      ? `${Math.round(summary.average_service_time)} min` 
+                      : 'N/A'
+                    }
+                  </p>
+                </div>
+                <Timer className="h-8 w-8 text-orange-200" />
               </div>
             </div>
           </div>
@@ -230,7 +245,11 @@ const Dashboard = () => {
               })}
               
               {category_breakdown.length === 0 && (
-                <p className="text-center text-gray-500 py-8">Sin datos de categorías</p>
+                <div className="text-center text-gray-500 py-8">
+                  <PieChart className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                  <p>Sin datos de categorías para esta fecha</p>
+                  <p className="text-sm">Verifica que existan pedidos pagados</p>
+                </div>
               )}
             </div>
           </div>
@@ -266,7 +285,11 @@ const Dashboard = () => {
               ))}
               
               {top_dishes.length === 0 && (
-                <p className="text-center text-gray-500 py-8">Sin datos de platos</p>
+                <div className="text-center text-gray-500 py-8">
+                  <Award className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                  <p>Sin datos de platos para esta fecha</p>
+                  <p className="text-sm">Verifica que existan pedidos pagados</p>
+                </div>
               )}
             </div>
           </div>
@@ -297,7 +320,10 @@ const Dashboard = () => {
               ))}
               
               {waiter_performance.length === 0 && (
-                <p className="text-center text-gray-500 py-4">Sin datos</p>
+                <div className="text-center text-gray-500 py-4">
+                  <UserCheck className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm">Sin datos de meseros</p>
+                </div>
               )}
             </div>
           </div>
@@ -324,7 +350,10 @@ const Dashboard = () => {
               ))}
               
               {zone_performance.length === 0 && (
-                <p className="text-center text-gray-500 py-4">Sin datos</p>
+                <div className="text-center text-gray-500 py-4">
+                  <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm">Sin datos de zonas</p>
+                </div>
               )}
             </div>
           </div>
@@ -349,7 +378,10 @@ const Dashboard = () => {
               ))}
               
               {top_tables.length === 0 && (
-                <p className="text-center text-gray-500 py-4">Sin datos</p>
+                <div className="text-center text-gray-500 py-4">
+                  <Utensils className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm">Sin datos de mesas</p>
+                </div>
               )}
             </div>
           </div>
@@ -382,7 +414,9 @@ const Dashboard = () => {
             
             {payment_methods.length === 0 && (
               <div className="col-span-full text-center text-gray-500 py-8">
-                Sin datos de métodos de pago
+                <CreditCard className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                <p>Sin datos de métodos de pago para esta fecha</p>
+                <p className="text-sm">Verifica que existan pedidos pagados</p>
               </div>
             )}
           </div>

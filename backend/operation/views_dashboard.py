@@ -68,12 +68,18 @@ class DashboardViewSet(viewsets.ViewSet):
             zone_revenue = {}
             table_revenue = {}
             payment_method_totals = {}
+            service_times = []
             
             # Procesar cada orden pagada
             print(f"🔍 Processing {total_orders} orders...")
             
             for order in paid_orders:
                 try:
+                    # Calcular tiempo de servicio
+                    if order.created_at and order.paid_at:
+                        service_time_minutes = int((order.paid_at - order.created_at).total_seconds() / 60)
+                        service_times.append(service_time_minutes)
+                    
                     # Stats por mesero
                     waiter_key = order.waiter or 'Sin asignar'
                     if waiter_key not in waiter_revenue:
@@ -127,6 +133,9 @@ class DashboardViewSet(viewsets.ViewSet):
                     continue
             
             print("✅ Finished processing orders, calculating final stats...")
+            
+            # Calcular tiempo de servicio promedio
+            average_service_time = sum(service_times) / len(service_times) if service_times else 0
             
             # Calcular porcentajes para categorías
             total_category_revenue = sum(cat['revenue'] for cat in category_stats.values())
@@ -202,7 +211,8 @@ class DashboardViewSet(viewsets.ViewSet):
                 'summary': {
                     'total_orders': total_orders,
                     'total_revenue': float(total_revenue),
-                    'average_ticket': float(average_ticket)
+                    'average_ticket': float(average_ticket),
+                    'average_service_time': float(average_service_time)
                 },
                 'category_breakdown': category_breakdown,
                 'top_dishes': top_dishes,
@@ -211,6 +221,19 @@ class DashboardViewSet(viewsets.ViewSet):
                 'top_tables': top_tables,
                 'payment_methods': payment_methods
             }
+            
+            # Debug: imprimir resumen de datos
+            print(f"✅ RESUMEN DE DATOS GENERADOS:")
+            print(f"   📊 Órdenes: {total_orders}")
+            print(f"   💰 Ingresos: {total_revenue}")
+            print(f"   📈 Ticket promedio: {average_ticket}")
+            print(f"   ⏱️ Tiempo servicio: {average_service_time:.1f} min")
+            print(f"   🏷️ Categorías: {len(category_breakdown)}")
+            print(f"   🍽️ Top platos: {len(top_dishes)}")
+            print(f"   👤 Meseros: {len(waiter_performance)}")
+            print(f"   🏢 Zonas: {len(zone_performance)}")
+            print(f"   🪑 Mesas top: {len(top_tables)}")
+            print(f"   💳 Métodos pago: {len(payment_methods)}")
             
             print(f"✅ Returning response with {total_orders} orders processed")
             return Response(response_data)
@@ -230,8 +253,196 @@ class DashboardViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def export_excel(self, request):
         """
-        Placeholder para exportación a Excel - funcionalidad deshabilitada temporalmente
+        Exporta el reporte del dashboard a Excel (CSV como fallback)
         """
-        return Response({
-            'error': 'Excel export temporarily disabled - use dashboard view for data'
-        }, status=status.HTTP_501_NOT_IMPLEMENTED)
+        try:
+            print("🔍 Starting Excel/CSV export...")
+            
+            # Obtener datos usando el mismo método
+            report_response = self.report(request)
+            if report_response.status_code != 200:
+                return report_response
+            
+            response_data = report_response.data
+            print(f"✅ Got dashboard data for export: {response_data.get('date')}")
+            
+            # Intentar importar openpyxl
+            try:
+                import openpyxl
+                from openpyxl.styles import Font, PatternFill, Alignment
+                excel_available = True
+                print("✅ openpyxl available - generating Excel file")
+            except ImportError:
+                excel_available = False
+                print("⚠️ openpyxl not available - generating CSV file")
+            
+            if excel_available:
+                # Generar Excel
+                return self._generate_excel(response_data)
+            else:
+                # Generar CSV como fallback
+                return self._generate_csv(response_data)
+                
+        except Exception as e:
+            print(f"❌ Error generating export file: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'error': f'Error generating export file: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _generate_csv(self, response_data):
+        """
+        Genera un CSV con los datos del dashboard
+        """
+        import csv
+        from django.http import HttpResponse
+        import io
+        
+        print("📊 Generating CSV export...")
+        
+        # Crear CSV en memoria
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Header del archivo
+        writer.writerow([f"Dashboard de Ventas - {response_data['date']}"])
+        writer.writerow([])
+        
+        # Resumen
+        writer.writerow(['RESUMEN GENERAL'])
+        writer.writerow(['Métrica', 'Valor'])
+        writer.writerow(['Total de Órdenes', response_data['summary']['total_orders']])
+        writer.writerow(['Ingresos Totales', f"S/ {response_data['summary']['total_revenue']:.2f}"])
+        writer.writerow(['Ticket Promedio', f"S/ {response_data['summary']['average_ticket']:.2f}"])
+        writer.writerow(['Tiempo Servicio Promedio', f"{response_data['summary']['average_service_time']:.1f} min"])
+        writer.writerow([])
+        
+        # Categorías
+        writer.writerow(['VENTAS POR CATEGORÍA'])
+        writer.writerow(['Categoría', 'Ingresos', 'Cantidad', 'Porcentaje'])
+        for cat in response_data['category_breakdown']:
+            writer.writerow([
+                cat['category'],
+                f"S/ {cat['revenue']:.2f}",
+                cat['quantity'],
+                f"{cat['percentage']:.1f}%"
+            ])
+        writer.writerow([])
+        
+        # Top platos
+        writer.writerow(['TOP PLATOS'])
+        writer.writerow(['Ranking', 'Plato', 'Categoría', 'Cantidad', 'Ingresos', 'Precio Unitario'])
+        for idx, dish in enumerate(response_data['top_dishes'], 1):
+            writer.writerow([
+                idx,
+                dish['name'],
+                dish['category'],
+                dish['quantity'],
+                f"S/ {dish['revenue']:.2f}",
+                f"S/ {dish['unit_price']:.2f}"
+            ])
+        writer.writerow([])
+        
+        # Performance meseros
+        writer.writerow(['PERFORMANCE MESEROS'])
+        writer.writerow(['Mesero', 'Órdenes', 'Ingresos', 'Ticket Promedio'])
+        for waiter in response_data['waiter_performance']:
+            writer.writerow([
+                waiter['waiter'],
+                waiter['orders'],
+                f"S/ {waiter['revenue']:.2f}",
+                f"S/ {waiter['average_ticket']:.2f}"
+            ])
+        writer.writerow([])
+        
+        # Performance zonas
+        writer.writerow(['PERFORMANCE ZONAS'])
+        writer.writerow(['Zona', 'Órdenes', 'Ingresos', 'Mesas Usadas', 'Promedio por Mesa'])
+        for zone in response_data['zone_performance']:
+            writer.writerow([
+                zone['zone'],
+                zone['orders'],
+                f"S/ {zone['revenue']:.2f}",
+                zone['tables_used'],
+                f"S/ {zone['average_per_table']:.2f}"
+            ])
+        writer.writerow([])
+        
+        # Métodos de pago
+        writer.writerow(['MÉTODOS DE PAGO'])
+        writer.writerow(['Método', 'Monto', 'Porcentaje'])
+        for method in response_data['payment_methods']:
+            writer.writerow([
+                method['method'],
+                f"S/ {method['amount']:.2f}",
+                f"{method['percentage']:.1f}%"
+            ])
+        
+        # Preparar respuesta
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        filename = f"dashboard_ventas_{response_data['date']}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response.write(output.getvalue())
+        
+        print("✅ CSV file generated successfully")
+        return response
+    
+    def _generate_excel(self, response_data):
+        """
+        Genera un archivo Excel con los datos del dashboard
+        """
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from django.http import HttpResponse
+        
+        print("📊 Generating Excel export...")
+        
+        # Crear libro de Excel
+        wb = openpyxl.Workbook()
+        
+        # Estilos
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        header_fill = PatternFill("solid", fgColor="366092")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Hoja 1: Resumen General
+        ws_summary = wb.active
+        ws_summary.title = "Resumen"
+        
+        # Título
+        ws_summary.merge_cells('A1:D1')
+        ws_summary['A1'] = f"Dashboard de Ventas - {response_data['date']}"
+        ws_summary['A1'].font = Font(bold=True, size=16)
+        ws_summary['A1'].alignment = Alignment(horizontal="center")
+        
+        # Resumen
+        ws_summary['A3'] = "Métrica"
+        ws_summary['B3'] = "Valor"
+        ws_summary['A3'].font = header_font
+        ws_summary['B3'].font = header_font
+        ws_summary['A3'].fill = header_fill
+        ws_summary['B3'].fill = header_fill
+        
+        summary_data = [
+            ("Total de Órdenes", response_data['summary']['total_orders']),
+            ("Ingresos Totales", f"S/ {response_data['summary']['total_revenue']:.2f}"),
+            ("Ticket Promedio", f"S/ {response_data['summary']['average_ticket']:.2f}"),
+            ("Tiempo Servicio Promedio", f"{response_data['summary']['average_service_time']:.1f} min")
+        ]
+        
+        for idx, (metric, value) in enumerate(summary_data, start=4):
+            ws_summary[f'A{idx}'] = metric
+            ws_summary[f'B{idx}'] = value
+        
+        # Preparar respuesta HTTP
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        filename = f"dashboard_ventas_{response_data['date']}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Guardar y retornar
+        wb.save(response)
+        print("✅ Excel file generated successfully")
+        return response
