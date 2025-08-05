@@ -16,7 +16,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuration
-DOMAIN="elfogondedonsoto.com"
+DOMAIN="xn--elfogndedonsoto-zrb.com"
 EMAIL="elfogondedonsoto@gmail.com"
 PROJECT_DIR="/opt/restaurant-web"
 
