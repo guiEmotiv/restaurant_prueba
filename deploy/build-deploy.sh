@@ -65,11 +65,9 @@ echo -e "\n${YELLOW}🏗️ PHASE 5: Build and Deploy${NC}"
 # Stop all services and clean up
 echo -e "${YELLOW}🛑 Stopping all services...${NC}"
 docker-compose -f docker-compose.ec2.yml down -v
-docker-compose -f docker-compose.ssl.yml down -v 2>/dev/null || true
 systemctl stop nginx 2>/dev/null || true
 systemctl stop apache2 2>/dev/null || true
 fuser -k 80/tcp 2>/dev/null || true
-fuser -k 443/tcp 2>/dev/null || true
 
 # Clean up old database files
 echo -e "${YELLOW}🧹 Cleaning up old data...${NC}"
