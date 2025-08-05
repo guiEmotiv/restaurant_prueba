@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Restaurant Web - Build and Deploy Script
-# Simple HTTP deployment that works
+# Restaurant Web - Build and Deploy Script with HTTPS
+# Complete deployment with SSL using system nginx
 
-echo "🚀 Restaurant Web - Build & Deploy"
-echo "=================================="
+echo "🚀 Restaurant Web - Build & Deploy with HTTPS"
+echo "=============================================="
 
 # Colors for output
 RED='\033[0;31m'
@@ -85,7 +85,7 @@ cat > .env.production << EOF
 # Generated: $(date)
 
 # API Configuration
-VITE_API_URL=http://$DOMAIN
+VITE_API_URL=https://$DOMAIN
 
 # AWS Cognito Configuration - MUST match backend
 VITE_AWS_REGION=$AWS_REGION
@@ -97,7 +97,7 @@ EOF
 cp .env.production .env.local
 
 echo -e "${BLUE}Frontend environment variables:${NC}"
-echo -e "  VITE_API_URL=http://$DOMAIN"
+echo -e "  VITE_API_URL=https://$DOMAIN"
 echo -e "  VITE_AWS_REGION=$AWS_REGION"
 echo -e "  VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID"
 echo -e "  VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID"
@@ -109,7 +109,7 @@ npm install --silent --no-fund --no-audit
 
 # Build frontend with explicit environment variables
 echo -e "${BLUE}Building frontend with Cognito configuration...${NC}"
-VITE_API_URL=http://$DOMAIN \
+VITE_API_URL=https://$DOMAIN \
 VITE_AWS_REGION=$AWS_REGION \
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID \
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID \
@@ -203,9 +203,184 @@ EOF
 echo -e "${GREEN}✅ Database configured${NC}"
 
 # ==============================================================================
-# PHASE 7: FINAL VERIFICATION
+# PHASE 7: CONFIGURE NGINX AND HTTPS
 # ==============================================================================
-echo -e "\n${YELLOW}🔍 PHASE 7: Final Verification${NC}"
+echo -e "\n${YELLOW}🔒 PHASE 7: Configure NGINX and HTTPS${NC}"
+
+# Install nginx if not present
+if ! command -v nginx &> /dev/null; then
+    echo -e "${BLUE}Installing nginx...${NC}"
+    apt-get update -qq
+    apt-get install -y nginx
+fi
+
+# Stop nginx to avoid conflicts
+systemctl stop nginx 2>/dev/null || true
+
+# Deploy frontend to nginx directory
+echo -e "${BLUE}Deploying frontend to nginx...${NC}"
+rm -rf /var/www/restaurant
+mkdir -p /var/www/restaurant
+cp -r frontend/dist/* /var/www/restaurant/
+chown -R www-data:www-data /var/www/restaurant
+
+# Create nginx configuration (HTTP first)
+echo -e "${BLUE}Creating nginx configuration...${NC}"
+cat > /etc/nginx/sites-available/restaurant << 'EOF'
+server {
+    listen 80;
+    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+
+    root /var/www/restaurant;
+    index index.html;
+
+    # API proxy to Docker backend
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # Django admin
+    location /admin/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Django static files
+    location /static/ {
+        alias /opt/restaurant-web/data/staticfiles/;
+        expires 30d;
+    }
+
+    # Frontend routes
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+}
+EOF
+
+# Enable site and remove default
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/restaurant /etc/nginx/sites-enabled/
+
+# Test nginx config
+nginx -t
+
+# Start nginx
+systemctl start nginx
+systemctl enable nginx
+
+# Test HTTP first
+echo -e "${BLUE}Testing HTTP...${NC}"
+sleep 3
+if curl -f http://localhost/api/v1/health/ &>/dev/null; then
+    echo -e "${GREEN}✅ HTTP working${NC}"
+else
+    echo -e "${YELLOW}⚠️ HTTP test inconclusive, continuing...${NC}"
+fi
+
+# Install certbot using apt (simpler than snap)
+echo -e "${BLUE}Installing certbot...${NC}"
+apt-get install -y python3-certbot-nginx
+
+# Stop nginx for standalone mode
+systemctl stop nginx
+
+# Get SSL certificate using standalone mode
+echo -e "${BLUE}Getting SSL certificate...${NC}"
+certbot certonly \
+    --standalone \
+    -d $DOMAIN \
+    -d www.$DOMAIN \
+    --non-interactive \
+    --agree-tos \
+    --email elfogondedonsoto@gmail.com
+
+# Update nginx config with HTTPS
+cat > /etc/nginx/sites-available/restaurant << 'EOF'
+server {
+    listen 80;
+    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+
+    ssl_certificate /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/privkey.pem;
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    root /var/www/restaurant;
+    index index.html;
+
+    # API proxy to Docker backend
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Ssl on;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # Django admin
+    location /admin/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Ssl on;
+    }
+
+    # Django static files
+    location /static/ {
+        alias /opt/restaurant-web/data/staticfiles/;
+        expires 30d;
+    }
+
+    # Frontend routes
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+}
+EOF
+
+# Start nginx with HTTPS
+systemctl start nginx
+
+# Configure auto-renewal
+echo "0 0,12 * * * root certbot renew --quiet --post-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
+
+echo -e "${GREEN}✅ HTTPS configured${NC}"
+
+# ==============================================================================
+# PHASE 8: FINAL VERIFICATION
+# ==============================================================================
+echo -e "\n${YELLOW}🔍 PHASE 8: Final Verification${NC}"
 
 # Wait for services to be ready
 sleep 10
@@ -265,10 +440,10 @@ show_space "Final space"
 # ==============================================================================
 echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED!${NC}"
 echo -e "${BLUE}════════════════════════════════════${NC}"
-echo -e "${BLUE}🌐 Application URLs:${NC}"
-echo -e "   Frontend: ${GREEN}http://$DOMAIN${NC}"
-echo -e "   API: ${GREEN}http://$DOMAIN/api/v1/${NC}"
-echo -e "   Admin: ${GREEN}http://$DOMAIN/api/v1/admin/${NC}"
+echo -e "${BLUE}🌐 Application URLs (HTTPS):${NC}"
+echo -e "   Frontend: ${GREEN}https://$DOMAIN${NC}"
+echo -e "   API: ${GREEN}https://$DOMAIN/api/v1/${NC}"
+echo -e "   Admin: ${GREEN}https://$DOMAIN/api/v1/admin/${NC}"
 echo -e ""
 echo -e "${BLUE}🔐 Login Access:${NC}"
 echo -e "   Use AWS Cognito credentials${NC}"
@@ -279,7 +454,7 @@ echo -e "   User Pool: ${COGNITO_USER_POOL_ID}"
 echo -e "   Region: ${AWS_REGION}"
 echo -e ""
 echo -e "${YELLOW}✅ Ready to use:${NC}"
-echo -e "1. Access application at: ${GREEN}http://$DOMAIN${NC}"
+echo -e "1. Access application at: ${GREEN}https://$DOMAIN${NC}"
 echo -e "2. Login with your existing Cognito credentials"
 echo -e "3. Users and groups already configured in AWS"
 echo -e ""
@@ -287,7 +462,7 @@ echo -e "${GREEN}✨ Restaurant Web Application is READY!${NC}"
 echo -e ""
 echo -e "${YELLOW}🔍 Troubleshooting:${NC}"
 echo -e "1. Check backend logs: docker-compose -f docker-compose.ec2.yml logs web"
-echo -e "2. Test API manually: curl -v http://$DOMAIN/api/v1/zones/"
+echo -e "2. Test API manually: curl -v https://$DOMAIN/api/v1/zones/"
 echo -e "3. Check container environment: docker-compose -f docker-compose.ec2.yml exec web env | grep COGNITO"
 echo -e "4. Verify user groups in AWS Cognito console"
 echo -e ""
