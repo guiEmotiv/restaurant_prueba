@@ -70,7 +70,7 @@ chmod 600 "$PROJECT_DIR/.env.ec2"
 
 cp "$PROJECT_DIR/.env.ec2" "$BACKEND_DIR/.env"
 
-# Configure Nginx
+# Configure Nginx (basic HTTP config that will be overwritten by build-deploy.sh)
 echo -e "${BLUE}🌐 Configuring nginx...${NC}"
 rm -f /etc/nginx/sites-enabled/default
 

@@ -224,9 +224,10 @@ mkdir -p /var/www/restaurant
 cp -r frontend/dist/* /var/www/restaurant/
 chown -R www-data:www-data /var/www/restaurant
 
-# Create nginx configuration (HTTP first)
+# Create nginx configuration (HTTP first) - overwrite any existing config
 echo -e "${BLUE}Creating nginx configuration...${NC}"
-cat > /etc/nginx/sites-available/restaurant << 'EOF'
+rm -f /etc/nginx/sites-enabled/*
+cat > /etc/nginx/sites-available/$DOMAIN << 'EOF'
 server {
     listen 80;
     server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
@@ -271,9 +272,9 @@ server {
 }
 EOF
 
-# Enable site and remove default
-rm -f /etc/nginx/sites-enabled/default
-ln -sf /etc/nginx/sites-available/restaurant /etc/nginx/sites-enabled/
+# Enable site and remove any conflicting configs
+rm -f /etc/nginx/sites-enabled/*
+ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
 
 # Test nginx config
 nginx -t
@@ -371,8 +372,8 @@ fi
 
 echo -e "${GREEN}✅ SSL certificate obtained successfully${NC}"
 
-# Update nginx config with HTTPS
-cat > /etc/nginx/sites-available/restaurant << 'EOF'
+# Update nginx config with HTTPS - use same filename
+cat > /etc/nginx/sites-available/$DOMAIN << 'EOF'
 server {
     listen 80;
     server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
