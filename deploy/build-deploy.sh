@@ -298,21 +298,43 @@ echo -e "${BLUE}Installing certbot (fixing OpenSSL issues)...${NC}"
 apt-get remove -y certbot python3-certbot-nginx 2>/dev/null || true
 apt-get autoremove -y
 
-# Install via pip (more reliable for older Ubuntu)
+# Install via pip (more reliable for older Ubuntu) as root
 apt-get install -y python3-pip python3-venv
 python3 -m pip install --upgrade pip
-python3 -m pip install certbot
+python3 -m pip install --root-user-action=ignore certbot
 
-# Ensure certbot is in PATH
-export PATH="/home/ubuntu/.local/bin:$PATH"
-echo 'export PATH="/home/ubuntu/.local/bin:$PATH"' >> /etc/environment
+# Find where certbot was installed
+CERTBOT_PATH=$(which certbot 2>/dev/null || find /usr/local/bin /root/.local/bin /home/ubuntu/.local/bin -name "certbot" 2>/dev/null | head -1)
+
+if [ -z "$CERTBOT_PATH" ]; then
+    echo -e "${RED}❌ Certbot installation failed${NC}"
+    echo -e "${YELLOW}⚠️ Continuing with HTTP only...${NC}"
+    
+    # Start nginx with HTTP config
+    systemctl start nginx
+    
+    show_space "Final space"
+    
+    echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED (HTTP ONLY)!${NC}"
+    echo -e "${BLUE}════════════════════════════════════${NC}"
+    echo -e "${BLUE}🌐 Application URLs (HTTP):${NC}"
+    echo -e "   Frontend: ${GREEN}http://$DOMAIN${NC}"
+    echo -e "   API: ${GREEN}http://$DOMAIN/api/v1/${NC}"
+    echo -e "   Admin: ${GREEN}http://$DOMAIN/api/v1/admin/${NC}"
+    echo -e ""
+    echo -e "${YELLOW}⚠️ HTTPS setup failed - application running on HTTP${NC}"
+    echo -e "${YELLOW}You can manually setup SSL later or check domain DNS${NC}"
+    exit 0
+fi
+
+echo -e "${GREEN}✅ Certbot found at: $CERTBOT_PATH${NC}"
 
 # Stop nginx for standalone mode
 systemctl stop nginx
 
-# Get SSL certificate using standalone mode with installed certbot
+# Get SSL certificate using found certbot path
 echo -e "${BLUE}Getting SSL certificate...${NC}"
-/home/ubuntu/.local/bin/certbot certonly \
+$CERTBOT_PATH certonly \
     --standalone \
     -d $DOMAIN \
     -d www.$DOMAIN \
@@ -414,7 +436,7 @@ EOF
 systemctl start nginx
 
 # Configure auto-renewal with correct certbot path
-echo "0 0,12 * * * root /home/ubuntu/.local/bin/certbot renew --quiet --post-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
+echo "0 0,12 * * * root $CERTBOT_PATH renew --quiet --post-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
 
 echo -e "${GREEN}✅ HTTPS configured${NC}"
 
