@@ -39,85 +39,190 @@ fi
 cd $PROJECT_DIR
 
 # Update code from git
-echo -e "${BLUE}📥 Updating code...${NC}"
+echo -e "${YELLOW}📥 Actualizando código desde repositorio...${NC}"
 git pull origin main
 
-# Check if initial setup was run - exit gracefully if not
+# Check if initial setup was run
 if [ ! -f "$PROJECT_DIR/.env.ec2" ]; then
-    echo -e "${RED}❌ Run setup-initial.sh first${NC}"
+    echo -e "${RED}❌ Initial setup not found. Run setup-initial.sh first${NC}"
     exit 1
 fi
 
-# Stop services and clean minimal
-echo -e "${BLUE}🛑 Stopping services...${NC}"
+# Function to show space
+show_space() {
+    local label="$1"
+    local space=$(df / | tail -1 | awk '{print int($4/1024/1024)}')
+    echo -e "${BLUE}💾 ${label}: ${space}GB${NC}"
+}
+
+show_space "Before build"
+
+# ==============================================================================
+# PHASE 5: BUILD AND DEPLOY
+# ==============================================================================
+echo -e "\n${YELLOW}🏗️ PHASE 5: Build and Deploy${NC}"
+
+# Stop all services and clean up
+echo -e "${YELLOW}🛑 Stopping all services...${NC}"
 docker-compose -f docker-compose.ec2.yml down -v
-systemctl stop nginx
+systemctl stop nginx 2>/dev/null || true
+systemctl stop apache2 2>/dev/null || true
+fuser -k 80/tcp 2>/dev/null || true
+
+# Clean up old database files
+echo -e "${YELLOW}🧹 Cleaning up old data...${NC}"
+rm -rf data/db.sqlite3 2>/dev/null || true
+rm -rf data/*.db 2>/dev/null || true
 docker system prune -f
 
 # Build frontend
 cd "$FRONTEND_DIR"
 
-# Create frontend environment
+# Always recreate .env.production with correct Cognito variables
+echo -e "${YELLOW}Creating frontend .env.production with Cognito config...${NC}"
 cat > .env.production << EOF
+# Frontend Production Environment - Auto-generated
+# Generated: $(date)
+
+# API Configuration
 VITE_API_URL=https://$DOMAIN
+
+# AWS Cognito Configuration - MUST match backend
 VITE_AWS_REGION=$AWS_REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
 EOF
+
+# Also create .env.local for consistency
 cp .env.production .env.local
 
-# Build frontend
-echo -e "${BLUE}🏗️ Building frontend...${NC}"
-rm -rf node_modules dist
-npm install --silent
+echo -e "${BLUE}Frontend environment variables:${NC}"
+echo -e "  VITE_API_URL=https://$DOMAIN"
+echo -e "  VITE_AWS_REGION=$AWS_REGION"
+echo -e "  VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID"
+echo -e "  VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID"
+echo -e "${GREEN}✅ Files created: .env.production, .env.local${NC}"
+
+# Clean install
+rm -rf node_modules package-lock.json dist 2>/dev/null || true
+npm install --silent --no-fund --no-audit
+
+# Build frontend with explicit environment variables
+echo -e "${BLUE}Building frontend with Cognito configuration...${NC}"
+VITE_API_URL=https://$DOMAIN \
+VITE_AWS_REGION=$AWS_REGION \
+VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID \
+VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID \
 NODE_ENV=production npm run build
 
-[ ! -d "dist" ] && { echo -e "${RED}❌ Build failed${NC}"; exit 1; }
-echo -e "${GREEN}✅ Frontend built${NC}"
+# Clean dev dependencies after build
+npm prune --production --silent
+
+if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
+    echo -e "${RED}❌ Frontend build failed${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ Frontend built ($(du -sh dist | cut -f1))${NC}"
 
 cd "$PROJECT_DIR"
 
-# Start containers
-echo -e "${BLUE}🐳 Starting services...${NC}"
+# Start Docker containers
+echo -e "${YELLOW}🐳 Starting services with HTTP...${NC}"
 docker-compose -f docker-compose.ec2.yml up -d --build
-sleep 15
 
-# Configure database
-echo -e "${BLUE}💾 Setting up database...${NC}"
+# Wait for containers
+echo -e "${YELLOW}⏳ Waiting for services...${NC}"
+sleep 20
+
+show_space "After build"
+
+# ==============================================================================
+# PHASE 6: CONFIGURE DATABASE
+# ==============================================================================
+echo -e "\n${YELLOW}💾 PHASE 6: Configure Database${NC}"
+
+# Verify backend is running
+if ! docker-compose -f docker-compose.ec2.yml ps | grep web | grep -q Up; then
+    echo -e "${RED}❌ Backend container failed to start${NC}"
+    docker-compose -f docker-compose.ec2.yml logs web
+    exit 1
+fi
+
+# Create migrations for all apps
+echo -e "${BLUE}Creating migrations...${NC}"
+docker-compose -f docker-compose.ec2.yml exec -T web python manage.py makemigrations config
+docker-compose -f docker-compose.ec2.yml exec -T web python manage.py makemigrations inventory
+docker-compose -f docker-compose.ec2.yml exec -T web python manage.py makemigrations operation
+
+# Apply migrations
+echo -e "${BLUE}Applying migrations...${NC}"
 docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput
 
-# Create minimal initial data only if empty
+# Collect static files
+echo -e "${BLUE}Collecting static files...${NC}"
+docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput --clear
+
+# Create initial data
+echo -e "${YELLOW}📊 Creating initial data...${NC}"
 docker-compose -f docker-compose.ec2.yml exec -T web python manage.py shell << 'EOF'
 from config.models import Unit, Zone, Table
 from inventory.models import Group
-if not Unit.objects.exists():
-    Unit.objects.bulk_create([Unit(name=n) for n in ["kg", "litros", "unidades"]])
-if not Zone.objects.exists():
-    zone = Zone.objects.create(name="Principal")
+
+# Create default units
+if Unit.objects.count() == 0:
+    print("Creating default units...")
+    Unit.objects.create(name="Kilogramo")
+    Unit.objects.create(name="Litro")
+    Unit.objects.create(name="Unidad")
+    Unit.objects.create(name="Gramo")
+    print("✅ Units created")
+
+# Create default zone
+if Zone.objects.count() == 0:
+    print("Creating default zone...")
+    Zone.objects.create(name="Salón Principal")
+    print("✅ Zone created")
+
+# Create default table
+if Table.objects.count() == 0 and Zone.objects.exists():
+    print("Creating default table...")
+    zone = Zone.objects.first()
     Table.objects.create(table_number="1", zone=zone)
-if not Group.objects.exists():
+    print("✅ Table created")
+
+# Create default group
+if Group.objects.count() == 0:
+    print("Creating default group...")
     Group.objects.create(name="General")
+    print("✅ Group created")
+
+print("✅ Initial data setup complete")
 EOF
 
-# Configure HTTPS
-echo -e "${BLUE}🔒 Configuring HTTPS...${NC}"
-systemctl stop nginx
+echo -e "${GREEN}✅ Database configured${NC}"
+
+# ==============================================================================
+# PHASE 7: CONFIGURE NGINX AND HTTPS
+# ==============================================================================
+echo -e "\n${YELLOW}🔒 PHASE 7: Configure NGINX and HTTPS${NC}"
+
+# Install nginx if not present
+if ! command -v nginx &> /dev/null; then
+    echo -e "${BLUE}Installing nginx...${NC}"
+    apt-get update -qq
+    apt-get install -y nginx
+fi
+
+# Stop nginx to avoid conflicts
+systemctl stop nginx 2>/dev/null || true
 
 # Deploy frontend to nginx directory
-echo -e "${BLUE}📱 Deploying frontend...${NC}"
+echo -e "${BLUE}Deploying frontend to nginx...${NC}"
 rm -rf /var/www/restaurant
 mkdir -p /var/www/restaurant
 cp -r frontend/dist/* /var/www/restaurant/
 chown -R www-data:www-data /var/www/restaurant
-echo -e "${GREEN}✅ Frontend deployed to /var/www/restaurant${NC}"
-
-# Verify frontend files exist
-if [ ! -f "/var/www/restaurant/index.html" ]; then
-    echo -e "${RED}❌ index.html not found in /var/www/restaurant${NC}"
-    ls -la /var/www/restaurant/
-    exit 1
-fi
 
 # Create nginx configuration (HTTP first)
 echo -e "${BLUE}Creating nginx configuration...${NC}"
@@ -186,37 +291,85 @@ else
     echo -e "${YELLOW}⚠️ HTTP test inconclusive, continuing...${NC}"
 fi
 
-# Install and configure certbot
+# Fix certbot OpenSSL issues and install via alternative method
+echo -e "${BLUE}Installing certbot (fixing OpenSSL issues)...${NC}"
+
+# Remove broken certbot first
 apt-get remove -y certbot python3-certbot-nginx 2>/dev/null || true
+apt-get autoremove -y
+
+# Install via pip (more reliable for older Ubuntu) as root
+apt-get install -y python3-pip python3-venv
+python3 -m pip install --upgrade pip
 python3 -m pip install --root-user-action=ignore certbot
-CERTBOT_PATH=$(which certbot || find /usr/local/bin /root/.local/bin /home/ubuntu/.local/bin -name "certbot" 2>/dev/null | head -1)
+
+# Find where certbot was installed
+CERTBOT_PATH=$(which certbot 2>/dev/null || find /usr/local/bin /root/.local/bin /home/ubuntu/.local/bin -name "certbot" 2>/dev/null | head -1)
 
 if [ -z "$CERTBOT_PATH" ]; then
-    echo -e "${YELLOW}⚠️ SSL setup failed, continuing HTTP${NC}"
-    # Ensure frontend is deployed for HTTP fallback
-    rm -rf /var/www/restaurant
-    mkdir -p /var/www/restaurant
-    cp -r frontend/dist/* /var/www/restaurant/
-    chown -R www-data:www-data /var/www/restaurant
+    echo -e "${RED}❌ Certbot installation failed${NC}"
+    echo -e "${YELLOW}⚠️ Continuing with HTTP only...${NC}"
+    
+    # Start nginx with HTTP config
     systemctl start nginx
-    echo -e "${GREEN}✅ Application running: http://$DOMAIN${NC}"
+    
+    show_space "Final space"
+    
+    echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED (HTTP ONLY)!${NC}"
+    echo -e "${BLUE}════════════════════════════════════${NC}"
+    echo -e "${BLUE}🌐 Application URLs (HTTP):${NC}"
+    echo -e "   Frontend: ${GREEN}http://$DOMAIN${NC}"
+    echo -e "   API: ${GREEN}http://$DOMAIN/api/v1/${NC}"
+    echo -e "   Admin: ${GREEN}http://$DOMAIN/api/v1/admin/${NC}"
+    echo -e ""
+    echo -e "${YELLOW}⚠️ HTTPS setup failed - application running on HTTP${NC}"
+    echo -e "${YELLOW}You can manually setup SSL later or check domain DNS${NC}"
     exit 0
 fi
 
-# Get SSL certificate
-$CERTBOT_PATH certonly --standalone -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --email elfogondedonsoto@gmail.com
+echo -e "${GREEN}✅ Certbot found at: $CERTBOT_PATH${NC}"
 
-# Check SSL certificate
+# Stop nginx for standalone mode
+systemctl stop nginx
+
+# Get SSL certificate using found certbot path
+echo -e "${BLUE}Getting SSL certificate...${NC}"
+$CERTBOT_PATH certonly \
+    --standalone \
+    -d $DOMAIN \
+    -d www.$DOMAIN \
+    --non-interactive \
+    --agree-tos \
+    --email elfogondedonsoto@gmail.com \
+    --key-type rsa \
+    --rsa-key-size 2048
+
+# Check if certificate was obtained successfully
 if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
-    # Ensure frontend is deployed for HTTP fallback
-    rm -rf /var/www/restaurant
-    mkdir -p /var/www/restaurant
-    cp -r frontend/dist/* /var/www/restaurant/
-    chown -R www-data:www-data /var/www/restaurant
+    echo -e "${RED}❌ SSL certificate not obtained. Continuing with HTTP only...${NC}"
+    
+    # Start nginx with HTTP config
     systemctl start nginx
-    echo -e "${YELLOW}⚠️ SSL failed, running HTTP: http://$DOMAIN${NC}"
+    
+    echo -e "${YELLOW}⚠️ Application running on HTTP only${NC}"
+    echo -e "${YELLOW}Manual SSL setup required later${NC}"
+    
+    # Skip HTTPS config and go to verification
+    show_space "Final space"
+    
+    echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED (HTTP ONLY)!${NC}"
+    echo -e "${BLUE}════════════════════════════════════${NC}"
+    echo -e "${BLUE}🌐 Application URLs (HTTP):${NC}"
+    echo -e "   Frontend: ${GREEN}http://$DOMAIN${NC}"
+    echo -e "   API: ${GREEN}http://$DOMAIN/api/v1/${NC}"
+    echo -e "   Admin: ${GREEN}http://$DOMAIN/api/v1/admin/${NC}"
+    echo -e ""
+    echo -e "${YELLOW}⚠️ HTTPS setup failed - application running on HTTP${NC}"
+    echo -e "${YELLOW}You can manually setup SSL later or check domain DNS${NC}"
     exit 0
 fi
+
+echo -e "${GREEN}✅ SSL certificate obtained successfully${NC}"
 
 # Update nginx config with HTTPS
 cat > /etc/nginx/sites-available/restaurant << 'EOF'
@@ -279,29 +432,105 @@ server {
 }
 EOF
 
-# Ensure frontend is available after HTTPS config
-echo -e "${BLUE}📱 Re-deploying frontend for HTTPS...${NC}"
-rm -rf /var/www/restaurant
-mkdir -p /var/www/restaurant
-cp -r frontend/dist/* /var/www/restaurant/
-chown -R www-data:www-data /var/www/restaurant
+# Start nginx with HTTPS
+systemctl start nginx
 
-# Verify frontend files exist again
-if [ ! -f "/var/www/restaurant/index.html" ]; then
-    echo -e "${RED}❌ index.html not found after HTTPS config${NC}"
-    exit 1
-fi
-
-# Start nginx with HTTPS and configure renewal
-systemctl start nginx 
+# Configure auto-renewal with correct certbot path
 echo "0 0,12 * * * root $CERTBOT_PATH renew --quiet --post-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
 
-# Quick verification
-sleep 5
-API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/health/ || echo "000")
-[ "$API_STATUS" = "200" ] && echo -e "${GREEN}✅ API ready${NC}" || echo -e "${YELLOW}⚠️ API: $API_STATUS${NC}"
+echo -e "${GREEN}✅ HTTPS configured${NC}"
 
-echo -e "\n${GREEN}🎉 DEPLOYMENT COMPLETED!${NC}"
-echo -e "${GREEN}✅ Application: https://$DOMAIN${NC}"
-echo -e "${GREEN}✅ API: https://$DOMAIN/api/v1/${NC}"
-echo -e "${BLUE}🔐 AWS Cognito enabled${NC}"
+# ==============================================================================
+# PHASE 8: FINAL VERIFICATION
+# ==============================================================================
+echo -e "\n${YELLOW}🔍 PHASE 8: Final Verification${NC}"
+
+# Wait for services to be ready
+sleep 10
+
+# Test API (expect 401 with Cognito enabled, no auth header)
+echo -e "${BLUE}Testing API without authentication...${NC}"
+for i in {1..3}; do
+    API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/zones/ 2>/dev/null || echo "000")
+    if [ "$API_STATUS" = "200" ] || [ "$API_STATUS" = "401" ] || [ "$API_STATUS" = "403" ]; then
+        if [ "$API_STATUS" = "401" ]; then
+            echo -e "${GREEN}✅ API working with Cognito auth - requires authentication (Status: $API_STATUS)${NC}"
+        elif [ "$API_STATUS" = "403" ]; then
+            echo -e "${GREEN}✅ API working with Cognito auth - forbidden (Status: $API_STATUS)${NC}"
+        else
+            echo -e "${GREEN}✅ API working without auth (Status: $API_STATUS)${NC}"
+        fi
+        break
+    else
+        echo -e "${YELLOW}⚠️ API Status: $API_STATUS (attempt $i/3)${NC}"
+        if [ $i -lt 3 ]; then
+            sleep 5
+        fi
+    fi
+done
+
+# Test specific endpoints
+echo -e "${BLUE}Testing specific endpoints...${NC}"
+HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/health/ 2>/dev/null || echo "000")
+echo -e "  Health endpoint: ${HEALTH_STATUS}"
+
+UNITS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/units/ 2>/dev/null || echo "000")
+echo -e "  Units endpoint: ${UNITS_STATUS}"
+
+# Show recent backend logs for debugging
+echo -e "${BLUE}Recent backend logs (last 20 lines):${NC}"
+docker-compose -f docker-compose.ec2.yml logs --tail=20 web || echo "Could not fetch logs"
+
+# Test domain
+DOMAIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://$DOMAIN/ 2>/dev/null || echo "000")
+if [ "$DOMAIN_STATUS" = "200" ]; then
+    echo -e "${GREEN}✅ Domain working (Status: $DOMAIN_STATUS)${NC}"
+else
+    echo -e "${YELLOW}⚠️ Domain Status: $DOMAIN_STATUS${NC}"
+fi
+
+# Show container status
+echo -e "${YELLOW}📊 Container status:${NC}"
+docker-compose -f docker-compose.ec2.yml ps
+
+# Clean up final
+apt clean >/dev/null 2>&1
+
+show_space "Final space"
+
+# ==============================================================================
+# DEPLOYMENT COMPLETE
+# ==============================================================================
+echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED!${NC}"
+echo -e "${BLUE}════════════════════════════════════${NC}"
+echo -e "${BLUE}🌐 Application URLs (HTTPS):${NC}"
+echo -e "   Frontend: ${GREEN}https://$DOMAIN${NC}"
+echo -e "   API: ${GREEN}https://$DOMAIN/api/v1/${NC}"
+echo -e "   Admin: ${GREEN}https://$DOMAIN/api/v1/admin/${NC}"
+echo -e ""
+echo -e "${BLUE}🔐 Login Access:${NC}"
+echo -e "   Use AWS Cognito credentials${NC}"
+echo -e ""
+echo -e "${BLUE}🔐 Authentication:${NC}"
+echo -e "   AWS Cognito: ${GREEN}ENABLED${NC}"
+echo -e "   User Pool: ${COGNITO_USER_POOL_ID}"
+echo -e "   Region: ${AWS_REGION}"
+echo -e ""
+echo -e "${YELLOW}✅ Ready to use:${NC}"
+echo -e "1. Access application at: ${GREEN}https://$DOMAIN${NC}"
+echo -e "2. Login with your existing Cognito credentials"
+echo -e "3. Users and groups already configured in AWS"
+echo -e ""
+echo -e "${GREEN}✨ Restaurant Web Application is READY!${NC}"
+echo -e ""
+echo -e "${YELLOW}🔍 Troubleshooting:${NC}"
+echo -e "1. Check backend logs: docker-compose -f docker-compose.ec2.yml logs web"
+echo -e "2. Test API manually: curl -v https://$DOMAIN/api/v1/zones/"
+echo -e "3. Check container environment: docker-compose -f docker-compose.ec2.yml exec web env | grep COGNITO"
+echo -e "4. Verify user groups in AWS Cognito console"
+echo -e ""
+echo -e "${BLUE}🔍 User Permission Debug:${NC}"
+echo -e "If you get 'No tienes permiso' errors:"
+echo -e "1. Verify your user is in the correct Cognito group (administradores/meseros/cocineros)"
+echo -e "2. Check JWT token contains 'cognito:groups' claim"
+echo -e "3. Verify user pool configuration in AWS console"
