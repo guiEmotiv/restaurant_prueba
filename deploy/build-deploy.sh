@@ -100,13 +100,24 @@ if not Group.objects.exists():
     Group.objects.create(name="General")
 EOF
 
-# Deploy frontend and configure HTTPS
+# Configure HTTPS
 echo -e "${BLUE}🔒 Configuring HTTPS...${NC}"
 systemctl stop nginx
+
+# Deploy frontend to nginx directory
+echo -e "${BLUE}📱 Deploying frontend...${NC}"
 rm -rf /var/www/restaurant
 mkdir -p /var/www/restaurant
 cp -r frontend/dist/* /var/www/restaurant/
 chown -R www-data:www-data /var/www/restaurant
+echo -e "${GREEN}✅ Frontend deployed to /var/www/restaurant${NC}"
+
+# Verify frontend files exist
+if [ ! -f "/var/www/restaurant/index.html" ]; then
+    echo -e "${RED}❌ index.html not found in /var/www/restaurant${NC}"
+    ls -la /var/www/restaurant/
+    exit 1
+fi
 
 # Create nginx configuration (HTTP first)
 echo -e "${BLUE}Creating nginx configuration...${NC}"
@@ -182,6 +193,11 @@ CERTBOT_PATH=$(which certbot || find /usr/local/bin /root/.local/bin /home/ubunt
 
 if [ -z "$CERTBOT_PATH" ]; then
     echo -e "${YELLOW}⚠️ SSL setup failed, continuing HTTP${NC}"
+    # Ensure frontend is deployed for HTTP fallback
+    rm -rf /var/www/restaurant
+    mkdir -p /var/www/restaurant
+    cp -r frontend/dist/* /var/www/restaurant/
+    chown -R www-data:www-data /var/www/restaurant
     systemctl start nginx
     echo -e "${GREEN}✅ Application running: http://$DOMAIN${NC}"
     exit 0
@@ -192,6 +208,11 @@ $CERTBOT_PATH certonly --standalone -d $DOMAIN -d www.$DOMAIN --non-interactive 
 
 # Check SSL certificate
 if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+    # Ensure frontend is deployed for HTTP fallback
+    rm -rf /var/www/restaurant
+    mkdir -p /var/www/restaurant
+    cp -r frontend/dist/* /var/www/restaurant/
+    chown -R www-data:www-data /var/www/restaurant
     systemctl start nginx
     echo -e "${YELLOW}⚠️ SSL failed, running HTTP: http://$DOMAIN${NC}"
     exit 0
@@ -258,8 +279,21 @@ server {
 }
 EOF
 
+# Ensure frontend is available after HTTPS config
+echo -e "${BLUE}📱 Re-deploying frontend for HTTPS...${NC}"
+rm -rf /var/www/restaurant
+mkdir -p /var/www/restaurant
+cp -r frontend/dist/* /var/www/restaurant/
+chown -R www-data:www-data /var/www/restaurant
+
+# Verify frontend files exist again
+if [ ! -f "/var/www/restaurant/index.html" ]; then
+    echo -e "${RED}❌ index.html not found after HTTPS config${NC}"
+    exit 1
+fi
+
 # Start nginx with HTTPS and configure renewal
-systemctl start nginx
+systemctl start nginx 
 echo "0 0,12 * * * root $CERTBOT_PATH renew --quiet --post-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
 
 # Quick verification
