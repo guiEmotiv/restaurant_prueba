@@ -100,13 +100,9 @@ if not Group.objects.exists():
     Group.objects.create(name="General")
 EOF
 
-# Deploy frontend and configure HTTPS
+# Configure HTTPS
 echo -e "${BLUE}🔒 Configuring HTTPS...${NC}"
 systemctl stop nginx
-rm -rf /var/www/restaurant
-mkdir -p /var/www/restaurant
-cp -r frontend/dist/* /var/www/restaurant/
-chown -R www-data:www-data /var/www/restaurant
 
 # Create nginx configuration (HTTP first)
 echo -e "${BLUE}Creating nginx configuration...${NC}"
@@ -159,6 +155,13 @@ EOF
 rm -f /etc/nginx/sites-enabled/default
 ln -sf /etc/nginx/sites-available/restaurant /etc/nginx/sites-enabled/
 
+# Deploy frontend to nginx directory
+echo -e "${BLUE}📱 Deploying frontend...${NC}"
+rm -rf /var/www/restaurant
+mkdir -p /var/www/restaurant
+cp -r frontend/dist/* /var/www/restaurant/
+chown -R www-data:www-data /var/www/restaurant
+
 # Test nginx config
 nginx -t
 
@@ -182,6 +185,11 @@ CERTBOT_PATH=$(which certbot || find /usr/local/bin /root/.local/bin /home/ubunt
 
 if [ -z "$CERTBOT_PATH" ]; then
     echo -e "${YELLOW}⚠️ SSL setup failed, continuing HTTP${NC}"
+    # Ensure frontend is deployed even if SSL fails
+    rm -rf /var/www/restaurant
+    mkdir -p /var/www/restaurant
+    cp -r frontend/dist/* /var/www/restaurant/
+    chown -R www-data:www-data /var/www/restaurant
     systemctl start nginx
     echo -e "${GREEN}✅ Application running: http://$DOMAIN${NC}"
     exit 0
@@ -192,6 +200,11 @@ $CERTBOT_PATH certonly --standalone -d $DOMAIN -d www.$DOMAIN --non-interactive 
 
 # Check SSL certificate
 if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+    # Ensure frontend is deployed even if SSL certificate fails
+    rm -rf /var/www/restaurant
+    mkdir -p /var/www/restaurant
+    cp -r frontend/dist/* /var/www/restaurant/
+    chown -R www-data:www-data /var/www/restaurant
     systemctl start nginx
     echo -e "${YELLOW}⚠️ SSL failed, running HTTP: http://$DOMAIN${NC}"
     exit 0
@@ -257,6 +270,13 @@ server {
     }
 }
 EOF
+
+# Deploy frontend for HTTPS configuration
+echo -e "${BLUE}📱 Deploying frontend for HTTPS...${NC}"
+rm -rf /var/www/restaurant
+mkdir -p /var/www/restaurant
+cp -r frontend/dist/* /var/www/restaurant/
+chown -R www-data:www-data /var/www/restaurant
 
 # Start nginx with HTTPS and configure renewal
 systemctl start nginx
