@@ -107,23 +107,23 @@ docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectsta
 # Create initial data if needed
 echo -e "${YELLOW}📊 Creating initial data...${NC}"
 docker-compose -f docker-compose.ec2.yml exec -T web python manage.py shell << 'EOF'
-from config.models import Unit, Zone, Table, Waiter
+from config.models import Unit, Zone, Table
 from inventory.models import Group
 from django.contrib.auth import get_user_model
 
 # Create default units if they don't exist
 if Unit.objects.count() == 0:
     print("Creating default units...")
-    Unit.objects.create(name="Kilogramo", abbreviation="kg")
-    Unit.objects.create(name="Litro", abbreviation="lt")
-    Unit.objects.create(name="Unidad", abbreviation="und")
-    Unit.objects.create(name="Gramo", abbreviation="gr")
+    Unit.objects.create(name="Kilogramo")
+    Unit.objects.create(name="Litro")
+    Unit.objects.create(name="Unidad")
+    Unit.objects.create(name="Gramo")
     print("✅ Units created")
 
 # Create default zone if it doesn't exist
 if Zone.objects.count() == 0:
     print("Creating default zone...")
-    Zone.objects.create(name="Salón Principal", description="Zona principal del restaurante")
+    Zone.objects.create(name="Salón Principal")
     print("✅ Zone created")
 
 # Create default table if it doesn't exist
@@ -131,10 +131,8 @@ if Table.objects.count() == 0 and Zone.objects.exists():
     print("Creating default table...")
     zone = Zone.objects.first()
     Table.objects.create(
-        number=1,
-        zone=zone,
-        capacity=4,
-        status="AVAILABLE"
+        table_number="1",
+        zone=zone
     )
     print("✅ Table created")
 
@@ -143,17 +141,6 @@ if Group.objects.count() == 0:
     print("Creating default group...")
     Group.objects.create(name="General", description="Grupo general de ingredientes")
     print("✅ Group created")
-
-# Create default waiter
-if Waiter.objects.count() == 0:
-    print("Creating default waiter...")
-    Waiter.objects.create(
-        code="W001",
-        name="Mesero General",
-        phone="999999999",
-        is_active=True
-    )
-    print("✅ Waiter created")
 
 print("✅ Initial data setup complete")
 EOF
@@ -201,6 +188,7 @@ echo -e "${BLUE}📋 Test these endpoints:${NC}"
 echo -e "  Units: http://$DOMAIN/api/v1/units/"
 echo -e "  Zones: http://$DOMAIN/api/v1/zones/"
 echo -e "  Tables: http://$DOMAIN/api/v1/tables/"
+echo -e "  Groups: http://$DOMAIN/api/v1/groups/"
 echo -e ""
 echo -e "${YELLOW}🔐 Login with AWS Cognito credentials${NC}"
 echo -e "${YELLOW}   Groups: administradores, meseros, cocineros${NC}"
