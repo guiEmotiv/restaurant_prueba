@@ -87,7 +87,12 @@ class DashboardViewSet(viewsets.ViewSet):
         ).order_by('paid_at')
         
         orders_count = paid_orders.count()
-        print(f"✅ Found {orders_count} paid orders for detailed processing")
+        print(f"✅ Found {orders_count} paid orders for {selected_date}")
+        
+        # Debug: mostrar algunas órdenes para verificar datos
+        if orders_count > 0:
+            sample_order = paid_orders.first()
+            print(f"📋 Sample order {sample_order.id}: created={sample_order.created_at}, paid={sample_order.paid_at}, status={sample_order.status}")
         
         detailed_rows = []
         
@@ -108,10 +113,14 @@ class DashboardViewSet(viewsets.ViewSet):
                 'service_time_minutes': None
             }
             
-            # Calcular tiempo de servicio
+            # Calcular tiempo de servicio (de created_at a paid_at)
             if order.created_at and order.paid_at:
-                service_time_minutes = int((order.paid_at - order.created_at).total_seconds() / 60)
+                service_time_seconds = (order.paid_at - order.created_at).total_seconds()
+                service_time_minutes = max(1, int(service_time_seconds / 60))  # Mínimo 1 minuto
                 order_info['service_time_minutes'] = service_time_minutes
+                print(f"⏱️ Order {order.id}: {service_time_minutes} minutes service time")
+            else:
+                print(f"⚠️ Order {order.id}: Missing timestamps - created_at: {order.created_at}, paid_at: {order.paid_at}")
             
             # Información de pagos
             payments_info = []
@@ -298,7 +307,12 @@ class DashboardViewSet(viewsets.ViewSet):
         # Métricas generales
         total_orders = len(unique_orders)
         average_ticket = total_revenue / total_orders if total_orders > 0 else Decimal('0')
-        average_service_time = sum(service_times) / len(service_times) if service_times else 0
+        if service_times:
+            average_service_time = sum(service_times) / len(service_times)
+            print(f"⏱️ Average service time calculated: {average_service_time:.1f} minutes from {len(service_times)} orders")
+        else:
+            average_service_time = 0
+            print("⚠️ No service times available for average calculation")
         
         # Procesar stats (igual que antes pero desde datos detallados)
         # Categorías
@@ -367,7 +381,15 @@ class DashboardViewSet(viewsets.ViewSet):
                 'percentage': float(percentage)
             })
         
-        print(f"✅ Dashboard generated: {total_orders} orders, {len(detailed_data)} items, {len(category_breakdown)} categories, {len(zone_performance)} zones, {len(top_tables)} tables")
+        print(f"✅ Dashboard Summary:")
+        print(f"   📊 Total orders: {total_orders}")
+        print(f"   💰 Total revenue: S/ {total_revenue:.2f}")
+        print(f"   🎫 Average ticket: S/ {average_ticket:.2f}")
+        print(f"   ⏱️ Average service time: {average_service_time:.1f} min")
+        print(f"   📋 Detailed items: {len(detailed_data)}")
+        print(f"   🏷️ Categories: {len(category_breakdown)}")
+        print(f"   🏪 Zones: {len(zone_performance)}")
+        print(f"   🪑 Tables: {len(top_tables)}")
         
         return {
             'date': selected_date.isoformat(),

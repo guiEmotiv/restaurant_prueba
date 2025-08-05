@@ -187,9 +187,9 @@ const Dashboard = () => {
                 <div>
                   <p className="text-orange-100 text-sm">Tiempo Promedio</p>
                   <p className="text-2xl font-bold">
-                    {summary.average_service_time 
+                    {summary.average_service_time > 0 
                       ? `${Math.round(summary.average_service_time)} min` 
-                      : 'N/A'
+                      : (summary.total_orders > 0 ? 'Calculando...' : 'Sin datos')
                     }
                   </p>
                 </div>
