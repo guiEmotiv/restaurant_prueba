@@ -291,22 +291,63 @@ else
     echo -e "${YELLOW}⚠️ HTTP test inconclusive, continuing...${NC}"
 fi
 
-# Install certbot using apt (simpler than snap)
-echo -e "${BLUE}Installing certbot...${NC}"
-apt-get install -y python3-certbot-nginx
+# Fix certbot OpenSSL issues and install via alternative method
+echo -e "${BLUE}Installing certbot (fixing OpenSSL issues)...${NC}"
+
+# Remove broken certbot first
+apt-get remove -y certbot python3-certbot-nginx 2>/dev/null || true
+apt-get autoremove -y
+
+# Install via pip (more reliable for older Ubuntu)
+apt-get install -y python3-pip python3-venv
+python3 -m pip install --upgrade pip
+python3 -m pip install certbot
+
+# Ensure certbot is in PATH
+export PATH="/home/ubuntu/.local/bin:$PATH"
+echo 'export PATH="/home/ubuntu/.local/bin:$PATH"' >> /etc/environment
 
 # Stop nginx for standalone mode
 systemctl stop nginx
 
-# Get SSL certificate using standalone mode
+# Get SSL certificate using standalone mode with installed certbot
 echo -e "${BLUE}Getting SSL certificate...${NC}"
-certbot certonly \
+/home/ubuntu/.local/bin/certbot certonly \
     --standalone \
     -d $DOMAIN \
     -d www.$DOMAIN \
     --non-interactive \
     --agree-tos \
-    --email elfogondedonsoto@gmail.com
+    --email elfogondedonsoto@gmail.com \
+    --key-type rsa \
+    --rsa-key-size 2048
+
+# Check if certificate was obtained successfully
+if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+    echo -e "${RED}❌ SSL certificate not obtained. Continuing with HTTP only...${NC}"
+    
+    # Start nginx with HTTP config
+    systemctl start nginx
+    
+    echo -e "${YELLOW}⚠️ Application running on HTTP only${NC}"
+    echo -e "${YELLOW}Manual SSL setup required later${NC}"
+    
+    # Skip HTTPS config and go to verification
+    show_space "Final space"
+    
+    echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED (HTTP ONLY)!${NC}"
+    echo -e "${BLUE}════════════════════════════════════${NC}"
+    echo -e "${BLUE}🌐 Application URLs (HTTP):${NC}"
+    echo -e "   Frontend: ${GREEN}http://$DOMAIN${NC}"
+    echo -e "   API: ${GREEN}http://$DOMAIN/api/v1/${NC}"
+    echo -e "   Admin: ${GREEN}http://$DOMAIN/api/v1/admin/${NC}"
+    echo -e ""
+    echo -e "${YELLOW}⚠️ HTTPS setup failed - application running on HTTP${NC}"
+    echo -e "${YELLOW}You can manually setup SSL later or check domain DNS${NC}"
+    exit 0
+fi
+
+echo -e "${GREEN}✅ SSL certificate obtained successfully${NC}"
 
 # Update nginx config with HTTPS
 cat > /etc/nginx/sites-available/restaurant << 'EOF'
@@ -372,8 +413,8 @@ EOF
 # Start nginx with HTTPS
 systemctl start nginx
 
-# Configure auto-renewal
-echo "0 0,12 * * * root certbot renew --quiet --post-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
+# Configure auto-renewal with correct certbot path
+echo "0 0,12 * * * root /home/ubuntu/.local/bin/certbot renew --quiet --post-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
 
 echo -e "${GREEN}✅ HTTPS configured${NC}"
 
