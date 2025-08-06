@@ -106,41 +106,132 @@ const Layout = ({ children }) => {
       )}
 
       {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
-        <div className="flex items-center justify-between px-4 py-3">
-          <h1 className="text-lg font-semibold text-gray-900 truncate flex-1 mr-2">El Fogón</h1>
-          <button
-            onClick={toggleMenu}
-            className="inline-flex items-center justify-center p-2.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-            aria-label="Abrir menú"
-          >
-            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+      <div className="lg:hidden">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between px-4 py-4">
+            <h1 className="text-base font-semibold text-gray-900">El Fogón de Don Soto</h1>
+            <button
+              onClick={toggleMenu}
+              className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              aria-label="Menú"
+            >
+              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
+        {/* Spacer for fixed header */}
+        <div className="h-16"></div>
       </div>
 
       <div className="lg:flex">
-        {/* Sidebar */}
+        {/* Mobile Sidebar */}
         <div className={`${
           isMenuOpen ? 'block' : 'hidden'
-        } ${
+        } lg:hidden fixed inset-0 z-40`}>
+          {/* Overlay */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50" 
+            onClick={() => setIsMenuOpen(false)}
+          ></div>
+          {/* Sidebar */}
+          <div className="fixed top-0 left-0 bottom-0 w-80 bg-white shadow-xl">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <h1 className="text-lg font-bold text-gray-900">Menú</h1>
+                <button
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+                {navigation.map((item) => (
+                  <div key={item.name}>
+                    {item.children ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center px-3 py-2 text-sm font-medium text-gray-700">
+                          <item.icon className="mr-3 h-5 w-5" />
+                          {item.name}
+                        </div>
+                        <div className="ml-6 space-y-1">
+                          {item.children.map((child) => (
+                            <Link
+                              key={child.name}
+                              to={child.href}
+                              onClick={() => setIsMenuOpen(false)}
+                              className={`group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors ${
+                                isActive(child.href)
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                              }`}
+                            >
+                              <child.icon className="mr-3 h-4 w-4" />
+                              {child.name}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <Link
+                        to={item.href}
+                        onClick={() => setIsMenuOpen(false)}
+                        className={`group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors ${
+                          isActive(item.href)
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        }`}
+                      >
+                        <item.icon className="mr-3 h-5 w-5" />
+                        {item.name}
+                      </Link>
+                    )}
+                  </div>
+                ))}
+              </nav>
+              
+              {/* User info and logout */}
+              <div className="px-4 py-4 border-t border-gray-200">
+                <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-700">
+                  <div className="flex items-center flex-1">
+                    <User className="mr-3 h-5 w-5" />
+                    <div className="flex-1">
+                      <div className="font-medium">{user?.username || 'Usuario'}</div>
+                      <div className="text-xs text-gray-500">
+                        {userRole === 'administradores' ? 'Administrador' : 
+                         userRole === 'meseros' ? 'Mesero' : 
+                         userRole === 'cocineros' ? 'Cocinero' : 'Sin rol'}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    title="Cerrar Sesión"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Desktop Sidebar */}
+        <div className={`hidden lg:block ${
           isSidebarOpen ? 'lg:block' : 'lg:hidden'
         } fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg`}>
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 lg:justify-center">
               <h1 className="text-xl font-bold text-gray-900 lg:text-center">El Fogón de Don Soto</h1>
-              {/* Close button for mobile and desktop */}
               <button
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  setIsSidebarOpen(false);
-                }}
+                onClick={() => setIsSidebarOpen(false)}
                 className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
             
             <nav className="flex-1 px-4 py-6 space-y-2">
               {navigation.map((item) => (
@@ -156,10 +247,7 @@ const Layout = ({ children }) => {
                           <Link
                             key={child.name}
                             to={child.href}
-                            onClick={() => {
-                              setIsMenuOpen(false);
-                              setIsSidebarOpen(false);
-                            }}
+                            onClick={() => setIsSidebarOpen(false)}
                             className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                               isActive(child.href)
                                 ? 'bg-blue-100 text-blue-700'
@@ -175,10 +263,7 @@ const Layout = ({ children }) => {
                   ) : (
                     <Link
                       to={item.href}
-                      onClick={() => {
-                        setIsMenuOpen(false);
-                        setIsSidebarOpen(false);
-                      }}
+                      onClick={() => setIsSidebarOpen(false)}
                       className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isActive(item.href)
                           ? 'bg-blue-100 text-blue-700'
@@ -216,28 +301,18 @@ const Layout = ({ children }) => {
                 </button>
               </div>
             </div>
-            
           </div>
         </div>
 
         {/* Main content */}
-        <div className="flex-1 lg:ml-0 min-h-screen">
-          <main className={`p-4 lg:p-8 pt-16 transition-all duration-300 ${
-            isSidebarOpen ? 'lg:ml-0' : 'lg:ml-0'
+        <div className="flex-1 min-h-screen">
+          <main className={`p-4 lg:p-8 transition-all duration-300 ${
+            isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
           }`}>
-            {console.log('🎨 About to render children in main...')}
             {children}
           </main>
         </div>
       </div>
-
-      {/* Mobile overlay */}
-      {isMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 lg:hidden z-40 transition-opacity duration-300"
-          onClick={() => setIsMenuOpen(false)}
-        />
-      )}
       
     </div>
   );
