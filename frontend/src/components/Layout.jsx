@@ -23,6 +23,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import '../mobile-menu.css';
 
 const Layout = ({ children }) => {
   console.log('🎨 Layout component rendering...');
@@ -106,22 +107,25 @@ const Layout = ({ children }) => {
       )}
 
       {/* Mobile header */}
-      <div className="lg:hidden">
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
-          <div className="flex items-center justify-between px-4 py-4">
-            <h1 className="text-base font-semibold text-gray-900">El Fogón de Don Soto</h1>
-            <button
-              onClick={toggleMenu}
-              className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              aria-label="Menú"
-            >
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-          </div>
+      <div className="mobile-header">
+        <div className="mobile-header-content">
+          <h1 className="text-lg font-semibold text-gray-900">
+            El Fogón de Don Soto
+          </h1>
+          <button
+            type="button"
+            onClick={toggleMenu}
+            className="mobile-menu-button"
+          >
+            {isMenuOpen ? (
+              <X size={24} />
+            ) : (
+              <Menu size={24} />
+            )}
+          </button>
         </div>
-        {/* Spacer for fixed header */}
-        <div className="h-16"></div>
       </div>
+      <div className="mobile-spacer" />
 
       <div className="lg:flex">
         {/* Mobile Sidebar */}
@@ -219,7 +223,7 @@ const Layout = ({ children }) => {
         </div>
         
         {/* Desktop Sidebar */}
-        <div className={`hidden lg:block ${
+        <div className={`desktop-sidebar hidden lg:block ${
           isSidebarOpen ? 'lg:block' : 'lg:hidden'
         } fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg`}>
           <div className="flex flex-col h-full">
