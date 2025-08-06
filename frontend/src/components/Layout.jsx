@@ -18,7 +18,9 @@ import {
   History,
   User,
   Users,
-  LogOut
+  LogOut,
+  Activity,
+  DollarSign
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -40,7 +42,8 @@ const Layout = ({ children }) => {
 
   // Define navigation items with permissions
   const allNavigation = [
-    { name: 'Dashboard', href: '/', icon: Home, permission: 'canViewDashboard' },
+    { name: 'Dashboard Operativo', href: '/', icon: Activity, permission: 'canViewDashboard' },
+    { name: 'Dashboard Financiero', href: '/dashboard-financiero', icon: DollarSign, permission: 'canViewDashboard' },
     { 
       name: 'Configuración', 
       icon: Settings,

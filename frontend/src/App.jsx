@@ -11,7 +11,8 @@ import AuthLoadingScreen from './components/auth/AuthLoadingScreen';
 import NoRoleError from './components/auth/NoRoleError';
 import RoleValidator from './components/auth/RoleValidator';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
-import Dashboard from './pages/Dashboard';
+import DashboardOperativo from './pages/DashboardOperativo';
+import DashboardFinanciero from './pages/DashboardFinanciero';
 import Units from './pages/config/Units';
 import Zones from './pages/config/Zones';
 import Tables from './pages/config/Tables';
@@ -80,11 +81,16 @@ const AppContent = () => {
         {console.log('🔍 Inside Layout wrapper...')}
         <Routes>
           {console.log('🔍 Inside Routes wrapper...')}
-          {/* Dashboard - Solo administradores */}
+          {/* Dashboards - Solo administradores */}
           <Route path="/" element={
             <RoleProtectedRoute requiredPermission="canViewDashboard">
-              {console.log('🔍 Rendering Dashboard route...')}
-              <Dashboard />
+              {console.log('🔍 Rendering Dashboard Operativo route...')}
+              <DashboardOperativo />
+            </RoleProtectedRoute>
+          } />
+          <Route path="/dashboard-financiero" element={
+            <RoleProtectedRoute requiredPermission="canViewDashboard">
+              <DashboardFinanciero />
             </RoleProtectedRoute>
           } />
 
