@@ -13,8 +13,8 @@ const RoleBasedRedirect = () => {
         // Administradores: Dashboard con acceso completo
         navigate('/', { replace: true });
       } else if (userRole === 'meseros') {
-        // Meseros: Estado de mesas (vista principal)
-        navigate('/table-status', { replace: true });
+        // Meseros: Órdenes (vista principal)
+        navigate('/orders', { replace: true });
       } else if (userRole === 'cocineros') {
         // Cocineros: Vista de cocina (única vista)
         navigate('/kitchen', { replace: true });

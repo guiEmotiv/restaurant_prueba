@@ -193,8 +193,8 @@ const Orders = () => {
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
           <div className="bg-white rounded-lg shadow p-6">
             <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-4 bg-gray-200 rounded"></div>
+              {Array.from({ length: 5 }, (_, index) => (
+                <div key={`skeleton-${index}`} className="h-4 bg-gray-200 rounded"></div>
               ))}
             </div>
           </div>
