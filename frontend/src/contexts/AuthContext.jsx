@@ -40,10 +40,10 @@ export const AuthProvider = ({ children }) => {
       canViewDashboard: false,
       canManageConfig: false,
       canManageInventory: false,
-      canManageOrders: false,
+      canManageOrders: true,      // Necesario para crear/modificar pedidos desde Estado Mesas
       canViewKitchen: false,
       canViewTableStatus: true,
-      canManagePayments: false,
+      canManagePayments: true,    // Necesario para procesar pagos desde Estado Mesas  
       canViewHistory: false,
     },
     [ROLES.COOK]: {
