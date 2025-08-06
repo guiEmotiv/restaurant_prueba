@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Menu, 
@@ -31,7 +31,19 @@ const Layout = ({ children }) => {
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
   const location = useLocation();
+
+  // Hook para detectar tamaño de pantalla
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    setIsDesktop(mediaQuery.matches);
+    
+    const handleChange = (e) => setIsDesktop(e.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
   
   const authContext = useAuth();
   const { user, userRole, logout, hasPermission } = authContext;
@@ -91,26 +103,38 @@ const Layout = ({ children }) => {
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Universal Menu Toggle Button - Works on all devices */}
-      <div className="fixed top-4 left-4 z-50">
-        <button
-          onClick={() => {
-            if (window.innerWidth >= 1024) {
-              toggleSidebar();
-            } else {
-              toggleMenu();
-            }
-          }}
-          className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white text-gray-700 shadow-lg border border-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
-        >
-          {(isSidebarOpen || isMenuOpen) ? (
-            <X className="w-6 h-6" />
-          ) : (
-            <Menu className="w-6 h-6" />
-          )}
-        </button>
-      </div>
+    <>
+      {/* Universal Menu Toggle Button - Always visible, outside main container */}
+      <button
+        onClick={() => {
+          if (isDesktop) {
+            toggleSidebar();
+          } else {
+            toggleMenu();
+          }
+        }}
+        className="fixed top-4 left-4 z-[9999] inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white shadow-2xl border-2 border-white hover:bg-blue-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-500/50 transition-all duration-200 backdrop-blur-sm select-none"
+        style={{
+          position: 'fixed !important',
+          top: '1rem !important',
+          left: '1rem !important',
+          zIndex: '9999 !important',
+          minWidth: '56px',
+          minHeight: '56px',
+          display: 'flex !important',
+          visibility: 'visible !important',
+          opacity: '1 !important',
+          pointerEvents: 'auto !important'
+        }}
+      >
+        {(isSidebarOpen || isMenuOpen) ? (
+          <X className="w-7 h-7" />
+        ) : (
+          <Menu className="w-7 h-7" />
+        )}
+      </button>
+      
+      <div className="min-h-screen bg-gray-50">
 
       {/* Mobile Overlay */}
       {isMenuOpen && (
@@ -222,6 +246,7 @@ const Layout = ({ children }) => {
       </div>
       
     </div>
+    </>
   );
 };
 
