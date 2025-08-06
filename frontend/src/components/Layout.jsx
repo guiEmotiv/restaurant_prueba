@@ -33,12 +33,11 @@ const Layout = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
   
-  try {
-    const authContext = useAuth();
-    const { user, userRole, logout, hasPermission } = authContext;
-    
-    console.log('🎨 Layout auth state:', { user: user?.username, userRole, hasPermission: !!hasPermission });
-    console.log('🎨 Full auth context:', authContext);
+  const authContext = useAuth();
+  const { user, userRole, logout, hasPermission } = authContext;
+  
+  console.log('🎨 Layout auth state:', { user: user?.username, userRole, hasPermission: !!hasPermission });
+  console.log('🎨 Full auth context:', authContext);
 
   // Define navigation items with permissions
   const allNavigation = [
@@ -210,6 +209,7 @@ const Layout = ({ children }) => {
               </button>
             </div>
           </div>
+        </div>
       </div>
 
       {/* Main content */}
@@ -223,17 +223,6 @@ const Layout = ({ children }) => {
       
     </div>
   );
-  } catch (error) {
-    console.error('❌ Error in Layout component:', error);
-    console.error('Stack trace:', error.stack);
-    return (
-      <div style={{ padding: '20px', color: 'red' }}>
-        <h2>Error in Layout</h2>
-        <p>{error.message}</p>
-        <pre>{error.stack}</pre>
-      </div>
-    );
-  }
 };
 
 export default Layout;
