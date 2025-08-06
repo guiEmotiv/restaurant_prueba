@@ -24,6 +24,7 @@ import Orders from './pages/operation/Orders';
 import NewOrder from './pages/operation/NewOrder';
 import OrderDetail from './pages/operation/OrderDetail';
 import Payment from './pages/operation/Payment';
+import Payments from './pages/operation/Payments';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
@@ -196,6 +197,11 @@ const AppContent = () => {
           } />
 
           {/* Payment routes */}
+          <Route path="/payments" element={
+            <ProtectedRoute requiredPermission="canManagePayments">
+              <Payments />
+            </ProtectedRoute>
+          } />
           <Route path="/payment-history" element={
             <RoleProtectedRoute requiredPermission="canViewHistory">
               <PaymentHistory />  

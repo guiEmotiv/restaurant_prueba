@@ -106,8 +106,8 @@ const Layout = ({ children }) => {
 
   // Debug logging
   console.log('🎨 Layout render - userRole:', userRole);
-  console.log('🎨 Layout render - navigation length:', navigation.length);
-  console.log('🎨 Layout render - filtered navigation:', navigation.map(item => item.name));
+  console.log('🎨 Layout render - navigation length:', navigation?.length || 0);
+  console.log('🎨 Layout render - filtered navigation:', navigation?.map?.(item => item.name) || []);
 
   return (
     <>
@@ -121,7 +121,7 @@ const Layout = ({ children }) => {
             toggleMenu();
           }
         }}
-        className="fixed top-4 left-4 z-[9999] inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-600 text-white shadow-2xl border-2 border-white hover:bg-red-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-500/50 transition-all duration-200 backdrop-blur-sm select-none"
+        className="fixed top-4 left-4 z-[9999] inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white shadow-2xl border-2 border-white hover:bg-blue-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-500/50 transition-all duration-200 backdrop-blur-sm select-none"
         style={{
           position: 'fixed !important',
           top: '1rem !important',
@@ -133,7 +133,7 @@ const Layout = ({ children }) => {
           visibility: 'visible !important',
           opacity: '1 !important',
           pointerEvents: 'auto !important',
-          backgroundColor: 'red !important' // Hacer más visible para debug
+          backgroundColor: '#2563eb !important' // Color azul consistente
         }}
         data-testid="menu-toggle"
         id="menu-toggle-button"
