@@ -12,6 +12,19 @@ echo ""
 if [ -f "/.dockerenv" ] || [ -n "${DOCKER_CONTAINER}" ] || [ -d "/opt/restaurant-web" ] || [ "$(whoami)" = "ubuntu" ]; then
     echo "🐳 Detectado: Servidor EC2 (Producción)"
     ENV_TYPE="production"
+    # En EC2, usar el contenedor correcto
+    CONTAINER_NAME="restaurant-web-web-1"
+    # Verificar si el contenedor existe con otro nombre
+    if ! docker ps -a | grep -q "$CONTAINER_NAME"; then
+        CONTAINER_NAME=$(docker ps --format "table {{.Names}}" | grep -E "restaurant|web" | head -1)
+        if [ -z "$CONTAINER_NAME" ]; then
+            echo "❌ Error: No se encontró el contenedor Docker"
+            echo "   Contenedores disponibles:"
+            docker ps --format "table {{.Names}}\t{{.Status}}"
+            exit 1
+        fi
+        echo "📦 Usando contenedor: $CONTAINER_NAME"
+    fi
 else
     echo "💻 Detectado: Desarrollo local"
     ENV_TYPE="development"
@@ -89,10 +102,10 @@ if [ "$ENV_TYPE" = "production" ]; then
     echo "📋 Preparando restauración en contenedor..."
     
     # Copiar archivo de backup al contenedor
-    docker cp "$BACKUP_FILE" restaurant-web-web-1:/app/backup_to_restore.json
+    docker cp "$BACKUP_FILE" $CONTAINER_NAME:/app/backup_to_restore.json
     
     # Crear el script Python en el contenedor
-    docker exec restaurant-web-web-1 bash -c 'cat > /app/restore_db.py << '\''PYTHON_SCRIPT'\''
+    docker exec $CONTAINER_NAME bash -c 'cat > /app/restore_db.py << '\''PYTHON_SCRIPT'\''
 #!/usr/bin/env python3
 import os
 import sys
@@ -128,7 +141,20 @@ def clean_database():
     Zone.objects.all().delete()
     Unit.objects.all().delete()
     
-    print("✅ Base de datos limpiada")
+    # Reiniciar contadores de autoincremento
+    from django.db import connection
+    with connection.cursor() as cursor:
+        # SQLite usa diferentes comandos para reiniciar secuencias
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='config_unit';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='config_zone';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='config_table';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='config_container';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='inventory_group';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='inventory_ingredient';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='inventory_recipe';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='inventory_recipeitem';")
+    
+    print("✅ Base de datos limpiada y contadores reiniciados")
 
 def restore_data(filename):
     """Restaura los datos desde el archivo JSON"""
@@ -255,11 +281,11 @@ if __name__ == "__main__":
 PYTHON_SCRIPT'
     
     echo "🐍 Ejecutando restauración..."
-    docker exec restaurant-web-web-1 python /app/restore_db.py
+    docker exec $CONTAINER_NAME python /app/restore_db.py
     
     echo ""
     echo "🧹 Limpiando archivos temporales..."
-    docker exec restaurant-web-web-1 rm -f /app/restore_db.py /app/backup_to_restore.json
+    docker exec $CONTAINER_NAME rm -f /app/restore_db.py /app/backup_to_restore.json
 
 else
     # Modo desarrollo local
@@ -299,7 +325,20 @@ def clean_database():
     Zone.objects.all().delete()
     Unit.objects.all().delete()
     
-    print("✅ Base de datos limpiada")
+    # Reiniciar contadores de autoincremento
+    from django.db import connection
+    with connection.cursor() as cursor:
+        # SQLite usa diferentes comandos para reiniciar secuencias
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='config_unit';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='config_zone';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='config_table';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='config_container';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='inventory_group';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='inventory_ingredient';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='inventory_recipe';")
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='inventory_recipeitem';")
+    
+    print("✅ Base de datos limpiada y contadores reiniciados")
 
 def restore_data(filename):
     """Restaura los datos desde el archivo JSON"""

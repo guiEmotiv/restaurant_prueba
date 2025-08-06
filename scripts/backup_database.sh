@@ -12,6 +12,19 @@ echo ""
 if [ -f "/.dockerenv" ] || [ -n "${DOCKER_CONTAINER}" ] || [ -d "/opt/restaurant-web" ] || [ "$(whoami)" = "ubuntu" ]; then
     echo "🐳 Detectado: Servidor EC2 (Producción)"
     ENV_TYPE="production"
+    # En EC2, usar el contenedor correcto
+    CONTAINER_NAME="restaurant-web-web-1"
+    # Verificar si el contenedor existe con otro nombre
+    if ! docker ps -a | grep -q "$CONTAINER_NAME"; then
+        CONTAINER_NAME=$(docker ps --format "table {{.Names}}" | grep -E "restaurant|web" | head -1)
+        if [ -z "$CONTAINER_NAME" ]; then
+            echo "❌ Error: No se encontró el contenedor Docker"
+            echo "   Contenedores disponibles:"
+            docker ps --format "table {{.Names}}\t{{.Status}}"
+            exit 1
+        fi
+        echo "📦 Usando contenedor: $CONTAINER_NAME"
+    fi
 else
     echo "💻 Detectado: Desarrollo local"
     ENV_TYPE="development"
@@ -52,7 +65,7 @@ if [ "$ENV_TYPE" = "production" ]; then
     echo "📋 Creando script de backup en contenedor..."
     
     # Crear el script Python en el contenedor
-    docker exec restaurant-web-web-1 bash -c 'cat > /app/backup_db.py << '\''PYTHON_SCRIPT'\''
+    docker exec $CONTAINER_NAME bash -c 'cat > /app/backup_db.py << '\''PYTHON_SCRIPT'\''
 #!/usr/bin/env python3
 import os
 import sys
@@ -208,14 +221,23 @@ PYTHON_SCRIPT'
     
     echo "🐍 Ejecutando backup..."
     # Ejecutar y capturar el output
-    docker exec restaurant-web-web-1 python /app/backup_db.py > temp_backup.txt
+    docker exec $CONTAINER_NAME python /app/backup_db.py > temp_backup.txt 2>&1
+    
+    # Verificar si el backup se ejecutó correctamente
+    if ! grep -q "---JSON_START---" temp_backup.txt; then
+        echo "❌ Error al ejecutar el backup:"
+        cat temp_backup.txt
+        rm -f temp_backup.txt
+        docker exec $CONTAINER_NAME rm -f /app/backup_db.py
+        exit 1
+    fi
     
     # Extraer solo el JSON del output
     sed -n '/---JSON_START---/,/---JSON_END---/p' temp_backup.txt | sed '1d;$d' > "$BACKUP_FILE"
     rm temp_backup.txt
     
     echo "🧹 Limpiando archivo temporal..."
-    docker exec restaurant-web-web-1 rm -f /app/backup_db.py
+    docker exec $CONTAINER_NAME rm -f /app/backup_db.py
 
 else
     # Modo desarrollo local
@@ -348,10 +370,26 @@ EOF
 fi
 
 echo ""
-echo "✅ ¡BACKUP COMPLETADO!"
-echo "============================================"
-echo ""
-echo "📁 Archivo guardado en: $BACKUP_FILE"
+
+# Verificar que el archivo se creó correctamente
+if [ -f "$BACKUP_FILE" ] && [ -s "$BACKUP_FILE" ]; then
+    FILE_SIZE=$(ls -lh "$BACKUP_FILE" | awk '{print $5}')
+    echo "✅ ¡BACKUP COMPLETADO!"
+    echo "============================================"
+    echo ""
+    echo "📁 Archivo guardado en: $BACKUP_FILE ($FILE_SIZE)"
+    
+    # Verificar que es un JSON válido
+    if python -m json.tool "$BACKUP_FILE" > /dev/null 2>&1; then
+        echo "✅ JSON válido"
+    else
+        echo "⚠️  Advertencia: El archivo podría no ser un JSON válido"
+    fi
+else
+    echo "❌ Error: El archivo de backup no se creó o está vacío"
+    exit 1
+fi
+
 echo ""
 
 # Mostrar lista de backups disponibles
