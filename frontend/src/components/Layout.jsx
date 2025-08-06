@@ -47,9 +47,8 @@ const Layout = ({ children }) => {
 
   // Define navigation items with permissions
   const allNavigation = [
-    // Dashboards temporarily disabled to fix JavaScript error
-    // { name: 'Dashboard Operativo', href: '/', icon: Activity, permission: 'canViewDashboard' },
-    // { name: 'Dashboard Financiero', href: '/dashboard-financiero', icon: DollarSign, permission: 'canViewDashboard' },
+    { name: 'Dashboard Operativo', href: '/', icon: Activity, permission: 'canViewDashboard' },
+    { name: 'Dashboard Financiero', href: '/dashboard-financiero', icon: DollarSign, permission: 'canViewDashboard' },
     { 
       name: 'Configuración', 
       icon: Settings,

@@ -78,8 +78,7 @@ const AppContent = () => {
     const content = (
       <Layout>
         <Routes>
-          {/* Dashboards - Temporarily disabled to fix JavaScript error */}
-          {/*
+          {/* Dashboards - Solo administradores */}
           <Route path="/" element={
             <RoleProtectedRoute requiredPermission="canViewDashboard">
               <DashboardOperativo />
@@ -89,14 +88,6 @@ const AppContent = () => {
             <RoleProtectedRoute requiredPermission="canViewDashboard">
               <DashboardFinanciero />
             </RoleProtectedRoute>
-          } />
-          */}
-          
-          {/* Temporary root route - redirects to appropriate view */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <RoleBasedRedirect />
-            </ProtectedRoute>
           } />
 
           {/* Configuration routes - Solo administradores */}
