@@ -105,15 +105,16 @@ const Layout = ({ children }) => {
         </div>
       )}
 
-      {/* Mobile menu button */}
-      <div className="lg:hidden">
-        <div className="flex items-center justify-between bg-white px-4 py-3 shadow-sm">
-          <h1 className="text-xl font-semibold text-gray-900">El Fogón de Don Soto</h1>
+      {/* Mobile header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
+        <div className="flex items-center justify-between px-4 py-3">
+          <h1 className="text-lg font-semibold text-gray-900 truncate flex-1 mr-2">El Fogón</h1>
           <button
             onClick={toggleMenu}
-            className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            className="inline-flex items-center justify-center p-2.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Abrir menú"
           >
-            {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
@@ -124,7 +125,7 @@ const Layout = ({ children }) => {
           isMenuOpen ? 'block' : 'hidden'
         } ${
           isSidebarOpen ? 'lg:block' : 'lg:hidden'
-        } fixed lg:fixed inset-y-0 left-0 z-50 lg:z-50 w-64 bg-white shadow-lg min-h-screen lg:min-h-auto`}>
+        } fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg`}>
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 lg:justify-center">
               <h1 className="text-xl font-bold text-gray-900 lg:text-center">El Fogón de Don Soto</h1>
@@ -221,7 +222,7 @@ const Layout = ({ children }) => {
 
         {/* Main content */}
         <div className="flex-1 lg:ml-0 min-h-screen">
-          <main className={`p-4 lg:p-8 pt-20 lg:pt-16 transition-all duration-300 ${
+          <main className={`p-4 lg:p-8 pt-16 transition-all duration-300 ${
             isSidebarOpen ? 'lg:ml-0' : 'lg:ml-0'
           }`}>
             {console.log('🎨 About to render children in main...')}
