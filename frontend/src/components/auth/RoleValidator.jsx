@@ -1,32 +1,25 @@
 import { useAuth } from '../../contexts/AuthContext';
+import NoRoleError from './NoRoleError';
 
 const RoleValidator = ({ children }) => {
-  console.log('🔍 RoleValidator rendering...');
-  
-  try {
-    const authData = useAuth();
-    console.log('🔍 Auth data:', authData);
-    
-    const { userRole, loading, isAuthenticated } = authData;
+  const { userRole, loading, isAuthenticated } = useAuth();
 
-    // Show loading while checking role
-    if (loading) {
-      console.log('🔍 RoleValidator: showing loading...');
-      return (
-        <div className="flex items-center justify-center min-h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      );
-    }
-
-    // For debugging - always show content without role validation
-    console.log('🔍 RoleValidator: showing children...', { userRole, isAuthenticated });
-    return children;
-    
-  } catch (error) {
-    console.error('🔍 RoleValidator error:', error);
-    return <div>Error in RoleValidator: {error.message}</div>;
+  // Show loading while checking role
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
+
+  // Show error if authenticated but no role
+  if (isAuthenticated && !userRole) {
+    return <NoRoleError />;
+  }
+
+  // Show content if role is assigned
+  return children;
 };
 
 export default RoleValidator;

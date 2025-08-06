@@ -72,6 +72,8 @@ const Layout = ({ children }) => {
       ]
     },
     { name: 'Estado Mesas', href: '/table-status', icon: Table, permission: 'canViewTableStatus' },
+    { name: 'Órdenes', href: '/orders', icon: ShoppingCart, permission: 'canManageOrders' },
+    { name: 'Pagos', href: '/payments', icon: CreditCard, permission: 'canManagePayments' },
     { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
     { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
   ];
@@ -102,41 +104,7 @@ const Layout = ({ children }) => {
   // Navigation ready for rendering
 
   return (
-    <>
-      {/* Universal Menu Toggle Button - ALWAYS visible for ALL users */}
-      <button
-        onClick={() => {
-          if (isDesktop) {
-            toggleSidebar();
-          } else {
-            toggleMenu();
-          }
-        }}
-        className="fixed top-4 left-4 z-[9999] inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white shadow-2xl border-2 border-white hover:bg-blue-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-500/50 transition-all duration-200 backdrop-blur-sm select-none"
-        style={{
-          position: 'fixed !important',
-          top: '1rem !important',
-          left: '1rem !important',
-          zIndex: '9999 !important',
-          minWidth: '56px',
-          minHeight: '56px',
-          display: 'flex !important',
-          visibility: 'visible !important',
-          opacity: '1 !important',
-          pointerEvents: 'auto !important',
-          backgroundColor: '#2563eb !important' // Color azul consistente
-        }}
-        data-testid="menu-toggle"
-        id="menu-toggle-button"
-      >
-        {(isSidebarOpen || isMenuOpen) ? (
-          <X className="w-7 h-7" />
-        ) : (
-          <Menu className="w-7 h-7" />
-        )}
-      </button>
-      
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
 
       {/* Mobile Overlay */}
       {isMenuOpen && (
@@ -146,6 +114,24 @@ const Layout = ({ children }) => {
         />
       )}
 
+      {/* Menu Toggle Button - Top Left */}
+      <button
+        onClick={() => {
+          if (isDesktop) {
+            toggleSidebar();
+          } else {
+            toggleMenu();
+          }
+        }}
+        className="fixed top-4 left-4 z-[60] inline-flex items-center justify-center w-12 h-12 rounded-lg bg-white text-gray-700 shadow-lg border border-gray-200 hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
+      >
+        {(isSidebarOpen || isMenuOpen) ? (
+          <X className="w-5 h-5" />
+        ) : (
+          <Menu className="w-5 h-5" />
+        )}
+      </button>
+
       {/* Unified Sidebar - Responsive */}
       <div className={`${
         isMenuOpen ? 'translate-x-0' : '-translate-x-full'
@@ -153,11 +139,13 @@ const Layout = ({ children }) => {
         isSidebarOpen ? 'lg:translate-x-0' : 'lg:-translate-x-full'
       } fixed inset-y-0 left-0 z-50 w-80 lg:w-64 bg-white shadow-xl transition-transform duration-300 ease-in-out`}>
         <div className="flex flex-col h-full">
-          {/* Header */}
+          {/* Header with integrated toggle space */}
           <div className="flex items-center justify-between px-6 py-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-gray-900">
-              El Fogón de Don Soto
-            </h1>
+            <div className="ml-12 lg:ml-0"> {/* Space for toggle button */}
+              <h1 className="text-xl font-bold text-gray-900">
+                El Fogón de Don Soto
+              </h1>
+            </div>
           </div>
           
           {/* Navigation */}
@@ -248,7 +236,6 @@ const Layout = ({ children }) => {
       </div>
       
     </div>
-    </>
   );
 };
 
