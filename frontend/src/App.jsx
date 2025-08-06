@@ -82,10 +82,10 @@ const AppContent = () => {
         {console.log('🔍 Inside Layout wrapper...')}
         <Routes>
           {console.log('🔍 Inside Routes wrapper...')}
-          {/* Dashboards - Solo administradores */}
+          {/* Dashboards - Temporarily disabled to fix JavaScript error */}
+          {/*
           <Route path="/" element={
             <RoleProtectedRoute requiredPermission="canViewDashboard">
-              {console.log('🔍 Rendering Dashboard Operativo route...')}
               <DashboardOperativo />
             </RoleProtectedRoute>
           } />
@@ -93,6 +93,14 @@ const AppContent = () => {
             <RoleProtectedRoute requiredPermission="canViewDashboard">
               <DashboardFinanciero />
             </RoleProtectedRoute>
+          } />
+          */}
+          
+          {/* Temporary root route - redirects to appropriate view */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <RoleBasedRedirect />
+            </ProtectedRoute>
           } />
 
           {/* Configuration routes - Solo administradores */}

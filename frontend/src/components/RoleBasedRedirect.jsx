@@ -10,8 +10,8 @@ const RoleBasedRedirect = () => {
     if (!loading) {
       // Redirect based on user role
       if (userRole === 'administradores') {
-        // Administradores: Dashboard con acceso completo
-        navigate('/', { replace: true });
+        // Administradores: Redirigir a configuración temporal (dashboards deshabilitados)
+        navigate('/zones', { replace: true });
       } else if (userRole === 'meseros') {
         // Meseros: Estado de mesas (vista principal) - solo pueden ver esto
         navigate('/table-status', { replace: true });
