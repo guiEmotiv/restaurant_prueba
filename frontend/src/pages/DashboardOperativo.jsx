@@ -85,7 +85,12 @@ const DashboardOperativo = () => {
     );
   }
 
-  const { summary, waiter_performance, zone_performance, top_tables } = dashboardData;
+  const { summary, waiter_performance = [], zone_performance = [], top_tables = [] } = dashboardData || {};
+  
+  // Calculate max values safely to avoid minification issues
+  const maxWaiterOrders = waiter_performance.length > 0 
+    ? Math.max.apply(null, waiter_performance.map(w => w.orders || 0))
+    : 1;
 
   return (
     <div className="min-h-screen bg-gray-50 -m-4 sm:-m-6 p-4 sm:p-6">
@@ -206,7 +211,7 @@ const DashboardOperativo = () => {
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${(waiter.orders / Math.max(...waiter_performance.map(w => w.orders))) * 100}%` }}
+                      style={{ width: `${(waiter.orders / maxWaiterOrders) * 100}%` }}
                     />
                   </div>
                 </div>

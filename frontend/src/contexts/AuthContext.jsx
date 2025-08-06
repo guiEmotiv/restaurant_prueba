@@ -40,10 +40,10 @@ export const AuthProvider = ({ children }) => {
       canViewDashboard: false,
       canManageConfig: false,
       canManageInventory: false,
-      canManageOrders: true,
+      canManageOrders: false,
       canViewKitchen: false,
       canViewTableStatus: true,
-      canManagePayments: true,
+      canManagePayments: false,
       canViewHistory: false,
     },
     [ROLES.COOK]: {
