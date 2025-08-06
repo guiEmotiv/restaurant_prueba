@@ -25,9 +25,6 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 const Layout = ({ children }) => {
-  console.log('🎨 Layout component rendering...');
-  console.log('🎨 Layout children type:', typeof children);
-  console.log('🎨 Layout children:', children);
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -47,9 +44,6 @@ const Layout = ({ children }) => {
   
   const authContext = useAuth();
   const { user, userRole, logout, hasPermission } = authContext;
-  
-  console.log('🎨 Layout auth state:', { user: user?.username, userRole, hasPermission: !!hasPermission });
-  console.log('🎨 Full auth context:', authContext);
 
   // Define navigation items with permissions
   const allNavigation = [
@@ -84,37 +78,35 @@ const Layout = ({ children }) => {
   ];
 
   // Filter navigation based on user permissions
-  const navigation = allNavigation.filter(item => {
-    if (!item.permission) return true; // No permission required
-    if (!hasPermission(item.permission)) return false;
-    
-    // If item has children, filter them too
-    if (item.children) {
-      item.children = item.children.filter(child => 
-        !child.permission || hasPermission(child.permission)
-      );
-      return item.children.length > 0; // Only show parent if it has visible children
-    }
-    
-    return true;
-  });
+  const navigation = allNavigation
+    .filter(item => {
+      if (!item.permission) return true; // No permission required
+      return hasPermission ? hasPermission(item.permission) : false;
+    })
+    .map(item => {
+      // If item has children, filter them too
+      if (item.children) {
+        const filteredChildren = item.children.filter(child => 
+          !child.permission || (hasPermission && hasPermission(child.permission))
+        );
+        return filteredChildren.length > 0 ? { ...item, children: filteredChildren } : null;
+      }
+      return item;
+    })
+    .filter(item => item !== null);
 
   const isActive = (href) => location.pathname === href;
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
-  // Debug logging
-  console.log('🎨 Layout render - userRole:', userRole);
-  console.log('🎨 Layout render - navigation length:', navigation?.length || 0);
-  console.log('🎨 Layout render - filtered navigation:', navigation?.map?.(item => item.name) || []);
+  // Navigation ready for rendering
 
   return (
     <>
       {/* Universal Menu Toggle Button - ALWAYS visible for ALL users */}
       <button
         onClick={() => {
-          console.log('🎯 Toggle button clicked - userRole:', userRole, 'isDesktop:', isDesktop);
           if (isDesktop) {
             toggleSidebar();
           } else {
