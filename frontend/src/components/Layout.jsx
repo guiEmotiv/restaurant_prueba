@@ -77,6 +77,8 @@ const Layout = ({ children }) => {
       ]
     },
     { name: 'Estado Mesas', href: '/table-status', icon: Table, permission: 'canViewTableStatus' },
+    { name: 'Órdenes', href: '/orders', icon: ShoppingCart, permission: 'canManageOrders' },
+    { name: 'Pagos', href: '/payments', icon: CreditCard, permission: 'canManagePayments' },
     { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
     { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
   ];
@@ -102,18 +104,24 @@ const Layout = ({ children }) => {
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
+  // Debug logging
+  console.log('🎨 Layout render - userRole:', userRole);
+  console.log('🎨 Layout render - navigation length:', navigation.length);
+  console.log('🎨 Layout render - filtered navigation:', navigation.map(item => item.name));
+
   return (
     <>
-      {/* Universal Menu Toggle Button - Always visible, outside main container */}
+      {/* Universal Menu Toggle Button - ALWAYS visible for ALL users */}
       <button
         onClick={() => {
+          console.log('🎯 Toggle button clicked - userRole:', userRole, 'isDesktop:', isDesktop);
           if (isDesktop) {
             toggleSidebar();
           } else {
             toggleMenu();
           }
         }}
-        className="fixed top-4 left-4 z-[9999] inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white shadow-2xl border-2 border-white hover:bg-blue-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-500/50 transition-all duration-200 backdrop-blur-sm select-none"
+        className="fixed top-4 left-4 z-[9999] inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-600 text-white shadow-2xl border-2 border-white hover:bg-red-700 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-500/50 transition-all duration-200 backdrop-blur-sm select-none"
         style={{
           position: 'fixed !important',
           top: '1rem !important',
@@ -124,8 +132,11 @@ const Layout = ({ children }) => {
           display: 'flex !important',
           visibility: 'visible !important',
           opacity: '1 !important',
-          pointerEvents: 'auto !important'
+          pointerEvents: 'auto !important',
+          backgroundColor: 'red !important' // Hacer más visible para debug
         }}
+        data-testid="menu-toggle"
+        id="menu-toggle-button"
       >
         {(isSidebarOpen || isMenuOpen) ? (
           <X className="w-7 h-7" />
