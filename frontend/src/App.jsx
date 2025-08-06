@@ -77,6 +77,7 @@ const AppContent = () => {
   console.log('🔍 AppContent rendering...');
   
   try {
+    console.log('🔍 Creating Layout component...');
     const content = (
       <Layout>
         {console.log('🔍 Inside Layout wrapper...')}
