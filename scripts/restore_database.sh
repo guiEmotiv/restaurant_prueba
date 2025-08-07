@@ -130,10 +130,19 @@ try:
     from django.db import transaction
     from config.models import Unit, Zone, Table, Container
     from inventory.models import Group, Ingredient, Recipe, RecipeItem
-    from operation.models import Order, OrderItem, Payment, PaymentItem
-    print("✅ Modelos importados correctamente")
+    print("✅ Modelos básicos importados correctamente")
+    
+    # Intentar importar modelos de operación (pueden no existir en algunos casos)
+    try:
+        from operation.models import Order, OrderItem, Payment, PaymentItem
+        print("✅ Modelos de operación también disponibles")
+    except ImportError as e:
+        print(f"⚠️ Modelos de operación no disponibles: {e}")
+        
 except ImportError as e:
     print(f"❌ Error importando modelos: {e}")
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 
 def clean_database():
@@ -324,17 +333,22 @@ django.setup()
 from django.db import transaction
 from config.models import Unit, Zone, Table, Container
 from inventory.models import Group, Ingredient, Recipe, RecipeItem
-from operation.models import Order, OrderItem, Payment, PaymentItem
 
 def clean_database():
     """Limpia la base de datos en orden correcto"""
     print("🗑️  Limpiando base de datos...")
     
     # Orden correcto de limpieza (dependencias inversas)
-    PaymentItem.objects.all().delete()
-    Payment.objects.all().delete()
-    OrderItem.objects.all().delete()
-    Order.objects.all().delete()
+    try:
+        from operation.models import Order, OrderItem, Payment, PaymentItem
+        PaymentItem.objects.all().delete()
+        Payment.objects.all().delete()
+        OrderItem.objects.all().delete()
+        Order.objects.all().delete()
+        print("✅ Limpieza de datos de operación completada")
+    except ImportError:
+        print("⚠️  Saltando limpieza de datos de operación (tablas no existen)")
+    
     RecipeItem.objects.all().delete()
     Recipe.objects.all().delete()
     Ingredient.objects.all().delete()

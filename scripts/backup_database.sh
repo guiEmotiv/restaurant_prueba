@@ -92,6 +92,8 @@ try:
     print("✅ Modelos importados correctamente")
 except ImportError as e:
     print(f"❌ Error importando modelos: {e}")
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 
 class DecimalEncoder(json.JSONEncoder):
