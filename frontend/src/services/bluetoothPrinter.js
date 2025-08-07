@@ -1,0 +1,410 @@
+/**
+ * Servicio de impresión Bluetooth para comprobantes de pago
+ * Configurado para etiquetera con PIN: 1234, MAC: 66:32:35:92:92:26
+ */
+
+class BluetoothPrinterService {
+  constructor() {
+    this.device = null;
+    this.server = null;
+    this.service = null;
+    this.characteristic = null;
+    this.isConnected = false;
+    
+    // Configuración de la impresora
+    this.config = {
+      deviceName: 'Label Printer',
+      macAddress: '66:32:35:92:92:26',
+      pin: '1234',
+      font: 'Font-A',
+      serviceUUID: '000018f0-0000-1000-8000-00805f9b34fb', // UUID genérico para impresoras
+      characteristicUUID: '00002af1-0000-1000-8000-00805f9b34fb'
+    };
+    
+    // Comandos ESC/POS para etiquetera
+    this.commands = {
+      INIT: [0x1B, 0x40],           // Inicializar impresora
+      LF: [0x0A],                   // Salto de línea
+      CR: [0x0D],                   // Retorno de carro
+      CUT_PAPER: [0x1D, 0x56, 0x00], // Cortar papel
+      ALIGN_LEFT: [0x1B, 0x61, 0x00],   // Alinear izquierda
+      ALIGN_CENTER: [0x1B, 0x61, 0x01], // Alinear centro
+      ALIGN_RIGHT: [0x1B, 0x61, 0x02],  // Alinear derecha
+      BOLD_ON: [0x1B, 0x45, 0x01],      // Activar negrita
+      BOLD_OFF: [0x1B, 0x45, 0x00],     // Desactivar negrita
+      UNDERLINE_ON: [0x1B, 0x2D, 0x01], // Activar subrayado
+      UNDERLINE_OFF: [0x1B, 0x2D, 0x00], // Desactivar subrayado
+      FONT_A: [0x1B, 0x4D, 0x00],       // Fuente A (normal)
+      FONT_B: [0x1B, 0x4D, 0x01],       // Fuente B (pequeña)
+    };
+  }
+
+  /**
+   * Verifica si el navegador soporta Web Bluetooth
+   */
+  isBluetoothSupported() {
+    return 'bluetooth' in navigator;
+  }
+
+  /**
+   * Conecta con la impresora Bluetooth
+   */
+  async connect() {
+    if (!this.isBluetoothSupported()) {
+      throw new Error('Web Bluetooth no está soportado en este navegador');
+    }
+
+    try {
+      console.log('Buscando impresora Bluetooth...');
+      
+      // Solicitar dispositivo Bluetooth
+      this.device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [this.config.serviceUUID]
+      });
+
+      console.log('Dispositivo encontrado:', this.device.name);
+
+      // Conectar al servidor GATT
+      this.server = await this.device.gatt.connect();
+      console.log('Conectado al servidor GATT');
+
+      // Obtener el servicio
+      this.service = await this.server.getPrimaryService(this.config.serviceUUID);
+      console.log('Servicio obtenido');
+
+      // Obtener la característica
+      this.characteristic = await this.service.getCharacteristic(this.config.characteristicUUID);
+      console.log('Característica obtenida');
+
+      this.isConnected = true;
+      console.log('Impresora conectada exitosamente');
+
+      return true;
+    } catch (error) {
+      console.error('Error conectando a la impresora:', error);
+      this.isConnected = false;
+      throw new Error(`Error de conexión: ${error.message}`);
+    }
+  }
+
+  /**
+   * Desconecta de la impresora
+   */
+  disconnect() {
+    if (this.device && this.device.gatt.connected) {
+      this.device.gatt.disconnect();
+    }
+    this.isConnected = false;
+    this.device = null;
+    this.server = null;
+    this.service = null;
+    this.characteristic = null;
+    console.log('Impresora desconectada');
+  }
+
+  /**
+   * Envía comandos a la impresora
+   */
+  async sendCommand(command) {
+    if (!this.isConnected || !this.characteristic) {
+      throw new Error('Impresora no conectada');
+    }
+
+    try {
+      const data = new Uint8Array(command);
+      await this.characteristic.writeValue(data);
+    } catch (error) {
+      console.error('Error enviando comando:', error);
+      throw new Error(`Error de impresión: ${error.message}`);
+    }
+  }
+
+  /**
+   * Imprime texto
+   */
+  async printText(text) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    await this.sendCommand(Array.from(data));
+  }
+
+  /**
+   * Genera e imprime el comprobante de pago
+   */
+  async printPaymentReceipt(paymentData) {
+    try {
+      if (!this.isConnected) {
+        await this.connect();
+      }
+
+      // Inicializar impresora
+      await this.sendCommand(this.commands.INIT);
+      await this.sendCommand(this.commands.FONT_A);
+
+      // Encabezado del restaurante
+      await this.sendCommand(this.commands.ALIGN_CENTER);
+      await this.sendCommand(this.commands.BOLD_ON);
+      await this.printText('EL FOGON DE DON SOTO\n');
+      await this.sendCommand(this.commands.BOLD_OFF);
+      await this.printText('=====================================\n');
+      await this.printText('COMPROBANTE DE PAGO\n');
+      await this.printText('=====================================\n\n');
+
+      // Información de la orden
+      await this.sendCommand(this.commands.ALIGN_LEFT);
+      await this.printText(`Orden: #${paymentData.order.id}\n`);
+      await this.printText(`Mesa: ${paymentData.order.table_number}\n`);
+      await this.printText(`Zona: ${paymentData.order.zone_name || 'N/A'}\n`);
+      
+      const now = new Date();
+      const fecha = now.toLocaleDateString('es-PE');
+      const hora = now.toLocaleTimeString('es-PE');
+      await this.printText(`Fecha: ${fecha}\n`);
+      await this.printText(`Hora: ${hora}\n\n`);
+
+      // Items de la orden
+      await this.printText('-------------------------------------\n');
+      await this.sendCommand(this.commands.BOLD_ON);
+      await this.printText('ITEMS\n');
+      await this.sendCommand(this.commands.BOLD_OFF);
+      await this.printText('-------------------------------------\n');
+
+      if (paymentData.order.items && paymentData.order.items.length > 0) {
+        for (const item of paymentData.order.items) {
+          const itemName = item.recipe_name || 'Item';
+          const quantity = item.quantity || 1;
+          const price = this.formatCurrency(item.total_price || 0);
+          
+          await this.printText(`${itemName}\n`);
+          await this.printText(`${quantity}x           ${price}\n`);
+          
+          if (item.notes) {
+            await this.printText(`  Notas: ${item.notes}\n`);
+          }
+          
+          if (item.is_takeaway) {
+            await this.printText(`  Para llevar (envase incl.)\n`);
+          }
+          
+          await this.printText('\n');
+        }
+      }
+
+      // Totales
+      await this.printText('-------------------------------------\n');
+      const subtotal = this.formatCurrency(paymentData.order.total_amount || 0);
+      const tax = this.formatCurrency(paymentData.tax_amount || 0);
+      const total = this.formatCurrency(paymentData.amount || paymentData.order.total_amount || 0);
+
+      await this.printText(`Subtotal:               ${subtotal}\n`);
+      
+      if (paymentData.tax_amount && parseFloat(paymentData.tax_amount) > 0) {
+        await this.printText(`Impuestos/Servicio:     ${tax}\n`);
+      }
+
+      await this.printText('=====================================\n');
+      await this.sendCommand(this.commands.BOLD_ON);
+      await this.printText(`TOTAL:                  ${total}\n`);
+      await this.sendCommand(this.commands.BOLD_OFF);
+      await this.printText('=====================================\n\n');
+
+      // Información del pago
+      await this.printText('METODO DE PAGO\n');
+      await this.printText('-------------------------------------\n');
+      const metodoPago = this.getPaymentMethodName(paymentData.payment_method);
+      await this.sendCommand(this.commands.BOLD_ON);
+      await this.printText(`${metodoPago}: ${total}\n`);
+      await this.sendCommand(this.commands.BOLD_OFF);
+
+      if (paymentData.notes) {
+        await this.printText(`Notas: ${paymentData.notes}\n`);
+      }
+
+      await this.printText('\n');
+
+      // Pie del comprobante
+      await this.sendCommand(this.commands.ALIGN_CENTER);
+      await this.printText('=====================================\n');
+      await this.printText('¡GRACIAS POR SU VISITA!\n');
+      await this.printText('Vuelva pronto\n');
+      await this.printText('=====================================\n\n');
+
+      // Saltos de línea y corte de papel
+      await this.printText('\n\n\n');
+      await this.sendCommand(this.commands.CUT_PAPER);
+
+      console.log('Comprobante impreso exitosamente');
+      return true;
+
+    } catch (error) {
+      console.error('Error imprimiendo comprobante:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Imprime comprobante de pago dividido
+   */
+  async printSplitPaymentReceipt(order, splitPayments) {
+    try {
+      for (let i = 0; i < splitPayments.length; i++) {
+        const split = splitPayments[i];
+        
+        if (!this.isConnected) {
+          await this.connect();
+        }
+
+        // Encabezado
+        await this.sendCommand(this.commands.INIT);
+        await this.sendCommand(this.commands.FONT_A);
+        await this.sendCommand(this.commands.ALIGN_CENTER);
+        await this.sendCommand(this.commands.BOLD_ON);
+        await this.printText('EL FOGON DE DON SOTO\n');
+        await this.sendCommand(this.commands.BOLD_OFF);
+        await this.printText('=====================================\n');
+        await this.printText(`COMPROBANTE DE PAGO ${i + 1}/${splitPayments.length}\n`);
+        await this.printText('(CUENTA DIVIDIDA)\n');
+        await this.printText('=====================================\n\n');
+
+        // Información de la orden
+        await this.sendCommand(this.commands.ALIGN_LEFT);
+        await this.printText(`Orden: #${order.id}\n`);
+        await this.printText(`Mesa: ${order.table_number}\n`);
+        
+        const now = new Date();
+        const fecha = now.toLocaleDateString('es-PE');
+        const hora = now.toLocaleTimeString('es-PE');
+        await this.printText(`Fecha: ${fecha}\n`);
+        await this.printText(`Hora: ${hora}\n\n`);
+
+        // Items de este pago
+        await this.printText('-------------------------------------\n');
+        await this.sendCommand(this.commands.BOLD_ON);
+        await this.printText('ITEMS DE ESTE PAGO\n');
+        await this.sendCommand(this.commands.BOLD_OFF);
+        await this.printText('-------------------------------------\n');
+
+        if (split.items && split.items.length > 0) {
+          for (const item of split.items) {
+            const itemName = item.recipe_name || 'Item';
+            const price = this.formatCurrency(item.total_price || 0);
+            
+            await this.printText(`${itemName}\n`);
+            await this.printText(`1x              ${price}\n\n`);
+          }
+        }
+
+        // Total de este pago
+        await this.printText('=====================================\n');
+        await this.sendCommand(this.commands.BOLD_ON);
+        const total = this.formatCurrency(split.amount || 0);
+        await this.printText(`TOTAL A PAGAR:          ${total}\n`);
+        await this.sendCommand(this.commands.BOLD_OFF);
+        await this.printText('=====================================\n\n');
+
+        // Método de pago
+        await this.printText('METODO DE PAGO\n');
+        await this.printText('-------------------------------------\n');
+        const metodoPago = this.getPaymentMethodName(split.payment_method);
+        await this.sendCommand(this.commands.BOLD_ON);
+        await this.printText(`${metodoPago}: ${total}\n`);
+        await this.sendCommand(this.commands.BOLD_OFF);
+
+        if (split.notes) {
+          await this.printText(`Notas: ${split.notes}\n`);
+        }
+
+        // Pie del comprobante
+        await this.sendCommand(this.commands.ALIGN_CENTER);
+        await this.printText('\n=====================================\n');
+        await this.printText('¡GRACIAS POR SU VISITA!\n');
+        await this.printText('Vuelva pronto\n');
+        await this.printText('=====================================\n\n');
+
+        // Saltos y corte
+        await this.printText('\n\n\n');
+        await this.sendCommand(this.commands.CUT_PAPER);
+
+        // Pausa entre impresiones si hay múltiples
+        if (i < splitPayments.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      console.log(`${splitPayments.length} comprobantes de pago dividido impresos`);
+      return true;
+
+    } catch (error) {
+      console.error('Error imprimiendo comprobantes divididos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Formatea cantidad como moneda peruana
+   */
+  formatCurrency(amount) {
+    const value = parseFloat(amount) || 0;
+    return new Intl.NumberFormat('es-PE', {
+      style: 'currency',
+      currency: 'PEN',
+      minimumFractionDigits: 2
+    }).format(value);
+  }
+
+  /**
+   * Obtiene el nombre del método de pago
+   */
+  getPaymentMethodName(method) {
+    const methods = {
+      'CASH': 'EFECTIVO',
+      'CARD': 'TARJETA',
+      'TRANSFER': 'TRANSFERENCIA',
+      'YAPE_PLIN': 'YAPE/PLIN',
+      'OTHER': 'OTRO'
+    };
+    return methods[method] || method;
+  }
+
+  /**
+   * Prueba la conexión e imprime un recibo de prueba
+   */
+  async printTest() {
+    try {
+      if (!this.isConnected) {
+        await this.connect();
+      }
+
+      await this.sendCommand(this.commands.INIT);
+      await this.sendCommand(this.commands.ALIGN_CENTER);
+      await this.sendCommand(this.commands.BOLD_ON);
+      await this.printText('PRUEBA DE IMPRESION\n');
+      await this.sendCommand(this.commands.BOLD_OFF);
+      await this.printText('===================\n');
+      await this.printText('EL FOGON DE DON SOTO\n');
+      
+      const now = new Date();
+      const fecha = now.toLocaleDateString('es-PE');
+      const hora = now.toLocaleTimeString('es-PE');
+      await this.printText(`${fecha} ${hora}\n`);
+      
+      await this.printText('===================\n');
+      await this.printText('Impresora conectada\n');
+      await this.printText('correctamente\n\n\n');
+      
+      await this.sendCommand(this.commands.CUT_PAPER);
+      
+      console.log('Prueba de impresión completada');
+      return true;
+    } catch (error) {
+      console.error('Error en prueba de impresión:', error);
+      throw error;
+    }
+  }
+}
+
+// Instancia singleton
+const bluetoothPrinter = new BluetoothPrinterService();
+
+export default bluetoothPrinter;

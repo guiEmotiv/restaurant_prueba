@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Split, Receipt, CheckCircle, X, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CreditCard, Split, Receipt, CheckCircle, X, AlertTriangle, Printer } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import bluetoothPrinter from '../../services/bluetoothPrinter';
 
 const Payment = () => {
   const { id } = useParams();
@@ -26,6 +27,7 @@ const Payment = () => {
     amount: 0,
     notes: ''
   });
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     loadOrder();
@@ -130,6 +132,16 @@ const Payment = () => {
 
       await apiService.payments.create(paymentPayload);
       showSuccess('Pago procesado exitosamente');
+
+      // Intentar imprimir comprobante
+      try {
+        await printPaymentReceipt(paymentPayload);
+      } catch (printError) {
+        console.error('Error imprimiendo:', printError);
+        // No bloqueamos el flujo si falla la impresión
+        showError('Pago exitoso, pero falló la impresión del comprobante');
+      }
+
       navigate('/orders');
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -159,6 +171,16 @@ const Payment = () => {
     try {
       await apiService.orders.splitPayment(order.id, { splits: formattedSplits });
       showSuccess(`Pagos divididos procesados exitosamente (${splits.length} pagos)`);
+
+      // Intentar imprimir comprobantes divididos
+      try {
+        await printSplitPaymentReceipts(splits);
+      } catch (printError) {
+        console.error('Error imprimiendo:', printError);
+        // No bloqueamos el flujo si falla la impresión
+        showError('Pagos exitosos, pero falló la impresión de comprobantes');
+      }
+
       navigate('/orders');
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -238,6 +260,78 @@ const Payment = () => {
     setSelectedItems(newSelectedItems);
 
     setSplits(splits.filter((_, idx) => idx !== splitIndex));
+  };
+
+  // Funciones de impresión
+  const printPaymentReceipt = async (paymentData) => {
+    try {
+      setPrinting(true);
+      
+      const receiptData = {
+        ...paymentData,
+        order: order,
+        tax_amount: paymentData.tax_amount || '0.00'
+      };
+
+      await bluetoothPrinter.printPaymentReceipt(receiptData);
+      showSuccess('Comprobante impreso exitosamente');
+    } catch (error) {
+      console.error('Error printing receipt:', error);
+      
+      if (error.message.includes('Web Bluetooth no está soportado')) {
+        showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
+      } else if (error.message.includes('conexión')) {
+        showError('No se pudo conectar con la impresora. Verifica que esté encendida.');
+      } else {
+        showError(`Error de impresión: ${error.message}`);
+      }
+      
+      throw error;
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const printSplitPaymentReceipts = async (splitPayments) => {
+    try {
+      setPrinting(true);
+      await bluetoothPrinter.printSplitPaymentReceipt(order, splitPayments);
+      showSuccess(`${splitPayments.length} comprobantes impresos exitosamente`);
+    } catch (error) {
+      console.error('Error printing split receipts:', error);
+      
+      if (error.message.includes('Web Bluetooth no está soportado')) {
+        showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
+      } else if (error.message.includes('conexión')) {
+        showError('No se pudo conectar con la impresora. Verifica que esté encendida.');
+      } else {
+        showError(`Error de impresión: ${error.message}`);
+      }
+      
+      throw error;
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const handleTestPrint = async () => {
+    try {
+      setPrinting(true);
+      await bluetoothPrinter.printTest();
+      showSuccess('Prueba de impresión completada');
+    } catch (error) {
+      console.error('Error in test print:', error);
+      
+      if (error.message.includes('Web Bluetooth no está soportado')) {
+        showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
+      } else if (error.message.includes('conexión')) {
+        showError('No se pudo conectar con la impresora. Verifica que esté encendida y el PIN sea 1234.');
+      } else {
+        showError(`Error de impresión: ${error.message}`);
+      }
+    } finally {
+      setPrinting(false);
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -410,8 +504,8 @@ const Payment = () => {
               </Button>
             </div>
 
-            {/* Botón cancelar */}
-            <div className="mt-6">
+            {/* Botones cancelar y prueba de impresión */}
+            <div className="mt-6 space-y-3">
               <Button
                 onClick={() => navigate('/orders')}
                 variant="secondary"
@@ -419,6 +513,25 @@ const Payment = () => {
               >
                 <ArrowLeft className="h-4 w-4" />
                 Cancelar
+              </Button>
+              
+              <Button
+                onClick={handleTestPrint}
+                disabled={printing}
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2"
+              >
+                {printing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                    Imprimiendo...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="h-4 w-4" />
+                    Probar Impresora
+                  </>
+                )}
               </Button>
             </div>
           </div>

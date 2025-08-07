@@ -1,15 +1,19 @@
 import { useState } from 'react';
-import { X, CreditCard, DollarSign } from 'lucide-react';
+import { X, CreditCard, DollarSign, Printer } from 'lucide-react';
 import Button from '../common/Button';
+import bluetoothPrinter from '../../services/bluetoothPrinter';
+import { useToast } from '../../contexts/ToastContext';
 
 const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
+  const { showSuccess, showError } = useToast();
   const [formData, setFormData] = useState({
     payment_method: 'CASH',
     tax_amount: '0.00',
     notes: ''
   });
+  const [printing, setPrinting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     const paymentData = {
@@ -18,7 +22,18 @@ const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
       tax_amount: parseFloat(formData.tax_amount)
     };
     
-    onSubmit(paymentData);
+    // Ejecutar el callback de pago original
+    const paymentResult = await onSubmit(paymentData);
+    
+    // Si el pago fue exitoso, intentar imprimir
+    if (paymentResult !== false) {
+      try {
+        await printPaymentReceipt(paymentData);
+      } catch (printError) {
+        console.error('Error imprimiendo:', printError);
+        // No bloqueamos el flujo si falla la impresión
+      }
+    }
   };
 
   const handleChange = (field, value) => {
@@ -37,6 +52,53 @@ const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
 
   const calculateTotal = () => {
     return parseFloat(order.total_amount) + parseFloat(formData.tax_amount || 0);
+  };
+
+  const printPaymentReceipt = async (paymentData) => {
+    try {
+      setPrinting(true);
+      
+      const receiptData = {
+        ...paymentData,
+        order: order,
+        tax_amount: paymentData.tax_amount || '0.00'
+      };
+
+      await bluetoothPrinter.printPaymentReceipt(receiptData);
+      showSuccess('Comprobante impreso exitosamente');
+    } catch (error) {
+      console.error('Error printing receipt:', error);
+      
+      if (error.message.includes('Web Bluetooth no está soportado')) {
+        showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
+      } else if (error.message.includes('conexión')) {
+        showError('No se pudo conectar con la impresora. Verifica que esté encendida.');
+      } else {
+        showError(`Error de impresión: ${error.message}`);
+      }
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const handleTestPrint = async () => {
+    try {
+      setPrinting(true);
+      await bluetoothPrinter.printTest();
+      showSuccess('Prueba de impresión completada');
+    } catch (error) {
+      console.error('Error in test print:', error);
+      
+      if (error.message.includes('Web Bluetooth no está soportado')) {
+        showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
+      } else if (error.message.includes('conexión')) {
+        showError('No se pudo conectar con la impresora. Verifica que esté encendida y el PIN sea 1234.');
+      } else {
+        showError(`Error de impresión: ${error.message}`);
+      }
+    } finally {
+      setPrinting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -150,14 +212,38 @@ const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancelar
+          <div className="space-y-3 pt-4 border-t border-gray-200">
+            {/* Botón de prueba de impresión */}
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handleTestPrint}
+              disabled={printing}
+              className="w-full flex items-center justify-center gap-2"
+            >
+              {printing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                  Imprimiendo...
+                </>
+              ) : (
+                <>
+                  <Printer className="h-4 w-4" />
+                  Probar Impresora
+                </>
+              )}
             </Button>
-            <Button type="submit" variant="success" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Procesar Pago
-            </Button>
+            
+            {/* Botones principales */}
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="success" className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Procesar Pago
+              </Button>
+            </div>
           </div>
         </form>
       </div>
