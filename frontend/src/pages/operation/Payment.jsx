@@ -504,8 +504,8 @@ const Payment = () => {
               </Button>
             </div>
 
-            {/* Botones cancelar y prueba de impresión */}
-            <div className="mt-6 space-y-3">
+            {/* Botón cancelar */}
+            <div className="mt-6">
               <Button
                 onClick={() => navigate('/orders')}
                 variant="secondary"
@@ -513,25 +513,6 @@ const Payment = () => {
               >
                 <ArrowLeft className="h-4 w-4" />
                 Cancelar
-              </Button>
-              
-              <Button
-                onClick={handleTestPrint}
-                disabled={printing}
-                variant="outline"
-                className="w-full flex items-center justify-center gap-2"
-              >
-                {printing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                    Imprimiendo...
-                  </>
-                ) : (
-                  <>
-                    <Printer className="h-4 w-4" />
-                    Probar Impresora
-                  </>
-                )}
               </Button>
             </div>
           </div>

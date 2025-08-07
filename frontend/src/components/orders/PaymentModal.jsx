@@ -212,38 +212,14 @@ const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
             />
           </div>
 
-          <div className="space-y-3 pt-4 border-t border-gray-200">
-            {/* Botón de prueba de impresión */}
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={handleTestPrint}
-              disabled={printing}
-              className="w-full flex items-center justify-center gap-2"
-            >
-              {printing ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                  Imprimiendo...
-                </>
-              ) : (
-                <>
-                  <Printer className="h-4 w-4" />
-                  Probar Impresora
-                </>
-              )}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancelar
             </Button>
-            
-            {/* Botones principales */}
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="secondary" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button type="submit" variant="success" className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                Procesar Pago
-              </Button>
-            </div>
+            <Button type="submit" variant="success" className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Procesar Pago
+            </Button>
           </div>
         </form>
       </div>
