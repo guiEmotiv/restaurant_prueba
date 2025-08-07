@@ -108,120 +108,120 @@ def export_data():
     
     try:
         data = {
-        "metadata": {
-            "version": "1.0",
-            "created_at": datetime.now().isoformat(),
-            "restaurant": "El Fogón de Don Soto"
-        },
-        "units": [],
-        "zones": [],
-        "tables": [],
-        "containers": [],
-        "groups": [],
-        "ingredients": [],
-        "recipes": [],
-        "recipe_items": []
-    }
-    
-    # Exportar unidades
-    print("   • Exportando unidades...")
-    for unit in Unit.objects.all():
-        data["units"].append({
-            "id": unit.id,
-            "name": unit.name
-        })
-    
-    # Exportar zonas
-    print("   • Exportando zonas...")
-    for zone in Zone.objects.all():
-        data["zones"].append({
-            "id": zone.id,
-            "name": zone.name
-        })
-    
-    # Exportar mesas
-    print("   • Exportando mesas...")
-    for table in Table.objects.all():
-        data["tables"].append({
-            "id": table.id,
-            "zone_id": table.zone_id,
-            "zone_name": table.zone.name,
-            "table_number": table.table_number
-        })
-    
-    # Exportar envases
-    print("   • Exportando envases...")
-    for container in Container.objects.all():
-        data["containers"].append({
-            "id": container.id,
-            "name": container.name,
-            "description": container.description,
-            "price": str(container.price),
-            "stock": container.stock,
-            "is_active": container.is_active
-        })
-    
-    # Exportar grupos
-    print("   • Exportando grupos...")
-    for group in Group.objects.all():
-        data["groups"].append({
-            "id": group.id,
-            "name": group.name
-        })
-    
-    # Exportar ingredientes
-    print("   • Exportando ingredientes...")
-    for ingredient in Ingredient.objects.all():
-        data["ingredients"].append({
-            "id": ingredient.id,
-            "name": ingredient.name,
-            "unit_id": ingredient.unit_id,
-            "unit_name": ingredient.unit.name,
-            "current_stock": str(ingredient.current_stock),
-            "unit_price": str(ingredient.unit_price),
-            "is_active": ingredient.is_active
-        })
-    
-    # Exportar recetas
-    print("   • Exportando recetas...")
-    for recipe in Recipe.objects.all():
-        data["recipes"].append({
-            "id": recipe.id,
-            "name": recipe.name,
-            "group_id": recipe.group_id,
-            "group_name": recipe.group.name,
-            "version": recipe.version,
-            "base_price": str(recipe.base_price),
-            "profit_percentage": str(recipe.profit_percentage),
-            "is_available": recipe.is_available,
-            "is_active": recipe.is_active,
-            "preparation_time": recipe.preparation_time
-        })
-    
-    # Exportar items de recetas
-    print("   • Exportando componentes de recetas...")
-    for item in RecipeItem.objects.all():
-        data["recipe_items"].append({
-            "id": item.id,
-            "recipe_id": item.recipe_id,
-            "recipe_name": item.recipe.name,
-            "ingredient_id": item.ingredient_id,
-            "ingredient_name": item.ingredient.name,
-            "quantity": str(item.quantity)
-        })
-    
-    # Mostrar resumen
-    print("\n📊 RESUMEN DEL BACKUP:")
-    print(f"   • Unidades: {len(data['units'])}")
-    print(f"   • Zonas: {len(data['zones'])}")
-    print(f"   • Mesas: {len(data['tables'])}")
-    print(f"   • Envases: {len(data['containers'])}")
-    print(f"   • Grupos: {len(data['groups'])}")
-    print(f"   • Ingredientes: {len(data['ingredients'])}")
-    print(f"   • Recetas: {len(data['recipes'])}")
-    print(f"   • Items de recetas: {len(data['recipe_items'])}")
-    
-    return data
+            "metadata": {
+                "version": "1.0",
+                "created_at": datetime.now().isoformat(),
+                "restaurant": "El Fogón de Don Soto"
+            },
+            "units": [],
+            "zones": [],
+            "tables": [],
+            "containers": [],
+            "groups": [],
+            "ingredients": [],
+            "recipes": [],
+            "recipe_items": []
+        }
+        
+        # Exportar unidades
+        print("   • Exportando unidades...")
+        for unit in Unit.objects.all():
+            data["units"].append({
+                "id": unit.id,
+                "name": unit.name
+            })
+        
+        # Exportar zonas
+        print("   • Exportando zonas...")
+        for zone in Zone.objects.all():
+            data["zones"].append({
+                "id": zone.id,
+                "name": zone.name
+            })
+        
+        # Exportar mesas
+        print("   • Exportando mesas...")
+        for table in Table.objects.all():
+            data["tables"].append({
+                "id": table.id,
+                "zone_id": table.zone_id,
+                "zone_name": table.zone.name,
+                "table_number": table.table_number
+            })
+        
+        # Exportar envases
+        print("   • Exportando envases...")
+        for container in Container.objects.all():
+            data["containers"].append({
+                "id": container.id,
+                "name": container.name,
+                "description": container.description,
+                "price": str(container.price),
+                "stock": container.stock,
+                "is_active": container.is_active
+            })
+        
+        # Exportar grupos
+        print("   • Exportando grupos...")
+        for group in Group.objects.all():
+            data["groups"].append({
+                "id": group.id,
+                "name": group.name
+            })
+        
+        # Exportar ingredientes
+        print("   • Exportando ingredientes...")
+        for ingredient in Ingredient.objects.all():
+            data["ingredients"].append({
+                "id": ingredient.id,
+                "name": ingredient.name,
+                "unit_id": ingredient.unit_id,
+                "unit_name": ingredient.unit.name,
+                "current_stock": str(ingredient.current_stock),
+                "unit_price": str(ingredient.unit_price),
+                "is_active": ingredient.is_active
+            })
+        
+        # Exportar recetas
+        print("   • Exportando recetas...")
+        for recipe in Recipe.objects.all():
+            data["recipes"].append({
+                "id": recipe.id,
+                "name": recipe.name,
+                "group_id": recipe.group_id,
+                "group_name": recipe.group.name,
+                "version": recipe.version,
+                "base_price": str(recipe.base_price),
+                "profit_percentage": str(recipe.profit_percentage),
+                "is_available": recipe.is_available,
+                "is_active": recipe.is_active,
+                "preparation_time": recipe.preparation_time
+            })
+        
+        # Exportar items de recetas
+        print("   • Exportando componentes de recetas...")
+        for item in RecipeItem.objects.all():
+            data["recipe_items"].append({
+                "id": item.id,
+                "recipe_id": item.recipe_id,
+                "recipe_name": item.recipe.name,
+                "ingredient_id": item.ingredient_id,
+                "ingredient_name": item.ingredient.name,
+                "quantity": str(item.quantity)
+            })
+        
+        # Mostrar resumen
+        print("\n📊 RESUMEN DEL BACKUP:")
+        print(f"   • Unidades: {len(data['units'])}")
+        print(f"   • Zonas: {len(data['zones'])}")
+        print(f"   • Mesas: {len(data['tables'])}")
+        print(f"   • Envases: {len(data['containers'])}")
+        print(f"   • Grupos: {len(data['groups'])}")
+        print(f"   • Ingredientes: {len(data['ingredients'])}")
+        print(f"   • Recetas: {len(data['recipes'])}")
+        print(f"   • Items de recetas: {len(data['recipe_items'])}")
+        
+        return data
         
     except Exception as e:
         print(f"❌ Error durante exportación: {str(e)}")
