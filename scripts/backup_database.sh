@@ -219,9 +219,9 @@ def export_data():
     print(f"   • Grupos: {len(data['groups'])}")
     print(f"   • Ingredientes: {len(data['ingredients'])}")
     print(f"   • Recetas: {len(data['recipes'])}")
-        print(f"   • Items de recetas: {len(data['recipe_items'])}")
-        
-        return data
+    print(f"   • Items de recetas: {len(data['recipe_items'])}")
+    
+    return data
         
     except Exception as e:
         print(f"❌ Error durante exportación: {str(e)}")
