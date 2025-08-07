@@ -121,13 +121,20 @@ from decimal import Decimal
 from datetime import datetime
 
 # Configurar entorno Django
+import sys
+sys.path.append("/app")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings_ec2")
 django.setup()
 
-from django.db import transaction
-from config.models import Unit, Zone, Table, Container
-from inventory.models import Group, Ingredient, Recipe, RecipeItem
-from operation.models import Order, OrderItem, Payment, PaymentItem
+try:
+    from django.db import transaction
+    from config.models import Unit, Zone, Table, Container
+    from inventory.models import Group, Ingredient, Recipe, RecipeItem
+    from operation.models import Order, OrderItem, Payment, PaymentItem
+    print("✅ Modelos importados correctamente")
+except ImportError as e:
+    print(f"❌ Error importando modelos: {e}")
+    sys.exit(1)
 
 def clean_database():
     """Limpia la base de datos en orden correcto"""

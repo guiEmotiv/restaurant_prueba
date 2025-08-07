@@ -81,11 +81,18 @@ from decimal import Decimal
 from datetime import datetime
 
 # Configurar entorno Django
+import sys
+sys.path.append("/app")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings_ec2")
 django.setup()
 
-from config.models import Unit, Zone, Table, Container
-from inventory.models import Group, Ingredient, Recipe, RecipeItem
+try:
+    from config.models import Unit, Zone, Table, Container
+    from inventory.models import Group, Ingredient, Recipe, RecipeItem
+    print("✅ Modelos importados correctamente")
+except ImportError as e:
+    print(f"❌ Error importando modelos: {e}")
+    sys.exit(1)
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -97,7 +104,8 @@ def export_data():
     """Exporta todos los datos de configuración"""
     print("📦 Exportando datos...")
     
-    data = {
+    try:
+        data = {
         "metadata": {
             "version": "1.0",
             "created_at": datetime.now().isoformat(),
@@ -209,9 +217,15 @@ def export_data():
     print(f"   • Grupos: {len(data['groups'])}")
     print(f"   • Ingredientes: {len(data['ingredients'])}")
     print(f"   • Recetas: {len(data['recipes'])}")
-    print(f"   • Items de recetas: {len(data['recipe_items'])}")
-    
-    return data
+        print(f"   • Items de recetas: {len(data['recipe_items'])}")
+        
+        return data
+        
+    except Exception as e:
+        print(f"❌ Error durante exportación: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 if __name__ == "__main__":
     try:
