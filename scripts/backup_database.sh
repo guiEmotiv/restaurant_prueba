@@ -9,22 +9,28 @@ echo "=========================================="
 echo ""
 
 # Detectar entorno
-if [ -f "/.dockerenv" ] || [ -n "${DOCKER_CONTAINER}" ] || [ -d "/opt/restaurant-web" ] || [ "$(whoami)" = "ubuntu" ]; then
+if [ -d "/opt/restaurant-web" ] || [ "$(whoami)" = "ubuntu" ] || [ -f "/usr/bin/docker-compose" ]; then
     echo "🐳 Detectado: Servidor EC2 (Producción)"
     ENV_TYPE="production"
-    # En EC2, usar el contenedor correcto
-    CONTAINER_NAME="restaurant-web-web-1"
-    # Verificar si el contenedor existe con otro nombre
-    if ! docker ps -a | grep -q "$CONTAINER_NAME"; then
-        CONTAINER_NAME=$(docker ps --format "table {{.Names}}" | grep -E "restaurant|web" | head -1)
+    
+    # Buscar contenedor web activo
+    CONTAINER_NAME=$(docker ps --format "{{.Names}}" | grep -E "web|restaurant" | head -1)
+    
+    if [ -z "$CONTAINER_NAME" ]; then
+        echo "❌ Error: No se encontró contenedor web activo"
+        echo "📦 Contenedores disponibles:"
+        docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+        echo ""
+        echo "🔧 Intentando usar docker-compose..."
+        cd /opt/restaurant-web 2>/dev/null || cd .
+        CONTAINER_NAME=$(docker-compose -f docker-compose.ec2.yml ps -q web 2>/dev/null | head -1)
         if [ -z "$CONTAINER_NAME" ]; then
-            echo "❌ Error: No se encontró el contenedor Docker"
-            echo "   Contenedores disponibles:"
-            docker ps --format "table {{.Names}}\t{{.Status}}"
+            echo "❌ Error: No se pudo detectar contenedor web"
             exit 1
         fi
-        echo "📦 Usando contenedor: $CONTAINER_NAME"
     fi
+    
+    echo "📦 Usando contenedor: $CONTAINER_NAME"
 else
     echo "💻 Detectado: Desarrollo local"
     ENV_TYPE="development"
@@ -220,22 +226,45 @@ if __name__ == "__main__":
 PYTHON_SCRIPT'
     
     echo "🐍 Ejecutando backup..."
-    # Ejecutar y capturar el output
-    docker exec $CONTAINER_NAME python /app/backup_db.py > temp_backup.txt 2>&1
     
-    # Verificar si el backup se ejecutó correctamente
-    if ! grep -q "---JSON_START---" temp_backup.txt; then
-        echo "❌ Error al ejecutar el backup:"
-        cat temp_backup.txt
-        rm -f temp_backup.txt
+    # Ejecutar el script y capturar solo el JSON
+    if docker exec $CONTAINER_NAME python /app/backup_db.py > temp_backup_full.txt 2>&1; then
+        
+        # Verificar si contiene JSON
+        if grep -q "---JSON_START---" temp_backup_full.txt; then
+            echo "✅ Backup ejecutado correctamente"
+            
+            # Extraer solo el JSON
+            sed -n '/---JSON_START---/,/---JSON_END---/p' temp_backup_full.txt | sed '1d;$d' > "$BACKUP_FILE"
+            
+            # Verificar que el JSON es válido
+            if python3 -m json.tool "$BACKUP_FILE" > /dev/null 2>&1; then
+                echo "✅ JSON válido generado"
+            else
+                echo "❌ Error: JSON inválido generado"
+                echo "Contenido del archivo:"
+                head -20 "$BACKUP_FILE"
+                rm -f temp_backup_full.txt "$BACKUP_FILE"
+                docker exec $CONTAINER_NAME rm -f /app/backup_db.py
+                exit 1
+            fi
+        else
+            echo "❌ Error: No se encontró JSON en la salida"
+            echo "Salida del script:"
+            cat temp_backup_full.txt
+            rm -f temp_backup_full.txt
+            docker exec $CONTAINER_NAME rm -f /app/backup_db.py
+            exit 1
+        fi
+    else
+        echo "❌ Error ejecutando el script Python"
+        cat temp_backup_full.txt
+        rm -f temp_backup_full.txt
         docker exec $CONTAINER_NAME rm -f /app/backup_db.py
         exit 1
     fi
     
-    # Extraer solo el JSON del output
-    sed -n '/---JSON_START---/,/---JSON_END---/p' temp_backup.txt | sed '1d;$d' > "$BACKUP_FILE"
-    rm temp_backup.txt
-    
+    rm -f temp_backup_full.txt
     echo "🧹 Limpiando archivo temporal..."
     docker exec $CONTAINER_NAME rm -f /app/backup_db.py
 

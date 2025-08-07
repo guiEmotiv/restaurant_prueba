@@ -9,22 +9,28 @@ echo "==============================================="
 echo ""
 
 # Detectar entorno
-if [ -f "/.dockerenv" ] || [ -n "${DOCKER_CONTAINER}" ] || [ -d "/opt/restaurant-web" ] || [ "$(whoami)" = "ubuntu" ]; then
+if [ -d "/opt/restaurant-web" ] || [ "$(whoami)" = "ubuntu" ] || [ -f "/usr/bin/docker-compose" ]; then
     echo "🐳 Detectado: Servidor EC2 (Producción)"
     ENV_TYPE="production"
-    # En EC2, usar el contenedor correcto
-    CONTAINER_NAME="restaurant-web-web-1"
-    # Verificar si el contenedor existe con otro nombre
-    if ! docker ps -a | grep -q "$CONTAINER_NAME"; then
-        CONTAINER_NAME=$(docker ps --format "table {{.Names}}" | grep -E "restaurant|web" | head -1)
+    
+    # Buscar contenedor web activo
+    CONTAINER_NAME=$(docker ps --format "{{.Names}}" | grep -E "web|restaurant" | head -1)
+    
+    if [ -z "$CONTAINER_NAME" ]; then
+        echo "❌ Error: No se encontró contenedor web activo"
+        echo "📦 Contenedores disponibles:"
+        docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+        echo ""
+        echo "🔧 Intentando usar docker-compose..."
+        cd /opt/restaurant-web 2>/dev/null || cd .
+        CONTAINER_NAME=$(docker-compose -f docker-compose.ec2.yml ps -q web 2>/dev/null | head -1)
         if [ -z "$CONTAINER_NAME" ]; then
-            echo "❌ Error: No se encontró el contenedor Docker"
-            echo "   Contenedores disponibles:"
-            docker ps --format "table {{.Names}}\t{{.Status}}"
+            echo "❌ Error: No se pudo detectar contenedor web"
             exit 1
         fi
-        echo "📦 Usando contenedor: $CONTAINER_NAME"
     fi
+    
+    echo "📦 Usando contenedor: $CONTAINER_NAME"
 else
     echo "💻 Detectado: Desarrollo local"
     ENV_TYPE="development"
@@ -281,7 +287,13 @@ if __name__ == "__main__":
 PYTHON_SCRIPT'
     
     echo "🐍 Ejecutando restauración..."
-    docker exec $CONTAINER_NAME python /app/restore_db.py
+    if docker exec $CONTAINER_NAME python /app/restore_db.py; then
+        echo "✅ Restauración completada exitosamente"
+    else
+        echo "❌ Error durante la restauración"
+        docker exec $CONTAINER_NAME rm -f /app/restore_db.py /app/backup_to_restore.json
+        exit 1
+    fi
     
     echo ""
     echo "🧹 Limpiando archivos temporales..."
