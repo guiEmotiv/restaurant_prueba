@@ -17,8 +17,21 @@ class BluetoothPrinterService {
       macAddress: '66:32:35:92:92:26',
       pin: '1234',
       font: 'Font-A',
-      serviceUUID: '000018f0-0000-1000-8000-00805f9b34fb', // UUID genérico para impresoras
-      characteristicUUID: '00002af1-0000-1000-8000-00805f9b34fb'
+      // UUIDs alternativos para diferentes tipos de impresoras
+      serviceUUIDs: [
+        '000018f0-0000-1000-8000-00805f9b34fb', // Generic Attribute
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455', // RN4020/Microchip
+        '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART Service
+        '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10/CC2541
+        '12345678-1234-5678-9abc-123456789abc'  // Custom UUID
+      ],
+      characteristicUUIDs: [
+        '00002af1-0000-1000-8000-00805f9b34fb', // Generic
+        '49535343-1e4d-4bd9-ba61-23c647249616', // RN4020 TX
+        '6e400002-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART TX
+        '0000ffe1-0000-1000-8000-00805f9b34fb', // HM-10 TX
+        '12345678-1234-5678-9abc-123456789abd'  // Custom TX
+      ]
     };
     
     // Comandos ESC/POS para etiquetera
@@ -57,10 +70,10 @@ class BluetoothPrinterService {
     try {
       console.log('Buscando impresora Bluetooth...');
       
-      // Solicitar dispositivo Bluetooth
+      // Solicitar dispositivo Bluetooth con todos los UUIDs posibles
       this.device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
-        optionalServices: [this.config.serviceUUID]
+        optionalServices: this.config.serviceUUIDs
       });
 
       console.log('Dispositivo encontrado:', this.device.name);
@@ -69,13 +82,41 @@ class BluetoothPrinterService {
       this.server = await this.device.gatt.connect();
       console.log('Conectado al servidor GATT');
 
-      // Obtener el servicio
-      this.service = await this.server.getPrimaryService(this.config.serviceUUID);
-      console.log('Servicio obtenido');
+      // Intentar conectar con diferentes UUIDs de servicio
+      let serviceFound = false;
+      for (const serviceUUID of this.config.serviceUUIDs) {
+        try {
+          this.service = await this.server.getPrimaryService(serviceUUID);
+          console.log('Servicio obtenido con UUID:', serviceUUID);
+          serviceFound = true;
+          break;
+        } catch (error) {
+          console.log('UUID de servicio no disponible:', serviceUUID);
+          continue;
+        }
+      }
 
-      // Obtener la característica
-      this.characteristic = await this.service.getCharacteristic(this.config.characteristicUUID);
-      console.log('Característica obtenida');
+      if (!serviceFound) {
+        throw new Error('No se pudo encontrar un servicio compatible en la impresora');
+      }
+
+      // Intentar obtener característica con diferentes UUIDs
+      let characteristicFound = false;
+      for (const charUUID of this.config.characteristicUUIDs) {
+        try {
+          this.characteristic = await this.service.getCharacteristic(charUUID);
+          console.log('Característica obtenida con UUID:', charUUID);
+          characteristicFound = true;
+          break;
+        } catch (error) {
+          console.log('UUID de característica no disponible:', charUUID);
+          continue;
+        }
+      }
+
+      if (!characteristicFound) {
+        throw new Error('No se pudo encontrar una característica compatible en la impresora');
+      }
 
       this.isConnected = true;
       console.log('Impresora conectada exitosamente');
@@ -406,5 +447,44 @@ class BluetoothPrinterService {
 
 // Instancia singleton
 const bluetoothPrinter = new BluetoothPrinterService();
+
+// Función para escanear dispositivos (disponible en consola del navegador)
+if (typeof window !== 'undefined') {
+  window.scanBluetoothPrinter = async () => {
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: bluetoothPrinter.config.serviceUUIDs
+      });
+
+      console.log('📱 Dispositivo:', device.name || 'Sin nombre');
+      
+      const server = await device.gatt.connect();
+      const services = await server.getPrimaryServices();
+      
+      console.log('🔍 Servicios encontrados:');
+      for (const service of services) {
+        console.log(`  📦 ${service.uuid}`);
+        try {
+          const characteristics = await service.getCharacteristics();
+          for (const char of characteristics) {
+            console.log(`    • ${char.uuid} - Propiedades:`, {
+              read: char.properties.read,
+              write: char.properties.write,
+              writeWithoutResponse: char.properties.writeWithoutResponse
+            });
+          }
+        } catch (error) {
+          console.log(`    ⚠️ Error obteniendo características`);
+        }
+      }
+      
+      device.gatt.disconnect();
+      return { device: device.name, services: services.map(s => s.uuid) };
+    } catch (error) {
+      console.error('❌ Error:', error);
+    }
+  };
+}
 
 export default bluetoothPrinter;
