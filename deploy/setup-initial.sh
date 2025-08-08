@@ -77,7 +77,7 @@ rm -f /etc/nginx/sites-enabled/default
 cat > /etc/nginx/sites-available/$DOMAIN << 'EOF'
 server {
     listen 80;
-    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+    server_name xn--elfogndedonsoto-zrb.com;
     
     location / {
         root /var/www/restaurant;

@@ -230,7 +230,7 @@ rm -f /etc/nginx/sites-enabled/*
 cat > /etc/nginx/sites-available/$DOMAIN << 'EOF'
 server {
     listen 80;
-    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+    server_name xn--elfogndedonsoto-zrb.com;
 
     root /var/www/restaurant;
     index index.html;
@@ -376,13 +376,13 @@ echo -e "${GREEN}✅ SSL certificate obtained successfully${NC}"
 cat > /etc/nginx/sites-available/$DOMAIN << 'EOF'
 server {
     listen 80;
-    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+    server_name xn--elfogndedonsoto-zrb.com;
     return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+    server_name xn--elfogndedonsoto-zrb.com;
 
     ssl_certificate /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/privkey.pem;

@@ -115,7 +115,7 @@ El dominio `elfogóndedonsoto.com` (xn--elfogndedonsoto-zrb.com) está configura
 ### Variables de entorno importantes
 
 **Frontend** (`.env.production`):
-- `VITE_API_URL=http://xn--elfogndedonsoto-zrb.com`
+- `VITE_API_URL=https://xn--elfogndedonsoto-zrb.com`
 - Configuración AWS Cognito
 
 **Backend** (`.env.ec2`):
