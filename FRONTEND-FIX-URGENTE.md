@@ -10,16 +10,21 @@ Resultado: `ERR_NAME_NOT_RESOLVED` + aplicación no funcional
 
 ## Solución Inmediata
 
-### En EC2, ejecutar (SOLUCIÓN COMPLETA):
+### ⚡ SOLUCIÓN DE EMERGENCIA (Problema de certificados SSL):
 ```bash
 cd /opt/restaurant-web
 sudo git pull
-sudo ./deploy/fix-all-problems.sh
+sudo ./deploy/fix-nginx-emergency.sh
 ```
 
-### O comando de una línea:
+### Luego compilar frontend:
 ```bash
-cd /opt/restaurant-web && sudo git pull && sudo ./deploy/fix-all-problems.sh
+sudo ./deploy/rebuild-frontend-www.sh
+```
+
+### ~~Solución completa (falló por certificados):~~
+```bash
+# sudo ./deploy/fix-all-problems.sh  # ❌ Falla por certificados SSL
 ```
 
 ### Solo para recompilar frontend:
