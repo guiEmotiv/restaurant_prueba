@@ -45,7 +45,13 @@ fi
 echo -e "\n${BLUE}2. Deteniendo servicios...${NC}"
 systemctl stop nginx
 cd /opt/restaurant-web
-docker-compose down
+if [ -f docker-compose.yml ]; then
+    docker-compose down
+elif [ -f docker-compose.ec2.yml ]; then
+    docker-compose -f docker-compose.ec2.yml down
+else
+    echo "⚠️  No se encontró archivo docker-compose, continuando..."
+fi
 
 # 4. Revocar certificado antiguo si incluye www
 echo -e "\n${BLUE}3. Verificando certificados SSL...${NC}"
@@ -246,7 +252,15 @@ EOF
 echo -e "\n${BLUE}8. Reiniciando servicios...${NC}"
 systemctl reload nginx
 cd /opt/restaurant-web
-docker-compose up -d
+if [ -f docker-compose.yml ]; then
+    docker-compose up -d
+elif [ -f docker-compose.ec2.yml ]; then
+    docker-compose -f docker-compose.ec2.yml up -d
+else
+    echo "⚠️  No se encontró archivo docker-compose"
+    # Intentar iniciar con Docker directamente
+    docker start restaurant-web-web-1 2>/dev/null || echo "⚠️  No se pudo iniciar el contenedor"
+fi
 
 # 11. Verificar estado final
 echo -e "\n${BLUE}9. Verificando estado final...${NC}"
