@@ -198,11 +198,11 @@ fi
 echo -e "\n${BLUE}Probando HTTPS...${NC}"
 sleep 3
 
-HTTPS_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" https://www.xn--elfogndedonsoto-zrb.com/ 2>/dev/null)
-echo "HTTPS Response: \$HTTPS_STATUS"
+HTTPS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://www.xn--elfogndedonsoto-zrb.com/ 2>/dev/null)
+echo "HTTPS Response: $HTTPS_STATUS"
 
-API_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" https://www.xn--elfogndedonsoto-zrb.com/api/v1/health/ 2>/dev/null)
-echo "API Response: \$API_STATUS"
+API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://www.xn--elfogndedonsoto-zrb.com/api/v1/health/ 2>/dev/null)
+echo "API Response: $API_STATUS"
 
 echo -e "\n${GREEN}🎉 SSL CONFIGURADO CORRECTAMENTE${NC}"
 echo "=========================================="
