@@ -101,11 +101,25 @@ fi
 echo "Ejecutando: $CERT_COMMAND"
 $CERT_COMMAND
 
+# Detectar path real del certificado
+ACTUAL_CERT_PATH=""
+if [ -d "/etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com" ]; then
+    ACTUAL_CERT_PATH="xn--elfogndedonsoto-zrb.com"
+elif [ -d "/etc/letsencrypt/live/www.xn--elfogndedonsoto-zrb.com" ]; then
+    ACTUAL_CERT_PATH="www.xn--elfogndedonsoto-zrb.com"
+else
+    echo -e "${RED}❌ Error: No se encontró certificado en ningún path${NC}"
+    exit 1
+fi
+
 # Verificar que el certificado se obtuvo correctamente
-if [ ! -f "/etc/letsencrypt/live/$CERT_NAME/fullchain.pem" ]; then
+if [ ! -f "/etc/letsencrypt/live/$ACTUAL_CERT_PATH/fullchain.pem" ]; then
     echo -e "${RED}❌ Error: No se pudo obtener certificado SSL${NC}"
     exit 1
 fi
+
+# Usar el path real del certificado
+CERT_NAME="$ACTUAL_CERT_PATH"
 
 echo -e "${GREEN}✅ Certificado SSL obtenido correctamente${NC}"
 
