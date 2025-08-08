@@ -85,7 +85,7 @@ cat > .env.production << EOF
 # Generated: $(date)
 
 # API Configuration
-VITE_API_URL=https://$DOMAIN
+VITE_API_URL=https://www.$DOMAIN
 
 # AWS Cognito Configuration - MUST match backend
 VITE_AWS_REGION=$AWS_REGION
@@ -97,7 +97,7 @@ EOF
 cp .env.production .env.local
 
 echo -e "${BLUE}Frontend environment variables:${NC}"
-echo -e "  VITE_API_URL=https://$DOMAIN"
+echo -e "  VITE_API_URL=https://www.$DOMAIN"
 echo -e "  VITE_AWS_REGION=$AWS_REGION"
 echo -e "  VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID"
 echo -e "  VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID"
@@ -109,7 +109,7 @@ npm install --silent --no-fund --no-audit
 
 # Build frontend with explicit environment variables
 echo -e "${BLUE}Building frontend with Cognito configuration...${NC}"
-VITE_API_URL=https://$DOMAIN \
+VITE_API_URL=https://www.$DOMAIN \
 VITE_AWS_REGION=$AWS_REGION \
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID \
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID \
