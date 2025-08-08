@@ -22,17 +22,10 @@ Esta guía te ayudará a configurar tu dominio de AWS Route53 con tu aplicación
 
 ### 1.2 Crear registros DNS
 
-Necesitas crear dos registros A:
+Necesitas crear un registro A:
 
 #### Registro A para dominio principal:
 - **Record name**: (dejar vacío)
-- **Record type**: A
-- **Value**: Tu IP pública de EC2
-- **TTL**: 300
-- **Routing policy**: Simple routing
-
-#### Registro A para www:
-- **Record name**: www
 - **Record type**: A
 - **Value**: Tu IP pública de EC2
 - **TTL**: 300

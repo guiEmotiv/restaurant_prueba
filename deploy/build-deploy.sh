@@ -338,7 +338,6 @@ echo -e "${BLUE}Getting SSL certificate...${NC}"
 $CERTBOT_PATH certonly \
     --standalone \
     -d $DOMAIN \
-    -d www.$DOMAIN \
     --non-interactive \
     --agree-tos \
     --email elfogondedonsoto@gmail.com \
