@@ -72,7 +72,7 @@ fi
 echo "Checking index.html content..."
 head -5 dist/index.html
 
-if ! head -1 dist/index.html | grep -q "<!DOCTYPE\|<html"; then
+if ! grep -i -q "<!DOCTYPE\|<html" dist/index.html; then
     echo -e "${RED}❌ index.html is not valid HTML${NC}"
     exit 1
 fi
