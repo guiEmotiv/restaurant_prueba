@@ -55,7 +55,7 @@ EC2_IP=$(hostname -I | awk '{print $1}')
 cat > "$PROJECT_DIR/.env.ec2" << EOF
 DJANGO_SECRET_KEY=$DJANGO_SECRET_KEY
 DEBUG=False
-ALLOWED_HOSTS=localhost,127.0.0.1,$EC2_IP,$DOMAIN
+ALLOWED_HOSTS=localhost,127.0.0.1,$EC2_IP,$DOMAIN,www.$DOMAIN
 DATABASE_URL=sqlite:///data/restaurant.sqlite3
 TIME_ZONE=America/Lima
 USE_COGNITO_AUTH=True

@@ -14,6 +14,8 @@ class CustomCORSMiddleware:
         
         # List of allowed origins
         allowed_origins = [
+            'http://www.xn--elfogndedonsoto-zrb.com',
+            'https://www.xn--elfogndedonsoto-zrb.com',
             'http://xn--elfogndedonsoto-zrb.com',
             'https://xn--elfogndedonsoto-zrb.com',
             'http://localhost:5173',

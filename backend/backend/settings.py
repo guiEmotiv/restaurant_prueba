@@ -140,7 +140,9 @@ DOMAIN_NAME = os.getenv('DOMAIN_NAME', '')
 if DOMAIN_NAME:
     CORS_ALLOWED_ORIGINS.extend([
         f"https://{DOMAIN_NAME}",
+        f"https://www.{DOMAIN_NAME}",
         f"http://{DOMAIN_NAME}",
+        f"http://www.{DOMAIN_NAME}",
     ])
 
 CORS_ALLOW_CREDENTIALS = True

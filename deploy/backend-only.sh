@@ -76,7 +76,7 @@ echo -e "${BLUE}📋 Recent backend logs:${NC}"
 docker-compose -f docker-compose.ec2.yml logs --tail=10 web
 
 echo -e "\n${GREEN}🎉 BACKEND DEPLOYMENT COMPLETED!${NC}"
-echo -e "${BLUE}🌐 API URL: ${GREEN}https://xn--elfogndedonsoto-zrb.com/api/v1/${NC}"
+echo -e "${BLUE}🌐 API URL: ${GREEN}https://www.xn--elfogndedonsoto-zrb.com/api/v1/${NC}"
 echo -e "${BLUE}⏱️ Total time: ~1-2 minutes${NC}"
 echo -e ""
 echo -e "${YELLOW}💡 Use this script when you only change:${NC}"

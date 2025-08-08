@@ -76,9 +76,9 @@ Los scripts están configurados para:
 
 ## 🌐 URLs de la Aplicación
 
-- **Frontend**: https://xn--elfogndedonsoto-zrb.com
-- **API**: https://xn--elfogndedonsoto-zrb.com/api/v1/
-- **Admin**: https://xn--elfogndedonsoto-zrb.com/api/v1/admin/
+- **Frontend**: https://www.xn--elfogndedonsoto-zrb.com
+- **API**: https://www.xn--elfogndedonsoto-zrb.com/api/v1/
+- **Admin**: https://www.xn--elfogndedonsoto-zrb.com/api/v1/admin/
 
 ## 🔧 Comandos de Mantenimiento
 

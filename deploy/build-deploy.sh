@@ -230,7 +230,7 @@ rm -f /etc/nginx/sites-enabled/*
 cat > /etc/nginx/sites-available/$DOMAIN << 'EOF'
 server {
     listen 80;
-    server_name xn--elfogndedonsoto-zrb.com;
+    server_name www.xn--elfogndedonsoto-zrb.com xn--elfogndedonsoto-zrb.com;
 
     root /var/www/restaurant;
     index index.html;
@@ -337,6 +337,7 @@ systemctl stop nginx
 echo -e "${BLUE}Getting SSL certificate...${NC}"
 $CERTBOT_PATH certonly \
     --standalone \
+    -d www.$DOMAIN \
     -d $DOMAIN \
     --non-interactive \
     --agree-tos \
@@ -375,16 +376,16 @@ echo -e "${GREEN}✅ SSL certificate obtained successfully${NC}"
 cat > /etc/nginx/sites-available/$DOMAIN << 'EOF'
 server {
     listen 80;
-    server_name xn--elfogndedonsoto-zrb.com;
+    server_name www.xn--elfogndedonsoto-zrb.com xn--elfogndedonsoto-zrb.com;
     return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name xn--elfogndedonsoto-zrb.com;
+    server_name www.xn--elfogndedonsoto-zrb.com xn--elfogndedonsoto-zrb.com;
 
-    ssl_certificate /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/www.xn--elfogndedonsoto-zrb.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/www.xn--elfogndedonsoto-zrb.com/privkey.pem;
     
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
