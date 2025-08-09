@@ -48,7 +48,7 @@ const OrderReceipt = () => {
     
     try {
       setIsPrinting(true);
-      await bluetoothPrinter.printReceipt({ order, payment });
+      await bluetoothPrinter.printPaymentReceipt({ order, payment });
     } catch (error) {
       console.error('Error printing receipt:', error);
       alert('Error al imprimir: ' + error.message);
@@ -62,7 +62,7 @@ const OrderReceipt = () => {
     
     try {
       setIsTesting(true);
-      await bluetoothPrinter.testConnection();
+      await bluetoothPrinter.printTest();
     } catch (error) {
       console.error('Error testing printer:', error);
       alert('Error al probar impresora: ' + error.message);
