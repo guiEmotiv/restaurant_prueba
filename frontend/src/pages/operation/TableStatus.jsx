@@ -124,9 +124,10 @@ const TableStatus = () => {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header compacto */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header fijo */}
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-4 py-3">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
           {/* Filtro por zona y leyenda */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -163,8 +164,11 @@ const TableStatus = () => {
             </div>
           </div>
         </div>
+        </div>
       </div>
 
+      {/* Contenido principal */}
+      <div className="p-4">
       {/* Mesas agrupadas por zona - Diseño más compacto */}
       {Object.keys(groupedTables).length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-8 text-center">
@@ -244,6 +248,7 @@ const TableStatus = () => {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 };

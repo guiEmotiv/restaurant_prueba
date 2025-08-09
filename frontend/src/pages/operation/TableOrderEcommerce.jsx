@@ -243,7 +243,7 @@ const TableOrderEcommerce = () => {
       {/* Header fijo */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Info de la mesa */}
             <div className="flex items-center gap-4">
               <button
@@ -254,16 +254,17 @@ const TableOrderEcommerce = () => {
               </button>
               
               <div>
-                <h1 className="text-lg font-bold text-gray-900">
-                  Mesa {table.table_number}
+                <h1 className="text-base sm:text-lg font-bold text-gray-900">
+                  Mesa {table.table_number} - Crear Pedido
                 </h1>
-                <p className="text-sm text-gray-600 flex items-center gap-2">
+                <p className="text-xs sm:text-sm text-gray-600 flex flex-wrap items-center gap-2">
                   <span>{table.zone_name}</span>
                   {table.capacity && (
                     <>
                       <span>•</span>
                       <Users className="h-3 w-3" />
-                      <span>{table.capacity} personas</span>
+                      <span className="hidden sm:inline">{table.capacity} personas</span>
+                      <span className="sm:hidden">{table.capacity}p</span>
                     </>
                   )}
                 </p>
