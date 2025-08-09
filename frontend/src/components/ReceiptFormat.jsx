@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-
 const ReceiptFormat = ({ order, payment, className = "" }) => {
   
   const formatCurrency = (amount) => {
@@ -10,24 +8,25 @@ const ReceiptFormat = ({ order, payment, className = "" }) => {
 
   const formatDate = (dateString) => {
     try {
-      if (!dateString) return new Date().toLocaleDateString('es-PE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
+      if (!dateString) {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
       
       const date = new Date(dateString);
-      return date.toLocaleDateString('es-PE', {
-        day: '2-digit',
-        month: '2-digit', 
-        year: 'numeric'
-      });
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
     } catch (error) {
-      return new Date().toLocaleDateString('es-PE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
+      const now = new Date();
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = now.getFullYear();
+      return `${day}/${month}/${year}`;
     }
   };
 
@@ -48,6 +47,7 @@ const ReceiptFormat = ({ order, payment, className = "" }) => {
   };
 
   const getPaymentMethodName = (method) => {
+    if (!method) return 'NO ESPECIFICADO';
     const methods = {
       'cash': 'EFECTIVO',
       'card': 'TARJETA',
@@ -55,7 +55,7 @@ const ReceiptFormat = ({ order, payment, className = "" }) => {
       'plin': 'PLIN',
       'transfer': 'TRANSFERENCIA'
     };
-    return methods[method] || method?.toUpperCase() || 'NO ESPECIFICADO';
+    return methods[method] || String(method).toUpperCase() || 'NO ESPECIFICADO';
   };
 
   if (!order || !payment) {
