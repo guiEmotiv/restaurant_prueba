@@ -68,12 +68,22 @@ class BluetoothPrinterService {
     return 'bluetooth' in navigator;
   }
 
+  getBluetoothErrorMessage() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    if (isIOS || isSafari) {
+      return 'Web Bluetooth no está soportado en iPhone/iPad Safari. Use Chrome en Android o Windows para imprimir vía Bluetooth.';
+    }
+    return 'Web Bluetooth no está soportado en este navegador. Use Chrome, Edge o Firefox para acceder a la función de impresión Bluetooth.';
+  }
+
   /**
    * Conecta con la impresora Bluetooth
    */
   async connect() {
     if (!this.isBluetoothSupported()) {
-      throw new Error('Web Bluetooth no está soportado en este navegador');
+      throw new Error(this.getBluetoothErrorMessage());
     }
 
     try {
