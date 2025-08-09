@@ -118,8 +118,8 @@ const TableStatus = () => {
     return (
       <div className="fixed inset-0 bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando mesas...</p>
+          <div className="animate-spin rounded h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+          <p className="mt-4 text-base text-gray-600">Cargando mesas...</p>
         </div>
       </div>
     );
@@ -181,26 +181,26 @@ const TableStatus = () => {
       </div>
 
       {/* Contenido principal scrollable */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-3">
+      <div className="flex-1 overflow-y-auto p-3">
         {Object.keys(groupedTables).length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <Table className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-              <h3 className="text-sm font-medium text-gray-900 mb-1">No hay mesas</h3>
-              <p className="text-xs text-gray-500">No se encontraron mesas</p>
+              <Table className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-base font-medium text-gray-900 mb-2">No hay mesas</h3>
+              <p className="text-sm text-gray-500">No se encontraron mesas</p>
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {Object.entries(groupedTables).map(([zoneName, zoneTables]) => (
               <div key={zoneName}>
-                <div className="flex items-center gap-1 mb-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <h3 className="text-sm font-semibold text-gray-800">{zoneName}</h3>
-                  <span className="text-xs text-gray-500">({zoneTables.length})</span>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                  <h3 className="text-base font-medium text-gray-800">{zoneName}</h3>
+                  <span className="text-sm text-gray-500">({zoneTables.length})</span>
                 </div>
                 
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {zoneTables.map((table) => {
                     const tableStatus = getTableStatus(table);
                     const StatusIcon = tableStatus.status === 'available' ? Plus : ShoppingCart;
@@ -209,40 +209,46 @@ const TableStatus = () => {
                       <button
                         key={table.id}
                         onClick={() => handleTableClick(table)}
-                        className={`group relative p-2 rounded-lg border transition-all duration-200 hover:shadow-md ${
+                        className={`relative p-3 rounded border transition-colors ${
                           tableStatus.status === 'available' 
-                            ? 'border-green-200 bg-green-50 hover:border-green-300' 
-                            : 'border-red-200 bg-red-50 hover:border-red-300'
+                            ? 'border-green-300 bg-green-50 hover:bg-green-100' 
+                            : 'border-red-300 bg-red-50 hover:bg-red-100'
                         }`}
                       >
                         {/* Indicador de estado */}
-                        <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
-                          tableStatus.status === 'available' ? 'bg-green-400' : 'bg-red-400'
+                        <div className={`absolute top-2 right-2 w-3 h-3 rounded ${
+                          tableStatus.status === 'available' ? 'bg-green-500' : 'bg-red-500'
                         }`}></div>
                         
                         {/* Contenido principal */}
                         <div className="flex flex-col items-center text-center">
-                          <div className={`flex items-center justify-center w-8 h-8 rounded-full mb-1 ${
+                          <div className={`flex items-center justify-center w-10 h-10 rounded mb-2 ${
                             tableStatus.status === 'available' 
                               ? 'bg-green-500' 
                               : 'bg-red-500'
                           }`}>
-                            <StatusIcon className="h-4 w-4 text-white" />
+                            <StatusIcon className="h-5 w-5 text-white" />
                           </div>
                           
-                          <div className="text-xs font-bold text-gray-900">
-                            M{table.table_number}
+                          <div className="text-sm font-medium text-gray-900">
+                            Mesa {table.table_number}
                           </div>
-                          <div className="text-xs text-gray-600">
-                            <Users className="h-3 w-3 inline" />
-                            <span className="ml-0.5">{table.capacity || 4}</span>
-                          </div>
+                          {tableStatus.status === 'occupied' ? (
+                            <div className="text-sm text-gray-600 flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{tableStatus.pendingItems}/{tableStatus.totalItems}</span>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-green-600 font-medium">
+                              Disponible
+                            </div>
+                          )}
                         </div>
                         
                         {/* Badge de múltiples cuentas */}
                         {tableStatus.ordersCount > 1 && (
                           <div className="absolute -top-1 -right-1">
-                            <div className="bg-orange-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs font-bold">
+                            <div className="bg-orange-500 text-white rounded w-5 h-5 flex items-center justify-center text-xs font-medium">
                               {tableStatus.ordersCount}
                             </div>
                           </div>

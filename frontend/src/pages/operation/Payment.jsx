@@ -354,13 +354,13 @@ const Payment = () => {
 
   const renderOrderItems = () => {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <div className="bg-white rounded p-3 mx-3 mb-3">
+        <h3 className="text-base font-medium text-gray-900 mb-3 flex items-center gap-2">
           <Receipt className="h-5 w-5" />
           Items del Pedido
         </h3>
         
-        <div className="space-y-2">
+        <div className="space-y-3">
           {order.items?.map((item) => {
             const isPaid = paidItems.has(item.id);
             const isAssigned = selectedItems[item.id] !== null && selectedItems[item.id] !== undefined;
@@ -375,7 +375,7 @@ const Payment = () => {
               <div
                 key={item.id}
                 onClick={() => paymentMode === 'split' && !isPaid && !isAssigned && toggleItemSelection(item.id)}
-                className={`p-3 rounded-lg border transition-colors ${
+                className={`p-3 rounded border transition-colors ${
                   isPaid
                     ? 'bg-green-100 border-green-300 cursor-not-allowed'
                     : paymentMode === 'split'
@@ -389,31 +389,31 @@ const Payment = () => {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">{item.recipe_name}</div>
+                    <div className="font-medium text-gray-900 text-sm">{item.recipe_name}</div>
                     {item.notes && (
-                      <div className="text-gray-500 italic text-xs mt-1">Notas: {item.notes}</div>
+                      <div className="text-gray-500 italic text-sm mt-1">Notas: {item.notes}</div>
                     )}
                     {item.customizations_count > 0 && (
-                      <div className="text-blue-600 text-xs mt-1">
+                      <div className="text-blue-600 text-sm mt-1">
                         {item.customizations_count} personalización(es)
                       </div>
                     )}
                     {item.is_takeaway && (
-                      <div className="text-orange-600 text-xs mt-1 flex items-center gap-1">
+                      <div className="text-orange-600 text-sm mt-1 flex items-center gap-1">
                         <span>📦</span>
                         <span>Para llevar (envase incluido)</span>
                       </div>
                     )}
                   </div>
                   <div className="text-right">
-                    <div className="font-medium">{formatCurrency(item.total_price)}</div>
+                    <div className="font-medium text-base">{formatCurrency(item.total_price)}</div>
                     {isPaid && (
-                      <div className="text-xs text-green-600 font-medium">
+                      <div className="text-sm text-green-600 font-medium">
                         ✓ Pagado parcialmente
                       </div>
                     )}
                     {isAssigned && !isPaid && paymentMode === 'split' && (
-                      <div className="text-xs text-gray-500">
+                      <div className="text-sm text-gray-500">
                         Asignado a pago {(selectedItems[item.id] ?? -1) + 1}
                       </div>
                     )}
@@ -429,16 +429,10 @@ const Payment = () => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-4 bg-gray-200 rounded"></div>
-              ))}
-            </div>
-          </div>
+      <div className="fixed inset-0 bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+          <p className="mt-4 text-base text-gray-600">Cargando pago...</p>
         </div>
       </div>
     );
@@ -446,8 +440,17 @@ const Payment = () => {
 
   if (!order) {
     return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">Orden no encontrada</p>
+      <div className="fixed inset-0 bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-base font-medium text-gray-900 mb-2">Orden no encontrada</h2>
+          <button 
+            onClick={() => navigate('/orders')}
+            className="text-blue-600 hover:text-blue-800 text-base"
+          >
+            Volver a órdenes
+          </button>
+        </div>
       </div>
     );
   }
@@ -456,35 +459,35 @@ const Payment = () => {
     <div className="fixed inset-0 bg-gray-50 flex flex-col h-full">
       {/* Modal/Popup inicial para selección de tipo de pago */}
       {!paymentMode && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded max-w-md w-full overflow-hidden">
             {/* Header del modal */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-white">
+            <div className="bg-blue-600 px-3 py-3 text-white">
               <div className="text-center">
-                <h2 className="text-base font-bold mb-1">Procesar Pago</h2>
-                <p className="text-blue-100 text-xs">
+                <h2 className="text-base font-medium mb-1">Procesar Pago</h2>
+                <p className="text-blue-100 text-sm">
                   Mesa {order.table_number} • #{order.id}
                 </p>
               </div>
             </div>
 
             {/* Contenido del modal */}
-            <div className="p-4">
+            <div className="p-3">
               {/* Total destacado */}
-              <div className="text-center mb-4 p-3 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1">Total a pagar</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="text-center mb-4 p-3 bg-gray-50 rounded">
+                <p className="text-sm text-gray-500 mb-1">Total a pagar</p>
+                <p className="text-xl font-medium text-gray-900">
                   {formatCurrency(order.total_amount)}
                 </p>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-sm text-gray-600 mt-1">
                   {order.items ? order.items.length : 0} items
                 </p>
               </div>
 
               {/* Mensaje informativo si hay items pagados */}
               {paidItems.size > 0 && (
-                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                  <div className="flex items-center gap-3">
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded">
+                  <div className="flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
                     <p className="text-sm text-amber-800">
                       <strong>Atención:</strong> Hay {paidItems.size} item(s) ya pagados. Solo puedes usar "Dividir Cuenta" para procesar los items restantes.
@@ -499,23 +502,23 @@ const Payment = () => {
                 <button
                   onClick={() => setPaymentMode('full')}
                   disabled={processing || paidItems.size > 0}
-                  className={`w-full p-3 rounded-xl border transition-all duration-200 ${
+                  className={`w-full p-3 rounded border transition-colors ${
                     paidItems.size > 0 
                       ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-50' 
-                      : 'border-green-200 bg-green-50 hover:border-green-300 hover:bg-green-100'
+                      : 'border-green-300 bg-green-50 hover:bg-green-100'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    <div className={`w-10 h-10 rounded flex items-center justify-center ${
                       paidItems.size > 0 ? 'bg-gray-200' : 'bg-green-500'
                     }`}>
-                      <CreditCard className={`h-4 w-4 ${paidItems.size > 0 ? 'text-gray-400' : 'text-white'}`} />
+                      <CreditCard className={`h-5 w-5 ${paidItems.size > 0 ? 'text-gray-400' : 'text-white'}`} />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className={`text-sm font-bold ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-900'}`}>
+                      <div className={`text-base font-medium ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-900'}`}>
                         Pago Completo
                       </div>
-                      <div className={`text-xs ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <div className={`text-sm ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-600'}`}>
                         Procesa toda la cuenta
                       </div>
                     </div>
@@ -526,15 +529,15 @@ const Payment = () => {
                 <button
                   onClick={() => setPaymentMode('split')}
                   disabled={processing}
-                  className="w-full p-3 rounded-xl border border-blue-200 bg-blue-50 hover:border-blue-300 hover:bg-blue-100 transition-all duration-200"
+                  className="w-full p-3 rounded border border-blue-300 bg-blue-50 hover:bg-blue-100 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                      <Split className="h-4 w-4 text-white" />
+                    <div className="w-10 h-10 bg-blue-500 rounded flex items-center justify-center">
+                      <Split className="h-5 w-5 text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className="text-sm font-bold text-gray-900">Dividir Cuenta</div>
-                      <div className="text-xs text-gray-600">
+                      <div className="text-base font-medium text-gray-900">Dividir Cuenta</div>
+                      <div className="text-sm text-gray-600">
                         {order.items ? order.items.filter(item => !paidItems.has(item.id)).length : 0} items disponibles
                       </div>
                     </div>
@@ -546,9 +549,9 @@ const Payment = () => {
               <div className="mt-4 pt-3 border-t border-gray-200">
                 <button
                   onClick={() => navigate('/orders')}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 text-sm flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2 border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-50 text-base flex items-center justify-center gap-2"
                 >
-                  <ArrowLeft className="h-3 w-3" />
+                  <ArrowLeft className="h-5 w-5" />
                   Cancelar
                 </button>
               </div>
@@ -563,24 +566,24 @@ const Payment = () => {
       {/* Formulario de Pago Completo */}
       {paymentMode === 'full' && (
         <div className="flex flex-col h-full">
-          {/* Header fijo compacto */}
-          <div className="bg-white border-b border-gray-200 shadow-sm p-3">
+          {/* Header fijo estandarizado */}
+          <div className="bg-white border-b border-gray-200 p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-1">
                 <button
                   onClick={() => setPaymentMode(null)}
-                  className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
                 >
-                  <ArrowLeft className="h-4 w-4" />
+                  <ArrowLeft className="h-5 w-5" />
                 </button>
                 <div className="text-center flex-1">
-                  <h1 className="text-sm font-bold text-gray-900">Pago Completo</h1>
-                  <p className="text-xs text-gray-600">Mesa {order.table_number} • #{order.id}</p>
+                  <h1 className="text-base font-medium text-gray-900">Pago Completo</h1>
+                  <p className="text-sm text-gray-500">Mesa {order.table_number} • #{order.id}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-500">Total</p>
-                <p className="text-base font-bold text-gray-900">{formatCurrency(order.total_amount)}</p>
+                <p className="text-sm text-gray-500">Total</p>
+                <p className="text-xl font-medium text-gray-900">{formatCurrency(order.total_amount)}</p>
               </div>
             </div>
           </div>
@@ -588,19 +591,19 @@ const Payment = () => {
           {/* Contenido scrollable */}
           <div className="flex-1 overflow-y-auto p-3">
             <div className="max-w-lg mx-auto">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-4">
+              <div className="bg-white rounded border border-gray-200 overflow-hidden">
+                <div className="p-3">
                   <div className="space-y-4">
                     {/* Método de pago */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Método de Pago
                       </label>
                       <select
                         name="payment_method"
                         value={paymentData.payment_method}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm bg-gray-50"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                       >
                         <option value="CASH">💵 Efectivo</option>
                         <option value="CARD">💳 Tarjeta</option>
@@ -612,7 +615,7 @@ const Payment = () => {
 
                     {/* Notas */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Notas (Opcional)
                       </label>
                       <input
@@ -620,18 +623,18 @@ const Payment = () => {
                         name="notes"
                         value={paymentData.notes}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm bg-gray-50"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                         placeholder="Ej: Cliente pagó con billete de 100..."
                       />
                     </div>
                   </div>
 
                   {/* Resumen del pago */}
-                  <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="mt-4 p-3 bg-green-50 rounded border border-green-200">
                     <div className="text-center">
-                      <h3 className="text-sm font-medium text-gray-900">Resumen del Pago</h3>
-                      <p className="text-xs text-gray-600 mt-1">{order.items ? order.items.length : 0} items</p>
-                      <p className="text-xl font-bold text-gray-900 mt-2">{formatCurrency(order.total_amount)}</p>
+                      <h3 className="text-base font-medium text-gray-900">Resumen del Pago</h3>
+                      <p className="text-sm text-gray-600 mt-1">{order.items ? order.items.length : 0} items</p>
+                      <p className="text-xl font-medium text-gray-900 mt-2">{formatCurrency(order.total_amount)}</p>
                     </div>
                   </div>
 
@@ -640,16 +643,16 @@ const Payment = () => {
                     <button
                       onClick={handleFullPayment}
                       disabled={processing}
-                      className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium text-sm flex items-center justify-center gap-2"
+                      className="w-full bg-green-600 text-white py-3 rounded hover:bg-green-700 disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
                     >
                       {processing ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <div className="animate-spin rounded h-5 w-5 border-2 border-white border-t-transparent"></div>
                           Procesando...
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="h-4 w-4" />
+                          <CheckCircle className="h-5 w-5" />
                           Confirmar Pago
                         </>
                       )}
