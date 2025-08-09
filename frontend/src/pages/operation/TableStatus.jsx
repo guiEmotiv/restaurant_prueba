@@ -240,7 +240,7 @@ const TableStatus = () => {
                 
                 {/* Grid de Mesas Moderno */}
                 <div className="p-6">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {zoneTables.map((table) => {
                       const tableStatus = getTableStatus(table);
                       const isAvailable = tableStatus.status === 'available';

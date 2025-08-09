@@ -662,7 +662,7 @@ const Payment = () => {
                   <label className="block font-bold text-gray-700 mb-3">
                     Método de Pago
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
                       { value: 'CASH', icon: <Wallet className="h-5 w-5" />, name: 'Efectivo' },
                       { value: 'CARD', icon: <CreditCard className="h-5 w-5" />, name: 'Tarjeta' },

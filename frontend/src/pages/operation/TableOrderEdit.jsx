@@ -554,7 +554,7 @@ const TableOrderEdit = () => {
                   <p className="text-gray-500">Intenta otros términos</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   {filteredRecipes.map((recipe) => (
                     <div
                       key={recipe.id}

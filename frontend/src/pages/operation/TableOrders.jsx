@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, ShoppingCart, Clock, User, DollarSign } from 'lucide-react';
-import Button from '../../components/common/Button';
+import { ArrowLeft, Plus, ShoppingCart, Clock, User, DollarSign, Utensils, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -76,166 +75,201 @@ const TableOrders = () => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
-            ))}
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600"></div>
           </div>
+          <p className="text-gray-600 font-medium">Cargando cuentas...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            onClick={() => navigate('/table-status')}
-            variant="secondary"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Volver
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Mesa {table?.table_number} - {table?.zone_name}
-            </h1>
-            <p className="text-gray-600">
-              {orders.length === 0 
-                ? 'Sin pedidos activos'
-                : orders.length === 1 
-                  ? '1 cuenta activa' 
-                  : `${orders.length} cuentas separadas`
-              }
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Header Moderno */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white sticky top-0 z-40 shadow-lg">
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1">
+              <button
+                onClick={() => navigate('/table-status')}
+                className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5 text-white" />
+              </button>
+              
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-200" />
+                  <h1 className="font-bold">Mesa {table?.table_number}</h1>
+                </div>
+                <p className="text-blue-100 text-sm">
+                  {table?.zone_name} • {orders.length === 0 
+                    ? 'Sin cuentas'
+                    : orders.length === 1 
+                      ? '1 cuenta activa' 
+                      : `${orders.length} cuentas`
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Nueva Cuenta Button */}
+            <button
+              onClick={handleNewOrder}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva Cuenta
+            </button>
           </div>
         </div>
-        
-        <Button
-          onClick={handleNewOrder}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva Cuenta
-        </Button>
       </div>
 
-      {/* Orders List */}
-      {orders.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Mesa disponible
-          </h3>
-          <p className="text-gray-600 mb-4">
-            Esta mesa no tiene cuentas activas. Puedes crear una nueva cuenta para comenzar a tomar pedidos.
-          </p>
-          <Button
-            onClick={handleNewOrder}
-            className="flex items-center gap-2 mx-auto"
-          >
-            <Plus className="h-4 w-4" />
-            Crear Primera Cuenta
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {orders.map((order, index) => {
-            const summary = getOrderSummary(order);
-            
-            return (
-              <div
-                key={order.id}
-                onClick={() => handleOrderClick(order)}
-                className="bg-white rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer p-6"
+      {/* Contenido Principal */}
+      <div className="px-4 py-6">
+        {orders.length === 0 ? (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center bg-white rounded-3xl p-8 shadow-xl border border-gray-100 max-w-md">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <ShoppingCart className="h-10 w-10 text-blue-500" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Mesa Disponible</h3>
+              <p className="text-gray-500 mb-6">
+                Esta mesa no tiene cuentas activas. Crea una nueva cuenta para comenzar.
+              </p>
+              <button
+                onClick={handleNewOrder}
+                className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 mx-auto"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
-                        Cuenta #{order.id}
-                      </span>
-                      {index === 0 && <span className="text-sm text-green-600">(Más reciente)</span>}
-                    </h3>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{formatDate(order.created_at)}</span>
-                      </div>
-                      {order.waiter && (
-                        <div className="flex items-center gap-1">
-                          <User className="h-4 w-4" />
-                          <span>{order.waiter}</span>
+                <Plus className="h-5 w-5" />
+                Crear Primera Cuenta
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {orders.map((order, index) => {
+              const summary = getOrderSummary(order);
+              
+              return (
+                <div
+                  key={order.id}
+                  onClick={() => handleOrderClick(order)}
+                  className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden group hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
+                >
+                  {/* Header de la Cuenta */}
+                  <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          summary.canPay 
+                            ? 'bg-emerald-500 text-white' 
+                            : 'bg-amber-500 text-white'
+                        }`}>
+                          {summary.canPay ? (
+                            <CheckCircle className="h-5 w-5" />
+                          ) : (
+                            <AlertCircle className="h-5 w-5" />
+                          )}
                         </div>
-                      )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900">Cuenta #{order.id}</span>
+                            {index === 0 && (
+                              <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-xs font-medium">
+                                Más reciente
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-sm text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>{formatDate(order.created_at)}</span>
+                            </div>
+                            {order.waiter && (
+                              <div className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                <span>{order.waiter}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="text-right">
+                        <div className="text-xl font-bold text-gray-900">
+                          {formatCurrency(order.total_amount)}
+                        </div>
+                        {summary.canPay && (
+                          <span className="text-sm text-emerald-600 font-medium">Listo para pagar</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contenido de la Cuenta */}
+                  <div className="p-6">
+                    {/* Resumen de Items */}
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      <div className="text-center p-4 bg-slate-50 rounded-xl">
+                        <div className="text-2xl font-bold text-slate-700">{summary.totalItems}</div>
+                        <div className="text-xs text-slate-500 font-medium mt-1">Items Total</div>
+                      </div>
+                      <div className="text-center p-4 bg-amber-50 rounded-xl">
+                        <div className="text-2xl font-bold text-amber-600">{summary.pendingItems}</div>
+                        <div className="text-xs text-amber-600 font-medium mt-1">Pendientes</div>
+                      </div>
+                      <div className="text-center p-4 bg-emerald-50 rounded-xl">
+                        <div className="text-2xl font-bold text-emerald-600">{summary.servedItems}</div>
+                        <div className="text-xs text-emerald-600 font-medium mt-1">Entregados</div>
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <span className="text-sm text-gray-600 font-medium">
+                        {summary.canPay ? 'Cuenta lista para cobrar' : 'Gestionar cuenta'}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOrderClick(order);
+                        }}
+                        className={`px-4 py-2 rounded-xl font-semibold transition-colors flex items-center gap-2 ${
+                          summary.canPay 
+                            ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                      >
+                        {summary.canPay ? (
+                          <>
+                            <DollarSign className="h-4 w-4" />
+                            Cobrar
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingCart className="h-4 w-4" />
+                            Gestionar
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                   
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">
-                      {formatCurrency(order.total_amount)}
-                    </div>
-                    {summary.canPay && (
-                      <span className="text-sm text-green-600">Listo para pagar</span>
-                    )}
-                  </div>
+                  {/* Shine Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
                 </div>
-
-                {/* Order Summary */}
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  <div className="text-center p-3 bg-gray-50 rounded">
-                    <div className="text-2xl font-bold text-gray-900">{summary.totalItems}</div>
-                    <div className="text-xs text-gray-600">Items Total</div>
-                  </div>
-                  <div className="text-center p-3 bg-orange-50 rounded">
-                    <div className="text-2xl font-bold text-orange-600">{summary.pendingItems}</div>
-                    <div className="text-xs text-gray-600">Pendientes</div>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded">
-                    <div className="text-2xl font-bold text-green-600">{summary.servedItems}</div>
-                    <div className="text-xs text-gray-600">Entregados</div>
-                  </div>
-                </div>
-
-                {/* Action Button */}
-                <div className="flex items-center justify-between pt-4 border-t">
-                  <span className="text-sm text-gray-600">
-                    {summary.canPay ? 'Cuenta lista para cobrar' : 'Gestionar cuenta'}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant={summary.canPay ? 'primary' : 'secondary'}
-                    className="flex items-center gap-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOrderClick(order);
-                    }}
-                  >
-                    {summary.canPay ? (
-                      <>
-                        <DollarSign className="h-4 w-4" />
-                        Cobrar Cuenta
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart className="h-4 w-4" />
-                        Gestionar
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
+      
+      {/* Spacing Bottom */}
+      <div className="h-20"></div>
     </div>
   );
 };

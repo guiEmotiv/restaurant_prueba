@@ -335,16 +335,16 @@ const TableOrderEcommerce = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredRecipes.map((recipe) => (
                 <div
                   key={recipe.id}
                   className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden group hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]"
                 >
                   {/* Product Image Placeholder */}
-                  <div className="relative h-48 bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
-                    <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center">
-                      <Coffee className="h-8 w-8 text-orange-500" />
+                  <div className="relative h-40 sm:h-48 bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center">
+                      <Coffee className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500" />
                     </div>
                     
                     {/* Quick Add Button */}
@@ -375,7 +375,7 @@ const TableOrderEcommerce = () => {
 
                     {/* Precio */}
                     <div className="flex items-center justify-between mb-4">
-                      <div className="text-2xl font-bold text-emerald-600">
+                      <div className="text-xl sm:text-2xl font-bold text-emerald-600">
                         {formatCurrency(recipe.base_price)}
                       </div>
                       <div className="flex items-center gap-1">
@@ -388,7 +388,7 @@ const TableOrderEcommerce = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleQuickAdd(recipe)}
-                        className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-semibold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 bg-emerald-500 text-white py-2 sm:py-3 rounded-xl text-sm sm:text-base font-semibold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="h-4 w-4" />
                         Agregar
