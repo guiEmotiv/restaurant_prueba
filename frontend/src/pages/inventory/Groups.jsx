@@ -32,7 +32,8 @@ const Groups = () => {
       setLoading(true);
       const data = await apiService.groups.getAll();
       console.log('Groups data received:', data);
-      setGroups(Array.isArray(data) ? data : []);
+      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
+      setGroups(sortedData);
     } catch (error) {
       console.error('Error loading groups:', error);
       showError('Error al cargar los grupos');

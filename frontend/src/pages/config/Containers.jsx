@@ -38,7 +38,8 @@ const Containers = () => {
     try {
       setLoading(true);
       const data = await apiService.containers.getAll();
-      setContainers(Array.isArray(data) ? data : []);
+      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
+      setContainers(sortedData);
     } catch (error) {
       console.error('Error loading containers:', error);
       showError('Error al cargar los envases');

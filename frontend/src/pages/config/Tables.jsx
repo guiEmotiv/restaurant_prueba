@@ -41,7 +41,8 @@ const Tables = () => {
     try {
       setLoading(true);
       const data = await apiService.tables.getAll();
-      setTables(Array.isArray(data) ? data : []);
+      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
+      setTables(sortedData);
     } catch (error) {
       console.error('Error loading tables:', error);
       showError('Error al cargar las mesas');

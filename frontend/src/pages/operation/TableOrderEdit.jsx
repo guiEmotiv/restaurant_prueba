@@ -19,12 +19,14 @@ import {
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const TableOrderEdit = () => {
   const { tableId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { showSuccess, showError } = useToast();
+  const { hasPermission } = useAuth();
   
   // Estados principales
   const [table, setTable] = useState(null);
@@ -375,8 +377,8 @@ const TableOrderEdit = () => {
                 )}
               </button>
               
-              {/* Botón Procesar Pago - solo visible cuando todos items están entregados */}
-              {checkAllItemsDelivered() && (
+              {/* Botón Procesar Pago - solo visible para admin cuando todos items están entregados */}
+              {checkAllItemsDelivered() && hasPermission('canManagePayments') && (
                 <button
                   onClick={handleGoToPayment}
                   className="bg-green-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:bg-green-700 flex items-center gap-2 text-sm"

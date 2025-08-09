@@ -31,7 +31,8 @@ const Zones = () => {
     try {
       setLoading(true);
       const data = await apiService.zones.getAll();
-      setZones(Array.isArray(data) ? data : []);
+      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
+      setZones(sortedData);
     } catch (error) {
       console.error('Error loading zones:', error);
       showError('Error al cargar las zonas');

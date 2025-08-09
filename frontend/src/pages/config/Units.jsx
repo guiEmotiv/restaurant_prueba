@@ -31,7 +31,8 @@ const Units = () => {
     try {
       setLoading(true);
       const data = await apiService.units.getAll();
-      setUnits(Array.isArray(data) ? data : []);
+      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
+      setUnits(sortedData);
     } catch (error) {
       console.error('Error loading units:', error);
       showError('Error al cargar las unidades');
