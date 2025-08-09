@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('config', '0010_delete_restaurantoperationalconfig_delete_waiter_and_more'),
+        ('config', '0010_alter_model_options'),
         ('inventory', '0007_recipe_is_active_recipe_version_alter_recipe_name_and_more'),
     ]
 

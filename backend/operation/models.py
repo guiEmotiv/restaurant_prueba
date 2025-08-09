@@ -291,8 +291,6 @@ class Payment(models.Model):
     )
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    # Fecha operativa heredada de la orden
-    operational_date = models.DateField(null=True, blank=True)
     # Identificador para agrupar pagos del mismo split
     split_group = models.CharField(max_length=36, null=True, blank=True)
     # Persona responsable del pago (opcional)
@@ -307,9 +305,6 @@ class Payment(models.Model):
         return f"Pago {self.order} - {self.payment_method} - {self.amount}"
 
     def save(self, *args, **kwargs):
-        # Usar fecha actual como fecha operativa
-        if not self.operational_date:
-            self.operational_date = timezone.now().date()
         super().save(*args, **kwargs)
         # Verificar si la orden está completamente pagada
         self._check_order_fully_paid()
@@ -364,7 +359,6 @@ class ContainerSale(models.Model):
         verbose_name="Total"
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    operational_date = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = 'container_sale'
@@ -383,9 +377,6 @@ class ContainerSale(models.Model):
         # Calcular precio total
         self.total_price = self.unit_price * self.quantity
         
-        # Usar fecha actual como fecha operativa
-        if not self.operational_date:
-            self.operational_date = timezone.now().date()
         
         super().save(*args, **kwargs)
         
