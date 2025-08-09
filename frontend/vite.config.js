@@ -13,5 +13,14 @@ export default defineConfig({
   preview: {
     port: 5173,
     strictPort: true
+  },
+  build: {
+    minify: false, // Disable minification to debug "i is not a function"
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
   }
 })
