@@ -105,6 +105,11 @@ const TableOrderEcommerce = () => {
       setCart([...cart, newItem]);
     }
     
+    // Auto-open cart when adding first item
+    if (cart.length === 0) {
+      setShowCart(true);
+    }
+    
     setSelectedRecipe(null);
     resetItemModal();
   };
@@ -229,8 +234,8 @@ const TableOrderEcommerce = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="px-4 py-3">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="px-4 py-3 pl-20">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
@@ -322,10 +327,7 @@ const TableOrderEcommerce = () => {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => {
-                      addToCart(recipe);
-                      showSuccess('Agregado al carrito');
-                    }}
+                    onClick={() => addToCart(recipe)}
                     className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                   >
                     <Plus className="h-4 w-4" />
@@ -565,7 +567,6 @@ const TableOrderEcommerce = () => {
               <button
                 onClick={() => {
                   addToCart(selectedRecipe, itemQuantity, itemNotes, itemTakeaway, itemTaper);
-                  showSuccess(`${itemQuantity} ${selectedRecipe.name} agregado${itemQuantity > 1 ? 's' : ''}`);
                 }}
                 className="w-full bg-blue-600 text-white py-4 rounded-lg text-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
               >

@@ -285,8 +285,8 @@ const TableOrderEdit = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="px-4 py-3">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="px-4 py-3 pl-20">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
@@ -512,10 +512,7 @@ const TableOrderEdit = () => {
 
                     <div className="flex gap-2">
                       <button
-                        onClick={() => {
-                          addNewItem(recipe);
-                          showSuccess('Agregado');
-                        }}
+                        onClick={() => addNewItem(recipe)}
                         className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="h-4 w-4" />
@@ -534,49 +531,13 @@ const TableOrderEdit = () => {
             )}
           </div>
 
-          {/* Cart Summary */}
+          {/* Update Button - Fixed at bottom when items selected */}
           {newItems.length > 0 && (
-            <div className="bg-white border-t border-gray-200 p-4">
-              <div className="mb-4 max-h-32 overflow-y-auto">
-                {newItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between py-2">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
-                      <p className="text-sm text-gray-600">{formatCurrency(item.unit_price)} c/u</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="font-bold text-gray-900">
-                        {formatCurrency(item.unit_price * item.quantity)}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => updateNewItemQuantity(item.id, item.quantity - 1)}
-                          className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="w-8 text-center font-medium">{item.quantity}</span>
-                        <button
-                          onClick={() => updateNewItemQuantity(item.id, item.quantity + 1)}
-                          className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between mb-4 pt-4 border-t border-gray-200">
-                <span className="text-lg font-medium text-gray-700">Subtotal</span>
-                <span className="text-2xl font-bold text-gray-900">{formatCurrency(calculateNewItemsTotal())}</span>
-              </div>
-              
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40">
               <button
                 onClick={handleUpdateOrder}
                 disabled={updatingOrder}
-                className="w-full bg-green-600 text-white py-4 rounded-lg text-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
                 {updatingOrder ? (
                   <>
@@ -586,7 +547,7 @@ const TableOrderEdit = () => {
                 ) : (
                   <>
                     <Check className="h-5 w-5" />
-                    Agregar al pedido
+                    Agregar {getNewItemsCount()} items • {formatCurrency(calculateNewItemsTotal())}
                   </>
                 )}
               </button>
@@ -699,7 +660,6 @@ const TableOrderEdit = () => {
               <button
                 onClick={() => {
                   addNewItem(selectedRecipe, itemQuantity, itemNotes, itemTakeaway, itemTaper);
-                  showSuccess(`${itemQuantity} ${selectedRecipe.name} agregado${itemQuantity > 1 ? 's' : ''}`);
                 }}
                 className="w-full bg-blue-600 text-white py-4 rounded-lg text-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
               >

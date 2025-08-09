@@ -75,37 +75,29 @@ const TableOrders = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600"></div>
-          </div>
-          <p className="text-gray-600 font-medium">Cargando cuentas...</p>
-        </div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header Moderno */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white sticky top-0 z-40 shadow-lg">
-        <div className="px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-1">
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="px-4 py-3 pl-20">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/table-status')}
-                className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg"
               >
-                <ArrowLeft className="h-5 w-5 text-white" />
+                <ArrowLeft className="h-5 w-5 text-gray-600" />
               </button>
               
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-200" />
-                  <h1 className="font-bold">Mesa {table?.table_number}</h1>
-                </div>
-                <p className="text-blue-100 text-sm">
+              <div>
+                <h1 className="font-bold text-lg text-gray-900">Mesa {table?.table_number}</h1>
+                <p className="text-sm text-gray-600">
                   {table?.zone_name} • {orders.length === 0 
                     ? 'Sin cuentas'
                     : orders.length === 1 
@@ -119,7 +111,7 @@ const TableOrders = () => {
             {/* Nueva Cuenta Button */}
             <button
               onClick={handleNewOrder}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />
               Nueva Cuenta

@@ -144,8 +144,8 @@ const TableStatus = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="px-4 py-4">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="px-4 py-4 pl-20">
           <h1 className="text-xl font-bold text-gray-900 mb-4">Estado de Mesas</h1>
           
           {/* Search */}
@@ -226,15 +226,11 @@ const TableStatus = () => {
                       {!isAvailable && (
                         <div className="text-xs mt-1 space-y-0.5">
                           <div className="flex items-center gap-1 justify-end">
-                            <Clock className="h-3 w-3" />
-                            {tableStatus.occupancyTime}
-                          </div>
-                          <div className="flex items-center gap-1 justify-end">
                             <Users className="h-3 w-3" />
                             {tableStatus.ordersCount} cuenta{tableStatus.ordersCount > 1 ? 's' : ''}
                           </div>
                           <div className="font-semibold">
-                            {formatCurrency(tableStatus.totalAmount)}
+                            {tableStatus.pendingItems}/{tableStatus.totalItems} items
                           </div>
                         </div>
                       )}

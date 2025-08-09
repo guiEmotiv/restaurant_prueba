@@ -235,24 +235,21 @@ const TablePaymentEcommerce = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando datos de pago...</p>
-        </div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
 
   if (!table || !order) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center bg-white rounded-2xl p-8 shadow-lg">
-          <Info className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Pedido no encontrado</h2>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Pedido no encontrado</h2>
           <button 
             onClick={() => navigate('/table-status')}
-            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
+            className="text-blue-600 hover:text-blue-800"
           >
             Volver al estado de mesas
           </button>
@@ -262,10 +259,10 @@ const TablePaymentEcommerce = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Header Fixed */}
-      <div className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="px-4 py-3">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="px-4 py-3 pl-20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
