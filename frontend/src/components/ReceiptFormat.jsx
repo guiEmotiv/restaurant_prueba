@@ -3,24 +3,48 @@ import { useEffect } from 'react';
 const ReceiptFormat = ({ order, payment, className = "" }) => {
   
   const formatCurrency = (amount) => {
-    return `S/ ${(amount || 0).toFixed(2)}`;
+    // Convert to number and handle edge cases
+    const numAmount = parseFloat(amount) || 0;
+    return `S/ ${numAmount.toFixed(2)}`;
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-PE', {
-      day: '2-digit',
-      month: '2-digit', 
-      year: 'numeric'
-    });
+    try {
+      if (!dateString) return new Date().toLocaleDateString('es-PE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-PE', {
+        day: '2-digit',
+        month: '2-digit', 
+        year: 'numeric'
+      });
+    } catch (error) {
+      return new Date().toLocaleDateString('es-PE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
   };
 
   const formatTime = (dateString) => {
-    const date = new Date(dateString);
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${hours}:${minutes}:${seconds}`;
+    try {
+      const date = dateString ? new Date(dateString) : new Date();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${hours}:${minutes}:${seconds}`;
+    } catch (error) {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      return `${hours}:${minutes}:${seconds}`;
+    }
   };
 
   const getPaymentMethodName = (method) => {
@@ -60,7 +84,7 @@ const ReceiptFormat = ({ order, payment, className = "" }) => {
         </div>
         <div className="flex justify-between">
           <span>Mesa:</span>
-          <span>{order.table_number}</span>
+          <span>{order.table_number || 'N/A'}</span>
         </div>
         {order.waiter && (
           <div className="flex justify-between">
@@ -85,8 +109,8 @@ const ReceiptFormat = ({ order, payment, className = "" }) => {
             {order.items.map((item, index) => (
               <div key={index} className="text-xs">
                 <div className="flex justify-between">
-                  <span>{item.quantity || 1}x {item.recipe_name || 'Item'}</span>
-                  <span>{formatCurrency(item.total_price || 0)}</span>
+                  <span>{(item.quantity || 1)}x {item.recipe_name || 'Item'}</span>
+                  <span>{formatCurrency(item.total_price)}</span>
                 </div>
                 {(item.is_takeaway || (order.container_sales && order.container_sales.length > 0)) && (
                   <div className="text-xs text-gray-600 ml-2">Para llevar</div>
@@ -103,7 +127,7 @@ const ReceiptFormat = ({ order, payment, className = "" }) => {
       <div className="border-t border-gray-300 pt-2">
         <div className="flex justify-between font-bold text-sm">
           <span>TOTAL:</span>
-          <span>{formatCurrency(payment.amount || order.total_amount || 0)}</span>
+          <span>{formatCurrency(payment?.amount || order?.total_amount)}</span>
         </div>
       </div>
 
