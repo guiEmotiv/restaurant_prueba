@@ -55,7 +55,7 @@ const TableOrderEdit = () => {
   useEffect(() => {
     if (!orderId) {
       showError('ID de pedido no encontrado');
-      navigate('/table-status');
+      navigate('/');
       return;
     }
     loadData();
@@ -83,7 +83,7 @@ const TableOrderEdit = () => {
     } catch (error) {
       console.error('Error loading data:', error);
       showError('Error al cargar los datos');
-      navigate('/table-status');
+      navigate('/');
     } finally {
       setLoading(false);
     }
@@ -159,7 +159,7 @@ const TableOrderEdit = () => {
           try {
             await apiService.orders.delete(order.id);
             showSuccess('Orden eliminada (no quedaban items)');
-            navigate('/table-status');
+            navigate('/');
             return;
           } catch (deleteOrderError) {
             console.error('Error deleting order:', deleteOrderError);
@@ -277,7 +277,7 @@ const TableOrderEdit = () => {
           <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Pedido no encontrado</h2>
           <button 
-            onClick={() => navigate('/table-status')}
+            onClick={() => navigate('/')}
             className="text-blue-600 hover:text-blue-800"
           >
             Volver al estado de mesas
@@ -295,7 +295,7 @@ const TableOrderEdit = () => {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => navigate('/table-status')}
+                onClick={() => navigate('/')}
                 className="p-1 hover:bg-gray-100 rounded transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 text-gray-600" />

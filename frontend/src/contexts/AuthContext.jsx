@@ -209,7 +209,7 @@ export const AuthProvider = ({ children }) => {
       case ROLES.ADMIN:
         return '/';  // Dashboard Operativo
       case ROLES.WAITER:
-        return '/table-status';  // Estado de Mesas
+        return '/';  // Dashboard
       case ROLES.COOK:
         return '/kitchen';  // Cocina
       default:

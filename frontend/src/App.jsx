@@ -28,7 +28,6 @@ import Payments from './pages/operation/Payments';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
-import TableStatus from './pages/operation/TableStatus';
 import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
 import TableOrderEdit from './pages/operation/TableOrderEdit';
 import TablePaymentEcommerce from './pages/operation/TablePaymentEcommerce';
@@ -163,11 +162,6 @@ const AppContent = () => {
           <Route path="/kitchen" element={
             <RoleProtectedRoute requiredPermission="canViewKitchen">
               <Kitchen />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/table-status" element={
-            <RoleProtectedRoute requiredPermission="canViewTableStatus">
-              <TableStatus />
             </RoleProtectedRoute>
           } />
           <Route path="/table/:tableId/order-ecommerce" element={

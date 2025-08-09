@@ -89,7 +89,7 @@ const TableOrders = () => {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => navigate('/table-status')}
+                onClick={() => navigate('/')}
                 className="p-1 hover:bg-gray-100 rounded transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 text-gray-600" />

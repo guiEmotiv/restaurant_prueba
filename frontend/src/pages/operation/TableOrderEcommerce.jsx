@@ -55,7 +55,7 @@ const TableOrderEcommerce = () => {
       
       if (operationalInfo && operationalInfo.has_config && !operationalInfo.is_currently_open) {
         showError(`El restaurante está cerrado. Horario de atención: ${operationalInfo.business_hours}`);
-        navigate('/table-status');
+        navigate('/');
         return;
       }
       
@@ -72,7 +72,7 @@ const TableOrderEcommerce = () => {
     } catch (error) {
       console.error('Error loading data:', error);
       showError('Error al cargar los datos');
-      navigate('/table-status');
+      navigate('/');
     } finally {
       setLoading(false);
     }
@@ -189,7 +189,7 @@ const TableOrderEcommerce = () => {
 
       await apiService.orders.create(orderData);
       showSuccess('¡Pedido creado exitosamente!');
-      navigate('/table-status');
+      navigate('/');
     } catch (error) {
       console.error('Error creating order:', error);
       const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
@@ -221,7 +221,7 @@ const TableOrderEcommerce = () => {
           <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Mesa no encontrada</h2>
           <button 
-            onClick={() => navigate('/table-status')}
+            onClick={() => navigate('/')}
             className="text-blue-600 hover:text-blue-800"
           >
             Volver al estado de mesas
@@ -239,7 +239,7 @@ const TableOrderEcommerce = () => {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => navigate('/table-status')}
+                onClick={() => navigate('/')}
                 className="p-1 hover:bg-gray-100 rounded transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 text-gray-600" />

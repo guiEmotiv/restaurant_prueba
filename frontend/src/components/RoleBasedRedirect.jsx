@@ -14,7 +14,7 @@ const RoleBasedRedirect = () => {
         navigate('/', { replace: true });
       } else if (userRole === 'meseros') {
         // Meseros: Estado de mesas (vista principal) - solo pueden ver esto
-        navigate('/table-status', { replace: true });
+        navigate('/', { replace: true });
       } else if (userRole === 'cocineros') {
         // Cocineros: Vista de cocina (única vista)
         navigate('/kitchen', { replace: true });

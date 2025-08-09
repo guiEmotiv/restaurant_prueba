@@ -51,7 +51,7 @@ const TablePaymentEcommerce = () => {
   useEffect(() => {
     if (!orderId) {
       showError('ID de pedido no encontrado');
-      navigate('/table-status');
+      navigate('/');
       return;
     }
     loadData();
@@ -95,7 +95,7 @@ const TablePaymentEcommerce = () => {
     } catch (error) {
       console.error('Error loading data:', error);
       showError('Error al cargar los datos');
-      navigate('/table-status');
+      navigate('/');
     } finally {
       setLoading(false);
     }
@@ -137,7 +137,7 @@ const TablePaymentEcommerce = () => {
 
       await apiService.payments.create(paymentData);
       showSuccess('Pago procesado exitosamente');
-      navigate('/table-status');
+      navigate('/');
       
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -200,7 +200,7 @@ const TablePaymentEcommerce = () => {
       if (orderFullyPaid) {
         showSuccess('¡Pedido completamente pagado!');
         setTimeout(() => {
-          navigate('/table-status');
+          navigate('/');
         }, 2000);
       }
       
@@ -239,7 +239,7 @@ const TablePaymentEcommerce = () => {
           <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Pedido no encontrado</h2>
           <button 
-            onClick={() => navigate('/table-status')}
+            onClick={() => navigate('/')}
             className="text-blue-600 hover:text-blue-800"
           >
             Volver al estado de mesas
