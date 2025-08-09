@@ -125,16 +125,19 @@ const TableStatus = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header fijo */}
+      {/* Header fijo estilo sidebar panel */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
-          {/* Filtro por zona y leyenda */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-semibold text-gray-900">Estado de Mesas</h2>
+          </div>
+
+          {/* Filtros */}
+          <div className="space-y-2">
             <select
               value={selectedZone}
               onChange={(e) => setSelectedZone(e.target.value)}
-              className="text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todas las zonas</option>
               {zones.map(zone => (
@@ -163,7 +166,6 @@ const TableStatus = () => {
               </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
 
