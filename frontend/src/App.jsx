@@ -23,13 +23,7 @@ import Recipes from './pages/inventory/Recipes';
 import OrderDetail from './pages/operation/OrderDetail';
 import Payment from './pages/operation/Payment';
 import PaymentHistory from './pages/operation/PaymentHistory';
-import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
-import Operations from './pages/Operations';
-import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
-import TableOrderEdit from './pages/operation/TableOrderEdit';
-import TablePaymentEcommerce from './pages/operation/TablePaymentEcommerce';
-import TableOrders from './pages/operation/TableOrders';
 
 // Debug environment variables with persistent logging
 const logWithTimestamp = (message, data) => {
@@ -126,13 +120,6 @@ const AppContent = () => {
             </RoleProtectedRoute>
           } />
 
-          {/* Operations - Nueva vista principal */}
-          <Route path="/operations" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <Operations />
-            </ProtectedRoute>
-          } />
-
           {/* Operation routes */}
           <Route path="/orders/:id" element={
             <ProtectedRoute requiredPermission="canManageOrders">
@@ -144,35 +131,10 @@ const AppContent = () => {
               <Payment />
             </ProtectedRoute>
           } />
-          <Route path="/orders/:id/receipt" element={
-            <ProtectedRoute requiredPermission="canManagePayments">
-              <OrderReceipt />
-            </ProtectedRoute>
-          } />
           <Route path="/kitchen" element={
             <RoleProtectedRoute requiredPermission="canViewKitchen">
               <Kitchen />
             </RoleProtectedRoute>
-          } />
-          <Route path="/table/:tableId/order-ecommerce" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <TableOrderEcommerce />
-            </ProtectedRoute>
-          } />
-          <Route path="/table/:tableId/order-edit" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <TableOrderEdit />
-            </ProtectedRoute>
-          } />
-          <Route path="/table/:tableId/orders" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <TableOrders />
-            </ProtectedRoute>
-          } />
-          <Route path="/table/:tableId/payment-ecommerce" element={
-            <ProtectedRoute requiredPermission="canManagePayments">
-              <TablePaymentEcommerce />
-            </ProtectedRoute>
           } />
 
           {/* Payment routes */}
