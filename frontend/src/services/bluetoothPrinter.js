@@ -183,10 +183,10 @@ class BluetoothPrinterService {
       await this.sendCommand(this.commands.INIT);
       await this.sendCommand(this.commands.FONT_A);
 
-      // Header centrado (sin caracteres especiales para compatibilidad)
+      // Header centrado (con caracteres especiales)
       await this.sendCommand(this.commands.ALIGN_CENTER);
       await this.sendCommand(this.commands.BOLD_ON);
-      await this.printText('EL FOGON DE DON SOTO\n');
+      await this.printText('EL FOGÓN DE DON SOTO\n');
       await this.sendCommand(this.commands.BOLD_OFF);
       await this.printText('COMPROBANTE\n\n');
 
@@ -243,9 +243,9 @@ class BluetoothPrinterService {
       // Separador final
       await this.printText('-------------------------------------\n');
 
-      // Footer centrado (sin caracteres especiales para compatibilidad)
+      // Footer centrado (con signo de admiración inicial)
       await this.sendCommand(this.commands.ALIGN_CENTER);
-      await this.printText('Gracias por su visita!\n');
+      await this.printText('¡Gracias por su visita!\n');
 
       // Espaciado suficiente antes del corte para evitar corte del texto
       await this.printText('\n\n\n\n');
