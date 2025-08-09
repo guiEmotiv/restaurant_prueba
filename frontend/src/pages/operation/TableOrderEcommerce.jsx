@@ -235,29 +235,29 @@ const TableOrderEcommerce = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
-        <div className="px-4 py-4 pl-20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
+        <div className="px-3 py-3 pl-16">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate('/table-status')}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
               >
-                <ArrowLeft className="h-5 w-5 text-gray-600" />
+                <ArrowLeft className="h-4 w-4 text-gray-600" />
               </button>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Mesa {table.table_number}</h1>
-                <p className="text-sm text-gray-500">{table.zone_name}</p>
+                <h1 className="text-base font-medium text-gray-900">Mesa {table.table_number}</h1>
+                <p className="text-xs text-gray-500">{table.zone_name}</p>
               </div>
             </div>
 
             {getCartItemsCount() > 0 && (
               <button
                 onClick={() => setShowCart(true)}
-                className="relative px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                className="relative px-3 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors flex items-center gap-1 text-sm"
               >
-                <ShoppingCart className="h-5 w-5" />
+                <ShoppingCart className="h-3 w-3" />
                 <span>{formatCurrency(calculateCartTotal())}</span>
-                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
                   {getCartItemsCount()}
                 </div>
               </button>
@@ -265,14 +265,14 @@ const TableOrderEcommerce = () => {
           </div>
 
           {/* Search */}
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <div className="relative mb-2">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
             <input
               type="text"
-              placeholder="Buscar platos..."
+              placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -280,7 +280,7 @@ const TableOrderEcommerce = () => {
           <select
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
-            className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           >
             <option value="all">Todo el menú</option>
             {groups.map(group => (
@@ -291,31 +291,30 @@ const TableOrderEcommerce = () => {
       </div>
 
       {/* Menu Items */}
-      <div className="px-4 py-6" style={{paddingTop: '200px'}}>
+      <div className="px-3 py-3" style={{paddingTop: '140px'}}>
         {filteredRecipes.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-gray-500 mb-2">No se encontraron platos</div>
-            <div className="text-sm text-gray-400">Intenta con otros términos</div>
+          <div className="text-center py-12">
+            <div className="text-gray-500 text-sm">No se encontraron platos</div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {filteredRecipes.map((recipe) => (
-              <div key={recipe.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-                <div className="flex items-start justify-between mb-3">
+              <div key={recipe.id} className="bg-white rounded border border-gray-200 p-3">
+                <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-1">{recipe.name}</h3>
+                    <h3 className="font-medium text-sm text-gray-900 mb-1">{recipe.name}</h3>
                     {recipe.description && (
-                      <p className="text-sm text-gray-600 mb-2">{recipe.description}</p>
+                      <p className="text-xs text-gray-600 mb-1">{recipe.description}</p>
                     )}
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <Clock className="h-4 w-4" />
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <Clock className="h-3 w-3" />
                       <span>{recipe.preparation_time} min</span>
                       <span>•</span>
                       <span>{recipe.group_name || 'Sin categoría'}</span>
                     </div>
                   </div>
-                  <div className="text-right ml-4">
-                    <div className="text-xl font-bold text-gray-900">
+                  <div className="text-right ml-3">
+                    <div className="text-base font-semibold text-gray-900">
                       {formatCurrency(recipe.base_price)}
                     </div>
                   </div>
@@ -324,16 +323,16 @@ const TableOrderEcommerce = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => addToCart(recipe)}
-                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-1 text-sm"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-3 w-3" />
                     Agregar
                   </button>
                   <button
                     onClick={() => openItemModal(recipe)}
-                    className="px-4 py-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="px-3 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
                   >
-                    <Info className="h-4 w-4" />
+                    <Info className="h-3 w-3" />
                   </button>
                 </div>
               </div>

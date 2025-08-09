@@ -145,18 +145,18 @@ const TableStatus = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
-        <div className="px-4 py-4 pl-20">
-          <h1 className="text-xl font-semibold text-gray-900 mb-4">Estado de Mesas</h1>
+        <div className="px-3 py-3 pl-16">
+          <h1 className="text-base font-medium text-gray-900 mb-3">Estado de Mesas</h1>
           
           {/* Search */}
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <div className="relative mb-2">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
             <input
               type="text"
-              placeholder="Buscar mesa..."
+              placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -164,7 +164,7 @@ const TableStatus = () => {
           <select
             value={selectedZone}
             onChange={(e) => setSelectedZone(e.target.value)}
-            className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           >
             <option value="">Todas las zonas</option>
             {zones.map(zone => (
@@ -175,14 +175,13 @@ const TableStatus = () => {
       </div>
 
       {/* Tables List */}
-      <div className="px-4 py-6" style={{paddingTop: '180px'}}>
+      <div className="px-3 py-3" style={{paddingTop: '130px'}}>
         {filteredTables.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-gray-500 mb-2">Sin mesas</div>
-            <div className="text-sm text-gray-400">Revisa los filtros</div>
+          <div className="text-center py-12">
+            <div className="text-gray-500 text-sm">Sin mesas</div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {filteredTables.map((table) => {
               const tableStatus = getTableStatus(table);
               const isAvailable = tableStatus.status === 'available';
@@ -191,27 +190,27 @@ const TableStatus = () => {
                 <button
                   key={table.id}
                   onClick={() => handleTableClick(table)}
-                  className="w-full p-4 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
+                  className="w-full p-3 bg-white rounded border border-gray-200 hover:border-gray-300 transition-colors"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-semibold ${
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded flex items-center justify-center text-white text-sm font-medium ${
                         isAvailable ? 'bg-green-500' : 'bg-red-500'
                       }`}>
                         {table.table_number}
                       </div>
                       
                       <div className="text-left">
-                        <div className="font-semibold text-gray-900">Mesa {table.table_number}</div>
-                        <div className="text-sm text-gray-500 flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
+                        <div className="font-medium text-sm text-gray-900">Mesa {table.table_number}</div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
                           {getZoneName(table.zone)}
                         </div>
                       </div>
                     </div>
                     
                     <div className="text-right">
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      <div className={`px-2 py-1 rounded text-xs font-medium ${
                         isAvailable 
                           ? 'bg-green-100 text-green-700' 
                           : 'bg-red-100 text-red-700'
@@ -220,9 +219,9 @@ const TableStatus = () => {
                       </div>
                       
                       {!isAvailable && (
-                        <div className="text-sm mt-2 space-y-1">
+                        <div className="text-xs mt-1 space-y-0.5">
                           <div className="flex items-center gap-1 justify-end text-gray-600">
-                            <Users className="h-4 w-4" />
+                            <Users className="h-3 w-3" />
                             {tableStatus.ordersCount} cuenta{tableStatus.ordersCount > 1 ? 's' : ''}
                           </div>
                           <div className="font-medium text-gray-900">

@@ -15,7 +15,8 @@ import {
   X,
   AlertCircle,
   ShoppingBag,
-  Receipt
+  Receipt,
+  ChevronRight
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -262,26 +263,26 @@ const TablePaymentEcommerce = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header Fixed */}
       <div className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
-        <div className="px-4 py-4 pl-20">
+        <div className="px-3 py-3 pl-16">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate(`/table/${tableId}/order-edit`, { state: { orderId: orderId }})}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
               >
-                <ArrowLeft className="h-5 w-5 text-gray-600" />
+                <ArrowLeft className="h-4 w-4 text-gray-600" />
               </button>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Procesar Pago</h1>
-                <p className="text-sm text-gray-500">Mesa {table.table_number} • Pedido #{order.id}</p>
+                <h1 className="text-base font-medium text-gray-900">Procesar Pago</h1>
+                <p className="text-xs text-gray-500">Mesa {table.table_number} • Pedido #{order.id}</p>
               </div>
             </div>
 
             <div className="text-right">
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-base font-semibold text-gray-900">
                 {formatCurrency(order.total_amount)}
               </div>
-              <div className="text-sm text-gray-500">Total a pagar</div>
+              <div className="text-xs text-gray-500">Total a pagar</div>
             </div>
           </div>
         </div>
@@ -289,30 +290,30 @@ const TablePaymentEcommerce = () => {
 
       {/* Payment Mode Selection */}
       {!paymentMode && (
-        <div className="p-4 max-w-md mx-auto" style={{paddingTop: '120px'}}>
-          <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">
+        <div className="p-3 max-w-md mx-auto" style={{paddingTop: '100px'}}>
+          <div className="bg-white rounded border border-gray-200 p-4">
+            <h2 className="text-base font-medium text-gray-900 mb-4 text-center">
               ¿Cómo desea procesar el pago?
             </h2>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Full Payment Option */}
               <button
                 onClick={() => setPaymentMode('full')}
-                className="w-full p-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-[1.02]"
+                className="w-full p-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                      <CreditCard className="h-6 w-6" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-white/20 rounded flex items-center justify-center">
+                      <CreditCard className="h-4 w-4" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-bold text-lg">Pago Completo</h3>
-                      <p className="text-sm text-blue-100">Un solo pago por todo</p>
+                      <h3 className="font-medium text-sm">Pago Completo</h3>
+                      <p className="text-xs text-blue-100">Un solo pago por todo</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold">{formatCurrency(order.total_amount)}</div>
+                    <div className="text-sm font-semibold">{formatCurrency(order.total_amount)}</div>
                     <div className="text-xs text-blue-100">{order.items.length} items</div>
                   </div>
                 </div>
@@ -321,20 +322,20 @@ const TablePaymentEcommerce = () => {
               {/* Split Payment Option */}
               <button
                 onClick={() => setPaymentMode('split')}
-                className="w-full p-6 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all transform hover:scale-[1.02]"
+                className="w-full p-4 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                      <Users className="h-6 w-6" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-white/20 rounded flex items-center justify-center">
+                      <Users className="h-4 w-4" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-bold text-lg">Dividir Cuenta</h3>
-                      <p className="text-sm text-purple-100">Pagar por items</p>
+                      <h3 className="font-medium text-sm">Dividir Cuenta</h3>
+                      <p className="text-xs text-purple-100">Pagar por items</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold">{getUnpaidItems().length}</div>
+                    <div className="text-sm font-semibold">{getUnpaidItems().length}</div>
                     <div className="text-xs text-purple-100">items disponibles</div>
                   </div>
                 </div>
@@ -342,10 +343,10 @@ const TablePaymentEcommerce = () => {
             </div>
 
             {hasPartialPayments() && (
-              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
+              <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs">
                     <p className="font-medium text-amber-900">Pagos parciales detectados</p>
                     <p className="text-amber-700">Este pedido tiene pagos parciales pendientes</p>
                   </div>
@@ -358,59 +359,59 @@ const TablePaymentEcommerce = () => {
 
       {/* Full Payment Mode */}
       {paymentMode === 'full' && (
-        <div className="p-4 max-w-md mx-auto" style={{paddingTop: '120px'}}>
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-3 max-w-md mx-auto" style={{paddingTop: '100px'}}>
+          <div className="bg-white rounded border border-gray-200 overflow-hidden">
             {/* Order Summary */}
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="font-bold text-gray-900 mb-4">Resumen del pedido</h2>
-              <div className="space-y-3">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="font-medium text-sm text-gray-900 mb-3">Resumen del pedido</h2>
+              <div className="space-y-2">
                 {order.items.map((item) => (
                   <div key={item.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-900">{item.recipe_name}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-900">{item.recipe_name}</span>
                       {item.is_takeaway && (
-                        <Package className="h-4 w-4 text-orange-500" />
+                        <Package className="h-3 w-3 text-orange-500" />
                       )}
                     </div>
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-xs text-gray-900">
                       {formatCurrency(item.total_price)}
                     </span>
                   </div>
                 ))}
               </div>
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex items-center justify-between text-lg">
-                  <span className="font-bold text-gray-900">Total</span>
-                  <span className="font-bold text-blue-600">{formatCurrency(order.total_amount)}</span>
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-gray-900">Total</span>
+                  <span className="font-semibold text-blue-600">{formatCurrency(order.total_amount)}</span>
                 </div>
               </div>
             </div>
 
             {/* Payment Method Selection */}
-            <div className="p-6 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900 mb-4">Método de pago</h3>
-              <div className="grid grid-cols-2 gap-3">
+            <div className="p-4 border-b border-gray-100">
+              <h3 className="font-medium text-sm text-gray-900 mb-3">Método de pago</h3>
+              <div className="grid grid-cols-2 gap-2">
                 {['CASH', 'CARD', 'YAPE_PLIN', 'TRANSFER'].map((method) => (
                   <button
                     key={method}
                     onClick={() => setPaymentMethod(method)}
-                    className={`relative p-4 rounded-xl border-2 transition-all ${
+                    className={`relative p-3 rounded border-2 transition-all ${
                       paymentMethod === method
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}
                   >
-                    <div className={`w-12 h-12 mx-auto mb-2 rounded-xl bg-gradient-to-r ${getPaymentMethodColor(method)} text-white flex items-center justify-center`}>
-                      {getPaymentMethodIcon(method)}
+                    <div className={`w-8 h-8 mx-auto mb-2 rounded bg-gradient-to-r ${getPaymentMethodColor(method)} text-white flex items-center justify-center`}>
+                      {React.cloneElement(getPaymentMethodIcon(method), { className: 'h-4 w-4' })}
                     </div>
-                    <span className={`text-sm font-medium ${
+                    <span className={`text-xs font-medium ${
                       paymentMethod === method ? 'text-blue-900' : 'text-gray-700'
                     }`}>
                       {getPaymentMethodName(method)}
                     </span>
                     {paymentMethod === method && (
-                      <div className="absolute top-2 right-2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-                        <Check className="h-4 w-4 text-white" />
+                      <div className="absolute top-1 right-1 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-white" />
                       </div>
                     )}
                   </button>
@@ -419,39 +420,39 @@ const TablePaymentEcommerce = () => {
             </div>
 
             {/* Notes */}
-            <div className="p-6 border-b border-gray-100">
+            <div className="p-4 border-b border-gray-100">
               <button
                 onClick={() => setShowNotesModal(true)}
-                className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                className="w-full flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <Receipt className="h-5 w-5 text-gray-600" />
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-gray-600" />
                   <div className="text-left">
-                    <p className="font-medium text-gray-900">Agregar notas</p>
-                    <p className="text-sm text-gray-600">
+                    <p className="font-medium text-xs text-gray-900">Agregar notas</p>
+                    <p className="text-xs text-gray-600">
                       {paymentNotes || 'Opcional'}
                     </p>
                   </div>
                 </div>
-                <ChevronRight className="h-5 w-5 text-gray-400" />
+                <ChevronRight className="h-3 w-3 text-gray-400" />
               </button>
             </div>
 
             {/* Process Payment Button */}
-            <div className="p-6">
+            <div className="p-4">
               <button
                 onClick={handleFullPayment}
                 disabled={processing}
-                className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-green-600 text-white py-3 rounded font-medium text-sm hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
                 {processing ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                     Procesando...
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="h-5 w-5" />
+                    <CheckCircle className="h-4 w-4" />
                     Procesar Pago
                   </>
                 )}
@@ -463,18 +464,18 @@ const TablePaymentEcommerce = () => {
 
       {/* Split Payment Mode */}
       {paymentMode === 'split' && (
-        <div className="p-4 pb-32" style={{paddingTop: '120px'}}>
+        <div className="p-3 pb-24" style={{paddingTop: '100px'}}>
           {/* Items Selection */}
-          <div className="bg-white rounded-2xl shadow-sm mb-4">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="font-bold text-gray-900">Selecciona los items a pagar</h2>
-              <p className="text-sm text-gray-600 mt-1">
+          <div className="bg-white rounded border border-gray-200 mb-3">
+            <div className="p-3 border-b border-gray-100">
+              <h2 className="font-medium text-sm text-gray-900">Selecciona los items a pagar</h2>
+              <p className="text-xs text-gray-600 mt-1">
                 {getSelectedItems().length} de {getUnpaidItems().length} items seleccionados
               </p>
             </div>
             
-            <div className="p-4">
-              <div className="space-y-3">
+            <div className="p-3">
+              <div className="space-y-2">
                 {order.items.map((item) => {
                   const isPaid = item.is_fully_paid;
                   const isSelected = selectedItems[item.id] === true;
@@ -484,7 +485,7 @@ const TablePaymentEcommerce = () => {
                       key={item.id}
                       onClick={() => !isPaid && toggleItemSelection(item.id)}
                       disabled={isPaid}
-                      className={`w-full p-4 rounded-xl border-2 transition-all ${
+                      className={`w-full p-3 rounded border-2 transition-all ${
                         isPaid
                           ? 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
                           : isSelected
@@ -493,19 +494,19 @@ const TablePaymentEcommerce = () => {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                        <div className="flex items-center gap-2">
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                             isPaid
                               ? 'bg-gray-300 border-gray-300'
                               : isSelected
                               ? 'bg-blue-600 border-blue-600'
                               : 'border-gray-300'
                           }`}>
-                            {(isSelected || isPaid) && <Check className="h-4 w-4 text-white" />}
+                            {(isSelected || isPaid) && <Check className="h-3 w-3 text-white" />}
                           </div>
                           <div className="text-left">
-                            <h4 className="font-medium text-gray-900">{item.recipe_name}</h4>
-                            <div className="flex items-center gap-2 text-sm">
+                            <h4 className="font-medium text-xs text-gray-900">{item.recipe_name}</h4>
+                            <div className="flex items-center gap-1 text-xs">
                               {item.is_takeaway && (
                                 <span className="flex items-center gap-1 text-orange-600">
                                   <Package className="h-3 w-3" />
@@ -521,7 +522,7 @@ const TablePaymentEcommerce = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-bold text-gray-900">
+                          <div className="font-semibold text-xs text-gray-900">
                             {formatCurrency(item.total_price)}
                           </div>
                         </div>
@@ -535,44 +536,44 @@ const TablePaymentEcommerce = () => {
 
           {/* Payment Summary */}
           {getSelectedItems().length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm">
-              <div className="p-4 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900">Resumen del pago</h3>
+            <div className="bg-white rounded border border-gray-200">
+              <div className="p-3 border-b border-gray-100">
+                <h3 className="font-medium text-sm text-gray-900">Resumen del pago</h3>
               </div>
               
-              <div className="p-4">
-                <div className="space-y-2 mb-4">
+              <div className="p-3">
+                <div className="space-y-1 mb-3">
                   {getSelectedItems().map(item => (
-                    <div key={item.id} className="flex justify-between text-sm">
+                    <div key={item.id} className="flex justify-between text-xs">
                       <span className="text-gray-700">{item.recipe_name}</span>
                       <span className="font-medium">{formatCurrency(item.total_price)}</span>
                     </div>
                   ))}
                 </div>
                 
-                <div className="pt-4 border-t border-gray-200">
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="font-bold text-gray-900">Total a pagar</span>
-                    <span className="text-xl font-bold text-blue-600">{formatCurrency(getSelectedTotal())}</span>
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="font-medium text-xs text-gray-900">Total a pagar</span>
+                    <span className="text-sm font-semibold text-blue-600">{formatCurrency(getSelectedTotal())}</span>
                   </div>
                   
                   {/* Payment Method for Split */}
-                  <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="grid grid-cols-2 gap-2 mb-3">
                     {['CASH', 'CARD', 'YAPE_PLIN', 'TRANSFER'].map((method) => (
                       <button
                         key={method}
                         onClick={() => setCurrentSplitMethod(method)}
-                        className={`p-3 rounded-lg border transition-all ${
+                        className={`p-2 rounded border transition-all ${
                           currentSplitMethod === method
                             ? 'border-blue-500 bg-blue-50'
                             : 'border-gray-200 bg-white'
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-r ${getPaymentMethodColor(method)} text-white flex items-center justify-center`}>
-                            {React.cloneElement(getPaymentMethodIcon(method), { className: 'h-4 w-4' })}
+                        <div className="flex items-center gap-1">
+                          <div className={`w-6 h-6 rounded bg-gradient-to-r ${getPaymentMethodColor(method)} text-white flex items-center justify-center`}>
+                            {React.cloneElement(getPaymentMethodIcon(method), { className: 'h-3 w-3' })}
                           </div>
-                          <span className={`text-sm font-medium ${
+                          <span className={`text-xs font-medium ${
                             currentSplitMethod === method ? 'text-blue-900' : 'text-gray-700'
                           }`}>
                             {getPaymentMethodName(method)}
@@ -590,20 +591,20 @@ const TablePaymentEcommerce = () => {
 
       {/* Fixed Bottom Action for Split Payment */}
       {paymentMode === 'split' && getSelectedItems().length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 z-40">
           <button
             onClick={handlePartialPayment}
             disabled={processing}
-            className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-green-600 text-white py-3 rounded font-medium text-sm hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
           >
             {processing ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                 Procesando...
               </>
             ) : (
               <>
-                <CheckCircle className="h-5 w-5" />
+                <CheckCircle className="h-4 w-4" />
                 Procesar Pago • {formatCurrency(getSelectedTotal())}
               </>
             )}
@@ -614,14 +615,14 @@ const TablePaymentEcommerce = () => {
       {/* Notes Modal */}
       {showNotesModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
-          <div className="bg-white rounded-t-2xl w-full p-6 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Notas del pago</h3>
+          <div className="bg-white rounded-t w-full p-4 animate-slide-up">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-900">Notas del pago</h3>
               <button
                 onClick={() => setShowNotesModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-4 w-4 text-gray-600" />
               </button>
             </div>
             
@@ -629,14 +630,14 @@ const TablePaymentEcommerce = () => {
               value={paymentNotes}
               onChange={(e) => setPaymentNotes(e.target.value)}
               placeholder="Ej: Cliente pagó con billete de 100, cambio: 20"
-              className="w-full px-4 py-3 bg-gray-100 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              rows={4}
+              className="w-full px-3 py-2 bg-gray-100 rounded text-xs text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              rows={3}
               autoFocus
             />
             
             <button
               onClick={() => setShowNotesModal(false)}
-              className="w-full mt-4 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
+              className="w-full mt-3 bg-blue-600 text-white py-2 rounded font-medium text-sm hover:bg-blue-700 transition-colors"
             >
               Guardar
             </button>
