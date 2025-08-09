@@ -117,6 +117,11 @@ const TableOrderEdit = () => {
       setNewItems([...newItems, newItem]);
     }
     
+    // Auto-open items selector when adding first item
+    if (newItems.length === 0) {
+      setShowNewItems(true);
+    }
+    
     setSelectedRecipe(null);
     resetItemModal();
   };
@@ -285,27 +290,27 @@ const TableOrderEdit = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="px-4 py-3 pl-20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
+      <div className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-30">
+        <div className="px-4 py-3 pl-16">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate('/table-status')}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-1 hover:bg-gray-100 rounded"
               >
-                <ArrowLeft className="h-5 w-5 text-gray-600" />
+                <ArrowLeft className="h-4 w-4 text-gray-600" />
               </button>
               <div>
-                <h1 className="font-bold text-lg text-gray-900">Mesa {table.table_number}</h1>
-                <p className="text-sm text-gray-600">Pedido #{order.id}</p>
+                <h1 className="font-bold text-base text-gray-900">Mesa {table.table_number}</h1>
+                <p className="text-xs text-gray-600">Pedido #{order.id}</p>
               </div>
             </div>
 
             <div className="text-right">
-              <div className="text-xl font-bold text-gray-900">
+              <div className="text-base font-bold text-gray-900">
                 {formatCurrency(order.total_amount)}
               </div>
-              <div className="text-xs text-gray-500">Total del pedido</div>
+              <div className="text-xs text-gray-500">Total</div>
             </div>
           </div>
 
@@ -313,24 +318,24 @@ const TableOrderEdit = () => {
           <div className="flex gap-2">
             <button
               onClick={() => navigate(`/table/${tableId}/order-ecommerce`)}
-              className="flex-1 bg-purple-600 text-white py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-purple-600 text-white py-2 rounded font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-1 text-sm"
             >
-              <Users className="h-4 w-4" />
+              <Users className="h-3 w-3" />
               Nueva cuenta
             </button>
 
             <button
               onClick={() => setShowNewItems(true)}
-              className={`flex-1 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 relative ${
+              className={`flex-1 py-2 rounded font-medium transition-colors flex items-center justify-center gap-1 relative text-sm ${
                 getNewItemsCount() > 0 
                   ? 'bg-blue-600 text-white hover:bg-blue-700' 
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3 w-3" />
               Agregar items
               {getNewItemsCount() > 0 && (
-                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
                   {getNewItemsCount()}
                 </div>
               )}
@@ -339,9 +344,9 @@ const TableOrderEdit = () => {
             {checkAllItemsDelivered() && hasPermission('canManagePayments') && (
               <button
                 onClick={handleGoToPayment}
-                className="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 bg-green-600 text-white py-2 rounded font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-1 text-sm"
               >
-                <CreditCard className="h-4 w-4" />
+                <CreditCard className="h-3 w-3" />
                 Pagar
               </button>
             )}
@@ -350,7 +355,7 @@ const TableOrderEdit = () => {
       </div>
 
       {/* Order Items */}
-      <div className="px-4 py-4">
+      <div className="px-4 py-3 pt-32">
         <div className="bg-white border border-gray-200 rounded-lg">
           <div className="p-4 border-b border-gray-100">
             <h2 className="font-bold text-gray-900">Items del pedido</h2>

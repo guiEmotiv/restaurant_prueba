@@ -144,19 +144,19 @@ const TableStatus = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="px-4 py-4 pl-20">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">Estado de Mesas</h1>
+      <div className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-30">
+        <div className="px-4 py-3 pl-16">
+          <h1 className="text-lg font-bold text-gray-900 mb-3">Estado de Mesas</h1>
           
           {/* Search */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <div className="relative mb-3">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
               type="text"
               placeholder="Buscar mesa..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -164,7 +164,7 @@ const TableStatus = () => {
           <select
             value={selectedZone}
             onChange={(e) => setSelectedZone(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-blue-500"
           >
             <option value="">Todas las zonas</option>
             {zones.map(zone => (
@@ -175,14 +175,14 @@ const TableStatus = () => {
       </div>
 
       {/* Tables List */}
-      <div className="px-4 py-4">
+      <div className="px-4 py-4 pt-32">
         {filteredTables.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-gray-500 mb-2">Sin mesas</div>
             <div className="text-sm text-gray-400">Revisa los filtros</div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {filteredTables.map((table) => {
               const tableStatus = getTableStatus(table);
               const isAvailable = tableStatus.status === 'available';
@@ -191,23 +191,23 @@ const TableStatus = () => {
                 <button
                   key={table.id}
                   onClick={() => handleTableClick(table)}
-                  className={`w-full p-4 rounded-lg border transition-all ${
+                  className={`w-full p-3 rounded border transition-all ${
                     isAvailable 
                       ? 'bg-green-50 border-green-500 text-green-900' 
                       : 'bg-red-50 border-red-500 text-red-900'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold text-white ${
+                    <div className="flex items-center gap-2">
+                      <div className={`w-10 h-10 rounded flex items-center justify-center text-sm font-bold text-white ${
                         isAvailable ? 'bg-green-500' : 'bg-red-500'
                       }`}>
                         {table.table_number}
                       </div>
                       
                       <div className="text-left">
-                        <div className="font-bold">Mesa {table.table_number}</div>
-                        <div className="text-sm opacity-75 flex items-center gap-1">
+                        <div className="font-medium text-sm">Mesa {table.table_number}</div>
+                        <div className="text-xs opacity-75 flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
                           {getZoneName(table.zone)}
                         </div>
@@ -215,7 +215,7 @@ const TableStatus = () => {
                     </div>
                     
                     <div className="text-right">
-                      <div className={`px-3 py-1 rounded-full text-sm font-bold ${
+                      <div className={`px-2 py-1 rounded text-xs font-bold ${
                         isAvailable 
                           ? 'bg-green-500 text-white' 
                           : 'bg-red-500 text-white'
@@ -229,7 +229,7 @@ const TableStatus = () => {
                             <Users className="h-3 w-3" />
                             {tableStatus.ordersCount} cuenta{tableStatus.ordersCount > 1 ? 's' : ''}
                           </div>
-                          <div className="font-semibold">
+                          <div className="font-medium">
                             {tableStatus.pendingItems}/{tableStatus.totalItems} items
                           </div>
                         </div>
