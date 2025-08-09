@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Table, Users, Clock, CheckCircle, AlertCircle, Plus, ShoppingCart, Filter, Search } from 'lucide-react';
+import { Table, Users, Clock, CheckCircle, AlertCircle, Plus, ShoppingCart, Filter, Search, MapPin, Utensils, Coffee } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -132,160 +132,192 @@ const TableStatus = () => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded h-8 w-8 border-2 border-blue-200 border-t-blue-600 mx-auto"></div>
-          <p className="mt-2 text-xs text-gray-600">Cargando mesas...</p>
+          <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600"></div>
+          </div>
+          <p className="text-gray-600 font-medium">Cargando mesas...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-50 flex flex-col h-full">
-      {/* Header estandarizado mejorado */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="p-3">
-          <div className="text-center mb-3">
-            <h2 className="text-sm font-medium text-gray-900">Estado de Mesas</h2>
-            <p className="text-xs text-gray-500">{filteredTables.length} mesas disponibles</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Header Moderno con Gradient */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white sticky top-0 z-40 shadow-lg">
+        <div className="px-4 py-6">
+          {/* Header Principal */}
+          <div className="text-center mb-6">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <Utensils className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">Mesas</h1>
+                <p className="text-blue-100 text-sm">{filteredTables.length} mesas disponibles</p>
+              </div>
+            </div>
           </div>
 
-          {/* Filtros estandarizados */}
-          <div className="space-y-2">
-            {/* Buscador */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar mesa..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+          {/* Barra de Búsqueda Moderna */}
+          <div className="relative mb-4">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-white/60" />
             </div>
+            <input
+              type="text"
+              placeholder="Buscar mesa..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/40"
+            />
+          </div>
 
-            {/* Filtro por zona */}
+          {/* Filtros Modernos */}
+          <div className="flex gap-3 mb-4">
             <select
               value={selectedZone}
               onChange={(e) => setSelectedZone(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="flex-1 px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/30"
             >
-              <option value="">Todas las zonas</option>
+              <option value="" className="text-gray-900">Todas las zonas</option>
               {zones.map(zone => (
-                <option key={zone.id} value={zone.id}>
+                <option key={zone.id} value={zone.id} className="text-gray-900">
                   {zone.name}
                 </option>
               ))}
             </select>
-            
-            {/* Leyenda de estados mejorada */}
-            <div className="bg-gray-50 rounded p-2">
-              <div className="flex items-center justify-center gap-4 text-xs">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-700">Libre</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="text-gray-700">Ocupada</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <span className="text-gray-700">Múltiple</span>
-                </div>
-              </div>
+          </div>
+
+          {/* Status Legend Moderna */}
+          <div className="flex items-center justify-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-emerald-400 rounded-full shadow-sm"></div>
+              <span className="text-white/90 font-medium">Libre</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-rose-400 rounded-full shadow-sm"></div>
+              <span className="text-white/90 font-medium">Ocupada</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-amber-400 rounded-full shadow-sm"></div>
+              <span className="text-white/90 font-medium">Múltiple</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Contenido principal scrollable */}
-      <div className="flex-1 overflow-y-auto p-3" style={{maxHeight: 'calc(100vh - 160px)'}}>
+      {/* Contenido Principal */}
+      <div className="px-4 py-6">
         {Object.keys(groupedTables).length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center bg-white rounded border border-gray-200 p-6">
-              <Table className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <h3 className="text-sm font-medium text-gray-900 mb-2">No hay mesas</h3>
-              <p className="text-xs text-gray-500">No se encontraron mesas</p>
+          <div className="flex items-center justify-center min-h-[50vh]">
+            <div className="text-center bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
+              <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Table className="h-10 w-10 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay mesas</h3>
+              <p className="text-gray-500">No se encontraron mesas con los filtros actuales</p>
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {Object.entries(groupedTables).map(([zoneName, zoneTables]) => (
-              <div key={zoneName}>
-                <div className="bg-white rounded border border-gray-200 overflow-hidden">
-                  {/* Header de zona */}
-                  <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <h3 className="text-sm font-medium text-gray-800">{zoneName}</h3>
-                      <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
-                        {zoneTables.length} mesas
-                      </span>
+              <div key={zoneName} className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                {/* Header de Zona Moderno */}
+                <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <MapPin className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900">{zoneName}</h3>
+                      <p className="text-sm text-gray-500">{zoneTables.length} mesas disponibles</p>
                     </div>
                   </div>
-                  
-                  {/* Grid de mesas */}
-                  <div className="p-3">
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-                      {zoneTables.map((table) => {
-                        const tableStatus = getTableStatus(table);
-                        const StatusIcon = tableStatus.status === 'available' ? Plus : ShoppingCart;
-                        
-                        return (
-                          <button
-                            key={table.id}
-                            onClick={() => handleTableClick(table)}
-                            className={`relative p-3 rounded border-2 transition-all duration-200 hover:scale-105 ${
-                              tableStatus.status === 'available' 
-                                ? 'border-green-300 bg-green-50 hover:border-green-400 hover:bg-green-100' 
-                                : 'border-red-300 bg-red-50 hover:border-red-400 hover:bg-red-100'
-                            }`}
-                          >
-                            {/* Indicador de estado */}
-                            <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
-                              tableStatus.status === 'available' ? 'bg-green-500' : 'bg-red-500'
+                </div>
+                
+                {/* Grid de Mesas Moderno */}
+                <div className="p-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {zoneTables.map((table) => {
+                      const tableStatus = getTableStatus(table);
+                      const isAvailable = tableStatus.status === 'available';
+                      
+                      return (
+                        <button
+                          key={table.id}
+                          onClick={() => handleTableClick(table)}
+                          className={`relative group transform transition-all duration-200 hover:scale-105 active:scale-95`}
+                        >
+                          {/* Card Principal */}
+                          <div className={`relative overflow-hidden rounded-2xl p-6 shadow-lg border-2 transition-all duration-300 ${
+                            isAvailable 
+                              ? 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200 hover:border-emerald-300 hover:shadow-xl' 
+                              : 'bg-gradient-to-br from-rose-50 to-pink-50 border-rose-200 hover:border-rose-300 hover:shadow-xl'
+                          }`}>
+                            
+                            {/* Status Indicator */}
+                            <div className={`absolute top-3 right-3 w-3 h-3 rounded-full shadow-sm ${
+                              isAvailable ? 'bg-emerald-500' : 'bg-rose-500'
                             }`}></div>
                             
-                            {/* Contenido principal */}
-                            <div className="flex flex-col items-center text-center">
-                              <div className={`flex items-center justify-center w-8 h-8 rounded-full mb-2 ${
-                                tableStatus.status === 'available' 
-                                  ? 'bg-green-500' 
-                                  : 'bg-red-500'
-                              }`}>
-                                <StatusIcon className="h-4 w-4 text-white" />
-                              </div>
-                              
-                              <div className="text-xs font-medium text-gray-900 mb-1">
-                                Mesa {table.table_number}
-                              </div>
-                              
-                              {tableStatus.status === 'occupied' ? (
-                                <div className="text-xs text-gray-600 flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  <span>{tableStatus.pendingItems || 0}/{tableStatus.totalItems || 0}</span>
-                                </div>
+                            {/* Icono Principal */}
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 mx-auto shadow-md ${
+                              isAvailable 
+                                ? 'bg-emerald-500 text-white' 
+                                : 'bg-rose-500 text-white'
+                            }`}>
+                              {isAvailable ? (
+                                <Plus className="h-6 w-6" />
                               ) : (
-                                <div className="text-xs text-green-600 font-medium">
-                                  Disponible
-                                </div>
+                                <ShoppingCart className="h-6 w-6" />
                               )}
                             </div>
                             
-                            {/* Badge de múltiples cuentas */}
+                            {/* Información de Mesa */}
+                            <div className="text-center">
+                              <div className="font-bold text-gray-900 mb-1">
+                                Mesa {table.table_number}
+                              </div>
+                              
+                              {!isAvailable ? (
+                                <div className="flex items-center justify-center gap-1 text-sm text-gray-600 mb-2">
+                                  <Clock className="h-4 w-4" />
+                                  <span className="font-medium">{tableStatus.pendingItems || 0}/{tableStatus.totalItems || 0}</span>
+                                </div>
+                              ) : (
+                                <div className="text-sm font-medium text-emerald-600 mb-2">
+                                  Disponible
+                                </div>
+                              )}
+                              
+                              {/* Action Button */}
+                              <div className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                                isAvailable 
+                                  ? 'bg-emerald-500 text-white group-hover:bg-emerald-600' 
+                                  : 'bg-rose-500 text-white group-hover:bg-rose-600'
+                              }`}>
+                                {isAvailable ? 'Nuevo Pedido' : 'Ver Pedido'}
+                              </div>
+                            </div>
+                            
+                            {/* Badge de Múltiples Pedidos */}
                             {tableStatus.ordersCount > 1 && (
-                              <div className="absolute -top-1 -right-1">
-                                <div className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium border-2 border-white">
+                              <div className="absolute -top-2 -right-2 z-10">
+                                <div className="bg-amber-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold border-3 border-white shadow-lg">
                                   {tableStatus.ordersCount}
                                 </div>
                               </div>
                             )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                            
+                            {/* Shine Effect */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -293,6 +325,9 @@ const TableStatus = () => {
           </div>
         )}
       </div>
+      
+      {/* Spacing Bottom for mobile navigation */}
+      <div className="h-20"></div>
     </div>
   );
 };

@@ -15,7 +15,13 @@ import {
   Clock,
   Trash2,
   CheckCircle,
-  CreditCard
+  CreditCard,
+  Star,
+  Coffee,
+  X,
+  Edit3,
+  Utensils,
+  Eye
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -192,6 +198,7 @@ const TableOrderEdit = () => {
 
   const handleQuickAdd = (recipe) => {
     addNewItem(recipe);
+    showSuccess('Agregado al pedido');
   };
 
   const calculateNewItemsTotal = () => {
@@ -272,8 +279,8 @@ const TableOrderEdit = () => {
 
   const getItemStatusColor = (status) => {
     switch (status) {
-      case 'CREATED': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'SERVED': return 'bg-green-100 text-green-800 border-green-300';
+      case 'CREATED': return 'bg-amber-100 text-amber-800 border-amber-300';
+      case 'SERVED': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
       default: return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
@@ -288,10 +295,12 @@ const TableOrderEdit = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
-          <p className="mt-4 text-base text-gray-600">Cargando pedido...</p>
+          <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600"></div>
+          </div>
+          <p className="text-gray-600 font-medium">Cargando pedido...</p>
         </div>
       </div>
     );
@@ -299,13 +308,13 @@ const TableOrderEdit = () => {
 
   if (!table || !order) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center">
+        <div className="text-center bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-base font-medium text-gray-900 mb-2">Pedido no encontrado</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Pedido no encontrado</h2>
           <button 
             onClick={() => navigate('/table-status')}
-            className="text-blue-600 hover:text-blue-800 text-base"
+            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
           >
             Volver al estado de mesas
           </button>
@@ -315,390 +324,385 @@ const TableOrderEdit = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-50 flex flex-col h-full">
-      {/* Header fijo estandarizado reducido 70% */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="p-2">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1 flex-1">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Header Moderno */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white sticky top-0 z-40 shadow-lg">
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3 flex-1">
               <button
                 onClick={() => navigate('/table-status')}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors"
               >
-                <ArrowLeft className="h-3 w-3" />
+                <ArrowLeft className="h-5 w-5 text-white" />
               </button>
               
-              <div className="text-center flex-1">
-                <h1 className="text-xs font-medium text-gray-900">
-                  Mesa {table.table_number} - #{order.id}
-                </h1>
-                <p className="text-xs text-gray-500">{table.zone_name}</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Edit3 className="h-5 w-5 text-blue-200" />
+                  <h1 className="font-bold">Mesa {table.table_number}</h1>
+                  <span className="text-blue-200">#{order.id}</span>
+                </div>
+                <p className="text-blue-100 text-sm">{table.zone_name}</p>
               </div>
             </div>
 
-            {/* Total estandarizado */}
+            {/* Total */}
             <div className="text-right">
-              <p className="text-xs text-gray-500">Total</p>
-              <p className="text-sm font-medium text-gray-900">{formatCurrency(order.total_amount)}</p>
+              <p className="text-blue-200 text-sm">Total</p>
+              <p className="text-xl font-bold">{formatCurrency(order.total_amount)}</p>
             </div>
           </div>
 
-          {/* Botones de acción estandarizados reducidos 70% */}
-          <div className="flex items-center gap-1.5">
-            {/* Botón Nueva Cuenta */}
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(`/table/${tableId}/order-ecommerce`)}
-              className="bg-purple-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-purple-700 flex items-center gap-0.5"
+              className="bg-purple-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2"
             >
-              <Users className="h-3 w-3" />
-              <span className="hidden sm:inline">Nueva Cuenta</span>
-              <span className="sm:hidden">+</span>
+              <Users className="h-4 w-4" />
+              Nueva Cuenta
             </button>
 
-            {/* Botón Agregar Items */}
             <button
               onClick={() => setShowNewItems(!showNewItems)}
-              className="relative bg-blue-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-blue-700 flex items-center gap-0.5"
+              className="relative bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-xl hover:bg-white/30 transition-colors flex items-center gap-2"
             >
-              <Plus className="h-3 w-3" />
-              <span>Agregar</span>
+              <Plus className="h-4 w-4" />
+              Agregar Items
               {getNewItemsCount() > 0 && (
-                <div className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded w-3.5 h-3.5 flex items-center justify-center text-xs font-medium">
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
                   {getNewItemsCount()}
                 </div>
               )}
             </button>
             
-            {/* Botón Procesar Pago */}
             {checkAllItemsDelivered() && hasPermission('canManagePayments') && (
               <button
                 onClick={handleGoToPayment}
-                className="bg-green-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-green-700 flex items-center gap-0.5"
+                className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2"
               >
-                <CreditCard className="h-3 w-3" />
-                <span>Pagar</span>
+                <CreditCard className="h-4 w-4" />
+                Pagar
               </button>
             )}
           </div>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Panel principal - Items existentes reducido 70% */}
-        <div className={`flex-1 flex flex-col transition-all duration-300 ${showNewItems ? 'hidden sm:flex sm:mr-56' : 'flex'}`}>
-          <div className="p-2">
-            <div className="bg-white rounded border border-gray-200 h-full flex flex-col">
-              <div className="p-2 border-b border-gray-200 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-medium text-gray-900">Items del Pedido</h2>
-                    <p className="text-xs text-gray-600">
-                      {existingItems.length} items • {existingItems.filter(i => i.status === 'SERVED').length} entregados
-                    </p>
-                  </div>
-                  <div className="flex gap-2 text-xs">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-yellow-400 rounded"></div>
-                      <span className="text-gray-700">Pendiente</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-green-400 rounded"></div>
-                      <span className="text-gray-700">Entregado</span>
-                    </div>
-                  </div>
+      {/* Contenido Principal */}
+      <div className={`transition-all duration-300 ${showNewItems ? 'pb-96' : ''}`}>
+        <div className="px-4 py-6">
+          {/* Items Existentes */}
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-6">
+            <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Eye className="h-4 w-4 text-blue-600" />
                 </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-2" style={{maxHeight: 'calc(100vh - 140px)'}}>
-                {existingItems.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <ShoppingCart className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                      <h3 className="text-xs font-medium text-gray-900 mb-1">Sin items</h3>
-                      <p className="text-xs text-gray-500">Agrega items al pedido</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {existingItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`rounded p-2 border-l-2 ${
-                          item.status === 'SERVED' 
-                            ? 'bg-green-50 border-green-400' 
-                            : 'bg-white border-yellow-400 border'
-                        }`}
-                      >
-                        <div className="flex items-start gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1 mb-1">
-                              <h4 className="font-medium text-gray-900 text-xs">{item.recipe_name}</h4>
-                              <span className={`inline-flex items-center px-1 py-0.5 rounded text-xs ${
-                                item.status === 'SERVED' 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-yellow-100 text-yellow-800'
-                              }`}>
-                                {getItemStatusText(item.status)}
-                              </span>
-                            </div>
-
-                            <div className="text-xs font-medium text-gray-900 mb-1">
-                              {formatCurrency(item.total_price)}
-                            </div>
-
-                            {item.notes && (
-                              <p className="text-xs text-gray-600 bg-blue-50 px-1 py-0.5 rounded mb-1">
-                                {item.notes}
-                              </p>
-                            )}
-
-                            <div className="flex gap-1">
-                              {item.is_takeaway && (
-                                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
-                                  <Package className="h-2.5 w-2.5" />
-                                  Para llevar
-                                </span>
-                              )}
-                              {item.has_taper && (
-                                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                                  <Check className="h-2.5 w-2.5" />
-                                  Envase
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {item.status === 'CREATED' && (
-                            <button
-                              onClick={() => removeExistingItem(item.id)}
-                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div>
+                  <h3 className="font-bold text-gray-900">Items del Pedido</h3>
+                  <p className="text-sm text-gray-500">
+                    {existingItems.length} items • {existingItems.filter(i => i.status === 'SERVED').length} entregados
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Overlay para móviles */}
-        {showNewItems && (
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden"
-            onClick={() => setShowNewItems(false)}
-          />
-        )}
-
-        {/* Panel para agregar nuevos items estandarizado reducido 70% */}
-        {showNewItems && (
-          <div className="fixed right-0 top-0 h-full w-full sm:w-56 bg-white border-l border-gray-200 z-50 pt-12 sm:pt-0">
-            <div className="flex flex-col h-full">
-              {/* Header */}
-              <div className="p-2 border-b border-gray-200 bg-gray-50">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-sm font-medium text-gray-900">Agregar Items</h2>
-                  <button
-                    onClick={() => setShowNewItems(false)}
-                    className="p-1 text-gray-500 hover:text-gray-700 rounded transition-colors"
-                  >
-                    <ArrowLeft className="h-3 w-3" />
-                  </button>
+            <div className="p-6">
+              {existingItems.length === 0 ? (
+                <div className="text-center py-8">
+                  <ShoppingCart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Sin items</h3>
+                  <p className="text-gray-500">Agrega items al pedido</p>
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  {existingItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`relative p-4 rounded-2xl border-2 transition-all duration-200 ${
+                        item.status === 'SERVED' 
+                          ? 'bg-emerald-50 border-emerald-200' 
+                          : 'bg-amber-50 border-amber-200'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-red-100 rounded-xl flex items-center justify-center">
+                          <Coffee className="h-6 w-6 text-orange-500" />
+                        </div>
+                        
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-bold text-gray-900">{item.recipe_name}</h4>
+                            <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                              item.status === 'SERVED' 
+                                ? 'bg-emerald-500 text-white' 
+                                : 'bg-amber-500 text-white'
+                            }`}>
+                              {getItemStatusText(item.status)}
+                            </span>
+                          </div>
 
-                {/* Filtros */}
-                <div className="space-y-1.5">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-2.5 w-2.5 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Buscar platos..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-6 pr-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
+                          <div className="text-lg font-bold text-gray-900 mb-2">
+                            {formatCurrency(item.total_price)}
+                          </div>
 
-                  <select
-                    value={selectedGroup}
-                    onChange={(e) => setSelectedGroup(e.target.value)}
-                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="all">Todos los grupos</option>
-                    {groups.map(group => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Lista de recetas estandarizada */}
-              <div className="flex-1 overflow-y-auto p-2" style={{maxHeight: 'calc(100vh - 160px)'}}>
-                {filteredRecipes.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <AlertCircle className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                      <h3 className="text-xs font-medium text-gray-900 mb-1">Sin resultados</h3>
-                      <p className="text-xs text-gray-500">Intenta otros términos</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredRecipes.map((recipe) => (
-                      <div
-                        key={recipe.id}
-                        className="bg-gray-50 rounded border border-gray-200 p-2"
-                      >
-                        <div className="flex items-start gap-2">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 text-xs line-clamp-1">
-                              {recipe.name}
-                            </h4>
-                            <p className="text-xs text-gray-600">
-                              {recipe.group_name || 'Sin grupo'}
-                            </p>
-
-                            <div className="flex items-center justify-between my-1">
-                              <span className="text-xs font-medium text-gray-900">
-                                {formatCurrency(recipe.base_price)}
-                              </span>
-                              <span className="text-xs text-gray-500 flex items-center gap-0.5">
-                                <Clock className="h-2.5 w-2.5" />
-                                {recipe.preparation_time}min
-                              </span>
+                          {item.notes && (
+                            <div className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg mb-2">
+                              {item.notes}
                             </div>
+                          )}
 
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => handleQuickAdd(recipe)}
-                                className="flex-1 bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-blue-700 flex items-center justify-center gap-0.5"
-                              >
-                                <Plus className="h-2.5 w-2.5" />
-                                Agregar
-                              </button>
-                              <button
-                                onClick={() => openItemModal(recipe)}
-                                className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-xs"
-                                title="Personalizar"
-                              >
-                                <StickyNote className="h-2.5 w-2.5" />
-                              </button>
-                            </div>
+                          <div className="flex gap-2">
+                            {item.is_takeaway && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-lg text-xs">
+                                <Package className="h-3 w-3" />
+                                Para llevar
+                              </span>
+                            )}
+                            {item.has_taper && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-lg text-xs">
+                                <Check className="h-3 w-3" />
+                                Envase
+                              </span>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
 
-              {/* Carrito de nuevos items estandarizado */}
-              {newItems.length > 0 && (
-                <div className="border-t border-gray-200 p-2 bg-gray-50">
-                  <div className="bg-white rounded p-2 mb-2">
-                    <h4 className="font-medium text-gray-900 mb-2 text-xs">Items a Agregar</h4>
-                    <div className="space-y-2 max-h-24 overflow-y-auto">
-                      {newItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between bg-blue-50 rounded p-2">
-                          <div className="flex-1">
-                            <div className="font-medium text-xs text-gray-900">{item.recipe.name}</div>
-                            <div className="text-xs text-gray-600">
-                              {item.quantity}x {formatCurrency(item.unit_price)} = {formatCurrency(item.unit_price * item.quantity)}
-                            </div>
-                          </div>
+                        {item.status === 'CREATED' && (
                           <button
-                            onClick={() => removeNewItem(item.id)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors ml-2"
+                            onClick={() => removeExistingItem(item.id)}
+                            className="w-10 h-10 bg-red-100 text-red-600 rounded-xl flex items-center justify-center hover:bg-red-200 transition-colors"
                           >
-                            <Minus className="h-3 w-3" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="pt-2 mt-2 border-t border-gray-200">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-gray-700">Subtotal:</span>
-                        <span className="font-medium text-gray-900">{formatCurrency(calculateNewItemsTotal())}</span>
+                        )}
                       </div>
                     </div>
-                  </div>
-
-                  <button
-                    onClick={handleUpdateOrder}
-                    disabled={updatingOrder}
-                    className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50 font-medium flex items-center justify-center gap-1 transition-colors text-xs"
-                  >
-                    {updatingOrder ? (
-                      <>
-                        <div className="animate-spin rounded h-3 w-3 border border-white border-t-transparent"></div>
-                        Actualizando...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-3 w-3" />
-                        Actualizar ({getNewItemsCount()})
-                      </>
-                    )}
-                  </button>
+                  ))}
                 </div>
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Modal estandarizado simplificado para agregar item */}
-      {selectedRecipe && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded max-w-sm w-full">
-            {/* Header del modal */}
-            <div className="p-2 bg-gray-50 border-b border-gray-200">
+      {/* Modal para Agregar Items */}
+      {showNewItems && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/50 z-50"
+            onClick={() => setShowNewItems(false)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 bg-white z-50 max-h-[85vh] overflow-hidden rounded-t-3xl shadow-2xl border border-gray-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-6 py-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-medium text-gray-900">
-                  {selectedRecipe.name}
-                </h3>
+                <div>
+                  <h2 className="text-xl font-bold">Agregar Items</h2>
+                  <p className="text-blue-100">
+                    {getNewItemsCount() > 0 ? `${getNewItemsCount()} items • ${formatCurrency(calculateNewItemsTotal())}` : 'Selecciona platos para agregar'}
+                  </p>
+                </div>
                 <button
-                  onClick={() => setSelectedRecipe(null)}
-                  className="text-gray-400 hover:text-gray-600 p-1"
+                  onClick={() => setShowNewItems(false)}
+                  className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
                 >
-                  <ArrowLeft className="h-3 w-3" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            <div className="p-3 space-y-3">
-              {/* Precio */}
-              <div className="text-center py-2 bg-gray-50 rounded">
-                <div className="text-sm font-medium text-gray-900">
+            {/* Filtros */}
+            <div className="border-b border-gray-200 px-6 py-4">
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Buscar platos..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <select
+                  value={selectedGroup}
+                  onChange={(e) => setSelectedGroup(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">Todos los grupos</option>
+                  {groups.map(group => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Lista de Recetas */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 max-h-60">
+              {filteredRecipes.length === 0 ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Sin resultados</h3>
+                  <p className="text-gray-500">Intenta otros términos</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {filteredRecipes.map((recipe) => (
+                    <div
+                      key={recipe.id}
+                      className="bg-gray-50 rounded-2xl p-4 hover:bg-gray-100 transition-colors border border-gray-200"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-red-100 rounded-xl flex items-center justify-center">
+                          <Coffee className="h-6 w-6 text-orange-500" />
+                        </div>
+                        
+                        <div className="flex-1">
+                          <h4 className="font-bold text-gray-900 mb-1">
+                            {recipe.name}
+                          </h4>
+                          <p className="text-sm text-gray-500 mb-2">
+                            {recipe.group_name || 'Sin grupo'}
+                          </p>
+
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-lg font-bold text-emerald-600">
+                              {formatCurrency(recipe.base_price)}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-gray-400" />
+                              <span className="text-sm text-gray-500">{recipe.preparation_time}min</span>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleQuickAdd(recipe)}
+                              className="flex-1 bg-emerald-500 text-white py-2 rounded-xl font-semibold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Agregar
+                            </button>
+                            <button
+                              onClick={() => openItemModal(recipe)}
+                              className="w-10 h-10 bg-gray-200 text-gray-600 rounded-xl hover:bg-gray-300 transition-colors flex items-center justify-center"
+                            >
+                              <StickyNote className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer con Nuevos Items */}
+            {newItems.length > 0 && (
+              <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
+                <div className="mb-4">
+                  <h4 className="font-bold text-gray-900 mb-3">Items a Agregar ({getNewItemsCount()})</h4>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {newItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between bg-blue-50 rounded-xl p-3">
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900">{item.recipe.name}</div>
+                          <div className="text-sm text-gray-600">
+                            {item.quantity}x {formatCurrency(item.unit_price)} = {formatCurrency(item.unit_price * item.quantity)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeNewItem(item.id)}
+                          className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200">
+                    <span className="font-bold text-gray-700">Subtotal:</span>
+                    <span className="text-xl font-bold text-gray-900">{formatCurrency(calculateNewItemsTotal())}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleUpdateOrder}
+                  disabled={updatingOrder}
+                  className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                >
+                  {updatingOrder ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      Actualizando pedido...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-5 w-5" />
+                      Actualizar Pedido ({getNewItemsCount()})
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Modal para personalizar item */}
+      {selectedRecipe && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-100 to-red-100 p-6 relative">
+              <button
+                onClick={() => setSelectedRecipe(null)}
+                className="absolute top-4 right-4 w-8 h-8 bg-white/80 rounded-full flex items-center justify-center hover:bg-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              
+              <div className="text-center">
+                <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center mx-auto mb-4">
+                  <Coffee className="h-8 w-8 text-orange-500" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {selectedRecipe.name}
+                </h3>
+                <div className="text-2xl font-bold text-emerald-600 mt-2">
                   {formatCurrency(selectedRecipe.base_price)}
                 </div>
               </div>
+            </div>
 
-              {/* Notas simplificadas */}
+            <div className="p-6 space-y-4">
+              {/* Notas */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Notas (opcional)
+                <label className="block font-semibold text-gray-700 mb-2">
+                  Notas especiales (opcional)
                 </label>
                 <input
                   type="text"
                   value={itemNotes}
                   onChange={(e) => setItemNotes(e.target.value)}
                   placeholder="Ej: Sin cebolla, término medio..."
-                  className="w-full px-2 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
               {/* Opciones */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs">
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-orange-300 hover:bg-orange-50 transition-colors cursor-pointer">
                   <input
                     type="checkbox"
                     checked={itemTakeaway}
@@ -708,33 +712,33 @@ const TableOrderEdit = () => {
                         setItemTaper(true);
                       }
                     }}
-                    className="rounded text-orange-600"
+                    className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500"
                   />
-                  <Package className="h-3 w-3 text-orange-600" />
-                  Para llevar
+                  <Package className="h-5 w-5 text-orange-600" />
+                  <span className="font-semibold text-gray-900">Para llevar</span>
                 </label>
 
                 {itemTakeaway && (
-                  <label className="flex items-center gap-2 text-xs ml-4">
+                  <label className="flex items-center gap-3 p-4 ml-6 border-2 border-gray-200 rounded-xl hover:border-green-300 hover:bg-green-50 transition-colors cursor-pointer">
                     <input
                       type="checkbox"
                       checked={itemTaper}
                       onChange={(e) => setItemTaper(e.target.checked)}
-                      className="rounded text-green-600"
+                      className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
                     />
-                    <Check className="h-3 w-3 text-green-600" />
-                    Incluir envase
+                    <Check className="h-5 w-5 text-green-600" />
+                    <span className="font-semibold text-gray-900">Incluir envase</span>
                   </label>
                 )}
               </div>
             </div>
 
-            {/* Footer del modal */}
-            <div className="p-2 bg-gray-50 border-t border-gray-200">
-              <div className="flex gap-1">
+            {/* Footer */}
+            <div className="border-t border-gray-200 p-6 bg-gray-50">
+              <div className="flex gap-3">
                 <button
                   onClick={() => setSelectedRecipe(null)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-100 transition-colors text-xs"
+                  className="flex-1 py-3 border-2 border-gray-300 rounded-xl text-gray-700 font-semibold hover:bg-gray-100 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -743,9 +747,9 @@ const TableOrderEdit = () => {
                     addNewItem(selectedRecipe, itemNotes, itemTakeaway, itemTaper);
                     showSuccess(`${selectedRecipe.name} agregado`);
                   }}
-                  className="flex-1 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium flex items-center justify-center gap-1 transition-colors text-xs"
+                  className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="h-4 w-4" />
                   Agregar
                 </button>
               </div>

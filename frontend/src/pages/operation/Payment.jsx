@@ -1,6 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Split, Receipt, CheckCircle, X, AlertTriangle, Printer } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  CreditCard, 
+  Split, 
+  Receipt, 
+  CheckCircle, 
+  X, 
+  AlertTriangle, 
+  Printer,
+  ShoppingCart,
+  Clock,
+  Package,
+  Check,
+  Wallet,
+  Smartphone,
+  Building2,
+  Link,
+  Users,
+  Eye,
+  Coffee
+} from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -111,7 +131,6 @@ const Payment = () => {
     }
   };
 
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setPaymentData(prev => ({
@@ -139,7 +158,7 @@ const Payment = () => {
       };
 
       await apiService.payments.create(paymentPayload);
-      showSuccess('Pago procesado exitosamente');
+      showSuccess('¡Pago procesado exitosamente!');
 
       // Intentar imprimir comprobante
       try {
@@ -178,7 +197,7 @@ const Payment = () => {
     setProcessing(true);
     try {
       await apiService.orders.splitPayment(order.id, { splits: formattedSplits });
-      showSuccess(`Pagos divididos procesados exitosamente (${splits.length} pagos)`);
+      showSuccess(`¡Pagos divididos procesados exitosamente! (${splits.length} pagos)`);
 
       // Intentar imprimir comprobantes divididos
       try {
@@ -352,71 +371,105 @@ const Payment = () => {
     }).format(value);
   };
 
+  const getPaymentMethodIcon = (method) => {
+    switch (method) {
+      case 'CASH': return <Wallet className="h-5 w-5" />;
+      case 'CARD': return <CreditCard className="h-5 w-5" />;
+      case 'YAPE_PLIN': return <Smartphone className="h-5 w-5" />;
+      case 'TRANSFER': return <Building2 className="h-5 w-5" />;
+      default: return <Link className="h-5 w-5" />;
+    }
+  };
+
+  const getPaymentMethodName = (method) => {
+    switch (method) {
+      case 'CASH': return 'Efectivo';
+      case 'CARD': return 'Tarjeta';
+      case 'YAPE_PLIN': return 'Yape/Plin';
+      case 'TRANSFER': return 'Transferencia';
+      default: return 'Otro';
+    }
+  };
+
   const renderOrderItems = () => {
     return (
-      <div className="bg-white rounded p-3 mx-3 mb-3">
-        <h3 className="text-base font-medium text-gray-900 mb-3 flex items-center gap-2">
-          <Receipt className="h-5 w-5" />
-          Items del Pedido
-        </h3>
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-6">
+        <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
+              <Receipt className="h-4 w-4 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900">Items del Pedido</h3>
+              <p className="text-sm text-gray-500">Selecciona los items para el pago dividido</p>
+            </div>
+          </div>
+        </div>
         
-        <div className="space-y-3">
+        <div className="p-6 space-y-4">
           {order.items?.map((item) => {
             const isPaid = paidItems.has(item.id);
             const isAssigned = selectedItems[item.id] !== null && selectedItems[item.id] !== undefined;
             const isSelected = currentSplit.items.some(i => i.id === item.id);
             
-            // Debug logging solo si hay problemas
-            if (paymentMode === 'split' && isAssigned && selectedItems[item.id] === null) {
-              console.warn(`Inconsistent state for item ${item.id}: isAssigned=${isAssigned} but selectedItems[item.id]=${selectedItems[item.id]}`);
-            }
-            
             return (
               <div
                 key={item.id}
                 onClick={() => paymentMode === 'split' && !isPaid && !isAssigned && toggleItemSelection(item.id)}
-                className={`p-3 rounded border transition-colors ${
+                className={`relative p-4 rounded-2xl border-2 transition-all duration-200 cursor-pointer ${
                   isPaid
-                    ? 'bg-green-100 border-green-300 cursor-not-allowed'
+                    ? 'bg-emerald-50 border-emerald-200 cursor-not-allowed'
                     : paymentMode === 'split'
                     ? isAssigned
                       ? 'bg-gray-100 border-gray-300 cursor-not-allowed opacity-60'
                       : isSelected
-                      ? 'bg-blue-50 border-blue-500 cursor-pointer'
-                      : 'hover:bg-gray-50 border-gray-200 cursor-pointer'
+                      ? 'bg-blue-50 border-blue-500 scale-[1.02] shadow-lg'
+                      : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300'
                     : 'border-gray-200'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-900 text-sm">{item.recipe_name}</div>
-                    {item.notes && (
-                      <div className="text-gray-500 italic text-sm mt-1">Notas: {item.notes}</div>
-                    )}
-                    {item.customizations_count > 0 && (
-                      <div className="text-blue-600 text-sm mt-1">
-                        {item.customizations_count} personalización(es)
-                      </div>
-                    )}
-                    {item.is_takeaway && (
-                      <div className="text-orange-600 text-sm mt-1 flex items-center gap-1">
-                        <span>📦</span>
-                        <span>Para llevar (envase incluido)</span>
-                      </div>
-                    )}
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-red-100 rounded-xl flex items-center justify-center">
+                    <Coffee className="h-6 w-6 text-orange-500" />
                   </div>
+                  
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-bold text-gray-900">{item.recipe_name}</h4>
+                      {isPaid && (
+                        <span className="px-2 py-1 bg-emerald-500 text-white rounded-lg text-xs font-medium">
+                          ✓ Pagado
+                        </span>
+                      )}
+                      {isAssigned && !isPaid && paymentMode === 'split' && (
+                        <span className="px-2 py-1 bg-gray-500 text-white rounded-lg text-xs font-medium">
+                          Pago {(selectedItems[item.id] ?? -1) + 1}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {item.notes && (
+                      <p className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-lg mb-2">{item.notes}</p>
+                    )}
+                    
+                    <div className="flex gap-2 mb-2">
+                      {item.is_takeaway && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-lg text-xs">
+                          <Package className="h-3 w-3" />
+                          Para llevar
+                        </span>
+                      )}
+                      {item.has_taper && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-lg text-xs">
+                          <Check className="h-3 w-3" />
+                          Envase incluido
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="text-right">
-                    <div className="font-medium text-base">{formatCurrency(item.total_price)}</div>
-                    {isPaid && (
-                      <div className="text-sm text-green-600 font-medium">
-                        ✓ Pagado parcialmente
-                      </div>
-                    )}
-                    {isAssigned && !isPaid && paymentMode === 'split' && (
-                      <div className="text-sm text-gray-500">
-                        Asignado a pago {(selectedItems[item.id] ?? -1) + 1}
-                      </div>
-                    )}
+                    <div className="text-xl font-bold text-gray-900">{formatCurrency(item.total_price)}</div>
                   </div>
                 </div>
               </div>
@@ -429,10 +482,12 @@ const Payment = () => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
-          <p className="mt-4 text-base text-gray-600">Cargando pago...</p>
+          <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600"></div>
+          </div>
+          <p className="text-gray-600 font-medium">Cargando pago...</p>
         </div>
       </div>
     );
@@ -440,13 +495,13 @@ const Payment = () => {
 
   if (!order) {
     return (
-      <div className="fixed inset-0 bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-base font-medium text-gray-900 mb-2">Orden no encontrada</h2>
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center">
+        <div className="text-center bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
+          <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Orden no encontrada</h2>
           <button 
             onClick={() => navigate('/orders')}
-            className="text-blue-600 hover:text-blue-800 text-base"
+            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
           >
             Volver a órdenes
           </button>
@@ -456,70 +511,76 @@ const Payment = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-50 flex flex-col h-full">
-      {/* Modal/Popup inicial para selección de tipo de pago */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Modal inicial para selección de tipo de pago */}
       {!paymentMode && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded max-w-md w-full overflow-hidden">
-            {/* Header del modal */}
-            <div className="bg-blue-600 px-2 py-2 text-white">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-6 py-4">
               <div className="text-center">
-                <h2 className="text-sm font-medium mb-1">Procesar Pago</h2>
-                <p className="text-blue-100 text-xs">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3 backdrop-blur-sm">
+                  <CreditCard className="h-6 w-6 text-white" />
+                </div>
+                <h2 className="text-xl font-bold mb-1">Procesar Pago</h2>
+                <p className="text-blue-100">
                   Mesa {order.table_number} • #{order.id}
                 </p>
               </div>
             </div>
 
-            {/* Contenido del modal */}
-            <div className="p-2">
+            {/* Contenido */}
+            <div className="p-6">
               {/* Total destacado */}
-              <div className="text-center mb-3 p-2 bg-gray-50 rounded">
-                <p className="text-xs text-gray-500 mb-1">Total a pagar</p>
-                <p className="text-sm font-medium text-gray-900">
+              <div className="text-center mb-6 p-4 bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl border border-emerald-200">
+                <p className="text-sm text-emerald-600 mb-1 font-semibold">Total a pagar</p>
+                <p className="text-3xl font-bold text-emerald-700">
                   {formatCurrency(order.total_amount)}
                 </p>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-sm text-emerald-600 mt-1">
                   {order.items ? order.items.length : 0} items
                 </p>
               </div>
 
               {/* Mensaje informativo si hay items pagados */}
               {paidItems.size > 0 && (
-                <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-3 w-3 text-amber-600 flex-shrink-0" />
-                    <p className="text-xs text-amber-800">
-                      <strong>Atención:</strong> Hay {paidItems.size} item(s) ya pagados. Solo puedes usar "Dividir Cuenta" para procesar los items restantes.
-                    </p>
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-amber-800 mb-1">¡Atención!</p>
+                      <p className="text-sm text-amber-700">
+                        Hay {paidItems.size} item(s) ya pagados. Solo puedes usar "Dividir Cuenta" para procesar los items restantes.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* Opciones de pago */}
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {/* Pago Completo */}
                 <button
                   onClick={() => setPaymentMode('full')}
                   disabled={processing || paidItems.size > 0}
-                  className={`w-full p-2 rounded border transition-colors ${
+                  className={`w-full p-4 rounded-2xl border-2 transition-all duration-200 ${
                     paidItems.size > 0 
                       ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-50' 
-                      : 'border-green-300 bg-green-50 hover:bg-green-100'
+                      : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 hover:scale-[1.02] shadow-lg'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded flex items-center justify-center ${
-                      paidItems.size > 0 ? 'bg-gray-200' : 'bg-green-500'
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md ${
+                      paidItems.size > 0 ? 'bg-gray-200' : 'bg-emerald-500'
                     }`}>
-                      <CreditCard className={`h-3 w-3 ${paidItems.size > 0 ? 'text-gray-400' : 'text-white'}`} />
+                      <CreditCard className={`h-6 w-6 ${paidItems.size > 0 ? 'text-gray-400' : 'text-white'}`} />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className={`text-xs font-medium ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-900'}`}>
+                      <div className={`font-bold text-lg ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-900'}`}>
                         Pago Completo
                       </div>
-                      <div className={`text-xs ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Procesa toda la cuenta
+                      <div className={`text-sm ${paidItems.size > 0 ? 'text-gray-400' : 'text-emerald-600'}`}>
+                        Procesa toda la cuenta de una vez
                       </div>
                     </div>
                   </div>
@@ -529,15 +590,15 @@ const Payment = () => {
                 <button
                   onClick={() => setPaymentMode('split')}
                   disabled={processing}
-                  className="w-full p-2 rounded border border-blue-300 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  className="w-full p-4 rounded-2xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-300 hover:scale-[1.02] transition-all duration-200 shadow-lg"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center">
-                      <Split className="h-3 w-3 text-white" />
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center shadow-md">
+                      <Split className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className="text-xs font-medium text-gray-900">Dividir Cuenta</div>
-                      <div className="text-xs text-gray-600">
+                      <div className="font-bold text-lg text-gray-900">Dividir Cuenta</div>
+                      <div className="text-sm text-blue-600">
                         {order.items ? order.items.filter(item => !paidItems.has(item.id)).length : 0} items disponibles
                       </div>
                     </div>
@@ -546,12 +607,12 @@ const Payment = () => {
               </div>
 
               {/* Botón cancelar */}
-              <div className="mt-3 pt-2 border-t border-gray-200">
+              <div className="mt-6 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => navigate('/orders')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-50 text-xs flex items-center justify-center gap-1"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-2xl text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
                 >
-                  <ArrowLeft className="h-3 w-3" />
+                  <ArrowLeft className="h-4 w-4" />
                   Cancelar
                 </button>
               </div>
@@ -563,247 +624,257 @@ const Payment = () => {
       {/* Items del pedido - solo para split payment */}
       {paymentMode === 'split' && renderOrderItems()}
 
-      {/* Formulario de Pago Completo */}
+      {/* Vista de Pago Completo */}
       {paymentMode === 'full' && (
-        <div className="flex flex-col h-full">
-          {/* Header fijo estandarizado reducido 70% */}
-          <div className="bg-white border-b border-gray-200 p-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1 flex-1">
-                <button
-                  onClick={() => setPaymentMode(null)}
-                  className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <ArrowLeft className="h-3 w-3" />
-                </button>
-                <div className="text-center flex-1">
-                  <h1 className="text-xs font-medium text-gray-900">Pago Completo</h1>
-                  <p className="text-xs text-gray-500">Mesa {order.table_number} • #{order.id}</p>
+        <div className="min-h-screen">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-emerald-600 to-green-700 text-white sticky top-0 z-40 shadow-lg">
+            <div className="px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <button
+                    onClick={() => setPaymentMode(null)}
+                    className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors"
+                  >
+                    <ArrowLeft className="h-5 w-5 text-white" />
+                  </button>
+                  
+                  <div className="flex-1">
+                    <h1 className="font-bold">Pago Completo</h1>
+                    <p className="text-emerald-100 text-sm">Mesa {order.table_number} • #{order.id}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Total</p>
-                <p className="text-sm font-medium text-gray-900">{formatCurrency(order.total_amount)}</p>
+
+                <div className="text-right">
+                  <p className="text-emerald-200 text-sm">Total</p>
+                  <p className="text-xl font-bold">{formatCurrency(order.total_amount)}</p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Contenido scrollable */}
-          <div className="flex-1 overflow-y-auto p-2" style={{maxHeight: 'calc(100vh - 140px)'}}>
-            <div className="max-w-md mx-auto">
-              <div className="bg-white rounded border border-gray-200 overflow-hidden">
-                <div className="p-2">
-                  <div className="space-y-3">
-                    {/* Método de pago */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Método de Pago
-                      </label>
-                      <select
-                        name="payment_method"
-                        value={paymentData.payment_method}
-                        onChange={handleInputChange}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
+          {/* Contenido */}
+          <div className="px-4 py-6">
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden max-w-lg mx-auto">
+              <div className="p-6 space-y-6">
+                {/* Método de pago */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-3">
+                    Método de Pago
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { value: 'CASH', icon: <Wallet className="h-5 w-5" />, name: 'Efectivo' },
+                      { value: 'CARD', icon: <CreditCard className="h-5 w-5" />, name: 'Tarjeta' },
+                      { value: 'YAPE_PLIN', icon: <Smartphone className="h-5 w-5" />, name: 'Yape/Plin' },
+                      { value: 'TRANSFER', icon: <Building2 className="h-5 w-5" />, name: 'Transferencia' }
+                    ].map((method) => (
+                      <button
+                        key={method.value}
+                        onClick={() => setPaymentData({ ...paymentData, payment_method: method.value })}
+                        className={`p-3 rounded-xl border-2 transition-all duration-200 flex items-center gap-2 ${
+                          paymentData.payment_method === method.value
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
                       >
-                        <option value="CASH">💵 Efectivo</option>
-                        <option value="CARD">💳 Tarjeta</option>
-                        <option value="TRANSFER">🏦 Transferencia</option>
-                        <option value="YAPE_PLIN">📱 Yape/Plin</option>
-                        <option value="OTHER">🔗 Otro</option>
-                      </select>
-                    </div>
-
-                    {/* Notas */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Notas (Opcional)
-                      </label>
-                      <input
-                        type="text"
-                        name="notes"
-                        value={paymentData.notes}
-                        onChange={handleInputChange}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
-                        placeholder="Ej: Cliente pagó con billete de 100..."
-                      />
-                    </div>
-                  </div>
-
-                  {/* Resumen del pago */}
-                  <div className="mt-3 p-2 bg-green-50 rounded border border-green-200">
-                    <div className="text-center">
-                      <h3 className="text-xs font-medium text-gray-900">Resumen del Pago</h3>
-                      <p className="text-xs text-gray-600 mt-1">{order.items ? order.items.length : 0} items</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{formatCurrency(order.total_amount)}</p>
-                    </div>
-                  </div>
-
-                  {/* Botón de pago */}
-                  <div className="mt-3">
-                    <button
-                      onClick={handleFullPayment}
-                      disabled={processing}
-                      className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50 font-medium text-xs flex items-center justify-center gap-1"
-                    >
-                      {processing ? (
-                        <>
-                          <div className="animate-spin rounded h-3 w-3 border border-white border-t-transparent"></div>
-                          Procesando...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-3 w-3" />
-                          Confirmar Pago
-                        </>
-                      )}
-                    </button>
+                        {method.icon}
+                        <span className="font-semibold text-sm">{method.name}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
+
+                {/* Notas */}
+                <div>
+                  <label className="block font-bold text-gray-700 mb-2">
+                    Notas (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    name="notes"
+                    value={paymentData.notes}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="Ej: Cliente pagó con billete de 100..."
+                  />
+                </div>
+
+                {/* Resumen del pago */}
+                <div className="p-4 bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl border border-emerald-200">
+                  <div className="text-center">
+                    <h3 className="font-bold text-gray-900 mb-2">Resumen del Pago</h3>
+                    <p className="text-sm text-emerald-600 mb-2">{order.items ? order.items.length : 0} items</p>
+                    <p className="text-3xl font-bold text-emerald-700">{formatCurrency(order.total_amount)}</p>
+                  </div>
+                </div>
+
+                {/* Botón de pago */}
+                <button
+                  onClick={handleFullPayment}
+                  disabled={processing}
+                  className="w-full bg-emerald-600 text-white py-4 rounded-2xl hover:bg-emerald-700 disabled:opacity-50 font-bold text-lg flex items-center justify-center gap-2 transition-colors shadow-lg"
+                >
+                  {processing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      Procesando pago...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-5 w-5" />
+                      Confirmar Pago
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Formulario de División de Cuenta */}
+      {/* Vista de División de Cuenta */}
       {paymentMode === 'split' && (
-        <div className="flex flex-col h-full">
-          {/* Header compacto */}
-          <div className="bg-white border-b border-gray-200 shadow-sm p-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1 flex-1">
-                <button
-                  onClick={() => setPaymentMode(null)}
-                  className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <ArrowLeft className="h-3 w-3" />
-                </button>
-                <div className="text-center flex-1">
-                  <h1 className="text-xs font-medium text-gray-900">Dividir Cuenta</h1>
-                  <p className="text-xs text-gray-600">#{order.id} • Mesa {order.table_number}</p>
+        <div className="min-h-screen">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white sticky top-0 z-40 shadow-lg">
+            <div className="px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <button
+                    onClick={() => setPaymentMode(null)}
+                    className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors"
+                  >
+                    <ArrowLeft className="h-5 w-5 text-white" />
+                  </button>
+                  
+                  <div className="flex-1">
+                    <h1 className="font-bold">Dividir Cuenta</h1>
+                    <p className="text-blue-100 text-sm">#{order.id} • Mesa {order.table_number}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Total</p>
-                <p className="text-sm font-medium text-gray-900">{formatCurrency(order.total_amount)}</p>
+
+                <div className="text-right">
+                  <p className="text-blue-200 text-sm">Total</p>
+                  <p className="text-xl font-bold">{formatCurrency(order.total_amount)}</p>
+                </div>
               </div>
             </div>
           </div>
           
-          {/* Contenido scrollable */}
-          <div className="flex-1 overflow-y-auto p-2" style={{maxHeight: 'calc(100vh - 140px)'}}>
-            <div className="max-w-md mx-auto">
-              <div className="bg-white rounded border border-gray-200 overflow-hidden">
-                <div className="p-2">
-                  <div className="space-y-2">
-                    {/* Formulario de split actual */}
-                    <div className="space-y-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Método de Pago
-                        </label>
-                        <select
-                          value={currentSplit.payment_method}
-                          onChange={(e) => setCurrentSplit({ ...currentSplit, payment_method: e.target.value })}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        >
-                          <option value="CASH">💵 Efectivo</option>
-                          <option value="CARD">💳 Tarjeta</option>
-                          <option value="YAPE_PLIN">📱 Yape/Plin</option>
-                          <option value="TRANSFER">🏦 Transferencia</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Items Seleccionados
-                        </label>
-                        <div className="bg-gray-50 rounded p-2 min-h-[40px]">
-                          {currentSplit.items.length === 0 ? (
-                            <p className="text-xs text-gray-500 text-center py-2">Seleccione items arriba</p>
-                          ) : (
-                            <div className="space-y-1">
-                              {currentSplit.items.map(item => (
-                                <div key={item.id} className="flex justify-between text-xs">
-                                  <span className="truncate">{item.recipe_name}</span>
-                                  <span className="font-medium ml-1">{formatCurrency(item.total_price)}</span>
-                                </div>
-                              ))}
-                              <div className="border-t pt-1 mt-1">
-                                <div className="flex justify-between font-medium text-xs">
-                                  <span>Total:</span>
-                                  <span>{formatCurrency(currentSplit.amount)}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-1">
-                      <button
-                        onClick={addSplit}
-                        disabled={currentSplit.items.length === 0}
-                        className="flex-1 bg-blue-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+          {/* Contenido */}
+          <div className="px-4 py-6">
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden max-w-lg mx-auto">
+              <div className="p-6 space-y-6">
+                {/* Formulario de split actual */}
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-4">Crear Nuevo Pago</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-2">
+                        Método de Pago
+                      </label>
+                      <select
+                        value={currentSplit.payment_method}
+                        onChange={(e) => setCurrentSplit({ ...currentSplit, payment_method: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
-                        Agregar Pago
-                      </button>
-                      
-                      {splits.length > 0 && (
-                        <button
-                          onClick={handleSplitPayment}
-                          disabled={processing || splits.length === 0}
-                          className="flex-1 bg-green-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-0.5"
-                        >
-                          {processing ? (
-                            <>
-                              <div className="animate-spin rounded-full h-2.5 w-2.5 border border-white border-t-transparent"></div>
-                              Procesando...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="h-2.5 w-2.5" />
-                              Procesar {splits.length}
-                            </>
-                          )}
-                        </button>
-                      )}
+                        <option value="CASH">💵 Efectivo</option>
+                        <option value="CARD">💳 Tarjeta</option>
+                        <option value="YAPE_PLIN">📱 Yape/Plin</option>
+                        <option value="TRANSFER">🏦 Transferencia</option>
+                      </select>
                     </div>
 
-                    {/* Pagos agregados */}
-                    {splits.length > 0 && (
-                      <div>
-                        <h4 className="text-xs font-medium text-gray-900 mb-1">Pagos Agregados</h4>
-                        <div className="space-y-1">
-                          {splits.map((split, idx) => (
-                            <div key={split.id} className="bg-gray-50 rounded p-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-xs font-medium">Pago {idx + 1}</span>
-                                    <span className="text-xs text-gray-600 truncate">
-                                      ({split.payment_method})
-                                    </span>
-                                  </div>
-                                  <div className="text-xs text-gray-600">
-                                    {split.items.length} item(s) - {formatCurrency(split.amount)}
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => removeSplit(idx)}
-                                  className="text-red-600 hover:text-red-800 p-0.5 ml-1"
-                                >
-                                  <X className="h-2.5 w-2.5" />
-                                </button>
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-2">
+                        Items Seleccionados
+                      </label>
+                      <div className="bg-gray-50 rounded-xl p-4 min-h-[80px]">
+                        {currentSplit.items.length === 0 ? (
+                          <p className="text-gray-500 text-center py-6">Selecciona items de arriba</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {currentSplit.items.map(item => (
+                              <div key={item.id} className="flex justify-between text-sm bg-white p-2 rounded-lg">
+                                <span className="font-medium">{item.recipe_name}</span>
+                                <span className="text-emerald-600 font-bold">{formatCurrency(item.total_price)}</span>
+                              </div>
+                            ))}
+                            <div className="border-t pt-2 mt-2">
+                              <div className="flex justify-between font-bold text-lg">
+                                <span>Total:</span>
+                                <span className="text-emerald-600">{formatCurrency(currentSplit.amount)}</span>
                               </div>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )}
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={addSplit}
+                      disabled={currentSplit.items.length === 0}
+                      className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Agregar Pago
+                    </button>
+                    
+                    {splits.length > 0 && (
+                      <button
+                        onClick={handleSplitPayment}
+                        disabled={processing || splits.length === 0}
+                        className="flex-1 bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                      >
+                        {processing ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            Procesando...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4" />
+                            Procesar ({splits.length})
+                          </>
+                        )}
+                      </button>
                     )}
                   </div>
                 </div>
+
+                {/* Pagos agregados */}
+                {splits.length > 0 && (
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-4">Pagos Agregados ({splits.length})</h4>
+                    <div className="space-y-3">
+                      {splits.map((split, idx) => (
+                        <div key={split.id} className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                {getPaymentMethodIcon(split.payment_method)}
+                                <span className="font-bold">Pago {idx + 1}</span>
+                                <span className="text-sm text-blue-600">({getPaymentMethodName(split.payment_method)})</span>
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {split.items.length} item(s) • <span className="font-bold text-emerald-600">{formatCurrency(split.amount)}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => removeSplit(idx)}
+                              className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors ml-3"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
