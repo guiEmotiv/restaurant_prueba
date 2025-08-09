@@ -190,7 +190,6 @@ const TableOrderEdit = () => {
 
   const handleQuickAdd = (recipe) => {
     addNewItem(recipe);
-    showSuccess(`${recipe.name} agregado al pedido`);
   };
 
   const calculateNewItemsTotal = () => {

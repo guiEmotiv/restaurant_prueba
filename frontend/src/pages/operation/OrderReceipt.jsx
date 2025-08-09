@@ -1,124 +1,149 @@
-// VERSIÓN ULTRA-MÍNIMA - Sin ninguna dependencia problemática
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import apiService from '../../services/api';
+import ReceiptFormat from '../../components/ReceiptFormat';
+import bluetoothPrinter from '../../services/bluetoothPrinter';
+
 const OrderReceipt = () => {
-  // Funciones básicas sin hooks
-  const handleBack = () => {
-    window.history.back();
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [order, setOrder] = useState(null);
+  const [payment, setPayment] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [orderResponse, paymentResponse] = await Promise.all([
+          apiService.orders.getById(id),
+          apiService.payments.getByOrderId(id)
+        ]);
+
+        setOrder(orderResponse);
+        setPayment(paymentResponse);
+      } catch (err) {
+        console.error('Error fetching receipt data:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchData();
+    }
+  }, [id]);
+
+  const handlePrintBluetooth = async () => {
+    if (!order || !payment || isPrinting) return;
+    
+    try {
+      setIsPrinting(true);
+      await bluetoothPrinter.printReceipt({ order, payment });
+    } catch (error) {
+      console.error('Error printing receipt:', error);
+      alert('Error al imprimir: ' + error.message);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
-  // Obtener ID de la URL manualmente
-  const url = window.location.pathname;
-  const id = url.split('/').pop() || '0';
+  const handleTestPrinter = async () => {
+    if (isTesting) return;
+    
+    try {
+      setIsTesting(true);
+      await bluetoothPrinter.testConnection();
+    } catch (error) {
+      console.error('Error testing printer:', error);
+      alert('Error al probar impresora: ' + error.message);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleBack = () => {
+    navigate('/payment-history');
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 p-4">
+        <div className="flex items-center justify-center min-h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 p-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleBack}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+          >
+            ← Volver
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold">Error</h1>
+            <p className="text-red-600">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '16px', fontFamily: 'system-ui' }}>
-      {/* Header con estilos inline */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+    <div className="space-y-6 p-4">
+      {/* Header */}
+      <div className="flex items-center gap-4">
         <button
           onClick={handleBack}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#e5e7eb',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer'
-          }}
+          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 flex items-center gap-2"
         >
-          ← Volver
+          <span>←</span> Volver
         </button>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>Recibo de Pago</h1>
-          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>Orden #{id}</p>
+          <h1 className="text-2xl font-bold">Recibo de Pago</h1>
+          <p className="text-gray-600">Orden #{id}</p>
         </div>
       </div>
 
-      {/* Contenido con estilos inline */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '24px',
-        borderRadius: '8px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-        maxWidth: '400px',
-        margin: '0 auto',
-        fontFamily: 'monospace',
-        fontSize: '12px'
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '14px', fontWeight: 'bold', margin: '0' }}>EL FOGÓN DE DON SOTO</h2>
-          <p style={{ fontSize: '12px', margin: '4px 0 0 0' }}>COMPROBANTE</p>
-        </div>
-        
-        <div style={{ fontSize: '12px', lineHeight: '1.5' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Orden:</span>
-            <span>#{id}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Mesa:</span>
-            <span>N/A</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Fecha:</span>
-            <span>{new Date().toLocaleDateString()}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Hora:</span>
-            <span>{new Date().toLocaleTimeString()}</span>
-          </div>
-        </div>
-
-        <div style={{ borderTop: '1px solid #d1d5db', marginTop: '16px', paddingTop: '16px' }}>
-          <div style={{ textAlign: 'center', color: '#6b7280' }}>
-            <p>Versión de emergencia - Sin datos dinámicos</p>
-          </div>
-        </div>
-
-        <div style={{ borderTop: '1px solid #d1d5db', marginTop: '16px', paddingTop: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-            <span>TOTAL:</span>
-            <span>S/ 0.00</span>
-          </div>
-        </div>
-
-        <div style={{ 
-          borderTop: '1px solid #d1d5db', 
-          marginTop: '16px', 
-          paddingTop: '16px',
-          textAlign: 'center'
-        }}>
-          <p style={{ fontSize: '12px', margin: '0' }}>¡Gracias por su visita!</p>
-        </div>
+      {/* Receipt */}
+      <div className="max-w-md mx-auto">
+        <ReceiptFormat order={order} payment={payment} />
       </div>
 
-      {/* Mensaje temporal */}
-      <div style={{
-        backgroundColor: '#fef3c7',
-        padding: '16px',
-        borderRadius: '6px',
-        textAlign: 'center',
-        margin: '24px 0'
-      }}>
-        <p style={{ fontSize: '14px', color: '#92400e', margin: '0' }}>
-          ⚠️ Versión temporal de emergencia
-        </p>
-        <p style={{ fontSize: '12px', color: '#b45309', margin: '4px 0 0 0' }}>
-          Funcionalidad completa temporalmente deshabilitada
-        </p>
-      </div>
-
-      {/* Botón deshabilitado */}
-      <div style={{ textAlign: 'center' }}>
+      {/* Bluetooth Buttons */}
+      <div className="flex gap-4 justify-center">
         <button
-          disabled
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#d1d5db',
-            color: '#6b7280',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'not-allowed'
-          }}
+          onClick={handlePrintBluetooth}
+          disabled={isPrinting || !order || !payment}
+          className={`px-6 py-3 rounded-lg font-medium ${
+            isPrinting || !order || !payment
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
         >
-          Imprimir Bluetooth (Deshabilitado)
+          {isPrinting ? 'Imprimiendo...' : 'Imprimir Bluetooth'}
+        </button>
+        
+        <button
+          onClick={handleTestPrinter}
+          disabled={isTesting}
+          className={`px-6 py-3 rounded-lg font-medium ${
+            isTesting
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-green-600 text-white hover:bg-green-700'
+          }`}
+        >
+          {isTesting ? 'Probando...' : 'Probar Impresora'}
         </button>
       </div>
     </div>
