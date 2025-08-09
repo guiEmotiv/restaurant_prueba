@@ -13,6 +13,7 @@ const OrderReceipt = () => {
   const [error, setError] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isQZAvailable, setIsQZAvailable] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,9 +39,18 @@ const OrderReceipt = () => {
       }
     };
 
+    // Check if QZ Tray is available
+    const checkQZAvailability = () => {
+      setIsQZAvailable(typeof window.qz !== 'undefined');
+    };
+
     if (id) {
       fetchData();
     }
+    
+    checkQZAvailability();
+    // Check again after a delay in case QZ loads later
+    setTimeout(checkQZAvailability, 1000);
   }, [id]);
 
   const handlePrintBluetooth = async () => {
@@ -66,6 +76,37 @@ const OrderReceipt = () => {
     } catch (error) {
       console.error('Error testing printer:', error);
       alert('Error al probar impresora: ' + error.message);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  // QZ Tray handlers for UTF-8 support
+  const handlePrintQZTray = async () => {
+    if (!order || !payment || isPrinting) return;
+    
+    try {
+      setIsPrinting(true);
+      await bluetoothPrinter.printPaymentReceiptQZ({ order, payment });
+      alert('✅ Ticket impreso con caracteres especiales (QZ Tray)');
+    } catch (error) {
+      console.error('Error printing with QZ Tray:', error);
+      alert('Error al imprimir con QZ Tray: ' + error.message + '\n\nAsegúrese de que QZ Tray esté instalado y ejecutándose.');
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleTestQZTray = async () => {
+    if (isTesting) return;
+    
+    try {
+      setIsTesting(true);
+      await bluetoothPrinter.printTestQZ();
+      alert('✅ Test QZ Tray completado con caracteres especiales');
+    } catch (error) {
+      console.error('Error testing QZ Tray:', error);
+      alert('Error en test QZ Tray: ' + error.message + '\n\nAsegúrese de que QZ Tray esté instalado y ejecutándose.');
     } finally {
       setIsTesting(false);
     }
@@ -126,30 +167,76 @@ const OrderReceipt = () => {
       </div>
 
       {/* Bluetooth Buttons */}
-      <div className="flex gap-4 justify-center">
-        <button
-          onClick={handlePrintBluetooth}
-          disabled={isPrinting || !order || !payment}
-          className={`px-6 py-3 rounded-lg font-medium ${
-            isPrinting || !order || !payment
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          {isPrinting ? 'Imprimiendo...' : 'Imprimir Bluetooth'}
-        </button>
-        
-        <button
-          onClick={handleTestPrinter}
-          disabled={isTesting}
-          className={`px-6 py-3 rounded-lg font-medium ${
-            isTesting
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-green-600 text-white hover:bg-green-700'
-          }`}
-        >
-          {isTesting ? 'Probando...' : 'Probar Impresora'}
-        </button>
+      <div className="space-y-4">
+        {/* Web Bluetooth API (método original) */}
+        <div>
+          <h3 className="text-lg font-medium mb-3 text-center text-gray-700">Web Bluetooth API (Original)</h3>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={handlePrintBluetooth}
+              disabled={isPrinting || !order || !payment}
+              className={`px-6 py-3 rounded-lg font-medium ${
+                isPrinting || !order || !payment
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {isPrinting ? 'Imprimiendo...' : 'Imprimir Bluetooth'}
+            </button>
+            
+            <button
+              onClick={handleTestPrinter}
+              disabled={isTesting}
+              className={`px-6 py-3 rounded-lg font-medium ${
+                isTesting
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              {isTesting ? 'Probando...' : 'Probar Impresora'}
+            </button>
+          </div>
+          <p className="text-sm text-gray-500 text-center mt-2">
+            ⚠️ Caracteres especiales pueden no imprimirse correctamente
+          </p>
+        </div>
+
+        {/* QZ Tray (método mejorado) */}
+        <div>
+          <h3 className="text-lg font-medium mb-3 text-center text-purple-700">QZ Tray (UTF-8 Completo)</h3>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={handlePrintQZTray}
+              disabled={isPrinting || !order || !payment || !isQZAvailable}
+              className={`px-6 py-3 rounded-lg font-medium ${
+                isPrinting || !order || !payment || !isQZAvailable
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}
+            >
+              {isPrinting ? 'Imprimiendo...' : '🎫 Imprimir QZ Tray'}
+            </button>
+            
+            <button
+              onClick={handleTestQZTray}
+              disabled={isTesting || !isQZAvailable}
+              className={`px-6 py-3 rounded-lg font-medium ${
+                isTesting || !isQZAvailable
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-orange-600 text-white hover:bg-orange-700'
+              }`}
+            >
+              {isTesting ? 'Probando...' : '🔧 Test QZ Tray'}
+            </button>
+          </div>
+          <div className="text-sm text-center mt-2">
+            {isQZAvailable ? (
+              <p className="text-green-600">✅ QZ Tray disponible - Soporta FOGÓN y ¡ correctamente</p>
+            ) : (
+              <p className="text-red-600">❌ QZ Tray no detectado - Instale QZ Tray y cargue qz-tray.js</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
