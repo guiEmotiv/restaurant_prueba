@@ -19,12 +19,14 @@ import {
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const TablePaymentEcommerce = () => {
   const { tableId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { showSuccess, showError } = useToast();
+  const { hasPermission } = useAuth();
   
   // Estados principales
   const [table, setTable] = useState(null);
@@ -408,7 +410,8 @@ const TablePaymentEcommerce = () => {
       {/* Header fijo */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* Info de la mesa y pedido */}
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate(`/table/${tableId}/order-edit`, { state: { orderId: orderId }})}
@@ -418,10 +421,10 @@ const TablePaymentEcommerce = () => {
               </button>
               
               <div>
-                <h1 className="text-lg font-bold text-gray-900">
-                  Procesar Pago - Mesa {table.table_number}
+                <h1 className="text-base sm:text-lg font-bold text-gray-900">
+                  Mesa {table.table_number} - Procesar Pago
                 </h1>
-                <p className="text-sm text-gray-600 flex items-center gap-2">
+                <p className="text-xs sm:text-sm text-gray-600 flex flex-wrap items-center gap-2">
                   <span>Pedido #{order.id}</span>
                   <span>•</span>
                   <span>{table.zone_name}</span>
@@ -429,7 +432,7 @@ const TablePaymentEcommerce = () => {
                     <>
                       <span>•</span>
                       <Users className="h-3 w-3" />
-                      <span>{table.capacity} personas</span>
+                      <span>{table.capacity}</span>
                     </>
                   )}
                 </p>
@@ -485,14 +488,6 @@ const TablePaymentEcommerce = () => {
             ) : (
               // Si no hay pagos parciales, mostrar ambas opciones
               <>
-                <div className="text-center mb-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                    ¿Cómo desea procesar el pago?
-                  </h2>
-                  <p className="text-gray-600">
-                    Seleccione el tipo de pago que mejor se adapte a sus necesidades
-                  </p>
-                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Pago Completo */}
@@ -509,8 +504,8 @@ const TablePaymentEcommerce = () => {
                     <p className="text-gray-600 text-sm">
                       Un solo pago por el total de la cuenta
                     </p>
-                    <div className="mt-3 text-xl font-bold text-blue-600">
-                      {formatCurrency(order.total_amount)}
+                    <div className="mt-3 text-sm text-blue-600 font-medium">
+                      {order.items?.length || 0} items disponibles
                     </div>
                   </button>
 
@@ -828,7 +823,8 @@ const TablePaymentEcommerce = () => {
                     />
                   </div>
 
-                  {/* Botón único para procesar pago */}
+                  {/* Botón único para procesar pago - Solo admin */}
+                  {hasPermission('canManagePayments') && (
                   <div className="space-y-2">
                     <button
                       onClick={handlePartialPayment}
@@ -860,6 +856,7 @@ const TablePaymentEcommerce = () => {
                       </button>
                     )}
                   </div>
+                  )}
                 </div>
 
                 {/* Información de pagos realizados */}

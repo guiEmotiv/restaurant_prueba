@@ -174,7 +174,7 @@ const PaymentHistory = () => {
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="text-sm font-medium text-gray-900">
-                        Orden #{order.id}
+                        {order.id}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -230,7 +230,7 @@ const PaymentHistory = () => {
                     {/* Order header */}
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">Orden #{order.id}</h3>
+                        <h3 className="text-lg font-bold text-gray-900">#{order.id}</h3>
                         <p className="text-sm text-gray-600">Mesa {order.table_number}</p>
                         <p className="text-xs text-gray-500">{order.zone_name}</p>
                       </div>
