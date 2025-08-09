@@ -20,8 +20,6 @@ import Containers from './pages/config/Containers';
 import Groups from './pages/inventory/Groups';
 import Ingredients from './pages/inventory/Ingredients';
 import Recipes from './pages/inventory/Recipes';
-import OrderDetail from './pages/operation/OrderDetail';
-import Payment from './pages/operation/Payment';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import Kitchen from './pages/operation/Kitchen';
 
@@ -121,16 +119,6 @@ const AppContent = () => {
           } />
 
           {/* Operation routes */}
-          <Route path="/orders/:id" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <OrderDetail />
-            </ProtectedRoute>
-          } />
-          <Route path="/orders/:id/payment" element={
-            <ProtectedRoute requiredPermission="canManagePayments">
-              <Payment />
-            </ProtectedRoute>
-          } />
           <Route path="/kitchen" element={
             <RoleProtectedRoute requiredPermission="canViewKitchen">
               <Kitchen />
