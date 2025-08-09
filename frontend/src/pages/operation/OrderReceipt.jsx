@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Receipt, Printer, DollarSign, Clock, User } from 'lucide-react';
 import Button from '../../components/common/Button';
+import ReceiptFormat from '../../components/ReceiptFormat';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import bluetoothPrinter from '../../services/bluetoothPrinter';
@@ -220,7 +221,12 @@ const OrderReceipt = () => {
       </div>
 
       {/* Receipt */}
-      <div className="bg-white rounded-lg shadow p-8 max-w-2xl mx-auto">
+      <div className="receipt-container max-w-2xl mx-auto">
+        <ReceiptFormat order={order} payment={payment} />
+      </div>
+
+      {/* Información adicional para web (no se imprime) */}
+      <div className="bg-white rounded-lg shadow p-8 max-w-2xl mx-auto no-print">
         {/* Restaurant Header */}
         <div className="text-center mb-8 border-b pb-4">
           <h2 className="text-3xl font-bold text-gray-900">EL FOGÓN DE DON SOTO</h2>

@@ -168,7 +168,7 @@ const OrderCreationModal = ({ isOpen, onClose, onSuccess }) => {
 
       await apiService.orders.create(orderData);
       
-      showSuccess('Orden creada exitosamente');
+      // Remover toast de éxito - la confirmación se maneja en la UI
       onSuccess();
       handleClose();
     } catch (error) {

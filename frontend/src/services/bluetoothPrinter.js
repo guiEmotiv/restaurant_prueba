@@ -198,9 +198,13 @@ class BluetoothPrinterService {
       await this.printText(`Mesa: ${paymentData.order.table_number}\n`);
       await this.printText(`Zona: ${paymentData.order.zone_name || 'N/A'}\n`);
       
+      // Agregar mesero si está disponible
+      if (paymentData.order.waiter) {
+        await this.printText(`Mesero: ${paymentData.order.waiter}\n`);
+      }
+      
       const now = new Date();
-      const fecha = now.toLocaleDateString('es-PE');
-      const hora = now.toLocaleTimeString('es-PE');
+      const { fecha, hora } = this.formatDateTime(now);
       await this.printText(`Fecha: ${fecha}\n`);
       await this.printText(`Hora: ${hora}\n\n`);
 
@@ -383,15 +387,33 @@ class BluetoothPrinterService {
   }
 
   /**
-   * Formatea cantidad como moneda peruana
+   * Formatea cantidad como moneda peruana sin caracteres especiales
    */
   formatCurrency(amount) {
     const value = parseFloat(amount) || 0;
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-      minimumFractionDigits: 2
-    }).format(value);
+    // Usar S/ en lugar del símbolo PEN que puede causar problemas en la impresora
+    return `S/ ${value.toFixed(2)}`;
+  }
+
+  /**
+   * Formatea fecha y hora sin caracteres especiales problemáticos
+   */
+  formatDateTime(date) {
+    const d = new Date(date);
+    
+    // Formatear fecha como DD/MM/YYYY
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const year = d.getFullYear();
+    const fecha = `${day}/${month}/${year}`;
+    
+    // Formatear hora como HH:MM:SS sin caracteres especiales
+    const hours = d.getHours().toString().padStart(2, '0');
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    const seconds = d.getSeconds().toString().padStart(2, '0');
+    const hora = `${hours}:${minutes}:${seconds}`;
+    
+    return { fecha, hora };
   }
 
   /**

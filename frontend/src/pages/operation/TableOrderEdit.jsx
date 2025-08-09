@@ -143,9 +143,29 @@ const TableOrderEdit = () => {
       return;
     }
 
-    if (window.confirm('¿Estás seguro de que deseas eliminar este item del pedido?')) {
+    const isLastItem = existingItems.length === 1 && newItems.length === 0;
+    
+    const confirmMessage = isLastItem 
+      ? '¿Estás seguro? Este es el último item del pedido. Al eliminarlo se eliminará toda la orden.'
+      : '¿Estás seguro de que deseas eliminar este item del pedido?';
+
+    if (window.confirm(confirmMessage)) {
       try {
         await apiService.orderItems.delete(itemId);
+        
+        // Si era el último item, eliminar la orden completa
+        if (isLastItem) {
+          try {
+            await apiService.orders.delete(order.id);
+            showSuccess('Orden eliminada (no quedaban items)');
+            navigate('/table-status');
+            return;
+          } catch (deleteOrderError) {
+            console.error('Error deleting order:', deleteOrderError);
+            // Continuar con el flujo normal si no se pudo eliminar la orden
+          }
+        }
+        
         setExistingItems(existingItems.filter(i => i.id !== itemId));
         showSuccess('Item eliminado del pedido');
         // Recargar orden para actualizar total
