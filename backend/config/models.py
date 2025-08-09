@@ -15,6 +15,7 @@ class Unit(models.Model):
         db_table = 'unit'
         verbose_name = 'Unidad'
         verbose_name_plural = 'Unidades'
+        ordering = ['-id']
 
     def __str__(self):
         return self.name
@@ -34,6 +35,7 @@ class Zone(models.Model):
         db_table = 'zone'
         verbose_name = 'Zona'
         verbose_name_plural = 'Zonas'
+        ordering = ['-id']
 
     def __str__(self):
         return self.name
@@ -54,6 +56,7 @@ class Table(models.Model):
         db_table = 'table'
         verbose_name = 'Mesa'
         verbose_name_plural = 'Mesas'
+        ordering = ['-id']
 
     def __str__(self):
         return f"Mesa {self.table_number} - {self.zone.name}"
@@ -85,7 +88,7 @@ class Container(models.Model):
         db_table = 'container'
         verbose_name = 'Envase'
         verbose_name_plural = 'Envases'
-        ordering = ['name']
+        ordering = ['-id']
 
     def __str__(self):
         return f"{self.name} - {self.price}"

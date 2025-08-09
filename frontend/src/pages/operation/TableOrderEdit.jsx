@@ -447,7 +447,7 @@ const TableOrderEdit = () => {
                               {item.has_taper && (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
                                   <Check className="h-3 w-3" />
-                                  Con taper
+                                  Con envase
                                 </span>
                               )}
                             </div>
@@ -690,7 +690,7 @@ const TableOrderEdit = () => {
                         className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                       />
                       <div className="flex-1">
-                        <span className="text-sm font-medium text-gray-700">Incluir taper/envase</span>
+                        <span className="text-sm font-medium text-gray-700">Incluir envase</span>
                         {containers.length > 0 && itemTaper && (
                           <div className="text-xs text-gray-500 mt-1">
                             {containers[0].name} - {formatCurrency(containers[0].price)}

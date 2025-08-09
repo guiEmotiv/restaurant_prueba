@@ -6,7 +6,8 @@ from django.db import transaction
 from backend.cognito_permissions import (
     CognitoAdminOnlyPermission, 
     CognitoWaiterAndAdminPermission, 
-    CognitoOrderStatusPermission
+    CognitoOrderStatusPermission,
+    CognitoPaymentPermission
 )
 from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
 from .serializers import (
@@ -328,7 +329,7 @@ class OrderItemIngredientViewSet(viewsets.ModelViewSet):
 
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all().order_by('-created_at')
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    permission_classes = [CognitoPaymentPermission]  # Solo administradores pueden procesar pagos
     serializer_class = PaymentSerializer
     
     def get_queryset(self):

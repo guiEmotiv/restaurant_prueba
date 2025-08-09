@@ -2,7 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from decimal import Decimal
-from config.models import Unit
+from config.models import Unit, Container
 
 
 class Group(models.Model):
@@ -14,6 +14,7 @@ class Group(models.Model):
         db_table = 'group'
         verbose_name = 'Grupo'
         verbose_name_plural = 'Grupos'
+        ordering = ['-id']
 
     def __str__(self):
         return self.name
@@ -46,6 +47,7 @@ class Ingredient(models.Model):
         db_table = 'ingredient'
         verbose_name = 'Ingrediente'
         verbose_name_plural = 'Ingredientes'
+        ordering = ['-id']
 
     def __str__(self):
         return f"{self.name} ({self.unit.name})"
@@ -72,6 +74,13 @@ class Ingredient(models.Model):
 class Recipe(models.Model):
     """Recetas del menú"""
     group = models.ForeignKey(Group, on_delete=models.PROTECT, null=True, blank=True)
+    container = models.ForeignKey(
+        Container, 
+        on_delete=models.PROTECT, 
+        null=True, 
+        blank=True,
+        help_text="Envase recomendado para pedidos para llevar"
+    )
     name = models.CharField(max_length=100)
     version = models.CharField(
         max_length=10, 
@@ -104,6 +113,7 @@ class Recipe(models.Model):
         verbose_name = 'Receta'
         verbose_name_plural = 'Recetas'
         unique_together = ['name', 'version']
+        ordering = ['-id']
 
     def __str__(self):
         return f"{self.name} v{self.version}"

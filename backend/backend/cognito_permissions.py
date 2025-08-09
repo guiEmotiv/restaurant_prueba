@@ -80,7 +80,7 @@ class CognitoOrderStatusPermission(permissions.BasePermission):
 class CognitoWaiterAndAdminPermission(permissions.BasePermission):
     """
     Solo meseros y administradores:
-    - Para estado de mesas, historial, pedidos, pagos
+    - Para estado de mesas, historial, pedidos (sin pagos)
     """
     
     def has_permission(self, request, view):
@@ -98,6 +98,22 @@ class CognitoWaiterAndAdminPermission(permissions.BasePermission):
             return True
             
         return False
+
+
+class CognitoPaymentPermission(permissions.BasePermission):
+    """
+    Solo administradores pueden procesar pagos
+    - Meseros y cocineros NO pueden procesar pagos
+    """
+    
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            hasattr(request.user, 'is_authenticated') and 
+            request.user.is_authenticated and
+            hasattr(request.user, 'is_admin') and
+            request.user.is_admin()
+        )
 
 
 class CognitoReadOnlyForNonAdmins(permissions.BasePermission):

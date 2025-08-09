@@ -185,25 +185,29 @@ def populate_database():
     
     # Recetas
     print("👨‍🍳 Creando recetas...")
+    containers = list(Container.objects.all())
     recipes_data = [
-        ("Parrillada Mixta", "Carnes", 45.00, 150.0, 25, "1.0"),
-        ("Lomo Saltado", "Carnes", 28.00, 140.0, 15, "1.0"),
-        ("Pollo a la Brasa", "Carnes", 25.00, 120.0, 30, "1.0"),
-        ("Costillas BBQ", "Carnes", 32.00, 130.0, 20, "1.0"),
-        ("Coca Cola Personal", "Bebidas", 5.00, 80.0, 2, "1.0"),
-        ("Cerveza Pilsen", "Bebidas", 8.00, 60.0, 2, "1.0"),
-        ("Agua Mineral", "Bebidas", 3.50, 70.0, 1, "1.0"),
-        ("Papas Fritas", "Verduras", 8.00, 200.0, 10, "1.0"),
-        ("Ensalada Mixta", "Verduras", 12.00, 150.0, 8, "1.0"),
-        ("Arroz Chaufa", "Cereales", 15.00, 180.0, 12, "1.0"),
+        ("Parrillada Mixta", "Carnes", 45.00, 150.0, 25, "1.0", "Bandeja Grande"),
+        ("Lomo Saltado", "Carnes", 28.00, 140.0, 15, "1.0", "Bandeja Grande"),
+        ("Pollo a la Brasa", "Carnes", 25.00, 120.0, 30, "1.0", "Bandeja Grande"),
+        ("Costillas BBQ", "Carnes", 32.00, 130.0, 20, "1.0", "Bandeja Grande"),
+        ("Coca Cola Personal", "Bebidas", 5.00, 80.0, 2, "1.0", "Botella Plástica"),
+        ("Cerveza Pilsen", "Bebidas", 8.00, 60.0, 2, "1.0", "Botella Plástica"),
+        ("Agua Mineral", "Bebidas", 3.50, 70.0, 1, "1.0", "Botella Plástica"),
+        ("Papas Fritas", "Verduras", 8.00, 200.0, 10, "1.0", "Bandeja Pequeña"),
+        ("Ensalada Mixta", "Verduras", 12.00, 150.0, 8, "1.0", "Bandeja Pequeña"),
+        ("Arroz Chaufa", "Cereales", 15.00, 180.0, 12, "1.0", "Bandeja Grande"),
     ]
     
+    created_objects["containers"] = {cont.name: cont for cont in containers}
     recipes = []
-    for name, group_name, price, profit, prep_time, version in recipes_data:
+    for name, group_name, price, profit, prep_time, version, container_name in recipes_data:
         group = created_objects["groups"][group_name]
+        container = created_objects["containers"][container_name]
         recipe = Recipe.objects.create(
             name=name,
             group=group,
+            container=container,
             version=version,
             base_price=Decimal(str(price)),
             profit_percentage=Decimal(str(profit)),

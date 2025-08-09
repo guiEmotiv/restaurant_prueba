@@ -8,14 +8,14 @@ import { useToast } from '../../contexts/ToastContext';
 const Recipes = () => {
   const { showSuccess, showError } = useToast();
   const [recipes, setRecipes] = useState([]);
+  const [filteredRecipes, setFilteredRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [groups, setGroups] = useState([]);
-  const [filters, setFilters] = useState({
-    name: '',
-    group: ''
-  });
+  const [nameFilter, setNameFilter] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
+  const [availableFilter, setAvailableFilter] = useState('');
 
   useEffect(() => {
     loadGroups();
@@ -23,8 +23,30 @@ const Recipes = () => {
   }, []);
 
   useEffect(() => {
-    loadRecipes();
-  }, [filters]);
+    // Filtrar recetas cuando cambian los filtros
+    let filtered = recipes;
+    
+    if (nameFilter) {
+      filtered = filtered.filter(recipe => 
+        recipe.name.toLowerCase().includes(nameFilter.toLowerCase())
+      );
+    }
+    
+    if (groupFilter) {
+      filtered = filtered.filter(recipe => 
+        recipe.group_id === parseInt(groupFilter)
+      );
+    }
+    
+    if (availableFilter !== '') {
+      const isAvailable = availableFilter === 'true';
+      filtered = filtered.filter(recipe => 
+        recipe.is_available === isAvailable
+      );
+    }
+    
+    setFilteredRecipes(filtered);
+  }, [recipes, nameFilter, groupFilter, availableFilter]);
 
   const loadGroups = async () => {
     try {
@@ -40,16 +62,10 @@ const Recipes = () => {
       setLoading(true);
       const params = { show_all: true };
       
-      // Add filters to params
-      if (filters.name) {
-        params.search = filters.name;
-      }
-      if (filters.group) {
-        params.group = filters.group;
-      }
-      
       const data = await apiService.recipes.getAll(params);
-      setRecipes(Array.isArray(data) ? data : []);
+      // Ordenar por ID descendente
+      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
+      setRecipes(sortedData);
     } catch (error) {
       console.error('Error loading recipes:', error);
       showError('Error al cargar las recetas');
@@ -166,7 +182,7 @@ const Recipes = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Buscar por nombre
@@ -177,8 +193,8 @@ const Recipes = () => {
               </div>
               <input
                 type="text"
-                value={filters.name}
-                onChange={(e) => setFilters({ ...filters, name: e.target.value })}
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
                 placeholder="Buscar receta..."
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
               />
@@ -190,17 +206,45 @@ const Recipes = () => {
               Filtrar por grupo
             </label>
             <select
-              value={filters.group}
-              onChange={(e) => setFilters({ ...filters, group: e.target.value })}
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
               className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
             >
-              <option value="">Todos los grupos</option>
+              <option value="">Todos ({recipes.length})</option>
               {groups.map((group) => (
                 <option key={group.id} value={group.id}>
-                  {group.name}
+                  {group.name} ({recipes.filter(r => r.group_id === group.id).length})
                 </option>
               ))}
             </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Filtrar por disponibilidad
+            </label>
+            <select
+              value={availableFilter}
+              onChange={(e) => setAvailableFilter(e.target.value)}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+            >
+              <option value="">Todas ({recipes.length})</option>
+              <option value="true">Disponibles ({recipes.filter(r => r.is_available).length})</option>
+              <option value="false">No disponibles ({recipes.filter(r => !r.is_available).length})</option>
+            </select>
+          </div>
+          
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setNameFilter('');
+                setGroupFilter('');
+                setAvailableFilter('');
+              }}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Limpiar filtros
+            </button>
           </div>
         </div>
       </div>
@@ -211,6 +255,9 @@ const Recipes = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ID
+                </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Nombre
                 </th>
@@ -243,13 +290,16 @@ const Recipes = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {recipes.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
                     No hay recetas disponibles
                   </td>
                 </tr>
               ) : (
-                recipes.map((recipe) => (
+                filteredRecipes.map((recipe) => (
                   <tr key={recipe.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                      {recipe.id}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center">
                         <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
@@ -348,7 +398,7 @@ const Recipes = () => {
             </div>
           ) : (
             <div className="space-y-3 p-4">
-              {recipes.map((recipe) => (
+              {filteredRecipes.map((recipe) => (
                 <div key={recipe.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="space-y-3">
                     {/* Recipe header */}

@@ -133,26 +133,24 @@ const OrderReceipt = () => {
           <button
             onClick={handlePrintBluetooth}
             disabled={isPrinting || !order || !payment}
-            className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
               isPrinting || !order || !payment
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
           >
-            <span>🖨️</span>
             {isPrinting ? 'Imprimiendo...' : 'Imprimir Ticket'}
           </button>
           
           <button
             onClick={handleTestPrinter}
             disabled={isTesting}
-            className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
               isTesting
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-green-600 text-white hover:bg-green-700'
             }`}
           >
-            <span>🔍</span>
             {isTesting ? 'Probando...' : 'Test Conexion'}
           </button>
         </div>

@@ -472,7 +472,7 @@ const TableOrderEcommerce = () => {
                           {item.has_taper && (
                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
                               <Check className="h-3 w-3" />
-                              Con taper
+                              Con envase
                             </span>
                           )}
                         </div>
@@ -575,7 +575,7 @@ const TableOrderEcommerce = () => {
                         onChange={(e) => setItemTaper(e.target.checked)}
                         className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                       />
-                      <span className="text-sm font-medium text-gray-700">Incluir taper/envase</span>
+                      <span className="text-sm font-medium text-gray-700">Incluir envase</span>
                     </label>
                   )}
                 </div>
