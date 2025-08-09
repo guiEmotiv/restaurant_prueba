@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
 import Button from '../../components/common/Button';
@@ -16,11 +16,7 @@ const OrderReceipt = () => {
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
 
-  useEffect(() => {
-    loadOrderDetails();
-  }, [id]);
-
-  const loadOrderDetails = async () => {
+  const loadOrderDetails = useCallback(async () => {
     try {
       setLoading(true);
       const [orderData, paymentsData] = await Promise.all([
@@ -36,13 +32,17 @@ const OrderReceipt = () => {
     } catch (error) {
       console.error('Error loading order details:', error);
       showError('Error al cargar los detalles de la orden');
-      navigate('/payment-history');
+      // REMOVIDO: navigate('/payment-history') - puede causar loops
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, showError]); // Dependencies específicas
 
-  const handleBluetoothPrint = async () => {
+  useEffect(() => {
+    loadOrderDetails();
+  }, [loadOrderDetails]);
+
+  const handleBluetoothPrint = useCallback(async () => {
     if (!order || !payment) {
       showError('No hay datos de orden o pago para imprimir');
       return;
@@ -63,38 +63,24 @@ const OrderReceipt = () => {
       showSuccess('Comprobante enviado a impresora Bluetooth');
     } catch (error) {
       console.error('Error printing via Bluetooth:', error);
-      
-      if (error.message.includes('Web Bluetooth no está soportado')) {
-        showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
-      } else if (error.message.includes('conexión')) {
-        showError('No se pudo conectar con la impresora. Verifica que esté encendida.');
-      } else {
-        showError(`Error de impresión Bluetooth: ${error.message}`);
-      }
+      showError('Error de impresión Bluetooth');
     } finally {
       setPrinting(false);
     }
-  };
+  }, [order, payment, showError, showSuccess]);
 
-  const handleTestPrint = async () => {
+  const handleTestPrint = useCallback(async () => {
     try {
       setPrinting(true);
       await bluetoothPrinter.printTest();
       showSuccess('Prueba de impresión completada');
     } catch (error) {
       console.error('Error in test print:', error);
-      
-      if (error.message.includes('Web Bluetooth no está soportado')) {
-        showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
-      } else if (error.message.includes('conexión')) {
-        showError('No se pudo conectar con la impresora. Verifica que esté encendida y el PIN sea 1234.');
-      } else {
-        showError(`Error de prueba de impresión: ${error.message}`);
-      }
+      showError('Error de prueba de impresión');
     } finally {
       setPrinting(false);
     }
-  };
+  }, [showError, showSuccess]);
 
   if (loading) {
     return (
