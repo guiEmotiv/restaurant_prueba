@@ -5,9 +5,9 @@ import {
   Table, 
   Plus, 
   Users, 
-  DollarSign,
   Clock,
-  ShoppingCart
+  ShoppingCart,
+  Filter
 } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -16,6 +16,9 @@ const Operations = () => {
   const { showError } = useToast();
   const [tables, setTables] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [orderItems, setOrderItems] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [selectedZone, setSelectedZone] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,12 +28,16 @@ const Operations = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tablesData, ordersData] = await Promise.all([
+      const [tablesData, ordersData, orderItemsData, zonesData] = await Promise.all([
         apiService.tables.getAll(),
-        apiService.orders.getAll()
+        apiService.orders.getAll(),
+        apiService.orderItems.getAll(),
+        apiService.zones.getAll()
       ]);
       setTables(Array.isArray(tablesData) ? tablesData : []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
+      setOrderItems(Array.isArray(orderItemsData) ? orderItemsData : []);
+      setZones(Array.isArray(zonesData) ? zonesData : []);
     } catch (error) {
       console.error('Error loading data:', error);
       showError('Error al cargar datos');
@@ -50,21 +57,26 @@ const Operations = () => {
     return tableOrders.length > 0 ? 'occupied' : 'available';
   };
 
-  const getTotalAmount = (tableId) => {
+  const getTableItemsStatus = (tableId) => {
     const tableOrders = getTableOrders(tableId);
-    return tableOrders.reduce((total, order) => total + parseFloat(order.total_amount || 0), 0);
+    const allOrderIds = tableOrders.map(order => order.id);
+    const tableOrderItems = orderItems.filter(item => allOrderIds.includes(item.order));
+    
+    const servedItems = tableOrderItems.filter(item => item.status === 'SERVED').length;
+    const totalItems = tableOrderItems.length;
+    
+    return { served: servedItems, total: totalItems };
   };
 
   const getOrdersCount = (tableId) => {
     return getTableOrders(tableId).length;
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN'
-    }).format(amount);
+  const getFilteredTables = () => {
+    if (!selectedZone) return tables;
+    return tables.filter(table => table.zone === parseInt(selectedZone));
   };
+
 
   const handleTableClick = (table) => {
     const status = getTableStatus(table.id);
@@ -98,35 +110,50 @@ const Operations = () => {
     );
   }
 
-  const availableTables = tables.filter(table => getTableStatus(table.id) === 'available');
-  const occupiedTables = tables.filter(table => getTableStatus(table.id) === 'occupied');
+  const filteredTables = getFilteredTables();
+  const availableTables = filteredTables.filter(table => getTableStatus(table.id) === 'available');
+  const occupiedTables = filteredTables.filter(table => getTableStatus(table.id) === 'occupied');
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
       {/* Header fijo */}
       <div className="fixed top-0 left-0 right-0 bg-white shadow-sm z-40 px-4 py-3 border-b">
-        <div className="flex items-center gap-2">
-          <ShoppingCart className="h-5 w-5 text-blue-600" />
-          <h1 className="text-lg font-bold text-gray-900">Operaciones</h1>
+        <h1 className="text-lg font-bold text-gray-900 text-center">Operaciones</h1>
+        
+        {/* Filtro por zona */}
+        <div className="mt-3">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-400" />
+            <select
+              value={selectedZone}
+              onChange={(e) => setSelectedZone(e.target.value)}
+              className="flex-1 text-sm border border-gray-200 rounded px-2 py-1"
+            >
+              <option value="">Todas las zonas</option>
+              {zones.map(zone => (
+                <option key={zone.id} value={zone.id}>{zone.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <p className="text-xs text-gray-500 mt-1">Gestión de mesas y pedidos</p>
       </div>
 
-      <div className="pt-20 px-3 space-y-5">
+      <div className="pt-24 px-3 space-y-5">
         {/* Mesas Ocupadas */}
         {occupiedTables.length > 0 && (
           <section>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+            <div className="text-center mb-4">
               <h2 className="text-sm font-semibold text-gray-800">
                 Mesas Ocupadas ({occupiedTables.length})
               </h2>
+              <div className="w-3 h-3 bg-red-500 rounded-full mx-auto mt-1"></div>
             </div>
             
             <div className="grid grid-cols-1 gap-3">
               {occupiedTables.map((table) => {
                 const ordersCount = getOrdersCount(table.id);
-                const totalAmount = getTotalAmount(table.id);
+                const itemsStatus = getTableItemsStatus(table.id);
+                const zoneName = zones.find(zone => zone.id === table.zone)?.name || 'Sin zona';
                 
                 return (
                   <div 
@@ -143,8 +170,8 @@ const Operations = () => {
                             <Table className="h-5 w-5 text-red-600" />
                           </div>
                           <div>
-                            <h3 className="text-base font-semibold text-gray-900">Mesa {table.number}</h3>
-                            <p className="text-xs text-gray-500">{table.zone_name || 'Sin zona'}</p>
+                            <h3 className="text-base font-semibold text-gray-900">{table.name}</h3>
+                            <p className="text-xs text-gray-500">{zoneName}</p>
                           </div>
                         </div>
                         <div className="w-3 h-3 bg-red-500 rounded-full"></div>
@@ -158,20 +185,20 @@ const Operations = () => {
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-700">
-                            {formatCurrency(totalAmount)}
+                          <Clock className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-700">
+                            {itemsStatus.served}/{itemsStatus.total} items
                           </span>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="px-4 pb-4">
+                    <div className="px-4 pb-3">
                       <button
                         onClick={(e) => handleNewOrder(table, e)}
-                        className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-1"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-3 w-3" />
                         Nueva Cuenta
                       </button>
                     </div>
@@ -185,32 +212,36 @@ const Operations = () => {
         {/* Mesas Disponibles */}
         {availableTables.length > 0 && (
           <section>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <div className="text-center mb-4">
               <h2 className="text-sm font-semibold text-gray-800">
                 Mesas Disponibles ({availableTables.length})
               </h2>
+              <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mt-1"></div>
             </div>
             
             <div className="grid grid-cols-2 gap-3">
-              {availableTables.map((table) => (
-                <div 
-                  key={table.id}
-                  onClick={() => handleTableClick(table)}
-                  className="bg-white rounded-lg shadow-sm border border-green-100 p-4 cursor-pointer hover:bg-green-50 transition-colors"
-                >
-                  <div className="flex flex-col items-center text-center gap-3">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Table className="h-6 w-6 text-green-600" />
+              {availableTables.map((table) => {
+                const zoneName = zones.find(zone => zone.id === table.zone)?.name || 'Sin zona';
+                
+                return (
+                  <div 
+                    key={table.id}
+                    onClick={() => handleTableClick(table)}
+                    className="bg-white rounded-lg shadow-sm border border-green-100 p-4 cursor-pointer hover:bg-green-50 transition-colors"
+                  >
+                    <div className="flex flex-col items-center text-center gap-3">
+                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <Table className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">{table.name}</h3>
+                        <p className="text-xs text-gray-500 mt-1">{zoneName}</p>
+                      </div>
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900">Mesa {table.number}</h3>
-                      <p className="text-xs text-gray-500 mt-1">{table.zone_name || 'Sin zona'}</p>
-                    </div>
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}

@@ -129,18 +129,14 @@ const OrderManage = () => {
       {/* Header fijo */}
       <div className="fixed top-0 left-0 right-0 bg-white shadow-sm z-40 px-4 py-3 border-b">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/operations')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">Mesa {table?.number}</h1>
-              <p className="text-xs text-gray-500">{orders.length} cuenta{orders.length !== 1 ? 's' : ''} activa{orders.length !== 1 ? 's' : ''}</p>
-            </div>
-          </div>
+          <button
+            onClick={() => navigate('/operations')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 text-gray-600" />
+          </button>
+          
+          <h1 className="text-lg font-bold text-gray-900">{table?.name}</h1>
           
           <button
             onClick={handleNewOrder}

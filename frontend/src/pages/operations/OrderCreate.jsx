@@ -5,10 +5,12 @@ import {
   ArrowLeft,
   Search,
   Plus,
-  Minus,
   ShoppingCart,
   X,
-  DollarSign
+  Trash2,
+  StickyNote,
+  Package,
+  Filter
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 
@@ -19,9 +21,16 @@ const OrderCreate = () => {
   
   const [table, setTable] = useState(null);
   const [recipes, setRecipes] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [containers, setContainers] = useState([]);
   const [cart, setCart] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState('');
   const [showCart, setShowCart] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [itemNotes, setItemNotes] = useState('');
+  const [isForTakeaway, setIsForTakeaway] = useState(false);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
@@ -32,12 +41,16 @@ const OrderCreate = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tableData, recipesData] = await Promise.all([
+      const [tableData, recipesData, groupsData, containersData] = await Promise.all([
         apiService.tables.getById(tableId),
-        apiService.recipes.getAll()
+        apiService.recipes.getAll(),
+        apiService.groups.getAll(),
+        apiService.containers.getAll()
       ]);
       setTable(tableData);
       setRecipes(Array.isArray(recipesData) ? recipesData : []);
+      setGroups(Array.isArray(groupsData) ? groupsData : []);
+      setContainers(Array.isArray(containersData) ? containersData : []);
     } catch (error) {
       console.error('Error loading data:', error);
       showError('Error al cargar datos');
@@ -46,37 +59,58 @@ const OrderCreate = () => {
     }
   };
 
-  const filteredRecipes = recipes.filter(recipe =>
-    recipe.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRecipes = recipes.filter(recipe => {
+    const matchesSearch = recipe.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGroup = !selectedGroup || recipe.group === parseInt(selectedGroup);
+    return matchesSearch && matchesGroup;
+  });
 
   const addToCart = (recipe) => {
-    const existingItem = cart.find(item => item.recipe.id === recipe.id);
-    if (existingItem) {
-      setCart(cart.map(item =>
-        item.recipe.id === recipe.id
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      ));
-    } else {
-      setCart([...cart, { recipe, quantity: 1 }]);
-    }
+    setSelectedItem(recipe);
+    setItemNotes('');
+    setIsForTakeaway(false);
+    setShowNotesModal(true);
   };
 
-  const updateQuantity = (recipeId, newQuantity) => {
-    if (newQuantity <= 0) {
-      setCart(cart.filter(item => item.recipe.id !== recipeId));
+  const confirmAddToCart = () => {
+    if (!selectedItem) return;
+    
+    const containerPrice = isForTakeaway ? (containers[0]?.price || 0) : 0;
+    const totalPrice = parseFloat(selectedItem.price || 0) + containerPrice;
+    
+    const cartItem = {
+      recipe: selectedItem,
+      quantity: 1,
+      notes: itemNotes,
+      isForTakeaway,
+      containerPrice,
+      unitPrice: totalPrice
+    };
+    
+    const existingItemIndex = cart.findIndex(item => 
+      item.recipe.id === selectedItem.id && 
+      item.notes === itemNotes && 
+      item.isForTakeaway === isForTakeaway
+    );
+    
+    if (existingItemIndex >= 0) {
+      const updatedCart = [...cart];
+      updatedCart[existingItemIndex].quantity += 1;
+      setCart(updatedCart);
     } else {
-      setCart(cart.map(item =>
-        item.recipe.id === recipeId
-          ? { ...item, quantity: newQuantity }
-          : item
-      ));
+      setCart([...cart, cartItem]);
     }
+    
+    setShowNotesModal(false);
+    setSelectedItem(null);
+  };
+
+  const removeFromCart = (index) => {
+    setCart(cart.filter((_, i) => i !== index));
   };
 
   const getCartTotal = () => {
-    return cart.reduce((total, item) => total + (item.recipe.price * item.quantity), 0);
+    return cart.reduce((total, item) => total + (item.unitPrice * item.quantity), 0);
   };
 
   const getCartItemsCount = () => {
@@ -111,8 +145,10 @@ const OrderCreate = () => {
           order: order.id,
           recipe: item.recipe.id,
           quantity: item.quantity,
-          unit_price: item.recipe.price,
-          total_price: item.recipe.price * item.quantity
+          unit_price: item.unitPrice,
+          total_price: item.unitPrice * item.quantity,
+          notes: item.notes || '',
+          is_takeaway: item.isForTakeaway || false
         });
       }
 
@@ -149,18 +185,14 @@ const OrderCreate = () => {
       {/* Header fijo */}
       <div className="fixed top-0 left-0 right-0 bg-white shadow-sm z-40 px-4 py-3 border-b">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/operations')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">Nueva Cuenta</h1>
-              <p className="text-xs text-gray-500">Mesa {table?.number}</p>
-            </div>
-          </div>
+          <button
+            onClick={() => navigate('/operations')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 text-gray-600" />
+          </button>
+          
+          <h1 className="text-lg font-bold text-gray-900">Nueva Cuenta</h1>
           
           <button
             onClick={() => setShowCart(true)}
@@ -177,8 +209,8 @@ const OrderCreate = () => {
       </div>
 
       <div className="pt-20 px-3">
-        {/* Buscador */}
-        <div className="mb-4">
+        {/* Filtros */}
+        <div className="mb-4 space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
@@ -188,6 +220,20 @@ const OrderCreate = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-400" />
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+              className="flex-1 text-sm border border-gray-200 rounded px-2 py-1"
+            >
+              <option value="">Todos los grupos</option>
+              {groups.map(group => (
+                <option key={group.id} value={group.id}>{group.name}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -241,27 +287,32 @@ const OrderCreate = () => {
                 <p className="text-gray-500 text-center py-8">Carrito vacío</p>
               ) : (
                 <div className="space-y-3">
-                  {cart.map((item) => (
-                    <div key={item.recipe.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{item.recipe.name}</h3>
-                        <p className="text-sm text-gray-600">{formatCurrency(item.recipe.price)}</p>
+                  {cart.map((item, index) => (
+                    <div key={index} className="p-3 border rounded-lg">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900">{item.recipe.name}</h3>
+                          <p className="text-sm text-gray-600">{formatCurrency(item.unitPrice)} × {item.quantity}</p>
+                          {item.notes && (
+                            <p className="text-xs text-blue-600 mt-1">📝 {item.notes}</p>
+                          )}
+                          {item.isForTakeaway && (
+                            <p className="text-xs text-orange-600 mt-1">📦 Para llevar (+{formatCurrency(item.containerPrice)})</p>
+                          )}
+                        </div>
+                        
+                        <button
+                          onClick={() => removeFromCart(index)}
+                          className="p-2 hover:bg-red-100 rounded text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                       
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => updateQuantity(item.recipe.id, item.quantity - 1)}
-                          className="p-1 hover:bg-gray-100 rounded"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="w-8 text-center font-medium">{item.quantity}</span>
-                        <button
-                          onClick={() => updateQuantity(item.recipe.id, item.quantity + 1)}
-                          className="p-1 hover:bg-gray-100 rounded"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-green-600">
+                          {formatCurrency(item.unitPrice * item.quantity)}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -287,6 +338,95 @@ const OrderCreate = () => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de notas */}
+      {showNotesModal && selectedItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-xl overflow-hidden">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Agregar Item</h2>
+              <button
+                onClick={() => setShowNotesModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-4">
+              <div className="mb-4">
+                <h3 className="font-semibold text-gray-900 mb-1">{selectedItem.name}</h3>
+                <p className="text-sm text-gray-600">{selectedItem.description}</p>
+                <p className="text-lg font-bold text-green-600 mt-2">
+                  {formatCurrency(selectedItem.price || 0)}
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <StickyNote className="h-4 w-4 inline mr-1" />
+                    Notas especiales
+                  </label>
+                  <textarea
+                    value={itemNotes}
+                    onChange={(e) => setItemNotes(e.target.value)}
+                    placeholder="Ej: Sin cebolla, extra queso..."
+                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    rows="3"
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-orange-600" />
+                    <span className="font-medium text-gray-900">Para llevar</span>
+                    {containers.length > 0 && (
+                      <span className="text-sm text-gray-500">
+                        (+{formatCurrency(containers[0]?.price || 0)})
+                      </span>
+                    )}
+                  </div>
+                  
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isForTakeaway}
+                      onChange={(e) => setIsForTakeaway(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+                
+                {isForTakeaway && (
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <p className="text-sm text-orange-800">
+                      Se añadirá automáticamente el costo del envase al precio del item.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-4 border-t bg-gray-50">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium text-gray-900">Total:</span>
+                <span className="text-lg font-bold text-green-600">
+                  {formatCurrency((selectedItem.price || 0) + (isForTakeaway ? (containers[0]?.price || 0) : 0))}
+                </span>
+              </div>
+              
+              <button
+                onClick={confirmAddToCart}
+                className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                Agregar al Carrito
+              </button>
+            </div>
           </div>
         </div>
       )}
