@@ -130,43 +130,44 @@ const OrderCreate = () => {
     try {
       setCreating(true);
       
-      // Datos de la orden con formato correcto
+      // Preparar items para la orden
+      const orderItems = cart.map(item => ({
+        recipe: item.recipe.id,
+        quantity: parseInt(item.quantity),
+        unit_price: parseFloat((item.unitPrice || 0).toFixed(2)),
+        total_price: parseFloat((item.unitPrice * item.quantity || 0).toFixed(2)),
+        notes: item.notes || ''
+      }));
+
+      // Datos de la orden con items incluidos
       const orderData = {
         table: parseInt(tableId),
         total_amount: parseFloat(getCartTotal().toFixed(2)),
-        status: 'CREATED'
+        items: orderItems
       };
 
       console.log('Creating order with data:', orderData);
-      const order = await apiService.orders.create(orderData);
-      console.log('Order created:', order);
-
-      // Crear items de la orden
-      for (const item of cart) {
-        const orderItemData = {
-          order: order.id,
-          recipe: item.recipe.id,
-          quantity: parseInt(item.quantity),
-          unit_price: parseFloat((item.unitPrice || 0).toFixed(2)),
-          total_price: parseFloat((item.unitPrice * item.quantity || 0).toFixed(2)),
-          notes: item.notes || '',
-          status: 'CREATED'
-        };
-
-        console.log('Creating order item:', orderItemData);
-        await apiService.orderItems.create(orderItemData);
-      }
+      const result = await apiService.orders.create(orderData);
+      console.log('Order created:', result);
 
       showSuccess('Pedido creado exitosamente');
       navigate(`/operations/table/${tableId}/manage`);
     } catch (error) {
       console.error('Error creating order:', error);
       console.error('Error details:', error.response?.data);
-      const errorMessage = error.response?.data?.detail || 
-                           error.response?.data?.error || 
-                           error.response?.data?.message ||
-                           'Error al crear el pedido';
-      showError(errorMessage);
+      
+      // Mostrar detalles específicos del error de validación
+      if (error.response?.data?.items) {
+        const validationErrors = error.response.data.items;
+        console.error('Validation errors:', validationErrors);
+        showError('Error de validación: ' + JSON.stringify(validationErrors));
+      } else {
+        const errorMessage = error.response?.data?.detail || 
+                             error.response?.data?.error || 
+                             error.response?.data?.message ||
+                             'Error al crear el pedido';
+        showError(errorMessage);
+      }
     } finally {
       setCreating(false);
     }
@@ -205,15 +206,10 @@ const OrderCreate = () => {
           <h1 className="text-lg font-bold text-gray-900">Nueva Cuenta</h1>
           
           <button
-            onClick={() => setShowCart(true)}
-            className="relative p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => navigate('/operations')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <ShoppingCart className="h-5 w-5" />
-            {getCartItemsCount() > 0 && (
-              <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium">
-                {getCartItemsCount()}
-              </div>
-            )}
+            <X className="h-5 w-5 text-gray-600" />
           </button>
         </div>
       </div>
@@ -254,17 +250,20 @@ const OrderCreate = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-900">{recipe.name || 'Sin nombre'}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{recipe.description || 'Sin descripción'}</p>
                   <p className="text-lg font-bold text-green-600 mt-2">
-                    {formatCurrency(recipe.price || 0)}
+                    {formatCurrency(parseFloat(recipe.price) || 0)}
                   </p>
                 </div>
                 
                 <div className="ml-4 space-y-2">
                   <button
                     onClick={() => {
-                      const containerPrice = 0;
-                      const totalPrice = parseFloat(recipe.price || 0);
+                      const totalPrice = parseFloat(recipe.price) || 0;
+                      
+                      if (totalPrice === 0) {
+                        showError('Esta receta no tiene precio configurado');
+                        return;
+                      }
                       
                       const cartItem = {
                         recipe,
@@ -311,6 +310,19 @@ const OrderCreate = () => {
           </div>
         )}
       </div>
+
+      {/* Botón carrito flotante */}
+      <button
+        onClick={() => setShowCart(true)}
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+      >
+        <ShoppingCart className="h-6 w-6" />
+        {getCartItemsCount() > 0 && (
+          <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-medium">
+            {getCartItemsCount()}
+          </div>
+        )}
+      </button>
 
       {/* Modal del carrito */}
       {showCart && (
@@ -412,7 +424,7 @@ const OrderCreate = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    📝 Notas especiales
+                    Notas especiales
                   </label>
                   <textarea
                     value={itemNotes}
@@ -425,7 +437,6 @@ const OrderCreate = () => {
                 
                 <div className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-2">
-                    <span className="text-orange-600">📦</span>
                     <span className="font-medium text-gray-900">Para llevar</span>
                     {containers.length > 0 && (
                       <span className="text-sm text-gray-500">

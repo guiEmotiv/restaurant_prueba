@@ -149,14 +149,9 @@ const Operations = () => {
           const availableZoneTables = zoneTables.filter(table => getTableStatus(table.id) === 'available');
           
           return (
-            <div key={zone.id} className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-100">
+            <div key={zone.id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-white px-4 py-3 border-b border-gray-100">
                 <h2 className="text-lg font-bold text-gray-900 text-center">{zone.name}</h2>
-                <p className="text-xs text-gray-600 text-center mt-1">
-                  {zoneTables.length} mesa{zoneTables.length !== 1 ? 's' : ''} • 
-                  {occupiedZoneTables.length} ocupada{occupiedZoneTables.length !== 1 ? 's' : ''} • 
-                  {availableZoneTables.length} disponible{availableZoneTables.length !== 1 ? 's' : ''}
-                </p>
               </div>
               
               <div className="p-4">
