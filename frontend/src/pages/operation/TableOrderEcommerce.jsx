@@ -240,47 +240,35 @@ const TableOrderEcommerce = () => {
 
   return (
     <div className="fixed inset-0 bg-gray-50 flex flex-col h-full">
-      {/* Header fijo estilo moderno */}
+      {/* Header fijo compacto */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-4">
+        <div className="px-3 py-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-1">
               <button
                 onClick={() => navigate('/table-status')}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4" />
               </button>
               
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">
+              <div className="text-center flex-1">
+                <h1 className="text-sm font-bold text-gray-900">
                   Mesa {table.table_number}
                 </h1>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span>{table.zone_name}</span>
-                  {table.capacity && (
-                    <>
-                      <span>•</span>
-                      <Users className="h-4 w-4" />
-                      <span>{table.capacity} personas</span>
-                    </>
-                  )}
-                </div>
+                <p className="text-xs text-gray-600">{table.zone_name}</p>
               </div>
             </div>
 
-            {/* Carrito con estilo mejorado */}
+            {/* Carrito compacto */}
             <button
               onClick={() => setShowCart(!showCart)}
-              className="relative bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 flex items-center gap-3 shadow-lg transition-all duration-200 transform hover:scale-105"
+              className="relative bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
             >
-              <ShoppingCart className="h-5 w-5" />
-              <div className="flex flex-col items-start">
-                <span className="font-semibold text-sm">Carrito</span>
-                <span className="text-xs opacity-90">{formatCurrency(calculateCartTotal())}</span>
-              </div>
+              <ShoppingCart className="h-4 w-4" />
+              <span className="hidden sm:inline font-medium">{formatCurrency(calculateCartTotal())}</span>
               {getCartItemsCount() > 0 && (
-                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs font-bold animate-pulse">
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
                   {getCartItemsCount()}
                 </div>
               )}
@@ -292,112 +280,93 @@ const TableOrderEcommerce = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Panel principal del menú */}
         <div className={`flex-1 flex flex-col transition-all duration-300 ${showCart ? 'hidden sm:flex sm:mr-80' : 'flex'}`}>
-          {/* Filtros fijos */}
-          <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
-            <div className="space-y-3">
+          {/* Filtros compactos */}
+          <div className="bg-white border-b border-gray-200 p-2 shadow-sm">
+            <div className="space-y-2">
               {/* Buscador */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Buscar platos..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
               {/* Filtro por grupo */}
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-gray-600" />
-                <select
-                  value={selectedGroup}
-                  onChange={(e) => setSelectedGroup(e.target.value)}
-                  className="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                >
-                  <option value="all">Todos los grupos</option>
-                  {groups.map(group => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select
+                value={selectedGroup}
+                onChange={(e) => setSelectedGroup(e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="all">Todos los grupos</option>
+                {groups.map(group => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Grid de recetas scrollable */}
-          <div className="flex-1 overflow-y-auto p-4">
+          {/* Grid de recetas compacto */}
+          <div className="flex-1 overflow-y-auto p-2">
             {filteredRecipes.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron platos</h3>
-                  <p className="text-gray-500">
-                    {searchTerm ? 'Intenta con otros términos de búsqueda' : 'No hay platos disponibles en este momento'}
+                  <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                  <h3 className="text-sm font-medium text-gray-900 mb-1">No se encontraron platos</h3>
+                  <p className="text-xs text-gray-500">
+                    {searchTerm ? 'Intenta con otros términos' : 'No hay platos disponibles'}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                 {filteredRecipes.map((recipe) => (
                   <div
                     key={recipe.id}
-                    className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 group"
+                    className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-200"
                   >
-                    {/* Imagen placeholder con gradiente */}
-                    <div className="h-32 bg-gradient-to-br from-blue-50 to-indigo-100 relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-                      <div className="absolute top-2 right-2">
-                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-1">
-                          <Clock className="h-3 w-3 text-gray-600" />
-                        </div>
-                      </div>
-                      <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1">
-                        <span className="text-xs font-medium text-gray-700">{recipe.preparation_time}min</span>
-                      </div>
-                    </div>
-
-                    <div className="p-4">
+                    <div className="p-3">
                       {/* Header del item */}
-                      <div className="mb-3">
-                        <h3 className="font-semibold text-gray-900 text-base line-clamp-2 group-hover:text-blue-600 transition-colors">
+                      <div className="mb-2">
+                        <h3 className="font-semibold text-gray-900 text-xs line-clamp-2">
                           {recipe.name}
                         </h3>
-                        <p className="text-xs text-blue-600 font-medium mt-1">
+                        <p className="text-xs text-gray-600 mt-0.5">
                           {recipe.group_name || 'Sin grupo'}
                         </p>
                       </div>
 
-                      {/* Descripción */}
-                      {recipe.description && (
-                        <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
-                          {recipe.description}
-                        </p>
-                      )}
-
-                      {/* Precio destacado */}
-                      <div className="mb-4">
-                        <span className="text-2xl font-bold text-gray-900">
+                      {/* Precio y tiempo */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-gray-900">
                           {formatCurrency(recipe.base_price)}
+                        </span>
+                        <span className="text-xs text-gray-500 flex items-center gap-0.5">
+                          <Clock className="h-3 w-3" />
+                          {recipe.preparation_time}min
                         </span>
                       </div>
 
-                      {/* Botones de acción mejorados */}
-                      <div className="flex gap-2">
+                      {/* Botones de acción */}
+                      <div className="flex gap-1">
                         <button
                           onClick={() => handleQuickAdd(recipe)}
-                          className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-2 shadow-lg transform hover:scale-105"
+                          className="flex-1 bg-blue-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-1"
                         >
-                          <Plus className="h-4 w-4" />
+                          <Plus className="h-3 w-3" />
                           Agregar
                         </button>
                         <button
                           onClick={() => openItemModal(recipe)}
-                          className="px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 text-sm"
-                          title="Personalizar pedido"
+                          className="px-2 py-1.5 border border-gray-300 rounded hover:bg-gray-50 transition-colors text-xs"
+                          title="Personalizar"
                         >
-                          <StickyNote className="h-4 w-4" />
+                          <StickyNote className="h-3 w-3" />
                         </button>
                       </div>
                     </div>
@@ -416,97 +385,85 @@ const TableOrderEcommerce = () => {
           />
         )}
 
-        {/* Panel del carrito (sidebar) mejorado */}
+        {/* Panel del carrito compacto */}
         {showCart && (
-          <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-white border-l border-gray-200 shadow-2xl z-50 pt-20 sm:pt-0">
+          <div className="fixed right-0 top-0 h-full w-full sm:w-80 bg-white border-l border-gray-200 shadow-xl z-50 pt-12 sm:pt-0">
             <div className="flex flex-col h-full">
               {/* Header del carrito */}
-              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xl font-bold text-gray-900">Tu Pedido</h2>
+              <div className="p-3 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-gray-900">Tu Pedido</h2>
                   <button
                     onClick={() => setShowCart(false)}
-                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-white/50 rounded-lg transition-colors"
+                    className="p-1 text-gray-500 hover:text-gray-700 rounded transition-colors"
                   >
-                    <ArrowLeft className="h-5 w-5" />
+                    <ArrowLeft className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600">
-                    {getCartItemsCount()} {getCartItemsCount() === 1 ? 'producto' : 'productos'}
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-gray-600">
+                    {getCartItemsCount()} items
                   </p>
-                  <p className="text-lg font-bold text-blue-600">
+                  <p className="text-sm font-bold text-blue-600">
                     {formatCurrency(calculateCartTotal())}
                   </p>
                 </div>
               </div>
 
               {/* Items del carrito */}
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="flex-1 overflow-y-auto p-2">
                 {cart.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
-                      <div className="bg-gray-100 rounded-full p-6 w-24 h-24 mx-auto mb-4 flex items-center justify-center">
-                        <ShoppingCart className="h-12 w-12 text-gray-400" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Tu carrito está vacío</h3>
-                      <p className="text-gray-500">Agrega algunos platos deliciosos</p>
+                      <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">Carrito vacío</h3>
+                      <p className="text-xs text-gray-500">Agrega algunos platos</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {cart.map((item) => (
-                      <div key={item.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-start gap-3">
-                          {/* Imagen placeholder */}
-                          <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <span className="text-blue-600 font-bold text-lg">
-                              {item.recipe.name.charAt(0)}
-                            </span>
-                          </div>
-                          
+                      <div key={item.id} className="bg-gray-50 rounded border border-gray-200 p-2">
+                        <div className="flex items-start gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between mb-2">
-                              <h4 className="font-semibold text-gray-900 text-sm line-clamp-2">
+                            <div className="flex items-start justify-between">
+                              <h4 className="font-medium text-gray-900 text-xs line-clamp-1">
                                 {item.recipe.name}
                               </h4>
                               <button
                                 onClick={() => removeFromCart(item.id)}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded-lg transition-colors ml-2"
+                                className="text-red-500 hover:text-red-700 p-0.5 ml-1"
                               >
-                                <Minus className="h-4 w-4" />
+                                <Minus className="h-3 w-3" />
                               </button>
                             </div>
 
-                            <div className="flex items-center justify-between text-sm mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-500">Cant:</span>
-                                <span className="font-semibold bg-gray-100 px-2 py-1 rounded-md">{item.quantity}</span>
-                              </div>
-                              <span className="font-bold text-gray-900 text-base">
+                            <div className="flex items-center justify-between text-xs mt-1">
+                              <span className="text-gray-600">
+                                {item.quantity}x {formatCurrency(item.unit_price)}
+                              </span>
+                              <span className="font-semibold text-gray-900">
                                 {formatCurrency(item.unit_price * item.quantity)}
                               </span>
                             </div>
 
                             {item.notes && (
-                              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                <p className="text-xs text-yellow-800">
-                                  <strong>Notas:</strong> {item.notes}
-                                </p>
-                              </div>
+                              <p className="text-xs text-gray-600 mt-1 bg-yellow-50 px-1 py-0.5 rounded">
+                                {item.notes}
+                              </p>
                             )}
 
-                            <div className="flex gap-2 mt-2">
+                            <div className="flex gap-1 mt-1">
                               {item.is_takeaway && (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
-                                  <Package className="h-3 w-3" />
+                                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
+                                  <Package className="h-2.5 w-2.5" />
                                   Para llevar
                                 </span>
                               )}
                               {item.has_taper && (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                                  <Check className="h-3 w-3" />
-                                  Con envase
+                                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                  <Check className="h-2.5 w-2.5" />
+                                  Envase
                                 </span>
                               )}
                             </div>
@@ -520,26 +477,26 @@ const TableOrderEcommerce = () => {
 
               {/* Footer del carrito */}
               {cart.length > 0 && (
-                <div className="border-t border-gray-200 p-6 bg-gray-50">
-                  <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
-                    <div className="flex items-center justify-between text-lg">
-                      <span className="font-semibold text-gray-700">Total:</span>
-                      <span className="font-bold text-2xl text-gray-900">{formatCurrency(calculateCartTotal())}</span>
+                <div className="border-t border-gray-200 p-3 bg-gray-50">
+                  <div className="mb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-700 text-sm">Total:</span>
+                      <span className="font-bold text-lg text-gray-900">{formatCurrency(calculateCartTotal())}</span>
                     </div>
                   </div>
                   <button
                     onClick={handleCreateOrder}
                     disabled={creatingOrder}
-                    className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-xl hover:from-green-700 hover:to-green-800 disabled:opacity-50 font-semibold flex items-center justify-center gap-2 shadow-lg transition-all duration-200 transform hover:scale-105"
+                    className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium text-sm flex items-center justify-center gap-2"
                   >
                     {creatingOrder ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        Creando pedido...
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Creando...
                       </>
                     ) : (
                       <>
-                        <Check className="h-5 w-5" />
+                        <Check className="h-4 w-4" />
                         Confirmar Pedido
                       </>
                     )}

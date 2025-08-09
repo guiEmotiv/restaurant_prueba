@@ -457,27 +457,27 @@ const Payment = () => {
       {/* Modal/Popup inicial para selección de tipo de pago */}
       {!paymentMode && (
         <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
             {/* Header del modal */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6 text-white">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-white">
               <div className="text-center">
-                <h2 className="text-2xl font-bold mb-2">Procesar Pago</h2>
-                <p className="text-blue-100">
-                  Mesa {order.table_number} • Orden #{order.id}
+                <h2 className="text-base font-bold mb-1">Procesar Pago</h2>
+                <p className="text-blue-100 text-xs">
+                  Mesa {order.table_number} • #{order.id}
                 </p>
               </div>
             </div>
 
             {/* Contenido del modal */}
-            <div className="p-8">
+            <div className="p-4">
               {/* Total destacado */}
-              <div className="text-center mb-8 p-6 bg-gray-50 rounded-2xl">
-                <p className="text-sm text-gray-500 mb-1">Total a pagar</p>
-                <p className="text-4xl font-bold text-gray-900">
+              <div className="text-center mb-4 p-3 bg-gray-50 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">Total a pagar</p>
+                <p className="text-2xl font-bold text-gray-900">
                   {formatCurrency(order.total_amount)}
                 </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  {order.items ? order.items.length : 0} items en la cuenta
+                <p className="text-xs text-gray-600 mt-1">
+                  {order.items ? order.items.length : 0} items
                 </p>
               </div>
 
@@ -494,32 +494,29 @@ const Payment = () => {
               )}
 
               {/* Opciones de pago */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Pago Completo */}
                 <button
                   onClick={() => setPaymentMode('full')}
                   disabled={processing || paidItems.size > 0}
-                  className={`w-full p-6 rounded-2xl border-2 transition-all duration-200 ${
+                  className={`w-full p-3 rounded-xl border transition-all duration-200 ${
                     paidItems.size > 0 
                       ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-50' 
-                      : 'border-green-200 bg-green-50 hover:border-green-300 hover:bg-green-100 hover:shadow-lg hover:-translate-y-1'
+                      : 'border-green-200 bg-green-50 hover:border-green-300 hover:bg-green-100'
                   }`}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       paidItems.size > 0 ? 'bg-gray-200' : 'bg-green-500'
                     }`}>
-                      <CreditCard className={`h-6 w-6 ${paidItems.size > 0 ? 'text-gray-400' : 'text-white'}`} />
+                      <CreditCard className={`h-4 w-4 ${paidItems.size > 0 ? 'text-gray-400' : 'text-white'}`} />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className={`text-lg font-bold ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-900'}`}>
+                      <div className={`text-sm font-bold ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-900'}`}>
                         Pago Completo
                       </div>
-                      <div className={`text-sm ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Procesa toda la cuenta en una transacción
-                      </div>
-                      <div className={`text-sm font-medium mt-1 ${paidItems.size > 0 ? 'text-gray-400' : 'text-green-600'}`}>
-                        {order.items ? order.items.length : 0} items
+                      <div className={`text-xs ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Procesa toda la cuenta
                       </div>
                     </div>
                   </div>
@@ -529,18 +526,15 @@ const Payment = () => {
                 <button
                   onClick={() => setPaymentMode('split')}
                   disabled={processing}
-                  className="w-full p-6 rounded-2xl border-2 border-blue-200 bg-blue-50 hover:border-blue-300 hover:bg-blue-100 transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
+                  className="w-full p-3 rounded-xl border border-blue-200 bg-blue-50 hover:border-blue-300 hover:bg-blue-100 transition-all duration-200"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                      <Split className="h-6 w-6 text-white" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                      <Split className="h-4 w-4 text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className="text-lg font-bold text-gray-900">Dividir Cuenta</div>
-                      <div className="text-sm text-gray-600">
-                        Selecciona items específicos para cada pago
-                      </div>
-                      <div className="text-sm font-medium text-blue-600 mt-1">
+                      <div className="text-sm font-bold text-gray-900">Dividir Cuenta</div>
+                      <div className="text-xs text-gray-600">
                         {order.items ? order.items.filter(item => !paidItems.has(item.id)).length : 0} items disponibles
                       </div>
                     </div>
@@ -549,12 +543,12 @@ const Payment = () => {
               </div>
 
               {/* Botón cancelar */}
-              <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="mt-4 pt-3 border-t border-gray-200">
                 <button
                   onClick={() => navigate('/orders')}
-                  className="w-full px-6 py-3 border border-gray-300 rounded-xl text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 text-sm flex items-center justify-center gap-2"
                 >
-                  <ArrowLeft className="h-4 w-4" />
+                  <ArrowLeft className="h-3 w-3" />
                   Cancelar
                 </button>
               </div>
@@ -569,44 +563,44 @@ const Payment = () => {
       {/* Formulario de Pago Completo */}
       {paymentMode === 'full' && (
         <div className="flex flex-col h-full">
-          {/* Header fijo */}
-          <div className="bg-white border-b border-gray-200 shadow-sm p-6">
+          {/* Header fijo compacto */}
+          <div className="bg-white border-b border-gray-200 shadow-sm p-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1">
                 <button
                   onClick={() => setPaymentMode(null)}
-                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
                 >
-                  <ArrowLeft className="h-5 w-5" />
+                  <ArrowLeft className="h-4 w-4" />
                 </button>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Pago Completo</h1>
-                  <p className="text-sm text-gray-600">Mesa {order.table_number} • Orden #{order.id}</p>
+                <div className="text-center flex-1">
+                  <h1 className="text-sm font-bold text-gray-900">Pago Completo</h1>
+                  <p className="text-xs text-gray-600">Mesa {order.table_number} • #{order.id}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-500">Total a pagar</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(order.total_amount)}</p>
+                <p className="text-xs text-gray-500">Total</p>
+                <p className="text-base font-bold text-gray-900">{formatCurrency(order.total_amount)}</p>
               </div>
             </div>
           </div>
 
           {/* Contenido scrollable */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="flex-1 overflow-y-auto p-3">
+            <div className="max-w-lg mx-auto">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-4">
+                  <div className="space-y-4">
                     {/* Método de pago */}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-4">
+                      <label className="block text-xs font-medium text-gray-700 mb-2">
                         Método de Pago
                       </label>
                       <select
                         name="payment_method"
                         value={paymentData.payment_method}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base bg-gray-50"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm bg-gray-50"
                       >
                         <option value="CASH">💵 Efectivo</option>
                         <option value="CARD">💳 Tarjeta</option>
@@ -618,7 +612,7 @@ const Payment = () => {
 
                     {/* Notas */}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-4">
+                      <label className="block text-xs font-medium text-gray-700 mb-2">
                         Notas (Opcional)
                       </label>
                       <input
@@ -626,41 +620,37 @@ const Payment = () => {
                         name="notes"
                         value={paymentData.notes}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base bg-gray-50"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm bg-gray-50"
                         placeholder="Ej: Cliente pagó con billete de 100..."
                       />
                     </div>
                   </div>
 
                   {/* Resumen del pago */}
-                  <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">Resumen del Pago</h3>
-                        <p className="text-sm text-gray-600 mt-1">{order.items ? order.items.length : 0} items en total</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-3xl font-bold text-gray-900">{formatCurrency(order.total_amount)}</p>
-                      </div>
+                  <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="text-center">
+                      <h3 className="text-sm font-medium text-gray-900">Resumen del Pago</h3>
+                      <p className="text-xs text-gray-600 mt-1">{order.items ? order.items.length : 0} items</p>
+                      <p className="text-xl font-bold text-gray-900 mt-2">{formatCurrency(order.total_amount)}</p>
                     </div>
                   </div>
 
                   {/* Botón de pago */}
-                  <div className="mt-8">
+                  <div className="mt-4">
                     <button
                       onClick={handleFullPayment}
                       disabled={processing}
-                      className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-5 rounded-2xl hover:from-green-700 hover:to-green-800 disabled:opacity-50 font-bold text-lg flex items-center justify-center gap-3 shadow-xl transition-all duration-200 transform hover:scale-105"
+                      className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium text-sm flex items-center justify-center gap-2"
                     >
                       {processing ? (
                         <>
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                          Procesando pago...
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Procesando...
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="h-6 w-6" />
-                          Confirmar Pago - {formatCurrency(order.total_amount)}
+                          <CheckCircle className="h-4 w-4" />
+                          Confirmar Pago
                         </>
                       )}
                     </button>
@@ -674,138 +664,144 @@ const Payment = () => {
 
       {/* Formulario de División de Cuenta */}
       {paymentMode === 'split' && (
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6 p-4 bg-white rounded-lg shadow">
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => setPaymentMode(null)}
-                variant="secondary"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Volver
-              </Button>
-              <div>
-                <p className="text-gray-600">Orden #{order.id} - Mesa {order.table_number}</p>
+        <div className="flex flex-col h-full">
+          {/* Header compacto */}
+          <div className="bg-white border-b border-gray-200 shadow-sm p-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-1">
+                <button
+                  onClick={() => setPaymentMode(null)}
+                  className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <div className="text-center flex-1">
+                  <h1 className="text-sm font-bold text-gray-900">Dividir Cuenta</h1>
+                  <p className="text-xs text-gray-600">#{order.id} • Mesa {order.table_number}</p>
+                </div>
               </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Total a dividir</p>
-              <p className="text-2xl font-bold text-blue-600">{formatCurrency(order.total_amount)}</p>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Total</p>
+                <p className="text-base font-bold text-gray-900">{formatCurrency(order.total_amount)}</p>
+              </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="space-y-6">
-            {/* Formulario de split actual */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Método de Pago
-                </label>
-                <select
-                  value={currentSplit.payment_method}
-                  onChange={(e) => setCurrentSplit({ ...currentSplit, payment_method: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="CASH">Efectivo</option>
-                  <option value="CARD">Tarjeta</option>
-                  <option value="YAPE_PLIN">Yape/Plin</option>
-                  <option value="TRANSFER">Transferencia</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Items Seleccionados
-                </label>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  {currentSplit.items.length === 0 ? (
-                    <p className="text-sm text-gray-500">Seleccione items arriba</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {currentSplit.items.map(item => (
-                        <div key={item.id} className="flex justify-between text-sm">
-                          <span>{item.recipe_name}</span>
-                          <span className="font-medium">{formatCurrency(item.total_price)}</span>
-                        </div>
-                      ))}
-                      <div className="border-t pt-1 mt-2">
-                        <div className="flex justify-between font-medium">
-                          <span>Total:</span>
-                          <span>{formatCurrency(currentSplit.amount)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <Button
-                onClick={addSplit}
-                disabled={currentSplit.items.length === 0}
-                className="flex-1"
-              >
-                Agregar Pago
-              </Button>
-              
-              {splits.length > 0 && (
-                <Button
-                  onClick={handleSplitPayment}
-                  disabled={processing || splits.length === 0}
-                  variant="success"
-                  className="flex-1"
-                >
-                  {processing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Procesando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Procesar {splits.length} Pagos
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-
-            {/* Pagos agregados */}
-            {splits.length > 0 && (
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3">Pagos Agregados</h4>
-                <div className="space-y-2">
-                  {splits.map((split, idx) => (
-                    <div key={split.id} className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">Pago {idx + 1}</span>
-                            <span className="text-sm text-gray-600">
-                              ({split.payment_method})
-                            </span>
-                          </div>
-                          <div className="text-sm text-gray-600 mt-1">
-                            {split.items.length} item(s) - {formatCurrency(split.amount)}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => removeSplit(idx)}
-                          className="text-red-600 hover:text-red-800"
+          {/* Contenido scrollable */}
+          <div className="flex-1 overflow-y-auto p-2">
+            <div className="max-w-lg mx-auto">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-3">
+                  <div className="space-y-3">
+                    {/* Formulario de split actual */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Método de Pago
+                        </label>
+                        <select
+                          value={currentSplit.payment_method}
+                          onChange={(e) => setCurrentSplit({ ...currentSplit, payment_method: e.target.value })}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
-                          <X className="h-4 w-4" />
-                        </button>
+                          <option value="CASH">💵 Efectivo</option>
+                          <option value="CARD">💳 Tarjeta</option>
+                          <option value="YAPE_PLIN">📱 Yape/Plin</option>
+                          <option value="TRANSFER">🏦 Transferencia</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Items Seleccionados
+                        </label>
+                        <div className="bg-gray-50 rounded p-2 min-h-[60px]">
+                          {currentSplit.items.length === 0 ? (
+                            <p className="text-xs text-gray-500 text-center py-4">Seleccione items arriba</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {currentSplit.items.map(item => (
+                                <div key={item.id} className="flex justify-between text-xs">
+                                  <span className="truncate">{item.recipe_name}</span>
+                                  <span className="font-medium ml-2">{formatCurrency(item.total_price)}</span>
+                                </div>
+                              ))}
+                              <div className="border-t pt-1 mt-1">
+                                <div className="flex justify-between font-medium text-xs">
+                                  <span>Total:</span>
+                                  <span>{formatCurrency(currentSplit.amount)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ))}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={addSplit}
+                        disabled={currentSplit.items.length === 0}
+                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        Agregar Pago
+                      </button>
+                      
+                      {splits.length > 0 && (
+                        <button
+                          onClick={handleSplitPayment}
+                          disabled={processing || splits.length === 0}
+                          className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                        >
+                          {processing ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                              Procesando...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-3 w-3" />
+                              Procesar {splits.length}
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Pagos agregados */}
+                    {splits.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-900 mb-2">Pagos Agregados</h4>
+                        <div className="space-y-1">
+                          {splits.map((split, idx) => (
+                            <div key={split.id} className="bg-gray-50 rounded p-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs font-medium">Pago {idx + 1}</span>
+                                    <span className="text-xs text-gray-600 truncate">
+                                      ({split.payment_method})
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-gray-600">
+                                    {split.items.length} item(s) - {formatCurrency(split.amount)}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => removeSplit(idx)}
+                                  className="text-red-600 hover:text-red-800 p-1 ml-2"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
             </div>
           </div>
         </div>

@@ -316,65 +316,54 @@ const TableOrderEdit = () => {
 
   return (
     <div className="fixed inset-0 bg-gray-50 flex flex-col h-full">
-      {/* Header fijo moderno */}
+      {/* Header fijo compacto */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+        <div className="px-3 py-2">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 flex-1">
               <button
                 onClick={() => navigate('/table-status')}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4" />
               </button>
               
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  Mesa {table.table_number}
+              <div className="text-center flex-1">
+                <h1 className="text-sm font-bold text-gray-900">
+                  Mesa {table.table_number} - #{order.id}
                 </h1>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span>Pedido #{order.id}</span>
-                  <span>•</span>
-                  <span>{table.zone_name}</span>
-                  {table.capacity && (
-                    <>
-                      <span>•</span>
-                      <Users className="h-4 w-4" />
-                      <span>{table.capacity} personas</span>
-                    </>
-                  )}
-                </div>
+                <p className="text-xs text-gray-600">{table.zone_name}</p>
               </div>
             </div>
 
-            {/* Total destacado */}
+            {/* Total compacto */}
             <div className="text-right">
-              <p className="text-sm text-gray-500">Total actual</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(order.total_amount)}</p>
+              <p className="text-xs text-gray-500">Total</p>
+              <p className="text-base font-bold text-gray-900">{formatCurrency(order.total_amount)}</p>
             </div>
           </div>
 
-          {/* Botones de acción */}
-          <div className="flex items-center gap-3 mt-4">
+          {/* Botones de acción compactos */}
+          <div className="flex items-center gap-2">
             {/* Botón Nueva Cuenta */}
             <button
               onClick={() => navigate(`/table/${tableId}/order-ecommerce`)}
-              className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-2 rounded-xl hover:from-purple-700 hover:to-purple-800 flex items-center gap-2 text-sm font-semibold shadow-lg transition-all duration-200 transform hover:scale-105"
-              title="Crear nueva cuenta para esta mesa"
+              className="bg-purple-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-purple-700 flex items-center gap-1"
             >
-              <Users className="h-4 w-4" />
-              <span>Nueva Cuenta</span>
+              <Users className="h-3 w-3" />
+              <span className="hidden sm:inline">Nueva Cuenta</span>
+              <span className="sm:hidden">+</span>
             </button>
 
             {/* Botón Agregar Items */}
             <button
               onClick={() => setShowNewItems(!showNewItems)}
-              className="relative bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-xl hover:from-blue-700 hover:to-blue-800 flex items-center gap-2 text-sm font-semibold shadow-lg transition-all duration-200 transform hover:scale-105"
+              className="relative bg-blue-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-blue-700 flex items-center gap-1"
             >
-              <Plus className="h-4 w-4" />
-              <span>Agregar Items</span>
+              <Plus className="h-3 w-3" />
+              <span>Agregar</span>
               {getNewItemsCount() > 0 && (
-                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold animate-pulse">
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs font-bold">
                   {getNewItemsCount()}
                 </div>
               )}
@@ -384,10 +373,10 @@ const TableOrderEdit = () => {
             {checkAllItemsDelivered() && hasPermission('canManagePayments') && (
               <button
                 onClick={handleGoToPayment}
-                className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-xl hover:from-green-700 hover:to-green-800 flex items-center gap-2 text-sm font-semibold shadow-lg transition-all duration-200 transform hover:scale-105"
+                className="bg-green-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-green-700 flex items-center gap-1"
               >
-                <CreditCard className="h-4 w-4" />
-                <span>Procesar Pago</span>
+                <CreditCard className="h-3 w-3" />
+                <span>Pagar</span>
               </button>
             )}
           </div>
@@ -397,101 +386,83 @@ const TableOrderEdit = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Panel principal - Items existentes */}
         <div className={`flex-1 flex flex-col transition-all duration-300 ${showNewItems ? 'hidden sm:flex sm:mr-96' : 'flex'}`}>
-          <div className="p-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 h-full flex flex-col">
-              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 rounded-t-2xl">
+          <div className="p-2">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 h-full flex flex-col">
+              <div className="p-2 border-b border-gray-200 bg-gray-50 rounded-t-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Items del Pedido</h2>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <h2 className="text-sm font-bold text-gray-900">Items del Pedido</h2>
+                    <p className="text-xs text-gray-600">
                       {existingItems.length} items • {existingItems.filter(i => i.status === 'SERVED').length} entregados
                     </p>
                   </div>
-                  <div className="text-right">
-                    <div className="flex gap-2">
-                      <div className="flex items-center gap-1 text-xs">
-                        <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                        <span className="text-gray-600">Pendiente</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs">
-                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                        <span className="text-gray-600">Entregado</span>
-                      </div>
+                  <div className="flex gap-2 text-xs">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                      <span className="text-gray-600">Pendiente</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-gray-600">Entregado</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-2">
                 {existingItems.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
-                      <div className="bg-gray-100 rounded-full p-8 w-32 h-32 mx-auto mb-6 flex items-center justify-center">
-                        <ShoppingCart className="h-16 w-16 text-gray-400" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay items en este pedido</h3>
-                      <p className="text-gray-500">Los items aparecerán aquí cuando se agreguen</p>
+                      <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">Sin items</h3>
+                      <p className="text-xs text-gray-500">Agrega items al pedido</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {existingItems.map((item) => (
                       <div
                         key={item.id}
-                        className={`rounded-xl p-6 border-l-4 shadow-sm hover:shadow-md transition-all duration-200 ${
+                        className={`rounded p-2 border-l-2 ${
                           item.status === 'SERVED' 
-                            ? 'bg-green-50 border-green-400 border border-green-200' 
-                            : 'bg-white border-yellow-400 border border-gray-200'
+                            ? 'bg-green-50 border-green-400' 
+                            : 'bg-white border-yellow-400 border'
                         }`}
                       >
-                        <div className="flex items-start gap-4">
-                          {/* Avatar del plato */}
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            item.status === 'SERVED' ? 'bg-green-100' : 'bg-yellow-100'
-                          }`}>
-                            <span className={`font-bold text-lg ${
-                              item.status === 'SERVED' ? 'text-green-600' : 'text-yellow-600'
-                            }`}>
-                              {item.recipe_name.charAt(0)}
-                            </span>
-                          </div>
-                          
+                        <div className="flex items-start gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-3 mb-3">
-                              <h4 className="font-semibold text-gray-900 text-lg">{item.recipe_name}</h4>
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium text-gray-900 text-xs">{item.recipe_name}</h4>
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
                                 item.status === 'SERVED' 
-                                  ? 'bg-green-100 text-green-800 border border-green-300' 
-                                  : 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-yellow-100 text-yellow-800'
                               }`}>
-                                {item.status === 'SERVED' && <CheckCircle className="h-3 w-3 mr-1" />}
                                 {getItemStatusText(item.status)}
                               </span>
                             </div>
 
-                            <div className="mb-3">
-                              <span className="text-xl font-bold text-gray-900">{formatCurrency(item.total_price)}</span>
+                            <div className="text-xs font-semibold text-gray-900 mb-1">
+                              {formatCurrency(item.total_price)}
                             </div>
 
                             {item.notes && (
-                              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p className="text-sm text-blue-800">
-                                  <strong>Notas:</strong> {item.notes}
-                                </p>
-                              </div>
+                              <p className="text-xs text-gray-600 bg-blue-50 px-1 py-0.5 rounded mb-1">
+                                {item.notes}
+                              </p>
                             )}
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-1">
                               {item.is_takeaway && (
-                                <span className="inline-flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
-                                  <Package className="h-4 w-4" />
+                                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
+                                  <Package className="h-2.5 w-2.5" />
                                   Para llevar
                                 </span>
                               )}
                               {item.has_taper && (
-                                <span className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                                  <Check className="h-4 w-4" />
-                                  Con envase
+                                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                  <Check className="h-2.5 w-2.5" />
+                                  Envase
                                 </span>
                               )}
                             </div>
@@ -500,10 +471,10 @@ const TableOrderEdit = () => {
                           {item.status === 'CREATED' && (
                             <button
                               onClick={() => removeExistingItem(item.id)}
-                              className="p-3 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors"
-                              title="Eliminar item"
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                              title="Eliminar"
                             >
-                              <Trash2 className="h-5 w-5" />
+                              <Trash2 className="h-3 w-3" />
                             </button>
                           )}
                         </div>
@@ -524,113 +495,100 @@ const TableOrderEdit = () => {
           />
         )}
 
-        {/* Panel para agregar nuevos items mejorado */}
+        {/* Panel para agregar nuevos items compacto */}
         {showNewItems && (
-          <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-white border-l border-gray-200 shadow-2xl z-50 pt-20 sm:pt-0">
+          <div className="fixed right-0 top-0 h-full w-full sm:w-80 bg-white border-l border-gray-200 shadow-xl z-50 pt-12 sm:pt-0">
             <div className="flex flex-col h-full">
               {/* Header */}
-              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xl font-bold text-gray-900">Agregar Items</h2>
+              <div className="p-3 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-sm font-bold text-gray-900">Agregar Items</h2>
                   <button
                     onClick={() => setShowNewItems(false)}
-                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-white/50 rounded-lg transition-colors"
+                    className="p-1 text-gray-500 hover:text-gray-700 rounded transition-colors"
                   >
-                    <ArrowLeft className="h-5 w-5" />
+                    <ArrowLeft className="h-4 w-4" />
                   </button>
                 </div>
 
                 {/* Filtros */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                     <input
                       type="text"
                       placeholder="Buscar platos..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-gray-600" />
-                    <select
-                      value={selectedGroup}
-                      onChange={(e) => setSelectedGroup(e.target.value)}
-                      className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">Todos los grupos</option>
-                      {groups.map(group => (
-                        <option key={group.id} value={group.id}>
-                          {group.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    value={selectedGroup}
+                    onChange={(e) => setSelectedGroup(e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="all">Todos los grupos</option>
+                    {groups.map(group => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Lista de recetas */}
-              <div className="flex-1 overflow-y-auto p-4">
+              {/* Lista de recetas compacta */}
+              <div className="flex-1 overflow-y-auto p-2">
                 {filteredRecipes.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
-                      <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No se encontraron platos</h3>
-                      <p className="text-gray-500">Intenta con otros términos de búsqueda</p>
+                      <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                      <h3 className="text-sm font-medium text-gray-900 mb-1">Sin resultados</h3>
+                      <p className="text-xs text-gray-500">Intenta otros términos</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {filteredRecipes.map((recipe) => (
                       <div
                         key={recipe.id}
-                        className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-all duration-200"
+                        className="bg-gray-50 rounded border border-gray-200 p-2"
                       >
-                        <div className="flex items-start gap-3">
-                          {/* Avatar del plato */}
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <span className="text-blue-600 font-bold text-lg">
-                              {recipe.name.charAt(0)}
-                            </span>
-                          </div>
-                          
+                        <div className="flex items-start gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between mb-2">
-                              <h4 className="font-semibold text-gray-900 text-sm line-clamp-2">
-                                {recipe.name}
-                              </h4>
-                              <div className="ml-2 flex items-center gap-1 text-xs text-gray-500">
-                                <Clock className="h-3 w-3" />
-                                <span>{recipe.preparation_time}min</span>
-                              </div>
-                            </div>
-
-                            <p className="text-xs text-blue-600 font-medium mb-2">
+                            <h4 className="font-medium text-gray-900 text-xs line-clamp-1">
+                              {recipe.name}
+                            </h4>
+                            <p className="text-xs text-gray-600">
                               {recipe.group_name || 'Sin grupo'}
                             </p>
 
-                            <div className="mb-3">
-                              <span className="text-lg font-bold text-gray-900">
+                            <div className="flex items-center justify-between my-1">
+                              <span className="text-xs font-bold text-gray-900">
                                 {formatCurrency(recipe.base_price)}
+                              </span>
+                              <span className="text-xs text-gray-500 flex items-center gap-0.5">
+                                <Clock className="h-2.5 w-2.5" />
+                                {recipe.preparation_time}min
                               </span>
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-1">
                               <button
                                 onClick={() => handleQuickAdd(recipe)}
-                                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2 rounded-lg hover:from-blue-700 hover:to-blue-800 text-xs font-semibold flex items-center justify-center gap-1 shadow-lg transition-all duration-200 transform hover:scale-105"
+                                className="flex-1 bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-blue-700 flex items-center justify-center gap-0.5"
                               >
-                                <Plus className="h-3 w-3" />
+                                <Plus className="h-2.5 w-2.5" />
                                 Agregar
                               </button>
                               <button
                                 onClick={() => openItemModal(recipe)}
-                                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all text-xs"
+                                className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 text-xs"
                                 title="Personalizar"
                               >
-                                <StickyNote className="h-3 w-3" />
+                                <StickyNote className="h-2.5 w-2.5" />
                               </button>
                             </div>
                           </div>
