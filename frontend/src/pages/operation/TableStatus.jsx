@@ -143,135 +143,150 @@ const TableStatus = () => {
 
   return (
     <div className="fixed inset-0 bg-gray-50 flex flex-col h-full">
-      {/* Header fijo reducido 70% */}
-      <div className="p-1.5 border-b border-gray-200 bg-white">
-        <div className="text-center mb-1.5">
-          <h2 className="text-xs font-medium text-gray-900">Estado de Mesas</h2>
-          <p className="text-xs text-gray-500">{filteredTables.length} mesas disponibles</p>
-        </div>
-
-        {/* Filtros reducidos 70% */}
-        <div className="space-y-1.5">
-          {/* Buscador */}
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-2.5 w-2.5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar mesa..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-6 pr-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+      {/* Header estandarizado mejorado */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="p-3">
+          <div className="text-center mb-3">
+            <h2 className="text-sm font-medium text-gray-900">Estado de Mesas</h2>
+            <p className="text-xs text-gray-500">{filteredTables.length} mesas disponibles</p>
           </div>
 
-          {/* Filtro por zona */}
-          <select
-            value={selectedZone}
-            onChange={(e) => setSelectedZone(e.target.value)}
-            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="">Todas las zonas</option>
-            {zones.map(zone => (
-              <option key={zone.id} value={zone.id}>
-                {zone.name}
-              </option>
-            ))}
-          </select>
-          
-          {/* Leyenda de estados reducida 70% */}
-          <div className="flex items-center justify-center gap-2 text-xs">
-            <div className="flex items-center gap-0.5">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-              <span className="text-gray-600">Libre</span>
+          {/* Filtros estandarizados */}
+          <div className="space-y-2">
+            {/* Buscador */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Buscar mesa..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
-            <div className="flex items-center gap-0.5">
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-              <span className="text-gray-600">Ocupada</span>
-            </div>
-            <div className="flex items-center gap-0.5">
-              <div className="w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
-              <span className="text-gray-600">Múltiple</span>
+
+            {/* Filtro por zona */}
+            <select
+              value={selectedZone}
+              onChange={(e) => setSelectedZone(e.target.value)}
+              className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Todas las zonas</option>
+              {zones.map(zone => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.name}
+                </option>
+              ))}
+            </select>
+            
+            {/* Leyenda de estados mejorada */}
+            <div className="bg-gray-50 rounded p-2">
+              <div className="flex items-center justify-center gap-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-700">Libre</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-gray-700">Ocupada</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <span className="text-gray-700">Múltiple</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Contenido principal scrollable arreglado */}
-      <div className="flex-1 overflow-y-auto p-1.5" style={{maxHeight: 'calc(100vh - 120px)'}}>
+      {/* Contenido principal scrollable */}
+      <div className="flex-1 overflow-y-auto p-3" style={{maxHeight: 'calc(100vh - 160px)'}}>
         {Object.keys(groupedTables).length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <Table className="h-8 w-8 text-gray-300 mx-auto mb-1" />
-              <h3 className="text-xs font-medium text-gray-900 mb-0.5">No hay mesas</h3>
+            <div className="text-center bg-white rounded border border-gray-200 p-6">
+              <Table className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <h3 className="text-sm font-medium text-gray-900 mb-2">No hay mesas</h3>
               <p className="text-xs text-gray-500">No se encontraron mesas</p>
             </div>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-4">
             {Object.entries(groupedTables).map(([zoneName, zoneTables]) => (
               <div key={zoneName}>
-                <div className="flex items-center gap-0.5 mb-1">
-                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                  <h3 className="text-xs font-medium text-gray-800">{zoneName}</h3>
-                  <span className="text-xs text-gray-500">({zoneTables.length})</span>
-                </div>
-                
-                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
-                  {zoneTables.map((table) => {
-                    const tableStatus = getTableStatus(table);
-                    const StatusIcon = tableStatus.status === 'available' ? Plus : ShoppingCart;
-                    
-                    return (
-                      <button
-                        key={table.id}
-                        onClick={() => handleTableClick(table)}
-                        className={`relative p-1.5 rounded border transition-colors ${
-                          tableStatus.status === 'available' 
-                            ? 'border-green-300 bg-green-50 hover:bg-green-100' 
-                            : 'border-red-300 bg-red-50 hover:bg-red-100'
-                        }`}
-                      >
-                        {/* Indicador de estado */}
-                        <div className={`absolute top-1 right-1 w-2 h-2 rounded ${
-                          tableStatus.status === 'available' ? 'bg-green-500' : 'bg-red-500'
-                        }`}></div>
+                <div className="bg-white rounded border border-gray-200 overflow-hidden">
+                  {/* Header de zona */}
+                  <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <h3 className="text-sm font-medium text-gray-800">{zoneName}</h3>
+                      <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                        {zoneTables.length} mesas
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Grid de mesas */}
+                  <div className="p-3">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                      {zoneTables.map((table) => {
+                        const tableStatus = getTableStatus(table);
+                        const StatusIcon = tableStatus.status === 'available' ? Plus : ShoppingCart;
                         
-                        {/* Contenido principal */}
-                        <div className="flex flex-col items-center text-center">
-                          <div className={`flex items-center justify-center w-6 h-6 rounded mb-1 ${
-                            tableStatus.status === 'available' 
-                              ? 'bg-green-500' 
-                              : 'bg-red-500'
-                          }`}>
-                            <StatusIcon className="h-3 w-3 text-white" />
-                          </div>
-                          
-                          <div className="text-xs font-medium text-gray-900">
-                            M{table.table_number}
-                          </div>
-                          {tableStatus.status === 'occupied' ? (
-                            <div className="text-xs text-gray-600 flex items-center gap-0.5">
-                              <Clock className="h-2.5 w-2.5" />
-                              <span>{tableStatus.pendingItems || 0}/{tableStatus.totalItems || 0}</span>
+                        return (
+                          <button
+                            key={table.id}
+                            onClick={() => handleTableClick(table)}
+                            className={`relative p-3 rounded border-2 transition-all duration-200 hover:scale-105 ${
+                              tableStatus.status === 'available' 
+                                ? 'border-green-300 bg-green-50 hover:border-green-400 hover:bg-green-100' 
+                                : 'border-red-300 bg-red-50 hover:border-red-400 hover:bg-red-100'
+                            }`}
+                          >
+                            {/* Indicador de estado */}
+                            <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
+                              tableStatus.status === 'available' ? 'bg-green-500' : 'bg-red-500'
+                            }`}></div>
+                            
+                            {/* Contenido principal */}
+                            <div className="flex flex-col items-center text-center">
+                              <div className={`flex items-center justify-center w-8 h-8 rounded-full mb-2 ${
+                                tableStatus.status === 'available' 
+                                  ? 'bg-green-500' 
+                                  : 'bg-red-500'
+                              }`}>
+                                <StatusIcon className="h-4 w-4 text-white" />
+                              </div>
+                              
+                              <div className="text-xs font-medium text-gray-900 mb-1">
+                                Mesa {table.table_number}
+                              </div>
+                              
+                              {tableStatus.status === 'occupied' ? (
+                                <div className="text-xs text-gray-600 flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  <span>{tableStatus.pendingItems || 0}/{tableStatus.totalItems || 0}</span>
+                                </div>
+                              ) : (
+                                <div className="text-xs text-green-600 font-medium">
+                                  Disponible
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="text-xs text-green-600 font-medium">
-                              Libre
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Badge de múltiples cuentas */}
-                        {tableStatus.ordersCount > 1 && (
-                          <div className="absolute -top-0.5 -right-0.5">
-                            <div className="bg-orange-500 text-white rounded w-3.5 h-3.5 flex items-center justify-center text-xs font-medium">
-                              {tableStatus.ordersCount}
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
+                            
+                            {/* Badge de múltiples cuentas */}
+                            {tableStatus.ordersCount > 1 && (
+                              <div className="absolute -top-1 -right-1">
+                                <div className="bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium border-2 border-white">
+                                  {tableStatus.ordersCount}
+                                </div>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}

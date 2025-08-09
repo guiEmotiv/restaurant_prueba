@@ -462,34 +462,34 @@ const Payment = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded max-w-md w-full overflow-hidden">
             {/* Header del modal */}
-            <div className="bg-blue-600 px-3 py-3 text-white">
+            <div className="bg-blue-600 px-2 py-2 text-white">
               <div className="text-center">
-                <h2 className="text-base font-medium mb-1">Procesar Pago</h2>
-                <p className="text-blue-100 text-sm">
+                <h2 className="text-sm font-medium mb-1">Procesar Pago</h2>
+                <p className="text-blue-100 text-xs">
                   Mesa {order.table_number} • #{order.id}
                 </p>
               </div>
             </div>
 
             {/* Contenido del modal */}
-            <div className="p-3">
+            <div className="p-2">
               {/* Total destacado */}
-              <div className="text-center mb-4 p-3 bg-gray-50 rounded">
-                <p className="text-sm text-gray-500 mb-1">Total a pagar</p>
-                <p className="text-xl font-medium text-gray-900">
+              <div className="text-center mb-3 p-2 bg-gray-50 rounded">
+                <p className="text-xs text-gray-500 mb-1">Total a pagar</p>
+                <p className="text-sm font-medium text-gray-900">
                   {formatCurrency(order.total_amount)}
                 </p>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-xs text-gray-600 mt-1">
                   {order.items ? order.items.length : 0} items
                 </p>
               </div>
 
               {/* Mensaje informativo si hay items pagados */}
               {paidItems.size > 0 && (
-                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded">
+                <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                    <p className="text-sm text-amber-800">
+                    <AlertTriangle className="h-3 w-3 text-amber-600 flex-shrink-0" />
+                    <p className="text-xs text-amber-800">
                       <strong>Atención:</strong> Hay {paidItems.size} item(s) ya pagados. Solo puedes usar "Dividir Cuenta" para procesar los items restantes.
                     </p>
                   </div>
@@ -497,28 +497,28 @@ const Payment = () => {
               )}
 
               {/* Opciones de pago */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {/* Pago Completo */}
                 <button
                   onClick={() => setPaymentMode('full')}
                   disabled={processing || paidItems.size > 0}
-                  className={`w-full p-3 rounded border transition-colors ${
+                  className={`w-full p-2 rounded border transition-colors ${
                     paidItems.size > 0 
                       ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-50' 
                       : 'border-green-300 bg-green-50 hover:bg-green-100'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded flex items-center justify-center ${
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded flex items-center justify-center ${
                       paidItems.size > 0 ? 'bg-gray-200' : 'bg-green-500'
                     }`}>
-                      <CreditCard className={`h-5 w-5 ${paidItems.size > 0 ? 'text-gray-400' : 'text-white'}`} />
+                      <CreditCard className={`h-3 w-3 ${paidItems.size > 0 ? 'text-gray-400' : 'text-white'}`} />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className={`text-base font-medium ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-900'}`}>
+                      <div className={`text-xs font-medium ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-900'}`}>
                         Pago Completo
                       </div>
-                      <div className={`text-sm ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <div className={`text-xs ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-600'}`}>
                         Procesa toda la cuenta
                       </div>
                     </div>
@@ -529,15 +529,15 @@ const Payment = () => {
                 <button
                   onClick={() => setPaymentMode('split')}
                   disabled={processing}
-                  className="w-full p-3 rounded border border-blue-300 bg-blue-50 hover:bg-blue-100 transition-colors"
+                  className="w-full p-2 rounded border border-blue-300 bg-blue-50 hover:bg-blue-100 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-500 rounded flex items-center justify-center">
-                      <Split className="h-5 w-5 text-white" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center">
+                      <Split className="h-3 w-3 text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className="text-base font-medium text-gray-900">Dividir Cuenta</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-xs font-medium text-gray-900">Dividir Cuenta</div>
+                      <div className="text-xs text-gray-600">
                         {order.items ? order.items.filter(item => !paidItems.has(item.id)).length : 0} items disponibles
                       </div>
                     </div>
@@ -546,12 +546,12 @@ const Payment = () => {
               </div>
 
               {/* Botón cancelar */}
-              <div className="mt-4 pt-3 border-t border-gray-200">
+              <div className="mt-3 pt-2 border-t border-gray-200">
                 <button
                   onClick={() => navigate('/orders')}
-                  className="w-full px-4 py-2 border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-50 text-base flex items-center justify-center gap-2"
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-50 text-xs flex items-center justify-center gap-1"
                 >
-                  <ArrowLeft className="h-5 w-5" />
+                  <ArrowLeft className="h-3 w-3" />
                   Cancelar
                 </button>
               </div>
@@ -566,44 +566,44 @@ const Payment = () => {
       {/* Formulario de Pago Completo */}
       {paymentMode === 'full' && (
         <div className="flex flex-col h-full">
-          {/* Header fijo estandarizado */}
-          <div className="bg-white border-b border-gray-200 p-3">
+          {/* Header fijo estandarizado reducido 70% */}
+          <div className="bg-white border-b border-gray-200 p-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-1">
+              <div className="flex items-center gap-1 flex-1">
                 <button
                   onClick={() => setPaymentMode(null)}
-                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                  className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
                 >
-                  <ArrowLeft className="h-5 w-5" />
+                  <ArrowLeft className="h-3 w-3" />
                 </button>
                 <div className="text-center flex-1">
-                  <h1 className="text-base font-medium text-gray-900">Pago Completo</h1>
-                  <p className="text-sm text-gray-500">Mesa {order.table_number} • #{order.id}</p>
+                  <h1 className="text-xs font-medium text-gray-900">Pago Completo</h1>
+                  <p className="text-xs text-gray-500">Mesa {order.table_number} • #{order.id}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-500">Total</p>
-                <p className="text-xl font-medium text-gray-900">{formatCurrency(order.total_amount)}</p>
+                <p className="text-xs text-gray-500">Total</p>
+                <p className="text-sm font-medium text-gray-900">{formatCurrency(order.total_amount)}</p>
               </div>
             </div>
           </div>
 
           {/* Contenido scrollable */}
-          <div className="flex-1 overflow-y-auto p-3">
-            <div className="max-w-lg mx-auto">
+          <div className="flex-1 overflow-y-auto p-2" style={{maxHeight: 'calc(100vh - 140px)'}}>
+            <div className="max-w-md mx-auto">
               <div className="bg-white rounded border border-gray-200 overflow-hidden">
-                <div className="p-3">
-                  <div className="space-y-4">
+                <div className="p-2">
+                  <div className="space-y-3">
                     {/* Método de pago */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
                         Método de Pago
                       </label>
                       <select
                         name="payment_method"
                         value={paymentData.payment_method}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
                       >
                         <option value="CASH">💵 Efectivo</option>
                         <option value="CARD">💳 Tarjeta</option>
@@ -615,7 +615,7 @@ const Payment = () => {
 
                     {/* Notas */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
                         Notas (Opcional)
                       </label>
                       <input
@@ -623,36 +623,36 @@ const Payment = () => {
                         name="notes"
                         value={paymentData.notes}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-xs"
                         placeholder="Ej: Cliente pagó con billete de 100..."
                       />
                     </div>
                   </div>
 
                   {/* Resumen del pago */}
-                  <div className="mt-4 p-3 bg-green-50 rounded border border-green-200">
+                  <div className="mt-3 p-2 bg-green-50 rounded border border-green-200">
                     <div className="text-center">
-                      <h3 className="text-base font-medium text-gray-900">Resumen del Pago</h3>
-                      <p className="text-sm text-gray-600 mt-1">{order.items ? order.items.length : 0} items</p>
-                      <p className="text-xl font-medium text-gray-900 mt-2">{formatCurrency(order.total_amount)}</p>
+                      <h3 className="text-xs font-medium text-gray-900">Resumen del Pago</h3>
+                      <p className="text-xs text-gray-600 mt-1">{order.items ? order.items.length : 0} items</p>
+                      <p className="text-sm font-medium text-gray-900 mt-1">{formatCurrency(order.total_amount)}</p>
                     </div>
                   </div>
 
                   {/* Botón de pago */}
-                  <div className="mt-4">
+                  <div className="mt-3">
                     <button
                       onClick={handleFullPayment}
                       disabled={processing}
-                      className="w-full bg-green-600 text-white py-3 rounded hover:bg-green-700 disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
+                      className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-50 font-medium text-xs flex items-center justify-center gap-1"
                     >
                       {processing ? (
                         <>
-                          <div className="animate-spin rounded h-5 w-5 border-2 border-white border-t-transparent"></div>
+                          <div className="animate-spin rounded h-3 w-3 border border-white border-t-transparent"></div>
                           Procesando...
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="h-5 w-5" />
+                          <CheckCircle className="h-3 w-3" />
                           Confirmar Pago
                         </>
                       )}
@@ -671,33 +671,33 @@ const Payment = () => {
           {/* Header compacto */}
           <div className="bg-white border-b border-gray-200 shadow-sm p-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-1">
+              <div className="flex items-center gap-1 flex-1">
                 <button
                   onClick={() => setPaymentMode(null)}
                   className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
                 >
-                  <ArrowLeft className="h-4 w-4" />
+                  <ArrowLeft className="h-3 w-3" />
                 </button>
                 <div className="text-center flex-1">
-                  <h1 className="text-sm font-bold text-gray-900">Dividir Cuenta</h1>
+                  <h1 className="text-xs font-medium text-gray-900">Dividir Cuenta</h1>
                   <p className="text-xs text-gray-600">#{order.id} • Mesa {order.table_number}</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Total</p>
-                <p className="text-base font-bold text-gray-900">{formatCurrency(order.total_amount)}</p>
+                <p className="text-sm font-medium text-gray-900">{formatCurrency(order.total_amount)}</p>
               </div>
             </div>
           </div>
           
           {/* Contenido scrollable */}
-          <div className="flex-1 overflow-y-auto p-2">
-            <div className="max-w-lg mx-auto">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-3">
-                  <div className="space-y-3">
+          <div className="flex-1 overflow-y-auto p-2" style={{maxHeight: 'calc(100vh - 140px)'}}>
+            <div className="max-w-md mx-auto">
+              <div className="bg-white rounded border border-gray-200 overflow-hidden">
+                <div className="p-2">
+                  <div className="space-y-2">
                     {/* Formulario de split actual */}
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Método de Pago
@@ -705,7 +705,7 @@ const Payment = () => {
                         <select
                           value={currentSplit.payment_method}
                           onChange={(e) => setCurrentSplit({ ...currentSplit, payment_method: e.target.value })}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
                           <option value="CASH">💵 Efectivo</option>
                           <option value="CARD">💳 Tarjeta</option>
@@ -718,15 +718,15 @@ const Payment = () => {
                         <label className="block text-xs font-medium text-gray-700 mb-1">
                           Items Seleccionados
                         </label>
-                        <div className="bg-gray-50 rounded p-2 min-h-[60px]">
+                        <div className="bg-gray-50 rounded p-2 min-h-[40px]">
                           {currentSplit.items.length === 0 ? (
-                            <p className="text-xs text-gray-500 text-center py-4">Seleccione items arriba</p>
+                            <p className="text-xs text-gray-500 text-center py-2">Seleccione items arriba</p>
                           ) : (
                             <div className="space-y-1">
                               {currentSplit.items.map(item => (
                                 <div key={item.id} className="flex justify-between text-xs">
                                   <span className="truncate">{item.recipe_name}</span>
-                                  <span className="font-medium ml-2">{formatCurrency(item.total_price)}</span>
+                                  <span className="font-medium ml-1">{formatCurrency(item.total_price)}</span>
                                 </div>
                               ))}
                               <div className="border-t pt-1 mt-1">
@@ -741,11 +741,11 @@ const Payment = () => {
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <button
                         onClick={addSplit}
                         disabled={currentSplit.items.length === 0}
-                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+                        className="flex-1 bg-blue-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
                       >
                         Agregar Pago
                       </button>
@@ -754,16 +754,16 @@ const Payment = () => {
                         <button
                           onClick={handleSplitPayment}
                           disabled={processing || splits.length === 0}
-                          className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                          className="flex-1 bg-green-600 text-white px-2 py-1.5 rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-0.5"
                         >
                           {processing ? (
                             <>
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                              <div className="animate-spin rounded-full h-2.5 w-2.5 border border-white border-t-transparent"></div>
                               Procesando...
                             </>
                           ) : (
                             <>
-                              <CheckCircle className="h-3 w-3" />
+                              <CheckCircle className="h-2.5 w-2.5" />
                               Procesar {splits.length}
                             </>
                           )}
@@ -774,7 +774,7 @@ const Payment = () => {
                     {/* Pagos agregados */}
                     {splits.length > 0 && (
                       <div>
-                        <h4 className="text-xs font-medium text-gray-900 mb-2">Pagos Agregados</h4>
+                        <h4 className="text-xs font-medium text-gray-900 mb-1">Pagos Agregados</h4>
                         <div className="space-y-1">
                           {splits.map((split, idx) => (
                             <div key={split.id} className="bg-gray-50 rounded p-2">
@@ -792,9 +792,9 @@ const Payment = () => {
                                 </div>
                                 <button
                                   onClick={() => removeSplit(idx)}
-                                  className="text-red-600 hover:text-red-800 p-1 ml-2"
+                                  className="text-red-600 hover:text-red-800 p-0.5 ml-1"
                                 >
-                                  <X className="h-3 w-3" />
+                                  <X className="h-2.5 w-2.5" />
                                 </button>
                               </div>
                             </div>
