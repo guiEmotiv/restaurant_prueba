@@ -55,7 +55,7 @@ const Payment = () => {
     // Verificar permisos - solo administradores pueden procesar pagos
     if (!hasPermission('canManagePayments')) {
       showError('No tienes permisos para procesar pagos. Solo administradores pueden realizar esta acción.');
-      navigate('/orders');
+      navigate('/');
       return;
     }
     loadOrder();
@@ -117,7 +117,7 @@ const Payment = () => {
       
       if (!allItemsServed) {
         showError('Solo se pueden procesar pagos cuando todos los items han sido entregados');
-        navigate('/orders');
+        navigate('/');
         return;
       }
       
@@ -125,7 +125,7 @@ const Payment = () => {
     } catch (error) {
       console.error('Error loading order:', error);
       showError('Error al cargar la orden');
-      navigate('/payments');
+      navigate('/');
     } finally {
       setLoading(false);
     }
@@ -169,7 +169,7 @@ const Payment = () => {
         showError('Pago exitoso, pero falló la impresión del comprobante');
       }
 
-      navigate('/orders');
+      navigate('/');
     } catch (error) {
       console.error('Error processing payment:', error);
       const errorMessage = error.response?.data?.detail || 
@@ -208,7 +208,7 @@ const Payment = () => {
         showError('Pagos exitosos, pero falló la impresión de comprobantes');
       }
 
-      navigate('/orders');
+      navigate('/');
     } catch (error) {
       console.error('Error processing payment:', error);
       const errorMessage = error.response?.data?.detail || 

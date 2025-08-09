@@ -82,16 +82,6 @@ const Layout = ({ children }) => {
         { name: 'Recetas', href: '/recipes', icon: ChefHat, permission: 'canManageInventory' },
       ]
     },
-    {
-      name: 'Operaciones',
-      icon: ShoppingCart,
-      permission: 'canManageOrders',
-      children: [
-        { name: 'Pedidos', href: '/orders', icon: ShoppingCart, permission: 'canManageOrders' },
-        { name: 'Nuevo Pedido', href: '/orders/new', icon: ShoppingCart, permission: 'canManageOrders' },
-        { name: 'Pagos', href: '/payments', icon: CreditCard, permission: 'canManagePayments' },
-      ]
-    },
     { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
     { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
   ];

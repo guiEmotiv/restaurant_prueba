@@ -121,7 +121,7 @@ const OrderDetail = () => {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">Orden no encontrada</p>
-        <Button onClick={() => navigate('/orders')} className="mt-4">
+        <Button onClick={() => navigate('/')} className="mt-4">
           Volver a órdenes
         </Button>
       </div>
@@ -133,7 +133,7 @@ const OrderDetail = () => {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button
-          onClick={() => navigate('/orders')}
+          onClick={() => navigate('/')}
           variant="secondary"
           className="flex items-center gap-2"
         >
