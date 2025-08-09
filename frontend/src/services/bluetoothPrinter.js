@@ -183,14 +183,14 @@ class BluetoothPrinterService {
       await this.sendCommand(this.commands.INIT);
       await this.sendCommand(this.commands.FONT_A);
 
-      // Encabezado compacto
+      // Header centrado (igual que web)
       await this.sendCommand(this.commands.ALIGN_CENTER);
       await this.sendCommand(this.commands.BOLD_ON);
       await this.printText('EL FOGON DE DON SOTO\n');
       await this.sendCommand(this.commands.BOLD_OFF);
       await this.printText('COMPROBANTE\n\n');
 
-      // Información básica (formato web)
+      // Información básica alineada (igual que web)
       await this.sendCommand(this.commands.ALIGN_LEFT);
       await this.printText(`Orden:               #${paymentData.order.id}\n`);
       await this.printText(`Mesa:                ${paymentData.order.table_number}\n`);
@@ -204,42 +204,48 @@ class BluetoothPrinterService {
       await this.printText(`Fecha:               ${fecha}\n`);
       await this.printText(`Hora:                ${hora}\n`);
 
-      // Separador para items (línea simple)
+      // Separador (igual que web)
       await this.printText('-------------------------------------\n');
 
-      // Items compactos (igual que formato web)
+      // Items con cálculo correcto del total
+      let itemsTotal = 0;
       if (paymentData.order.items && paymentData.order.items.length > 0) {
         for (const item of paymentData.order.items) {
           const itemName = item.recipe_name || 'Item';
           const quantity = item.quantity || 1;
-          const price = this.formatCurrency(item.total_price || 0);
+          const itemPrice = parseFloat(item.total_price || 0);
+          itemsTotal += itemPrice;
+          const price = this.formatCurrency(itemPrice);
           
-          // Formato: "2x Nombre del Plato          S/ 15.00"
+          // Formato exacto: "2x Nombre del Plato          S/ 15.00"
           const itemLine = `${quantity}x ${itemName}`;
           const spaces = Math.max(1, 37 - itemLine.length - price.length);
           await this.printText(`${itemLine}${' '.repeat(spaces)}${price}\n`);
           
-          // Solo mostrar "Para llevar" si aplica (sin notas)
           if (item.is_takeaway) {
             await this.printText(`  Para llevar\n`);
           }
         }
       }
 
-      // Total (formato web compacto)
+      // Separador antes del total
       await this.printText('-------------------------------------\n');
-      const total = this.formatCurrency(paymentData.amount || paymentData.order.total_amount || 0);
+
+      // Total usando suma real de items
+      const displayTotal = this.formatCurrency(itemsTotal || paymentData.amount || paymentData.order.total_amount || 0);
       await this.sendCommand(this.commands.BOLD_ON);
-      await this.printText(`TOTAL:               ${total}\n`);
+      await this.printText(`TOTAL:               ${displayTotal}\n`);
       await this.sendCommand(this.commands.BOLD_OFF);
 
-      // Pie compacto
+      // Separador final
       await this.printText('-------------------------------------\n');
+
+      // Footer centrado (igual que web)
       await this.sendCommand(this.commands.ALIGN_CENTER);
       await this.printText('¡Gracias por su visita!\n');
 
-      // Saltos de línea y corte de papel
-      await this.printText('\n\n\n');
+      // Espaciado suficiente antes del corte para evitar corte del texto
+      await this.printText('\n\n\n\n');
       await this.sendCommand(this.commands.CUT_PAPER);
 
       console.log('Comprobante impreso exitosamente');
