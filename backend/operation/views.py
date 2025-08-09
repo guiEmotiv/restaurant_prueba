@@ -21,6 +21,7 @@ from .serializers import (
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all().order_by('-created_at')
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    pagination_class = None  # Deshabilitar paginación para órdenes
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -246,6 +247,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
 class OrderItemViewSet(viewsets.ModelViewSet):
     queryset = OrderItem.objects.all().order_by('-created_at')
+    pagination_class = None  # Deshabilitar paginación para order items
     serializer_class = OrderItemSerializer
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
     

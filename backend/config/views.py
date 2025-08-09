@@ -33,6 +33,7 @@ class ZoneViewSet(viewsets.ModelViewSet):
     queryset = Zone.objects.all().order_by('name')
     serializer_class = ZoneSerializer
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    pagination_class = None  # Deshabilitar paginación para zonas
     
     @action(detail=True, methods=['get'])
     def tables(self, request, pk=None):
@@ -46,6 +47,7 @@ class ZoneViewSet(viewsets.ModelViewSet):
 class TableViewSet(viewsets.ModelViewSet):
     queryset = Table.objects.all().order_by('zone__name', 'table_number')
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    pagination_class = None  # Deshabilitar paginación para mesas
     
     def get_serializer_class(self):
         if self.action in ['retrieve', 'create', 'update', 'partial_update']:

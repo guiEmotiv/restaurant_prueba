@@ -19,6 +19,7 @@ class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.all().order_by('name')
     serializer_class = GroupSerializer
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    pagination_class = None  # Deshabilitar paginación para grupos
     
     @action(detail=True, methods=['get'])
     def recipes(self, request, pk=None):
@@ -108,6 +109,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
 class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
     queryset = Recipe.objects.all().order_by('name')
+    pagination_class = None  # Deshabilitar paginación para recetas
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:

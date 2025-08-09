@@ -73,14 +73,13 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle pagination
+// Add response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
     console.log(`✅ API Response: ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
-    // If the response has a 'results' field, it's paginated
-    if (response.data && response.data.results !== undefined) {
-      return { ...response, data: response.data.results };
-    }
+    console.log('  Response data type:', typeof response.data);
+    console.log('  Has results field:', response.data?.results !== undefined);
+    // DON'T modify the response here - let handlePaginatedResponse handle it
     return response;
   },
   (error) => {
@@ -111,14 +110,27 @@ api.interceptors.response.use(
 // Helper function to handle paginated responses
 const handlePaginatedResponse = (response) => {
   console.log('🔍 Raw API Response:', response.data);
+  console.log('  Response type:', typeof response.data);
+  console.log('  Is Array:', Array.isArray(response.data));
+  
   // Handle paginated response
-  if (response.data && typeof response.data === 'object' && response.data.results) {
-    console.log('📋 Extracted results:', response.data.results);
+  if (response.data && typeof response.data === 'object' && response.data.results !== undefined) {
+    console.log('📋 Paginated response detected');
+    console.log('  Results:', response.data.results);
+    console.log('  Count:', response.data.count);
+    console.log('  Next:', response.data.next);
     return response.data.results;
   }
-  const fallback = Array.isArray(response.data) ? response.data : [];
-  console.log('📋 Using fallback:', fallback);
-  return fallback;
+  
+  // Direct array response
+  if (Array.isArray(response.data)) {
+    console.log('📋 Direct array response:', response.data.length, 'items');
+    return response.data;
+  }
+  
+  // Fallback
+  console.warn('⚠️ Unexpected response format, returning empty array');
+  return [];
 };
 
 // API service functions
