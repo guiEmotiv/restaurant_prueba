@@ -1,174 +1,125 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer } from 'lucide-react';
-import Button from '../../components/common/Button';
-import ReceiptFormat from '../../components/ReceiptFormat';
-import { apiService } from '../../services/api';
-import { useToast } from '../../contexts/ToastContext';
-import bluetoothPrinter from '../../services/bluetoothPrinter';
-
+// VERSIÓN ULTRA-MÍNIMA - Sin ninguna dependencia problemática
 const OrderReceipt = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const { showError, showSuccess } = useToast();
-  const [order, setOrder] = useState(null);
-  const [payment, setPayment] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [printing, setPrinting] = useState(false);
+  // Funciones básicas sin hooks
+  const handleBack = () => {
+    window.history.back();
+  };
 
-  const loadOrderDetails = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [orderData, paymentsData] = await Promise.all([
-        apiService.orders.getById(id),
-        apiService.payments.getAll()
-      ]);
-      
-      // Buscar el pago de esta orden
-      const orderPayment = paymentsData.find(p => p.order === parseInt(id));
-      
-      setOrder(orderData);
-      setPayment(orderPayment);
-    } catch (error) {
-      console.error('Error loading order details:', error);
-      showError('Error al cargar los detalles de la orden');
-      // REMOVIDO: navigate('/payment-history') - puede causar loops
-    } finally {
-      setLoading(false);
-    }
-  }, [id, showError]); // Dependencies específicas
-
-  useEffect(() => {
-    loadOrderDetails();
-  }, [loadOrderDetails]);
-
-  const handleBluetoothPrint = useCallback(async () => {
-    if (!order || !payment) {
-      showError('No hay datos de orden o pago para imprimir');
-      return;
-    }
-
-    try {
-      setPrinting(true);
-      
-      const receiptData = {
-        payment_method: payment.payment_method,
-        amount: payment.amount,
-        tax_amount: payment.tax_amount || '0.00',
-        notes: payment.notes || '',
-        order: order
-      };
-
-      await bluetoothPrinter.printPaymentReceipt(receiptData);
-      showSuccess('Comprobante enviado a impresora Bluetooth');
-    } catch (error) {
-      console.error('Error printing via Bluetooth:', error);
-      showError('Error de impresión Bluetooth');
-    } finally {
-      setPrinting(false);
-    }
-  }, [order, payment, showError, showSuccess]);
-
-  const handleTestPrint = useCallback(async () => {
-    try {
-      setPrinting(true);
-      await bluetoothPrinter.printTest();
-      showSuccess('Prueba de impresión completada');
-    } catch (error) {
-      console.error('Error in test print:', error);
-      showError('Error de prueba de impresión');
-    } finally {
-      setPrinting(false);
-    }
-  }, [showError, showSuccess]);
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="space-y-3">
-              {[...Array(10)].map((_, i) => (
-                <div key={i} className="h-4 bg-gray-200 rounded"></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!order) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">Orden no encontrada</p>
-      </div>
-    );
-  }
+  // Obtener ID de la URL manualmente
+  const url = window.location.pathname;
+  const id = url.split('/').pop() || '0';
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between no-print">
-        <div className="flex items-center gap-4">
-          <Button
-            onClick={() => navigate('/payment-history')}
-            variant="secondary"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Volver
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Recibo de Pago</h1>
-            <p className="text-gray-600">Orden #{order.id}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={handleBluetoothPrint}
-            disabled={printing}
-            className="flex items-center gap-2"
-          >
-            {printing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Imprimiendo...
-              </>
-            ) : (
-              <>
-                <Printer className="h-4 w-4" />
-                Imprimir Bluetooth
-              </>
-            )}
-          </Button>
-          
-          <Button
-            onClick={handleTestPrint}
-            disabled={printing}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            {printing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                Probando...
-              </>
-            ) : (
-              <>
-                <Printer className="h-4 w-4" />
-                Probar Impresora
-              </>
-            )}
-          </Button>
+    <div style={{ padding: '16px', fontFamily: 'system-ui' }}>
+      {/* Header con estilos inline */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+        <button
+          onClick={handleBack}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#e5e7eb',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          ← Volver
+        </button>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>Recibo de Pago</h1>
+          <p style={{ color: '#6b7280', margin: '4px 0 0 0' }}>Orden #{id}</p>
         </div>
       </div>
 
-      {/* Receipt - Solo el formato compacto */}
-      <div className="max-w-md mx-auto">
-        <ReceiptFormat order={order} payment={payment} />
+      {/* Contenido con estilos inline */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '24px',
+        borderRadius: '8px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        maxWidth: '400px',
+        margin: '0 auto',
+        fontFamily: 'monospace',
+        fontSize: '12px'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 'bold', margin: '0' }}>EL FOGÓN DE DON SOTO</h2>
+          <p style={{ fontSize: '12px', margin: '4px 0 0 0' }}>COMPROBANTE</p>
+        </div>
+        
+        <div style={{ fontSize: '12px', lineHeight: '1.5' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Orden:</span>
+            <span>#{id}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Mesa:</span>
+            <span>N/A</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Fecha:</span>
+            <span>{new Date().toLocaleDateString()}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Hora:</span>
+            <span>{new Date().toLocaleTimeString()}</span>
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid #d1d5db', marginTop: '16px', paddingTop: '16px' }}>
+          <div style={{ textAlign: 'center', color: '#6b7280' }}>
+            <p>Versión de emergencia - Sin datos dinámicos</p>
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid #d1d5db', marginTop: '16px', paddingTop: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+            <span>TOTAL:</span>
+            <span>S/ 0.00</span>
+          </div>
+        </div>
+
+        <div style={{ 
+          borderTop: '1px solid #d1d5db', 
+          marginTop: '16px', 
+          paddingTop: '16px',
+          textAlign: 'center'
+        }}>
+          <p style={{ fontSize: '12px', margin: '0' }}>¡Gracias por su visita!</p>
+        </div>
+      </div>
+
+      {/* Mensaje temporal */}
+      <div style={{
+        backgroundColor: '#fef3c7',
+        padding: '16px',
+        borderRadius: '6px',
+        textAlign: 'center',
+        margin: '24px 0'
+      }}>
+        <p style={{ fontSize: '14px', color: '#92400e', margin: '0' }}>
+          ⚠️ Versión temporal de emergencia
+        </p>
+        <p style={{ fontSize: '12px', color: '#b45309', margin: '4px 0 0 0' }}>
+          Funcionalidad completa temporalmente deshabilitada
+        </p>
+      </div>
+
+      {/* Botón deshabilitado */}
+      <div style={{ textAlign: 'center' }}>
+        <button
+          disabled
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#d1d5db',
+            color: '#6b7280',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'not-allowed'
+          }}
+        >
+          Imprimir Bluetooth (Deshabilitado)
+        </button>
       </div>
     </div>
   );
