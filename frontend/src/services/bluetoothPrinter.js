@@ -183,10 +183,10 @@ class BluetoothPrinterService {
       await this.sendCommand(this.commands.INIT);
       await this.sendCommand(this.commands.FONT_A);
 
-      // Header centrado (igual que web)
+      // Header centrado (con tilde correcta)
       await this.sendCommand(this.commands.ALIGN_CENTER);
       await this.sendCommand(this.commands.BOLD_ON);
-      await this.printText('EL FOGON DE DON SOTO\n');
+      await this.printText('EL FOGÓN DE DON SOTO\n');
       await this.sendCommand(this.commands.BOLD_OFF);
       await this.printText('COMPROBANTE\n\n');
 
@@ -199,8 +199,9 @@ class BluetoothPrinterService {
         await this.printText(`Mesero:              ${paymentData.order.waiter}\n`);
       }
       
-      const now = new Date();
-      const { fecha, hora } = this.formatDateTime(now);
+      // Usar fecha y hora del pago, no de impresión
+      const paymentDate = paymentData.payment.created_at || paymentData.order.created_at || new Date().toISOString();
+      const { fecha, hora } = this.formatDateTime(new Date(paymentDate));
       await this.printText(`Fecha:               ${fecha}\n`);
       await this.printText(`Hora:                ${hora}\n`);
 
@@ -231,16 +232,18 @@ class BluetoothPrinterService {
       // Separador antes del total
       await this.printText('-------------------------------------\n');
 
-      // Total usando suma real de items
+      // Total alineado con los precios (derecha como los items)
       const displayTotal = this.formatCurrency(itemsTotal || paymentData.amount || paymentData.order.total_amount || 0);
+      const totalLine = 'TOTAL:';
+      const totalSpaces = Math.max(1, 37 - totalLine.length - displayTotal.length);
       await this.sendCommand(this.commands.BOLD_ON);
-      await this.printText(`TOTAL:               ${displayTotal}\n`);
+      await this.printText(`${totalLine}${' '.repeat(totalSpaces)}${displayTotal}\n`);
       await this.sendCommand(this.commands.BOLD_OFF);
 
       // Separador final
       await this.printText('-------------------------------------\n');
 
-      // Footer centrado (igual que web)
+      // Footer centrado con signo de admiración correcto
       await this.sendCommand(this.commands.ALIGN_CENTER);
       await this.printText('¡Gracias por su visita!\n');
 
