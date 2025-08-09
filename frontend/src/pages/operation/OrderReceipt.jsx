@@ -1,20 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Receipt, Printer, DollarSign, Clock, User } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Button from '../../components/common/Button';
 import ReceiptFormat from '../../components/ReceiptFormat';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import bluetoothPrinter from '../../services/bluetoothPrinter';
 
 const OrderReceipt = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { showError, showSuccess } = useToast();
+  const { showError } = useToast();
   const [order, setOrder] = useState(null);
   const [payment, setPayment] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     loadOrderDetails();
@@ -42,90 +40,6 @@ const OrderReceipt = () => {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleBluetoothPrint = async () => {
-    if (!order || !payment) {
-      showError('No hay datos de orden o pago para imprimir');
-      return;
-    }
-
-    try {
-      setPrinting(true);
-      
-      const receiptData = {
-        payment_method: payment.payment_method,
-        amount: payment.amount,
-        tax_amount: payment.tax_amount || '0.00',
-        notes: payment.notes || '',
-        order: order
-      };
-
-      await bluetoothPrinter.printPaymentReceipt(receiptData);
-      showSuccess('Comprobante enviado a impresora Bluetooth');
-    } catch (error) {
-      console.error('Error printing via Bluetooth:', error);
-      
-      if (error.message.includes('Web Bluetooth no está soportado')) {
-        showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
-      } else if (error.message.includes('conexión')) {
-        showError('No se pudo conectar con la impresora. Verifica que esté encendida.');
-      } else {
-        showError(`Error de impresión Bluetooth: ${error.message}`);
-      }
-    } finally {
-      setPrinting(false);
-    }
-  };
-
-  const handleTestPrint = async () => {
-    try {
-      setPrinting(true);
-      await bluetoothPrinter.printTest();
-      showSuccess('Prueba de impresión completada');
-    } catch (error) {
-      console.error('Error in test print:', error);
-      
-      if (error.message.includes('Web Bluetooth no está soportado')) {
-        showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
-      } else if (error.message.includes('conexión')) {
-        showError('No se pudo conectar con la impresora. Verifica que esté encendida y el PIN sea 1234.');
-      } else {
-        showError(`Error de prueba de impresión: ${error.message}`);
-      }
-    } finally {
-      setPrinting(false);
-    }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN'
-    }).format(amount || 0);
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getPaymentMethodLabel = (method) => {
-    const methods = {
-      CASH: 'Efectivo',
-      CARD: 'Tarjeta',
-      TRANSFER: 'Transferencia',
-      OTHER: 'Otro'
-    };
-    return methods[method] || method;
-  };
 
   if (loading) {
     return (
@@ -174,25 +88,9 @@ const OrderReceipt = () => {
       </div>
 
       {/* Receipt - Solo el formato compacto */}
-      <div className="receipt-container max-w-md mx-auto">
+      <div className="max-w-md mx-auto">
         <ReceiptFormat order={order} payment={payment} />
       </div>
-
-      {/* Print Styles */}
-      <style jsx>{`
-        @media print {
-          .no-print {
-            display: none !important;
-          }
-          body {
-            background: white;
-          }
-          .bg-white {
-            box-shadow: none !important;
-            border: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };
