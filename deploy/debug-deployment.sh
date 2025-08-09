@@ -52,16 +52,19 @@ else
     echo -e "${RED}❌ OLD VERSION - Missing compact format${NC}"
 fi
 
-echo -e "\n${BLUE}5. Limpiando cache de npm...${NC}"
+echo -e "\n${BLUE}5. Instalando dependencias...${NC}"
 cd "$FRONTEND_DIR"
+npm install --silent --no-fund --no-audit
+
+echo -e "\n${BLUE}6. Limpiando cache de npm...${NC}"
 rm -rf node_modules/.cache 2>/dev/null || true
 rm -rf dist 2>/dev/null || true
 npm cache clean --force 2>/dev/null || true
 
-echo -e "\n${BLUE}6. Building frontend...${NC}"
+echo -e "\n${BLUE}7. Building frontend...${NC}"
 npm run build
 
-echo -e "\n${BLUE}7. Verificando build output...${NC}"
+echo -e "\n${BLUE}8. Verificando build output...${NC}"
 if [ -d "dist" ]; then
     echo -e "${GREEN}✅ Build directory exists${NC}"
     echo "Build size: $(du -sh dist | cut -f1)"
@@ -71,7 +74,7 @@ else
     exit 1
 fi
 
-echo -e "\n${BLUE}8. Verificando contenido del build...${NC}"
+echo -e "\n${BLUE}9. Verificando contenido del build...${NC}"
 # Check if the built files contain the new clean version
 if find dist -name "*.js" -exec grep -l "handleBluetoothPrint" {} \; | head -1; then
     echo -e "${RED}❌ Built files still contain old print functions${NC}"
@@ -79,7 +82,7 @@ else
     echo -e "${GREEN}✅ Built files are clean${NC}"
 fi
 
-echo -e "\n${BLUE}9. Desplegando a nginx...${NC}"
+echo -e "\n${BLUE}10. Desplegando a nginx...${NC}"
 systemctl stop nginx
 rm -rf /var/www/restaurant/*
 mkdir -p /var/www/restaurant
@@ -87,7 +90,7 @@ cp -r dist/* /var/www/restaurant/
 chown -R www-data:www-data /var/www/restaurant
 systemctl start nginx
 
-echo -e "\n${BLUE}10. Verificando deployment...${NC}"
+echo -e "\n${BLUE}11. Verificando deployment...${NC}"
 echo "Nginx files deployed: $(find /var/www/restaurant -type f | wc -l) files"
 echo "Nginx directory size: $(du -sh /var/www/restaurant | cut -f1)"
 

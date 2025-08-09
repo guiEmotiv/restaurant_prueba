@@ -124,6 +124,10 @@ VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
 EOF
     
+    # Install dependencies and build frontend
+    echo -e "${BLUE}📦 Installing dependencies...${NC}"
+    npm install --silent --no-fund --no-audit
+    
     # Clean cache and build frontend
     echo -e "${BLUE}🔨 Building frontend...${NC}"
     rm -rf node_modules/.cache 2>/dev/null || true
@@ -197,6 +201,9 @@ VITE_AWS_REGION=$AWS_REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
 EOF
+    
+    echo -e "${BLUE}📦 Installing dependencies...${NC}"
+    npm install --silent --no-fund --no-audit
     
     echo -e "${BLUE}🔨 Building frontend...${NC}"
     rm -rf node_modules/.cache 2>/dev/null || true
