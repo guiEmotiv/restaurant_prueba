@@ -183,10 +183,10 @@ class BluetoothPrinterService {
       await this.sendCommand(this.commands.INIT);
       await this.sendCommand(this.commands.FONT_A);
 
-      // Header centrado (con tilde correcta)
+      // Header centrado (sin caracteres especiales para compatibilidad)
       await this.sendCommand(this.commands.ALIGN_CENTER);
       await this.sendCommand(this.commands.BOLD_ON);
-      await this.printText('EL FOGÓN DE DON SOTO\n');
+      await this.printText('EL FOGON DE DON SOTO\n');
       await this.sendCommand(this.commands.BOLD_OFF);
       await this.printText('COMPROBANTE\n\n');
 
@@ -216,9 +216,9 @@ class BluetoothPrinterService {
           const quantity = item.quantity || 1;
           const itemPrice = parseFloat(item.total_price || 0);
           itemsTotal += itemPrice;
-          const price = this.formatCurrency(itemPrice);
+          const price = this.formatPrice(itemPrice); // Sin símbolo S/
           
-          // Formato exacto: "2x Nombre del Plato          S/ 15.00"
+          // Formato: "2x Nombre del Plato              15.00" (sin S/)
           const itemLine = `${quantity}x ${itemName}`;
           const spaces = Math.max(1, 37 - itemLine.length - price.length);
           await this.printText(`${itemLine}${' '.repeat(spaces)}${price}\n`);
@@ -243,9 +243,9 @@ class BluetoothPrinterService {
       // Separador final
       await this.printText('-------------------------------------\n');
 
-      // Footer centrado con signo de admiración correcto
+      // Footer centrado (sin caracteres especiales para compatibilidad)
       await this.sendCommand(this.commands.ALIGN_CENTER);
-      await this.printText('¡Gracias por su visita!\n');
+      await this.printText('Gracias por su visita!\n');
 
       // Espaciado suficiente antes del corte para evitar corte del texto
       await this.printText('\n\n\n\n');
@@ -365,6 +365,14 @@ class BluetoothPrinterService {
     const value = parseFloat(amount) || 0;
     // Usar S/ en lugar del símbolo PEN que puede causar problemas en la impresora
     return `S/ ${value.toFixed(2)}`;
+  }
+
+  /**
+   * Formatea cantidad sin símbolo de moneda (solo para items)
+   */
+  formatPrice(amount) {
+    const value = parseFloat(amount) || 0;
+    return value.toFixed(2);
   }
 
   /**
