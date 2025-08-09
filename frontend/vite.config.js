@@ -15,11 +15,19 @@ export default defineConfig({
     strictPort: true
   },
   build: {
-    minify: false, // Disable minification to debug "i is not a function"
-    sourcemap: true,
+    minify: 'esbuild', // Enable minification for smaller bundle
+    sourcemap: false, // Disable sourcemaps in production to save memory
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: undefined
+        manualChunks: {
+          // Split vendor chunks to reduce memory usage during build
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-router': ['react-router-dom'],
+          'vendor-icons': ['lucide-react'],
+          'vendor-aws': ['aws-amplify', '@aws-amplify/ui-react'],
+          'vendor-utils': ['date-fns']
+        }
       }
     }
   }

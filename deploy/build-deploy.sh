@@ -133,7 +133,7 @@ EOF
     rm -rf node_modules/.cache 2>/dev/null || true
     rm -rf dist 2>/dev/null || true
     npm cache clean --force 2>/dev/null || true
-    npm run build
+    npm run build:prod
     
     if [ ! -d "dist" ]; then
         echo -e "${RED}❌ Frontend build failed${NC}"
@@ -209,7 +209,7 @@ EOF
     rm -rf node_modules/.cache 2>/dev/null || true
     rm -rf dist 2>/dev/null || true
     npm cache clean --force 2>/dev/null || true
-    npm run build &
+    npm run build:prod &
     FRONTEND_PID=$!
     
     # Start backend while frontend builds
