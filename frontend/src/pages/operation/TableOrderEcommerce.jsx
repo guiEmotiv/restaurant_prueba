@@ -239,47 +239,48 @@ const TableOrderEcommerce = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header fijo */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {/* Info de la mesa */}
-            <div className="flex items-center gap-4">
+    <div className="fixed inset-0 bg-gray-50 flex flex-col h-full">
+      {/* Header fijo estilo moderno */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/table-status')}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               
               <div>
-                <h1 className="text-base sm:text-lg font-bold text-gray-900">
-                  Mesa {table.table_number} - Crear Pedido
+                <h1 className="text-xl font-bold text-gray-900">
+                  Mesa {table.table_number}
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-600 flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
                   <span>{table.zone_name}</span>
                   {table.capacity && (
                     <>
                       <span>•</span>
-                      <Users className="h-3 w-3" />
-                      <span className="hidden sm:inline">{table.capacity} personas</span>
-                      <span className="sm:hidden">{table.capacity}p</span>
+                      <Users className="h-4 w-4" />
+                      <span>{table.capacity} personas</span>
                     </>
                   )}
-                </p>
+                </div>
               </div>
             </div>
 
-            {/* Carrito */}
+            {/* Carrito con estilo mejorado */}
             <button
               onClick={() => setShowCart(!showCart)}
-              className="relative bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              className="relative bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 flex items-center gap-3 shadow-lg transition-all duration-200 transform hover:scale-105"
             >
-              <ShoppingCart className="h-4 w-4" />
-              <span className="font-medium">Carrito</span>
+              <ShoppingCart className="h-5 w-5" />
+              <div className="flex flex-col items-start">
+                <span className="font-semibold text-sm">Carrito</span>
+                <span className="text-xs opacity-90">{formatCurrency(calculateCartTotal())}</span>
+              </div>
               {getCartItemsCount() > 0 && (
-                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs font-bold animate-pulse">
                   {getCartItemsCount()}
                 </div>
               )}
@@ -288,21 +289,21 @@ const TableOrderEcommerce = () => {
         </div>
       </div>
 
-      <div className="flex">
+      <div className="flex flex-1 overflow-hidden">
         {/* Panel principal del menú */}
-        <div className={`flex-1 transition-all duration-300 ${showCart ? 'hidden sm:block sm:mr-80' : 'mr-0'}`}>
-          {/* Filtros */}
-          <div className="bg-white border-b border-gray-200 p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
+        <div className={`flex-1 flex flex-col transition-all duration-300 ${showCart ? 'hidden sm:flex sm:mr-80' : 'flex'}`}>
+          {/* Filtros fijos */}
+          <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
+            <div className="space-y-3">
               {/* Buscador */}
-              <div className="flex-1 relative">
+              <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Buscar platos..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
               </div>
 
@@ -312,7 +313,7 @@ const TableOrderEcommerce = () => {
                 <select
                   value={selectedGroup}
                   onChange={(e) => setSelectedGroup(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 >
                   <option value="all">Todos los grupos</option>
                   {groups.map(group => (
@@ -325,66 +326,78 @@ const TableOrderEcommerce = () => {
             </div>
           </div>
 
-          {/* Grid de recetas */}
-          <div className="p-4">
+          {/* Grid de recetas scrollable */}
+          <div className="flex-1 overflow-y-auto p-4">
             {filteredRecipes.length === 0 ? (
-              <div className="text-center py-12">
-                <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron platos</h3>
-                <p className="text-gray-600">
-                  {searchTerm ? 'Intenta con otros términos de búsqueda' : 'No hay platos disponibles en este momento'}
-                </p>
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron platos</h3>
+                  <p className="text-gray-500">
+                    {searchTerm ? 'Intenta con otros términos de búsqueda' : 'No hay platos disponibles en este momento'}
+                  </p>
+                </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
                 {filteredRecipes.map((recipe) => (
                   <div
                     key={recipe.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200"
+                    className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 group"
                   >
+                    {/* Imagen placeholder con gradiente */}
+                    <div className="h-32 bg-gradient-to-br from-blue-50 to-indigo-100 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                      <div className="absolute top-2 right-2">
+                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-1">
+                          <Clock className="h-3 w-3 text-gray-600" />
+                        </div>
+                      </div>
+                      <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1">
+                        <span className="text-xs font-medium text-gray-700">{recipe.preparation_time}min</span>
+                      </div>
+                    </div>
+
                     <div className="p-4">
                       {/* Header del item */}
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-medium text-gray-900 text-sm leading-tight">
+                      <div className="mb-3">
+                        <h3 className="font-semibold text-gray-900 text-base line-clamp-2 group-hover:text-blue-600 transition-colors">
                           {recipe.name}
                         </h3>
-                        <div className="ml-2 flex items-center gap-1 text-xs text-gray-500">
-                          <Clock className="h-3 w-3" />
-                          <span>{recipe.preparation_time}min</span>
-                        </div>
+                        <p className="text-xs text-blue-600 font-medium mt-1">
+                          {recipe.group_name || 'Sin grupo'}
+                        </p>
                       </div>
 
                       {/* Descripción */}
                       {recipe.description && (
-                        <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                        <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
                           {recipe.description}
                         </p>
                       )}
 
-                      {/* Precio */}
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-lg font-bold text-gray-900">
+                      {/* Precio destacado */}
+                      <div className="mb-4">
+                        <span className="text-2xl font-bold text-gray-900">
                           {formatCurrency(recipe.base_price)}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {recipe.group_name || 'Sin grupo'}
                         </span>
                       </div>
 
-                      {/* Botones de acción */}
+                      {/* Botones de acción mejorados */}
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleQuickAdd(recipe)}
-                          className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-1"
+                          className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-2 shadow-lg transform hover:scale-105"
                         >
-                          <Plus className="h-3 w-3" />
+                          <Plus className="h-4 w-4" />
                           Agregar
                         </button>
                         <button
                           onClick={() => openItemModal(recipe)}
-                          className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                          className="px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 text-sm"
+                          title="Personalizar pedido"
                         >
-                          <StickyNote className="h-3 w-3" />
+                          <StickyNote className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
@@ -403,79 +416,101 @@ const TableOrderEcommerce = () => {
           />
         )}
 
-        {/* Panel del carrito (sidebar) */}
+        {/* Panel del carrito (sidebar) mejorado */}
         {showCart && (
-          <div className="fixed right-0 top-0 h-full w-full sm:w-80 bg-white border-l border-gray-200 shadow-lg z-50 pt-16 sm:pt-0">
+          <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-white border-l border-gray-200 shadow-2xl z-50 pt-20 sm:pt-0">
             <div className="flex flex-col h-full">
               {/* Header del carrito */}
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900">Carrito</h2>
+              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-xl font-bold text-gray-900">Tu Pedido</h2>
                   <button
                     onClick={() => setShowCart(false)}
-                    className="p-1 text-gray-400 hover:text-gray-600"
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-white/50 rounded-lg transition-colors"
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                 </div>
-                <p className="text-sm text-gray-600 mt-1">
-                  {getCartItemsCount()} {getCartItemsCount() === 1 ? 'item' : 'items'}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">
+                    {getCartItemsCount()} {getCartItemsCount() === 1 ? 'producto' : 'productos'}
+                  </p>
+                  <p className="text-lg font-bold text-blue-600">
+                    {formatCurrency(calculateCartTotal())}
+                  </p>
+                </div>
               </div>
 
               {/* Items del carrito */}
               <div className="flex-1 overflow-y-auto p-4">
                 {cart.length === 0 ? (
-                  <div className="text-center py-8">
-                    <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">El carrito está vacío</p>
-                    <p className="text-sm text-gray-400 mt-1">Agrega platos del menú</p>
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="bg-gray-100 rounded-full p-6 w-24 h-24 mx-auto mb-4 flex items-center justify-center">
+                        <ShoppingCart className="h-12 w-12 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Tu carrito está vacío</h3>
+                      <p className="text-gray-500">Agrega algunos platos deliciosos</p>
+                    </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {cart.map((item) => (
-                      <div key={item.id} className="bg-gray-50 rounded-lg p-3">
-                        <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-medium text-sm text-gray-900">
-                            {item.recipe.name}
-                          </h4>
-                          <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="text-red-600 hover:text-red-800 ml-2"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-600">Cantidad:</span>
-                            <span className="font-medium">{item.quantity}</span>
-                          </div>
-                          <span className="font-semibold text-gray-900">
-                            {formatCurrency(item.unit_price * item.quantity)}
-                          </span>
-                        </div>
-
-                        {item.notes && (
-                          <div className="mt-2 text-xs text-gray-600">
-                            <strong>Notas:</strong> {item.notes}
-                          </div>
-                        )}
-
-                        <div className="flex gap-2 mt-2">
-                          {item.is_takeaway && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">
-                              <Package className="h-3 w-3" />
-                              Para llevar
+                      <div key={item.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-start gap-3">
+                          {/* Imagen placeholder */}
+                          <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <span className="text-blue-600 font-bold text-lg">
+                              {item.recipe.name.charAt(0)}
                             </span>
-                          )}
-                          {item.has_taper && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
-                              <Check className="h-3 w-3" />
-                              Con envase
-                            </span>
-                          )}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between mb-2">
+                              <h4 className="font-semibold text-gray-900 text-sm line-clamp-2">
+                                {item.recipe.name}
+                              </h4>
+                              <button
+                                onClick={() => removeFromCart(item.id)}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded-lg transition-colors ml-2"
+                              >
+                                <Minus className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center justify-between text-sm mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-500">Cant:</span>
+                                <span className="font-semibold bg-gray-100 px-2 py-1 rounded-md">{item.quantity}</span>
+                              </div>
+                              <span className="font-bold text-gray-900 text-base">
+                                {formatCurrency(item.unit_price * item.quantity)}
+                              </span>
+                            </div>
+
+                            {item.notes && (
+                              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-xs text-yellow-800">
+                                  <strong>Notas:</strong> {item.notes}
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="flex gap-2 mt-2">
+                              {item.is_takeaway && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                                  <Package className="h-3 w-3" />
+                                  Para llevar
+                                </span>
+                              )}
+                              {item.has_taper && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                  <Check className="h-3 w-3" />
+                                  Con envase
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -485,25 +520,27 @@ const TableOrderEcommerce = () => {
 
               {/* Footer del carrito */}
               {cart.length > 0 && (
-                <div className="border-t border-gray-200 p-4">
-                  <div className="flex items-center justify-between mb-4 text-lg font-semibold">
-                    <span>Total:</span>
-                    <span>{formatCurrency(calculateCartTotal())}</span>
+                <div className="border-t border-gray-200 p-6 bg-gray-50">
+                  <div className="bg-white rounded-xl p-4 mb-4 shadow-sm">
+                    <div className="flex items-center justify-between text-lg">
+                      <span className="font-semibold text-gray-700">Total:</span>
+                      <span className="font-bold text-2xl text-gray-900">{formatCurrency(calculateCartTotal())}</span>
+                    </div>
                   </div>
                   <button
                     onClick={handleCreateOrder}
                     disabled={creatingOrder}
-                    className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+                    className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 rounded-xl hover:from-green-700 hover:to-green-800 disabled:opacity-50 font-semibold flex items-center justify-center gap-2 shadow-lg transition-all duration-200 transform hover:scale-105"
                   >
                     {creatingOrder ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                         Creando pedido...
                       </>
                     ) : (
                       <>
-                        <Check className="h-4 w-4" />
-                        Crear Pedido
+                        <Check className="h-5 w-5" />
+                        Confirmar Pedido
                       </>
                     )}
                   </button>
@@ -514,46 +551,67 @@ const TableOrderEcommerce = () => {
         )}
       </div>
 
-      {/* Modal para agregar item con opciones */}
+      {/* Modal para agregar item con opciones mejorado */}
       {selectedRecipe && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            {/* Header del modal */}
+            <div className="relative p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-2xl">
+              <button
+                onClick={() => setSelectedRecipe(null)}
+                className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-white/50 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              
+              <div className="pr-12">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
                   {selectedRecipe.name}
                 </h3>
-                <button
-                  onClick={() => setSelectedRecipe(null)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
+                <p className="text-blue-600 text-sm font-medium">
+                  {selectedRecipe.group_name || 'Sin grupo'}
+                </p>
               </div>
+            </div>
 
-              <div className="space-y-4">
-                {/* Precio */}
-                <div className="text-xl font-bold text-gray-900">
+            <div className="p-6 space-y-6">
+              {/* Precio destacado */}
+              <div className="text-center py-4 bg-gray-50 rounded-xl">
+                <div className="text-3xl font-bold text-gray-900">
                   {formatCurrency(selectedRecipe.base_price)}
                 </div>
+                <p className="text-sm text-gray-600 mt-1">Precio base</p>
+              </div>
 
-                {/* Notas */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Notas especiales (opcional)
-                  </label>
-                  <textarea
-                    value={itemNotes}
-                    onChange={(e) => setItemNotes(e.target.value)}
-                    placeholder="Ej: Sin cebolla, término medio..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={3}
-                  />
+              {/* Descripción si existe */}
+              {selectedRecipe.description && (
+                <div className="p-4 bg-blue-50 rounded-xl">
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {selectedRecipe.description}
+                  </p>
                 </div>
+              )}
 
-                {/* Opciones de takeaway */}
+              {/* Notas especiales */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Notas especiales (opcional)
+                </label>
+                <textarea
+                  value={itemNotes}
+                  onChange={(e) => setItemNotes(e.target.value)}
+                  placeholder="Ej: Sin cebolla, término medio, extra salsa..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                  rows={3}
+                />
+              </div>
+
+              {/* Opciones de entrega */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-gray-700">Opciones de entrega</h4>
+                
                 <div className="space-y-3">
-                  <label className="flex items-center gap-3">
+                  <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl hover:border-orange-300 hover:bg-orange-50 transition-colors cursor-pointer">
                     <input
                       type="checkbox"
                       checked={itemTakeaway}
@@ -563,30 +621,44 @@ const TableOrderEcommerce = () => {
                           setItemTaper(true);
                         }
                       }}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-gray-300 text-orange-600 focus:ring-orange-500 mt-0.5"
                     />
-                    <span className="text-sm font-medium text-gray-700">Para llevar</span>
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                        <Package className="h-4 w-4 text-orange-600" />
+                        Para llevar
+                      </span>
+                      <p className="text-xs text-gray-600 mt-1">El pedido será preparado para llevar</p>
+                    </div>
                   </label>
 
                   {itemTakeaway && (
-                    <label className="flex items-center gap-3 ml-6">
+                    <label className="flex items-start gap-3 p-3 ml-6 border border-gray-200 rounded-xl hover:border-green-300 hover:bg-green-50 transition-colors cursor-pointer">
                       <input
                         type="checkbox"
                         checked={itemTaper}
                         onChange={(e) => setItemTaper(e.target.checked)}
-                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                        className="rounded border-gray-300 text-green-600 focus:ring-green-500 mt-0.5"
                       />
-                      <span className="text-sm font-medium text-gray-700">Incluir envase</span>
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          Incluir envase
+                        </span>
+                        <p className="text-xs text-gray-600 mt-1">Se agregará un envase apropiado</p>
+                      </div>
                     </label>
                   )}
                 </div>
               </div>
+            </div>
 
-              {/* Botones */}
-              <div className="flex gap-3 mt-6">
+            {/* Footer del modal */}
+            <div className="p-6 bg-gray-50 rounded-b-2xl">
+              <div className="flex gap-3">
                 <button
                   onClick={() => setSelectedRecipe(null)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-6 py-3 border border-gray-300 rounded-xl text-gray-700 font-semibold hover:bg-gray-100 hover:border-gray-400 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -594,7 +666,7 @@ const TableOrderEcommerce = () => {
                   onClick={() => {
                     addToCart(selectedRecipe, itemNotes, itemTakeaway, itemTaper);
                   }}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 font-semibold flex items-center justify-center gap-2 shadow-lg transition-all duration-200 transform hover:scale-105"
                 >
                   <Plus className="h-4 w-4" />
                   Agregar al carrito
