@@ -138,113 +138,100 @@ const Operations = () => {
         </div>
       </div>
 
-      <div className="pt-24 px-3 space-y-5">
-        {/* Mesas Ocupadas */}
-        {occupiedTables.length > 0 && (
-          <section>
-            <div className="text-center mb-4">
-              <h2 className="text-sm font-semibold text-gray-800">
-                Mesas Ocupadas ({occupiedTables.length})
-              </h2>
-              <div className="w-3 h-3 bg-red-500 rounded-full mx-auto mt-1"></div>
-            </div>
-            
-            <div className="grid grid-cols-1 gap-3">
-              {occupiedTables.map((table) => {
-                const ordersCount = getOrdersCount(table.id);
-                const itemsStatus = getTableItemsStatus(table.id);
-                const zoneName = zones.find(zone => zone.id === table.zone)?.name || 'Sin zona';
-                
-                return (
-                  <div 
-                    key={table.id} 
-                    className="bg-white rounded-lg shadow-sm border border-red-100 overflow-hidden"
-                  >
-                    <div 
-                      onClick={() => handleTableClick(table)}
-                      className="p-4 cursor-pointer hover:bg-red-50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                            <Table className="h-5 w-5 text-red-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-base font-semibold text-gray-900">{table.name}</h3>
-                            <p className="text-xs text-gray-500">{zoneName}</p>
-                          </div>
-                        </div>
-                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm text-gray-600">
-                            {ordersCount} cuenta{ordersCount !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-blue-600" />
-                          <span className="text-sm font-medium text-blue-700">
-                            {itemsStatus.served}/{itemsStatus.total} items
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+      <div className="pt-24 px-3 space-y-6">
+        {/* Vista por zonas */}
+        {zones.filter(zone => {
+          const zoneTables = filteredTables.filter(table => table.zone === zone.id);
+          return zoneTables.length > 0;
+        }).map((zone) => {
+          const zoneTables = filteredTables.filter(table => table.zone === zone.id);
+          const occupiedZoneTables = zoneTables.filter(table => getTableStatus(table.id) === 'occupied');
+          const availableZoneTables = zoneTables.filter(table => getTableStatus(table.id) === 'available');
+          
+          return (
+            <div key={zone.id} className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-100">
+                <h2 className="text-lg font-bold text-gray-900 text-center">{zone.name}</h2>
+                <p className="text-xs text-gray-600 text-center mt-1">
+                  {zoneTables.length} mesa{zoneTables.length !== 1 ? 's' : ''} • 
+                  {occupiedZoneTables.length} ocupada{occupiedZoneTables.length !== 1 ? 's' : ''} • 
+                  {availableZoneTables.length} disponible{availableZoneTables.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              
+              <div className="p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {zoneTables.map((table) => {
+                    const status = getTableStatus(table.id);
+                    const ordersCount = getOrdersCount(table.id);
+                    const itemsStatus = getTableItemsStatus(table.id);
+                    const isOccupied = status === 'occupied';
                     
-                    <div className="px-4 pb-3">
-                      <button
-                        onClick={(e) => handleNewOrder(table, e)}
-                        className="w-full py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-1"
+                    return (
+                      <div 
+                        key={table.id}
+                        className={`border-2 rounded-lg overflow-hidden transition-all duration-200 hover:shadow-md ${
+                          isOccupied 
+                            ? 'border-red-200 bg-red-50' 
+                            : 'border-green-200 bg-green-50'
+                        }`}
                       >
-                        <Plus className="h-3 w-3" />
-                        Nueva Cuenta
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Mesas Disponibles */}
-        {availableTables.length > 0 && (
-          <section>
-            <div className="text-center mb-4">
-              <h2 className="text-sm font-semibold text-gray-800">
-                Mesas Disponibles ({availableTables.length})
-              </h2>
-              <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mt-1"></div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-3">
-              {availableTables.map((table) => {
-                const zoneName = zones.find(zone => zone.id === table.zone)?.name || 'Sin zona';
-                
-                return (
-                  <div 
-                    key={table.id}
-                    onClick={() => handleTableClick(table)}
-                    className="bg-white rounded-lg shadow-sm border border-green-100 p-4 cursor-pointer hover:bg-green-50 transition-colors"
-                  >
-                    <div className="flex flex-col items-center text-center gap-3">
-                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                        <Table className="h-6 w-6 text-green-600" />
+                        <div 
+                          onClick={() => handleTableClick(table)}
+                          className="p-3 cursor-pointer hover:opacity-80 transition-opacity"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                isOccupied ? 'bg-red-100' : 'bg-green-100'
+                              }`}>
+                                <div className={`w-4 h-4 rounded ${
+                                  isOccupied ? 'bg-red-500' : 'bg-green-500'
+                                }`}></div>
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-semibold text-gray-900">{table.name}</h3>
+                              </div>
+                            </div>
+                            <div className={`w-2 h-2 rounded-full ${
+                              isOccupied ? 'bg-red-500' : 'bg-green-500'
+                            }`}></div>
+                          </div>
+                          
+                          {isOccupied && (
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <div>{ordersCount} cuenta{ordersCount !== 1 ? 's' : ''}</div>
+                              <div className="font-medium text-blue-700">
+                                {itemsStatus.served}/{itemsStatus.total} items
+                              </div>
+                            </div>
+                          )}
+                          
+                          {!isOccupied && (
+                            <div className="text-xs text-gray-500 text-center">
+                              Disponible
+                            </div>
+                          )}
+                        </div>
+                        
+                        {isOccupied && (
+                          <div className="px-3 pb-3">
+                            <button
+                              onClick={(e) => handleNewOrder(table, e)}
+                              className="w-full py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+                            >
+                              + Nueva Cuenta
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-900">{table.name}</h3>
-                        <p className="text-xs text-gray-500 mt-1">{zoneName}</p>
-                      </div>
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </section>
-        )}
+          );
+        })}
 
         {/* Empty State */}
         {tables.length === 0 && (

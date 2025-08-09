@@ -4,12 +4,9 @@ import { useToast } from '../../contexts/ToastContext';
 import { 
   ArrowLeft,
   Search,
-  Plus,
   ShoppingCart,
   X,
   Trash2,
-  StickyNote,
-  Package,
   Filter
 } from 'lucide-react';
 import { apiService } from '../../services/api';
@@ -133,30 +130,43 @@ const OrderCreate = () => {
     try {
       setCreating(true);
       
+      // Datos de la orden con formato correcto
       const orderData = {
         table: parseInt(tableId),
-        total_amount: getCartTotal()
+        total_amount: parseFloat(getCartTotal().toFixed(2)),
+        status: 'CREATED'
       };
 
+      console.log('Creating order with data:', orderData);
       const order = await apiService.orders.create(orderData);
+      console.log('Order created:', order);
 
+      // Crear items de la orden
       for (const item of cart) {
-        await apiService.orderItems.create({
+        const orderItemData = {
           order: order.id,
           recipe: item.recipe.id,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          total_price: item.unitPrice * item.quantity,
+          quantity: parseInt(item.quantity),
+          unit_price: parseFloat((item.unitPrice || 0).toFixed(2)),
+          total_price: parseFloat((item.unitPrice * item.quantity || 0).toFixed(2)),
           notes: item.notes || '',
-          is_takeaway: item.isForTakeaway || false
-        });
+          status: 'CREATED'
+        };
+
+        console.log('Creating order item:', orderItemData);
+        await apiService.orderItems.create(orderItemData);
       }
 
       showSuccess('Pedido creado exitosamente');
       navigate(`/operations/table/${tableId}/manage`);
     } catch (error) {
       console.error('Error creating order:', error);
-      showError('Error al crear el pedido');
+      console.error('Error details:', error.response?.data);
+      const errorMessage = error.response?.data?.detail || 
+                           error.response?.data?.error || 
+                           error.response?.data?.message ||
+                           'Error al crear el pedido';
+      showError(errorMessage);
     } finally {
       setCreating(false);
     }
@@ -241,21 +251,55 @@ const OrderCreate = () => {
         <div className="space-y-3">
           {filteredRecipes.map((recipe) => (
             <div key={recipe.id} className="bg-white rounded-lg shadow-sm border p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">{recipe.name}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{recipe.description}</p>
+                  <h3 className="font-semibold text-gray-900">{recipe.name || 'Sin nombre'}</h3>
+                  <p className="text-sm text-gray-600 mt-1">{recipe.description || 'Sin descripción'}</p>
                   <p className="text-lg font-bold text-green-600 mt-2">
-                    {formatCurrency(recipe.price)}
+                    {formatCurrency(recipe.price || 0)}
                   </p>
                 </div>
                 
-                <button
-                  onClick={() => addToCart(recipe)}
-                  className="ml-4 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
+                <div className="ml-4 space-y-2">
+                  <button
+                    onClick={() => {
+                      const containerPrice = 0;
+                      const totalPrice = parseFloat(recipe.price || 0);
+                      
+                      const cartItem = {
+                        recipe,
+                        quantity: 1,
+                        notes: '',
+                        isForTakeaway: false,
+                        containerPrice: 0,
+                        unitPrice: totalPrice
+                      };
+                      
+                      const existingItemIndex = cart.findIndex(item => 
+                        item.recipe.id === recipe.id && 
+                        item.notes === '' && 
+                        item.isForTakeaway === false
+                      );
+                      
+                      if (existingItemIndex >= 0) {
+                        const updatedCart = [...cart];
+                        updatedCart[existingItemIndex].quantity += 1;
+                        setCart(updatedCart);
+                      } else {
+                        setCart([...cart, cartItem]);
+                      }
+                    }}
+                    className="w-full px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    Agregar
+                  </button>
+                  <button
+                    onClick={() => addToCart(recipe)}
+                    className="w-full px-3 py-1.5 bg-gray-600 text-white rounded text-xs font-medium hover:bg-gray-700 transition-colors"
+                  >
+                    + Nota
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -368,8 +412,7 @@ const OrderCreate = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <StickyNote className="h-4 w-4 inline mr-1" />
-                    Notas especiales
+                    📝 Notas especiales
                   </label>
                   <textarea
                     value={itemNotes}
@@ -382,7 +425,7 @@ const OrderCreate = () => {
                 
                 <div className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-orange-600" />
+                    <span className="text-orange-600">📦</span>
                     <span className="font-medium text-gray-900">Para llevar</span>
                     {containers.length > 0 && (
                       <span className="text-sm text-gray-500">
