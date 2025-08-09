@@ -127,15 +127,7 @@ const TableStatus = () => {
     <div className="space-y-4">
       {/* Header compacto */}
       <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Table className="h-5 w-5" />
-              Estado de Mesas
-            </h1>
-            <p className="text-xs sm:text-sm text-gray-600">Gestiona cuentas separadas por mesa - cada cliente puede tener su propia cuenta</p>
-          </div>
-          
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
           {/* Filtro por zona y leyenda */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <select

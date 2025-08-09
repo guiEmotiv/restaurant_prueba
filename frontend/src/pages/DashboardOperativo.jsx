@@ -98,12 +98,7 @@ const DashboardOperativo = () => {
         
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Dashboard Operativo</h1>
-              <p className="text-gray-600 mt-1">Indicadores de eficiencia y tiempos</p>
-            </div>
-            
+          <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-gray-500" />
               <input

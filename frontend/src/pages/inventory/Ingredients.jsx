@@ -163,11 +163,7 @@ const Ingredients = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ingredientes</h1>
-          <p className="text-gray-600">Gestiona el inventario de ingredientes</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button 
           onClick={handleAdd} 
           className="flex items-center gap-2"

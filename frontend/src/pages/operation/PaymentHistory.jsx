@@ -98,13 +98,6 @@ const PaymentHistory = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Historial de Pagos</h1>
-          <p className="text-sm md:text-base text-gray-600">Órdenes pagadas y tickets</p>
-        </div>
-      </div>
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4 space-y-4">

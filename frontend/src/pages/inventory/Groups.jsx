@@ -89,13 +89,7 @@ const Groups = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Grupos de Recetas</h1>
-          <p className="mt-2 text-gray-600">
-            Gestiona los grupos para categorizar las recetas del menú
-          </p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button 
           onClick={handleAdd}
           className="flex items-center gap-2"

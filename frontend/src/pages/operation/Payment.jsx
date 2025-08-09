@@ -458,14 +458,13 @@ const Payment = () => {
       {!paymentMode && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-            {/* Header del modal - Estandarizado */}
+            {/* Info del pago */}
             <div className="mb-6">
               <div className="text-center">
-                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Procesar Pago</h1>
-                <p className="text-sm md:text-base text-gray-600 mt-1">
+                <p className="text-sm text-gray-600">
                   Orden #{order.id} - Mesa {order.table_number}
                 </p>
-                <p className="text-2xl font-bold text-blue-600 mt-3">
+                <p className="text-2xl font-bold text-blue-600 mt-2">
                   {formatCurrency(order.total_amount)}
                 </p>
               </div>
@@ -554,7 +553,6 @@ const Payment = () => {
                 Volver
               </Button>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Pago Completo</h1>
                 <p className="text-gray-600">Orden #{order.id} - Mesa {order.table_number}</p>
               </div>
             </div>
@@ -642,7 +640,6 @@ const Payment = () => {
                 Volver
               </Button>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Dividir Cuenta</h1>
                 <p className="text-gray-600">Orden #{order.id} - Mesa {order.table_number}</p>
               </div>
             </div>

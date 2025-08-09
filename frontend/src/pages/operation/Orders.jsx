@@ -207,11 +207,7 @@ const Orders = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Pedidos</h1>
-          <p className="text-sm md:text-base text-gray-600">Gestiona los pedidos del restaurante</p>
-        </div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3">
         <Button onClick={handleAdd} className="flex items-center gap-2 w-full sm:w-auto justify-center">
           <Plus className="h-4 w-4" />
           Nuevo

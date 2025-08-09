@@ -99,11 +99,7 @@ const Payments = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Pagos Pendientes</h1>
-          <p className="text-sm md:text-base text-gray-600">Órdenes entregadas listas para cobrar</p>
-        </div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3">
         <div className="flex items-center gap-4">
           <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
             {filteredOrders.length} órdenes pendientes

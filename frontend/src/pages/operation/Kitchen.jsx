@@ -193,15 +193,9 @@ const Kitchen = () => {
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-3 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <ChefHat className="h-5 w-5" />
-              Cocina - Kanban
-            </h1>
-            <div className="flex items-center gap-1">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs text-gray-600">En vivo</span>
-            </div>
+          <div className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-xs text-gray-600">En vivo</span>
           </div>
 
           {/* Filtros */}
