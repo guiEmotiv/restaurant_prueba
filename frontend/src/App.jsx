@@ -25,6 +25,7 @@ import Payment from './pages/operation/Payment';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import OrderReceipt from './pages/operation/OrderReceipt';
 import Kitchen from './pages/operation/Kitchen';
+import Operations from './pages/Operations';
 import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
 import TableOrderEdit from './pages/operation/TableOrderEdit';
 import TablePaymentEcommerce from './pages/operation/TablePaymentEcommerce';
@@ -123,6 +124,13 @@ const AppContent = () => {
             <RoleProtectedRoute requiredPermission="canManageInventory">
               <Recipes />
             </RoleProtectedRoute>
+          } />
+
+          {/* Operations - Nueva vista principal */}
+          <Route path="/operations" element={
+            <ProtectedRoute requiredPermission="canManageOrders">
+              <Operations />
+            </ProtectedRoute>
           } />
 
           {/* Operation routes */}
