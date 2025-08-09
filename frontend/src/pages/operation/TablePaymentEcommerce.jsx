@@ -259,21 +259,21 @@ const TablePaymentEcommerce = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Header Fixed */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="px-4 py-3 pl-20">
+      <div className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
+        <div className="px-4 py-4 pl-20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate(`/table/${tableId}/order-edit`, { state: { orderId: orderId }})}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <ArrowLeft className="h-5 w-5 text-gray-700" />
+                <ArrowLeft className="h-5 w-5 text-gray-600" />
               </button>
               <div>
-                <h1 className="font-bold text-lg text-gray-900">Procesar Pago</h1>
-                <p className="text-sm text-gray-600">Mesa {table.table_number} • Pedido #{order.id}</p>
+                <h1 className="text-xl font-semibold text-gray-900">Procesar Pago</h1>
+                <p className="text-sm text-gray-500">Mesa {table.table_number} • Pedido #{order.id}</p>
               </div>
             </div>
 
@@ -281,7 +281,7 @@ const TablePaymentEcommerce = () => {
               <div className="text-2xl font-bold text-gray-900">
                 {formatCurrency(order.total_amount)}
               </div>
-              <div className="text-xs text-gray-500">Total a pagar</div>
+              <div className="text-sm text-gray-500">Total a pagar</div>
             </div>
           </div>
         </div>
@@ -289,7 +289,7 @@ const TablePaymentEcommerce = () => {
 
       {/* Payment Mode Selection */}
       {!paymentMode && (
-        <div className="p-4 max-w-md mx-auto">
+        <div className="p-4 max-w-md mx-auto" style={{paddingTop: '120px'}}>
           <div className="bg-white rounded-2xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6 text-center">
               ¿Cómo desea procesar el pago?
@@ -358,7 +358,7 @@ const TablePaymentEcommerce = () => {
 
       {/* Full Payment Mode */}
       {paymentMode === 'full' && (
-        <div className="p-4 max-w-md mx-auto">
+        <div className="p-4 max-w-md mx-auto" style={{paddingTop: '120px'}}>
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             {/* Order Summary */}
             <div className="p-6 border-b border-gray-100">
@@ -463,7 +463,7 @@ const TablePaymentEcommerce = () => {
 
       {/* Split Payment Mode */}
       {paymentMode === 'split' && (
-        <div className="p-4 pb-32">
+        <div className="p-4 pb-32" style={{paddingTop: '120px'}}>
           {/* Items Selection */}
           <div className="bg-white rounded-2xl shadow-sm mb-4">
             <div className="p-4 border-b border-gray-100">

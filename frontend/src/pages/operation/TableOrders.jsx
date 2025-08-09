@@ -82,22 +82,22 @@ const TableOrders = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="px-4 py-3 pl-20">
+      <div className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-40">
+        <div className="px-4 py-4 pl-20">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/table-status')}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <ArrowLeft className="h-5 w-5 text-gray-600" />
               </button>
               
               <div>
-                <h1 className="font-bold text-lg text-gray-900">Mesa {table?.table_number}</h1>
-                <p className="text-sm text-gray-600">
+                <h1 className="text-xl font-semibold text-gray-900">Mesa {table?.table_number}</h1>
+                <p className="text-sm text-gray-500">
                   {table?.zone_name} • {orders.length === 0 
                     ? 'Sin cuentas'
                     : orders.length === 1 
@@ -111,7 +111,7 @@ const TableOrders = () => {
             {/* Nueva Cuenta Button */}
             <button
               onClick={handleNewOrder}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />
               Nueva Cuenta
@@ -121,7 +121,7 @@ const TableOrders = () => {
       </div>
 
       {/* Contenido Principal */}
-      <div className="px-4 py-3 pt-32">
+      <div className="px-4 py-6" style={{paddingTop: '140px'}}>
         {orders.length === 0 ? (
           <div className="text-center py-20">
             <ShoppingCart className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -138,7 +138,7 @@ const TableOrders = () => {
             </button>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {orders.map((order, index) => {
               const summary = getOrderSummary(order);
               
@@ -146,33 +146,32 @@ const TableOrders = () => {
                 <div
                   key={order.id}
                   onClick={() => handleOrderClick(order)}
-                  className="bg-white border border-gray-200 rounded p-3 cursor-pointer"
+                  className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:border-gray-300 transition-colors shadow-sm"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded flex items-center justify-center text-xs ${
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-semibold ${
                         summary.canPay 
-                          ? 'bg-green-500 text-white' 
-                          : 'bg-orange-500 text-white'
+                          ? 'bg-green-500' 
+                          : 'bg-orange-500'
                       }`}>
                         #{order.id}
                       </div>
                       <div>
-                        <div className="font-medium text-sm text-gray-900">Cuenta #{order.id}</div>
-                        <div className="text-xs text-gray-500">{formatDate(order.created_at)}</div>
+                        <div className="font-semibold text-gray-900">Cuenta #{order.id}</div>
+                        <div className="text-sm text-gray-500">{formatDate(order.created_at)}</div>
                       </div>
                     </div>
                     
                     <div className="text-right">
-                      <div className="text-base font-bold text-gray-900">
+                      <div className="text-xl font-bold text-gray-900">
                         {formatCurrency(order.total_amount)}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-sm text-gray-500">
                         {summary.pendingItems}/{summary.totalItems} items
                       </div>
                     </div>
                   </div>
-
                 </div>
               );
             })}
