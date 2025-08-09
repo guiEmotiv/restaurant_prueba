@@ -18,13 +18,18 @@ const OrderReceipt = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [orderResponse, paymentResponse] = await Promise.all([
-          apiService.orders.getById(id),
-          apiService.payments.getByOrderId(id)
-        ]);
-
+        const orderResponse = await apiService.orders.getById(id);
+        
         setOrder(orderResponse);
-        setPayment(paymentResponse);
+        
+        // Get payment from order.payments array
+        if (orderResponse.payments && orderResponse.payments.length > 0) {
+          // Use the most recent payment (last one)
+          const latestPayment = orderResponse.payments[orderResponse.payments.length - 1];
+          setPayment(latestPayment);
+        } else {
+          setPayment(null);
+        }
       } catch (err) {
         console.error('Error fetching receipt data:', err);
         setError(err.message);
