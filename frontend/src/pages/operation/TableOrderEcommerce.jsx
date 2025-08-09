@@ -247,166 +247,134 @@ const TableOrderEcommerce = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header Moderno */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white sticky top-0 z-40 shadow-lg">
-        <div className="px-4 py-4">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Fijo */}
+      <div className="bg-white shadow-sm sticky top-0 z-50 border-b">
+        <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1">
               <button
                 onClick={() => navigate('/table-status')}
-                className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors"
+                className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-900"
               >
-                <ArrowLeft className="h-5 w-5 text-white" />
+                <ArrowLeft className="h-5 w-5" />
               </button>
               
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Utensils className="h-5 w-5 text-blue-200" />
-                  <h1 className="font-bold">Mesa {table.table_number}</h1>
-                </div>
-                <p className="text-blue-100 text-sm">{table.zone_name}</p>
+                <h1 className="font-semibold text-gray-900">Mesa {table.table_number}</h1>
+                <p className="text-xs text-gray-500">{table.zone_name}</p>
               </div>
             </div>
 
-            {/* Carrito Button */}
+            {/* Carrito */}
             <button
               onClick={() => setShowCart(!showCart)}
-              className="relative bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-xl hover:bg-white/30 transition-colors flex items-center gap-2"
+              className="relative bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
             >
-              <ShoppingCart className="h-5 w-5" />
-              <span className="font-bold">{formatCurrency(calculateCartTotal())}</span>
+              <ShoppingCart className="h-4 w-4" />
+              <span>{formatCurrency(calculateCartTotal())}</span>
               {getCartItemsCount() > 0 && (
-                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
                   {getCartItemsCount()}
                 </div>
               )}
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Filtros y Búsqueda */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="space-y-3">
-          {/* Búsqueda */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
+          {/* Controles Compactos */}
+          <div className="mt-3 space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                placeholder="Buscar platos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Buscar platos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">Todos los grupos</option>
+              {groups.map(group => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
           </div>
-
-          {/* Filtro por grupo */}
-          <select
-            value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">Todos los grupos</option>
-            {groups.map(group => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
-      {/* Contenido Principal */}
-      <div className={`flex-1 transition-all duration-300 ${showCart ? 'pb-96' : ''}`}>
-        <div className="px-4 py-6">
-          {filteredRecipes.length === 0 ? (
-            <div className="flex items-center justify-center min-h-[50vh]">
-              <div className="text-center bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-                <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle className="h-10 w-10 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No se encontraron platos</h3>
-                <p className="text-gray-500">
-                  {searchTerm ? 'Intenta con otros términos de búsqueda' : 'No hay platos disponibles'}
-                </p>
-              </div>
+      {/* Contenido */}
+      <div className="px-4 py-4">
+        {filteredRecipes.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-2">Sin platos disponibles</div>
+            <div className="text-sm text-gray-500">
+              {searchTerm ? 'Intenta con otros términos' : 'No hay platos en el menú'}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredRecipes.map((recipe) => (
-                <div
-                  key={recipe.id}
-                  className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden group hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]"
-                >
-                  {/* Product Image Placeholder */}
-                  <div className="relative h-40 sm:h-48 bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center">
-                      <Coffee className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500" />
-                    </div>
-                    
-                    {/* Quick Add Button */}
-                    <button
-                      onClick={() => handleQuickAdd(recipe)}
-                      className="absolute top-3 right-3 w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-emerald-600 transition-colors transform hover:scale-110"
-                    >
-                      <Plus className="h-5 w-5" />
-                    </button>
-
-                    {/* Badge de tiempo */}
-                    <div className="absolute bottom-3 left-3 bg-black/20 backdrop-blur-sm text-white px-3 py-1 rounded-xl text-sm flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {recipe.preparation_time}min
-                    </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {filteredRecipes.map((recipe) => (
+              <div
+                key={recipe.id}
+                className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow"
+              >
+                <div className="flex gap-3">
+                  {/* Imagen placeholder */}
+                  <div className="w-16 h-16 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Coffee className="h-8 w-8 text-orange-500" />
                   </div>
-
-                  {/* Product Info */}
-                  <div className="p-6">
-                    <div className="mb-3">
-                      <h3 className="font-bold text-gray-900 text-lg mb-1 line-clamp-2">
-                        {recipe.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {recipe.group_name || 'Sin grupo'}
-                      </p>
-                    </div>
-
-                    {/* Precio */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="text-xl sm:text-2xl font-bold text-emerald-600">
+                  
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 truncate">
+                          {recipe.name}
+                        </h3>
+                        <p className="text-xs text-gray-500">{recipe.group_name || 'Sin grupo'}</p>
+                      </div>
+                      
+                      <div className="text-lg font-bold text-green-600 ml-2">
                         {formatCurrency(recipe.base_price)}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                        <span className="text-sm text-gray-600">4.5</span>
-                      </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleQuickAdd(recipe)}
-                        className="flex-1 bg-emerald-500 text-white py-2 sm:py-3 rounded-xl text-sm sm:text-base font-semibold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Agregar
-                      </button>
-                      <button
-                        onClick={() => openItemModal(recipe)}
-                        className="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center"
-                        title="Personalizar"
-                      >
-                        <StickyNote className="h-5 w-5" />
-                      </button>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <Clock className="h-3 w-3" />
+                        <span>{recipe.preparation_time}min</span>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleQuickAdd(recipe)}
+                          className="bg-green-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-1"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Agregar
+                        </button>
+                        <button
+                          onClick={() => openItemModal(recipe)}
+                          className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm hover:bg-gray-200 transition-colors"
+                        >
+                          <StickyNote className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Modal de Carrito */}
@@ -416,77 +384,78 @@ const TableOrderEcommerce = () => {
             className="fixed inset-0 bg-black/50 z-50"
             onClick={() => setShowCart(false)}
           />
-          <div className="fixed bottom-0 left-0 right-0 bg-white z-50 max-h-[80vh] overflow-hidden rounded-t-3xl shadow-2xl border border-gray-200">
-            {/* Header del carrito */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-6 py-4">
+          <div className="fixed bottom-0 left-0 right-0 bg-white z-50 max-h-[80vh] overflow-hidden rounded-t-lg shadow-xl border-t">
+            {/* Header */}
+            <div className="bg-white px-4 py-3 border-b">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold">Tu Pedido</h2>
-                  <p className="text-blue-100">
+                  <h2 className="font-semibold text-gray-900">Tu Pedido</h2>
+                  <p className="text-sm text-gray-500">
                     {getCartItemsCount()} items • {formatCurrency(calculateCartTotal())}
                   </p>
                 </div>
                 <button
                   onClick={() => setShowCart(false)}
-                  className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-900"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
-            {/* Items del carrito */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 max-h-60">
+            {/* Items */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 max-h-60">
               {cart.length === 0 ? (
                 <div className="text-center py-8">
-                  <ShoppingCart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Carrito vacío</h3>
-                  <p className="text-gray-500">Agrega algunos platos para comenzar</p>
+                  <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                  <div className="text-gray-500 text-sm">Carrito vacío</div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {cart.map((item) => (
-                    <div key={item.id} className="bg-gray-50 rounded-2xl p-4 flex items-center gap-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-red-100 rounded-xl flex items-center justify-center">
-                        <Coffee className="h-6 w-6 text-orange-500" />
-                      </div>
-                      
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">{item.recipe.name}</h4>
-                        <p className="text-sm text-gray-600">
-                          {item.quantity}x {formatCurrency(item.unit_price)}
-                        </p>
-                        {item.notes && (
-                          <p className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-lg mt-1">
-                            {item.notes}
+                    <div key={item.id} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Coffee className="h-5 w-5 text-orange-500" />
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-gray-900 text-sm truncate">{item.recipe.name}</h4>
+                          <p className="text-xs text-gray-600">
+                            {item.quantity}x {formatCurrency(item.unit_price)}
                           </p>
-                        )}
-                        <div className="flex gap-2 mt-2">
-                          {item.is_takeaway && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-700 rounded-lg text-xs">
-                              <Package className="h-3 w-3" />
-                              Para llevar
-                            </span>
+                          {item.notes && (
+                            <p className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded mt-1">
+                              {item.notes}
+                            </p>
                           )}
-                          {item.has_taper && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-lg text-xs">
-                              <Check className="h-3 w-3" />
-                              Envase
-                            </span>
-                          )}
+                          <div className="flex gap-1 mt-1">
+                            {item.is_takeaway && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
+                                <Package className="h-2 w-2" />
+                                Llevar
+                              </span>
+                            )}
+                            {item.has_taper && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                <Check className="h-2 w-2" />
+                                Envase
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-2">
-                        <div className="text-lg font-bold text-gray-900">
-                          {formatCurrency(item.unit_price * item.quantity)}
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium text-gray-900">
+                            {formatCurrency(item.unit_price * item.quantity)}
+                          </div>
+                          <button
+                            onClick={() => removeFromCart(item.id)}
+                            className="w-6 h-6 bg-red-100 text-red-600 rounded flex items-center justify-center hover:bg-red-200 transition-colors"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => removeFromCart(item.id)}
-                          className="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center hover:bg-red-200 transition-colors"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -494,26 +463,26 @@ const TableOrderEcommerce = () => {
               )}
             </div>
 
-            {/* Footer del carrito */}
+            {/* Footer */}
             {cart.length > 0 && (
-              <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-lg font-semibold text-gray-700">Total:</span>
-                  <span className="text-2xl font-bold text-gray-900">{formatCurrency(calculateCartTotal())}</span>
+              <div className="border-t px-4 py-3 bg-white">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-medium text-gray-700">Total:</span>
+                  <span className="text-xl font-bold text-gray-900">{formatCurrency(calculateCartTotal())}</span>
                 </div>
                 <button
                   onClick={handleCreateOrder}
                   disabled={creatingOrder}
-                  className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                  className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                 >
                   {creatingOrder ? (
                     <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                      Creando pedido...
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Creando...
                     </>
                   ) : (
                     <>
-                      <Check className="h-5 w-5" />
+                      <Check className="h-4 w-4" />
                       Confirmar Pedido
                     </>
                   )}
@@ -527,47 +496,43 @@ const TableOrderEcommerce = () => {
       {/* Modal para personalizar item */}
       {selectedRecipe && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-2xl">
+          <div className="bg-white rounded-lg max-w-md w-full shadow-xl">
             {/* Header */}
-            <div className="bg-gradient-to-r from-orange-100 to-red-100 p-6 relative">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">
+                {selectedRecipe.name}
+              </h3>
               <button
                 onClick={() => setSelectedRecipe(null)}
-                className="absolute top-4 right-4 w-8 h-8 bg-white/80 rounded-full flex items-center justify-center hover:bg-white transition-colors"
+                className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-900"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
-              
-              <div className="text-center">
-                <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center mx-auto mb-4">
-                  <Coffee className="h-8 w-8 text-orange-500" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">
-                  {selectedRecipe.name}
-                </h3>
-                <div className="text-2xl font-bold text-emerald-600 mt-2">
-                  {formatCurrency(selectedRecipe.base_price)}
-                </div>
-              </div>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-4 space-y-4">
+              {/* Precio */}
+              <div className="text-lg font-bold text-green-600">
+                {formatCurrency(selectedRecipe.base_price)}
+              </div>
+
               {/* Notas */}
               <div>
-                <label className="block font-semibold text-gray-700 mb-2">
-                  Notas especiales (opcional)
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notas especiales
                 </label>
                 <input
                   type="text"
                   value={itemNotes}
                   onChange={(e) => setItemNotes(e.target.value)}
-                  placeholder="Ej: Sin cebolla, término medio..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Sin cebolla, término medio..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
               {/* Opciones */}
-              <div className="space-y-3">
-                <label className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-orange-300 hover:bg-orange-50 transition-colors cursor-pointer">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={itemTakeaway}
@@ -577,47 +542,45 @@ const TableOrderEcommerce = () => {
                         setItemTaper(true);
                       }
                     }}
-                    className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500"
+                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
                   />
-                  <Package className="h-5 w-5 text-orange-600" />
-                  <span className="font-semibold text-gray-900">Para llevar</span>
+                  <Package className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm font-medium text-gray-900">Para llevar</span>
                 </label>
 
                 {itemTakeaway && (
-                  <label className="flex items-center gap-3 p-4 ml-6 border-2 border-gray-200 rounded-xl hover:border-green-300 hover:bg-green-50 transition-colors cursor-pointer">
+                  <label className="flex items-center gap-2 p-3 ml-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={itemTaper}
                       onChange={(e) => setItemTaper(e.target.checked)}
-                      className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                      className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
                     />
-                    <Check className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold text-gray-900">Incluir envase</span>
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-gray-900">Incluir envase</span>
                   </label>
                 )}
               </div>
             </div>
 
             {/* Footer */}
-            <div className="border-t border-gray-200 p-6 bg-gray-50">
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setSelectedRecipe(null)}
-                  className="flex-1 py-3 border-2 border-gray-300 rounded-xl text-gray-700 font-semibold hover:bg-gray-100 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => {
-                    addToCart(selectedRecipe, itemNotes, itemTakeaway, itemTaper);
-                    showSuccess(`${selectedRecipe.name} agregado al carrito`);
-                  }}
-                  className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Agregar al carrito
-                </button>
-              </div>
+            <div className="border-t px-4 py-3 flex gap-3">
+              <button
+                onClick={() => setSelectedRecipe(null)}
+                className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  addToCart(selectedRecipe, itemNotes, itemTakeaway, itemTaper);
+                  showSuccess(`${selectedRecipe.name} agregado`);
+                }}
+                className="flex-1 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Agregar
+              </button>
             </div>
           </div>
         </div>
