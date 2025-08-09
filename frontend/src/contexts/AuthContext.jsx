@@ -201,6 +201,22 @@ export const AuthProvider = ({ children }) => {
     await checkAuthState();
   };
 
+  const getDefaultRoute = () => {
+    if (!userRole) return '/';
+    
+    // Return default route based on user role
+    switch (userRole) {
+      case ROLES.ADMIN:
+        return '/';  // Dashboard Operativo
+      case ROLES.WAITER:
+        return '/table-status';  // Estado de Mesas
+      case ROLES.COOK:
+        return '/kitchen';  // Cocina
+      default:
+        return '/';
+    }
+  };
+
   const value = {
     user,
     userRole,
@@ -212,6 +228,7 @@ export const AuthProvider = ({ children }) => {
     hasPermission,
     logout,
     refreshAuth,
+    getDefaultRoute,
     ROLES,
     PERMISSIONS
   };
