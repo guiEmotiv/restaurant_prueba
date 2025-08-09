@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import apiService from '../../services/api';
+import { apiService } from '../../services/api';
 import ReceiptFormat from '../../components/ReceiptFormat';
 import bluetoothPrinter from '../../services/bluetoothPrinter';
 
