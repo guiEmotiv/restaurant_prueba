@@ -183,97 +183,60 @@ class BluetoothPrinterService {
       await this.sendCommand(this.commands.INIT);
       await this.sendCommand(this.commands.FONT_A);
 
-      // Encabezado del restaurante
+      // Encabezado compacto
       await this.sendCommand(this.commands.ALIGN_CENTER);
       await this.sendCommand(this.commands.BOLD_ON);
       await this.printText('EL FOGON DE DON SOTO\n');
       await this.sendCommand(this.commands.BOLD_OFF);
-      await this.printText('=====================================\n');
-      await this.printText('COMPROBANTE DE PAGO\n');
-      await this.printText('=====================================\n\n');
+      await this.printText('COMPROBANTE\n\n');
 
-      // Información de la orden
+      // Información básica (formato web)
       await this.sendCommand(this.commands.ALIGN_LEFT);
-      await this.printText(`Orden: #${paymentData.order.id}\n`);
-      await this.printText(`Mesa: ${paymentData.order.table_number}\n`);
-      await this.printText(`Zona: ${paymentData.order.zone_name || 'N/A'}\n`);
+      await this.printText(`Orden:               #${paymentData.order.id}\n`);
+      await this.printText(`Mesa:                ${paymentData.order.table_number}\n`);
       
-      // Agregar mesero si está disponible
       if (paymentData.order.waiter) {
-        await this.printText(`Mesero: ${paymentData.order.waiter}\n`);
+        await this.printText(`Mesero:              ${paymentData.order.waiter}\n`);
       }
       
       const now = new Date();
       const { fecha, hora } = this.formatDateTime(now);
-      await this.printText(`Fecha: ${fecha}\n`);
-      await this.printText(`Hora: ${hora}\n\n`);
+      await this.printText(`Fecha:               ${fecha}\n`);
+      await this.printText(`Hora:                ${hora}\n`);
 
-      // Items de la orden
-      await this.printText('-------------------------------------\n');
-      await this.sendCommand(this.commands.BOLD_ON);
-      await this.printText('ITEMS\n');
-      await this.sendCommand(this.commands.BOLD_OFF);
+      // Separador para items (línea simple)
       await this.printText('-------------------------------------\n');
 
+      // Items compactos (igual que formato web)
       if (paymentData.order.items && paymentData.order.items.length > 0) {
         for (const item of paymentData.order.items) {
           const itemName = item.recipe_name || 'Item';
           const quantity = item.quantity || 1;
           const price = this.formatCurrency(item.total_price || 0);
           
-          await this.printText(`${itemName}\n`);
-          await this.printText(`${quantity}x           ${price}\n`);
+          // Formato: "2x Nombre del Plato          S/ 15.00"
+          const itemLine = `${quantity}x ${itemName}`;
+          const spaces = Math.max(1, 37 - itemLine.length - price.length);
+          await this.printText(`${itemLine}${' '.repeat(spaces)}${price}\n`);
           
-          if (item.notes) {
-            await this.printText(`  Notas: ${item.notes}\n`);
-          }
-          
+          // Solo mostrar "Para llevar" si aplica (sin notas)
           if (item.is_takeaway) {
-            await this.printText(`  Para llevar (envase incl.)\n`);
+            await this.printText(`  Para llevar\n`);
           }
-          
-          await this.printText('\n');
         }
       }
 
-      // Totales
+      // Total (formato web compacto)
       await this.printText('-------------------------------------\n');
-      const subtotal = this.formatCurrency(paymentData.order.total_amount || 0);
-      const tax = this.formatCurrency(paymentData.tax_amount || 0);
       const total = this.formatCurrency(paymentData.amount || paymentData.order.total_amount || 0);
-
-      await this.printText(`Subtotal:               ${subtotal}\n`);
-      
-      if (paymentData.tax_amount && parseFloat(paymentData.tax_amount) > 0) {
-        await this.printText(`Impuestos/Servicio:     ${tax}\n`);
-      }
-
-      await this.printText('=====================================\n');
       await this.sendCommand(this.commands.BOLD_ON);
-      await this.printText(`TOTAL:                  ${total}\n`);
+      await this.printText(`TOTAL:               ${total}\n`);
       await this.sendCommand(this.commands.BOLD_OFF);
-      await this.printText('=====================================\n\n');
 
-      // Información del pago
-      await this.printText('METODO DE PAGO\n');
+      // Pie compacto
       await this.printText('-------------------------------------\n');
-      const metodoPago = this.getPaymentMethodName(paymentData.payment_method);
-      await this.sendCommand(this.commands.BOLD_ON);
-      await this.printText(`${metodoPago}: ${total}\n`);
-      await this.sendCommand(this.commands.BOLD_OFF);
-
-      if (paymentData.notes) {
-        await this.printText(`Notas: ${paymentData.notes}\n`);
-      }
-
-      await this.printText('\n');
-
-      // Pie del comprobante
       await this.sendCommand(this.commands.ALIGN_CENTER);
-      await this.printText('=====================================\n');
-      await this.printText('¡GRACIAS POR SU VISITA!\n');
-      await this.printText('Vuelva pronto\n');
-      await this.printText('=====================================\n\n');
+      await this.printText('¡Gracias por su visita!\n');
 
       // Saltos de línea y corte de papel
       await this.printText('\n\n\n');
