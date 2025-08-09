@@ -10,12 +10,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.DeleteModel(
-            name='RestaurantOperationalConfig',
-        ),
-        migrations.DeleteModel(
-            name='Waiter',
-        ),
         migrations.AlterModelOptions(
             name='container',
             options={'ordering': ['-id'], 'verbose_name': 'Envase', 'verbose_name_plural': 'Envases'},
