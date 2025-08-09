@@ -124,8 +124,11 @@ VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
 EOF
     
-    # Build frontend
+    # Clean cache and build frontend
     echo -e "${BLUE}🔨 Building frontend...${NC}"
+    rm -rf node_modules/.cache 2>/dev/null || true
+    rm -rf dist 2>/dev/null || true
+    npm cache clean --force 2>/dev/null || true
     npm run build
     
     if [ ! -d "dist" ]; then
@@ -196,6 +199,9 @@ VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
 EOF
     
     echo -e "${BLUE}🔨 Building frontend...${NC}"
+    rm -rf node_modules/.cache 2>/dev/null || true
+    rm -rf dist 2>/dev/null || true
+    npm cache clean --force 2>/dev/null || true
     npm run build &
     FRONTEND_PID=$!
     
