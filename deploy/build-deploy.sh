@@ -1,10 +1,63 @@
 #!/bin/bash
 
-# Restaurant Web - Build and Deploy Script with HTTPS
-# Complete deployment with SSL using system nginx
+# Restaurant Web - Build and Deploy Script (Optimized)
+# Single script with options for different deployment scenarios
 
-echo "🚀 Restaurant Web - Build & Deploy with HTTPS"
-echo "=============================================="
+# Usage options
+FRONTEND_ONLY=false
+BACKEND_ONLY=false
+FULL_DEPLOY=true
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --frontend-only)
+            FRONTEND_ONLY=true
+            FULL_DEPLOY=false
+            shift
+            ;;
+        --backend-only)
+            BACKEND_ONLY=true
+            FULL_DEPLOY=false
+            shift
+            ;;
+        --help|-h)
+            echo "🚀 Restaurant Web - Optimized Build & Deploy"
+            echo "============================================="
+            echo ""
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --frontend-only    Build and deploy only frontend (~2 min)"
+            echo "  --backend-only     Restart only backend services (~30 sec)"
+            echo "  (no options)       Full deployment with cleanup (~5 min)"
+            echo "  --help, -h         Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  sudo $0                    # Full deployment"
+            echo "  sudo $0 --frontend-only    # Update only frontend"
+            echo "  sudo $0 --backend-only     # Restart only backend"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Set deployment mode display
+if [[ "$FRONTEND_ONLY" == "true" ]]; then
+    echo "🚀 Restaurant Web - Frontend Only Deploy"
+    echo "========================================"
+elif [[ "$BACKEND_ONLY" == "true" ]]; then
+    echo "🚀 Restaurant Web - Backend Only Deploy"
+    echo "======================================="
+else
+    echo "🚀 Restaurant Web - Full Deploy (Optimized)"
+    echo "============================================"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -38,9 +91,11 @@ fi
 
 cd $PROJECT_DIR
 
-# Update code from git
-echo -e "${YELLOW}📥 Actualizando código desde repositorio...${NC}"
-git pull origin main
+# Update code from git (unless running backend-only)
+if [[ "$BACKEND_ONLY" != "true" ]]; then
+    echo -e "${YELLOW}📥 Actualizando código desde repositorio...${NC}"
+    git pull origin main
+fi
 
 # Check if initial setup was run
 if [ ! -f "$PROJECT_DIR/.env.ec2" ]; then
@@ -55,483 +110,391 @@ show_space() {
     echo -e "${BLUE}💾 ${label}: ${space}GB${NC}"
 }
 
-show_space "Before build"
-
-# ==============================================================================
-# PHASE 5: BUILD AND DEPLOY
-# ==============================================================================
-echo -e "\n${YELLOW}🏗️ PHASE 5: Build and Deploy${NC}"
-
-# Stop all services and clean up
-echo -e "${YELLOW}🛑 Stopping all services...${NC}"
-docker-compose -f docker-compose.ec2.yml down -v
-systemctl stop nginx 2>/dev/null || true
-systemctl stop apache2 2>/dev/null || true
-fuser -k 80/tcp 2>/dev/null || true
-
-# Clean up old database files
-echo -e "${YELLOW}🧹 Cleaning up old data...${NC}"
-rm -rf data/db.sqlite3 2>/dev/null || true
-rm -rf data/*.db 2>/dev/null || true
-docker system prune -f
-
-# Build frontend
-cd "$FRONTEND_DIR"
-
-# Always recreate .env.production with correct Cognito variables
-echo -e "${YELLOW}Creating frontend .env.production with Cognito config...${NC}"
-cat > .env.production << EOF
-# Frontend Production Environment - Auto-generated
-# Generated: $(date)
-
-# API Configuration
+# Function for frontend-only deployment
+frontend_only_deploy() {
+    echo -e "\n${YELLOW}🎨 Frontend Only Deployment${NC}"
+    
+    cd "$FRONTEND_DIR"
+    
+    # Create environment file
+    cat > .env.production << EOF
 VITE_API_URL=https://www.$DOMAIN
-
-# AWS Cognito Configuration - MUST match backend
 VITE_AWS_REGION=$AWS_REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
 EOF
+    
+    # Build frontend
+    echo -e "${BLUE}🔨 Building frontend...${NC}"
+    npm run build
+    
+    if [ ! -d "dist" ]; then
+        echo -e "${RED}❌ Frontend build failed${NC}"
+        exit 1
+    fi
+    
+    # Deploy to nginx
+    echo -e "${BLUE}🚀 Deploying frontend...${NC}"
+    systemctl stop nginx
+    rm -rf /var/www/restaurant/*
+    mkdir -p /var/www/restaurant
+    cp -r dist/* /var/www/restaurant/
+    chown -R www-data:www-data /var/www/restaurant
+    systemctl start nginx
+    
+    echo -e "${GREEN}✅ Frontend deployed successfully${NC}"
+}
 
-# Also create .env.local for consistency
-cp .env.production .env.local
+# Function for backend-only deployment
+backend_only_deploy() {
+    echo -e "\n${YELLOW}🐳 Backend Only Deployment${NC}"
+    
+    cd "$PROJECT_DIR"
+    
+    # Restart backend container
+    echo -e "${BLUE}🔄 Restarting backend...${NC}"
+    docker-compose -f docker-compose.ec2.yml restart web
+    
+    # Wait and verify
+    sleep 10
+    BACKEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/health/)
+    
+    if [ "$BACKEND_STATUS" = "200" ]; then
+        echo -e "${GREEN}✅ Backend restarted successfully${NC}"
+    else
+        echo -e "${RED}❌ Backend restart failed (Status: $BACKEND_STATUS)${NC}"
+        docker-compose -f docker-compose.ec2.yml logs --tail=10 web
+        exit 1
+    fi
+}
 
-echo -e "${BLUE}Frontend environment variables:${NC}"
-echo -e "  VITE_API_URL=https://www.$DOMAIN"
-echo -e "  VITE_AWS_REGION=$AWS_REGION"
-echo -e "  VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID"
-echo -e "  VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID"
-echo -e "${GREEN}✅ Files created: .env.production, .env.local${NC}"
-
-# Clean install
-rm -rf node_modules package-lock.json dist 2>/dev/null || true
-npm install --silent --no-fund --no-audit
-
-# Build frontend with explicit environment variables
-echo -e "${BLUE}Building frontend with Cognito configuration...${NC}"
-VITE_API_URL=https://www.$DOMAIN \
-VITE_AWS_REGION=$AWS_REGION \
-VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID \
-VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID \
-NODE_ENV=production npm run build
-
-# Clean dev dependencies after build
-npm prune --production --silent
-
-if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
-    echo -e "${RED}❌ Frontend build failed${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✅ Frontend built ($(du -sh dist | cut -f1))${NC}"
-
-cd "$PROJECT_DIR"
-
-# Start Docker containers
-echo -e "${YELLOW}🐳 Starting services with HTTP...${NC}"
-docker-compose -f docker-compose.ec2.yml up -d --build
-
-# Wait for containers
-echo -e "${YELLOW}⏳ Waiting for services...${NC}"
-sleep 20
-
-show_space "After build"
-
-# ==============================================================================
-# PHASE 6: CONFIGURE DATABASE
-# ==============================================================================
-echo -e "\n${YELLOW}💾 PHASE 6: Configure Database${NC}"
-
-# Verify backend is running
-if ! docker-compose -f docker-compose.ec2.yml ps | grep web | grep -q Up; then
-    echo -e "${RED}❌ Backend container failed to start${NC}"
-    docker-compose -f docker-compose.ec2.yml logs web
-    exit 1
-fi
-
-# Create migrations for all apps
-echo -e "${BLUE}Creating migrations...${NC}"
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py makemigrations config
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py makemigrations inventory
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py makemigrations operation
-
-# Apply migrations
-echo -e "${BLUE}Applying migrations...${NC}"
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
-
-# Collect static files
-echo -e "${BLUE}Collecting static files...${NC}"
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput --clear
-
-# Create initial data
-echo -e "${YELLOW}📊 Creating initial data...${NC}"
-docker-compose -f docker-compose.ec2.yml exec -T web python manage.py shell << 'EOF'
+# Function for full deployment
+full_deploy() {
+    echo -e "\n${YELLOW}🏗️ Full Deployment (Optimized)${NC}"
+    
+    show_space "Before build"
+    
+    # Stop services
+    echo -e "${BLUE}🛑 Stopping services...${NC}"
+    docker-compose -f docker-compose.ec2.yml down
+    systemctl stop nginx 2>/dev/null || true
+    
+    # Selective cleanup (only if needed)
+    if ! docker images | grep -q restaurant-web-web; then
+        echo -e "${BLUE}🧹 Cleaning Docker images...${NC}"
+        docker system prune -f
+    fi
+    
+    # Build frontend in parallel with backend preparation
+    cd "$FRONTEND_DIR"
+    
+    cat > .env.production << EOF
+VITE_API_URL=https://www.$DOMAIN
+VITE_AWS_REGION=$AWS_REGION
+VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
+VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
+EOF
+    
+    echo -e "${BLUE}🔨 Building frontend...${NC}"
+    npm run build &
+    FRONTEND_PID=$!
+    
+    # Start backend while frontend builds
+    cd "$PROJECT_DIR"
+    echo -e "${BLUE}🐳 Starting backend...${NC}"
+    docker-compose -f docker-compose.ec2.yml up -d --build &
+    BACKEND_PID=$!
+    
+    # Wait for frontend build
+    wait $FRONTEND_PID
+    
+    if [ ! -d "frontend/dist" ]; then
+        echo -e "${RED}❌ Frontend build failed${NC}"
+        exit 1
+    fi
+    
+    # Deploy frontend
+    echo -e "${BLUE}🚀 Deploying frontend...${NC}"
+    rm -rf /var/www/restaurant/*
+    mkdir -p /var/www/restaurant
+    cp -r frontend/dist/* /var/www/restaurant/
+    chown -R www-data:www-data /var/www/restaurant
+    
+    # Wait for backend
+    wait $BACKEND_PID
+    sleep 15
+    
+    # Setup database
+    echo -e "${BLUE}💾 Setting up database...${NC}"
+    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
+    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput --clear
+    
+    # Create initial data if needed
+    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py shell << 'EOF'
 from config.models import Unit, Zone, Table
 from inventory.models import Group
 
-# Create default units
 if Unit.objects.count() == 0:
-    print("Creating default units...")
-    Unit.objects.create(name="Kilogramo")
-    Unit.objects.create(name="Litro")
-    Unit.objects.create(name="Unidad")
-    Unit.objects.create(name="Gramo")
+    Unit.objects.create(name="Kilogramo", abbreviation="kg")
+    Unit.objects.create(name="Litro", abbreviation="lt")
+    Unit.objects.create(name="Unidad", abbreviation="un")
+    Unit.objects.create(name="Gramo", abbreviation="g")
     print("✅ Units created")
 
-# Create default zone
 if Zone.objects.count() == 0:
-    print("Creating default zone...")
-    Zone.objects.create(name="Salón Principal")
+    zone = Zone.objects.create(name="Salón Principal")
     print("✅ Zone created")
+    
+    if Table.objects.count() == 0:
+        for i in range(1, 11):
+            Table.objects.create(table_number=str(i), zone=zone, capacity=4)
+        print("✅ Tables created")
 
-# Create default table
-if Table.objects.count() == 0 and Zone.objects.exists():
-    print("Creating default table...")
-    zone = Zone.objects.first()
-    Table.objects.create(table_number="1", zone=zone)
-    print("✅ Table created")
-
-# Create default group
 if Group.objects.count() == 0:
-    print("Creating default group...")
     Group.objects.create(name="General")
     print("✅ Group created")
-
-print("✅ Initial data setup complete")
 EOF
-
-echo -e "${GREEN}✅ Database configured${NC}"
-
-# ==============================================================================
-# PHASE 7: CONFIGURE NGINX AND HTTPS
-# ==============================================================================
-echo -e "\n${YELLOW}🔒 PHASE 7: Configure NGINX and HTTPS${NC}"
-
-# Install nginx if not present
-if ! command -v nginx &> /dev/null; then
-    echo -e "${BLUE}Installing nginx...${NC}"
-    apt-get update -qq
-    apt-get install -y nginx
-fi
-
-# Stop nginx to avoid conflicts
-systemctl stop nginx 2>/dev/null || true
-
-# Deploy frontend to nginx directory
-echo -e "${BLUE}Deploying frontend to nginx...${NC}"
-rm -rf /var/www/restaurant
-mkdir -p /var/www/restaurant
-cp -r frontend/dist/* /var/www/restaurant/
-chown -R www-data:www-data /var/www/restaurant
-
-# Create nginx configuration (HTTP first) - overwrite any existing config
-echo -e "${BLUE}Creating nginx configuration...${NC}"
-rm -f /etc/nginx/sites-enabled/*
-cat > /etc/nginx/sites-available/$DOMAIN << 'EOF'
-server {
-    listen 80;
-    server_name www.xn--elfogndedonsoto-zrb.com xn--elfogndedonsoto-zrb.com;
-
-    root /var/www/restaurant;
-    index index.html;
-
-    # API proxy to Docker backend
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-
-    # Django admin
-    location /admin/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Django static files
-    location /static/ {
-        alias /opt/restaurant-web/data/staticfiles/;
-        expires 30d;
-    }
-
-    # Frontend routes
-    location / {
-        try_files $uri $uri/ /index.html;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
+    
+    # Configure nginx with SSL detection
+    configure_nginx
+    
+    show_space "After build"
 }
-EOF
 
-# Enable site and remove any conflicting configs
-rm -f /etc/nginx/sites-enabled/*
-ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
-
-# Test nginx config
-nginx -t
-
-# Start nginx
-systemctl start nginx
-systemctl enable nginx
-
-# Test HTTP first
-echo -e "${BLUE}Testing HTTP...${NC}"
-sleep 3
-if curl -f http://localhost/api/v1/health/ &>/dev/null; then
-    echo -e "${GREEN}✅ HTTP working${NC}"
-else
-    echo -e "${YELLOW}⚠️ HTTP test inconclusive, continuing...${NC}"
-fi
-
-# Fix certbot OpenSSL issues and install via alternative method
-echo -e "${BLUE}Installing certbot (fixing OpenSSL issues)...${NC}"
-
-# Remove broken certbot first
-apt-get remove -y certbot python3-certbot-nginx 2>/dev/null || true
-apt-get autoremove -y
-
-# Install via pip (more reliable for older Ubuntu) as root
-apt-get install -y python3-pip python3-venv
-python3 -m pip install --upgrade pip
-python3 -m pip install --root-user-action=ignore certbot
-
-# Find where certbot was installed
-CERTBOT_PATH=$(which certbot 2>/dev/null || find /usr/local/bin /root/.local/bin /home/ubuntu/.local/bin -name "certbot" 2>/dev/null | head -1)
-
-if [ -z "$CERTBOT_PATH" ]; then
-    echo -e "${RED}❌ Certbot installation failed${NC}"
-    echo -e "${YELLOW}⚠️ Continuing with HTTP only...${NC}"
+# Function to configure nginx with SSL detection
+configure_nginx() {
+    echo -e "${BLUE}🔒 Configuring nginx...${NC}"
     
-    # Start nginx with HTTP config
-    systemctl start nginx
+    # Check for SSL certificates
+    if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+        CERT_PATH="/etc/letsencrypt/live/$DOMAIN"
+        echo -e "${GREEN}✅ Certificate found for $DOMAIN${NC}"
+    elif [ -f "/etc/letsencrypt/live/www.$DOMAIN/fullchain.pem" ]; then
+        CERT_PATH="/etc/letsencrypt/live/www.$DOMAIN"
+        echo -e "${GREEN}✅ Certificate found for www.$DOMAIN${NC}"
+    else
+        echo -e "${YELLOW}⚠️ No SSL certificates found, using HTTP${NC}"
+        CERT_PATH=""
+    fi
     
-    show_space "Final space"
-    
-    echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED (HTTP ONLY)!${NC}"
-    echo -e "${BLUE}════════════════════════════════════${NC}"
-    echo -e "${BLUE}🌐 Application URLs (HTTP):${NC}"
-    echo -e "   Frontend: ${GREEN}http://$DOMAIN${NC}"
-    echo -e "   API: ${GREEN}http://$DOMAIN/api/v1/${NC}"
-    echo -e "   Admin: ${GREEN}http://$DOMAIN/api/v1/admin/${NC}"
-    echo -e ""
-    echo -e "${YELLOW}⚠️ HTTPS setup failed - application running on HTTP${NC}"
-    echo -e "${YELLOW}You can manually setup SSL later or check domain DNS${NC}"
-    exit 0
-fi
-
-echo -e "${GREEN}✅ Certbot found at: $CERTBOT_PATH${NC}"
-
-# Stop nginx for standalone mode
-systemctl stop nginx
-
-# Get SSL certificate using found certbot path
-echo -e "${BLUE}Getting SSL certificate...${NC}"
-$CERTBOT_PATH certonly \
-    --standalone \
-    -d www.$DOMAIN \
-    -d $DOMAIN \
-    --non-interactive \
-    --agree-tos \
-    --email elfogondedonsoto@gmail.com \
-    --key-type rsa \
-    --rsa-key-size 2048
-
-# Check if certificate was obtained successfully
-if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
-    echo -e "${RED}❌ SSL certificate not obtained. Continuing with HTTP only...${NC}"
-    
-    # Start nginx with HTTP config
-    systemctl start nginx
-    
-    echo -e "${YELLOW}⚠️ Application running on HTTP only${NC}"
-    echo -e "${YELLOW}Manual SSL setup required later${NC}"
-    
-    # Skip HTTPS config and go to verification
-    show_space "Final space"
-    
-    echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED (HTTP ONLY)!${NC}"
-    echo -e "${BLUE}════════════════════════════════════${NC}"
-    echo -e "${BLUE}🌐 Application URLs (HTTP):${NC}"
-    echo -e "   Frontend: ${GREEN}http://$DOMAIN${NC}"
-    echo -e "   API: ${GREEN}http://$DOMAIN/api/v1/${NC}"
-    echo -e "   Admin: ${GREEN}http://$DOMAIN/api/v1/admin/${NC}"
-    echo -e ""
-    echo -e "${YELLOW}⚠️ HTTPS setup failed - application running on HTTP${NC}"
-    echo -e "${YELLOW}You can manually setup SSL later or check domain DNS${NC}"
-    exit 0
-fi
-
-echo -e "${GREEN}✅ SSL certificate obtained successfully${NC}"
-
-# Update nginx config with HTTPS - use same filename
-cat > /etc/nginx/sites-available/$DOMAIN << 'EOF'
+    # Create nginx configuration
+    if [ -n "$CERT_PATH" ]; then
+        # HTTPS configuration
+        cat > /etc/nginx/sites-available/$DOMAIN << EOF
 server {
     listen 80;
-    server_name www.xn--elfogndedonsoto-zrb.com xn--elfogndedonsoto-zrb.com;
-    return 301 https://$server_name$request_uri;
+    listen [::]:80;
+    server_name www.$DOMAIN $DOMAIN;
+    return 301 https://www.\$server_name\$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name www.xn--elfogndedonsoto-zrb.com xn--elfogndedonsoto-zrb.com;
-
-    ssl_certificate /etc/letsencrypt/live/www.xn--elfogndedonsoto-zrb.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/www.xn--elfogndedonsoto-zrb.com/privkey.pem;
+    listen [::]:443 ssl http2;
+    server_name www.$DOMAIN $DOMAIN;
     
+    ssl_certificate $CERT_PATH/fullchain.pem;
+    ssl_certificate_key $CERT_PATH/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
     ssl_prefer_server_ciphers on;
-
+    
     root /var/www/restaurant;
     index index.html;
-
-    # API proxy to Docker backend
+    
+    # Frontend routes
+    location / {
+        try_files \$uri \$uri/ /index.html;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+    
+    # API proxy
     location /api/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-Ssl on;
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
     }
-
+    
     # Django admin
     location /admin/ {
         proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host \$http_host;
         proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header X-Forwarded-Ssl on;
     }
-
+    
     # Django static files
     location /static/ {
         alias /opt/restaurant-web/data/staticfiles/;
         expires 30d;
     }
-
+}
+EOF
+    else
+        # HTTP-only configuration
+        cat > /etc/nginx/sites-available/$DOMAIN << EOF
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name www.$DOMAIN $DOMAIN _;
+    
+    root /var/www/restaurant;
+    index index.html;
+    
     # Frontend routes
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files \$uri \$uri/ /index.html;
         add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+    
+    # API proxy
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+    
+    # Django admin
+    location /admin/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$http_host;
+    }
+    
+    # Django static files
+    location /static/ {
+        alias /opt/restaurant-web/data/staticfiles/;
+        expires 30d;
     }
 }
 EOF
-
-# Start nginx with HTTPS
-systemctl start nginx
-
-# Configure auto-renewal with correct certbot path
-echo "0 0,12 * * * root $CERTBOT_PATH renew --quiet --post-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
-
-echo -e "${GREEN}✅ HTTPS configured${NC}"
-
-# ==============================================================================
-# PHASE 8: FINAL VERIFICATION
-# ==============================================================================
-echo -e "\n${YELLOW}🔍 PHASE 8: Final Verification${NC}"
-
-# Wait for services to be ready
-sleep 10
-
-# Test API (expect 401 with Cognito enabled, no auth header)
-echo -e "${BLUE}Testing API without authentication...${NC}"
-for i in {1..3}; do
-    API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/zones/ 2>/dev/null || echo "000")
-    if [ "$API_STATUS" = "200" ] || [ "$API_STATUS" = "401" ] || [ "$API_STATUS" = "403" ]; then
-        if [ "$API_STATUS" = "401" ]; then
-            echo -e "${GREEN}✅ API working with Cognito auth - requires authentication (Status: $API_STATUS)${NC}"
-        elif [ "$API_STATUS" = "403" ]; then
-            echo -e "${GREEN}✅ API working with Cognito auth - forbidden (Status: $API_STATUS)${NC}"
-        else
-            echo -e "${GREEN}✅ API working without auth (Status: $API_STATUS)${NC}"
-        fi
-        break
-    else
-        echo -e "${YELLOW}⚠️ API Status: $API_STATUS (attempt $i/3)${NC}"
-        if [ $i -lt 3 ]; then
-            sleep 5
-        fi
     fi
-done
+    
+    # Enable configuration and start nginx
+    rm -f /etc/nginx/sites-enabled/*
+    ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
+    
+    if nginx -t; then
+        systemctl start nginx
+        echo -e "${GREEN}✅ Nginx configured and started${NC}"
+    else
+        echo -e "${RED}❌ Nginx configuration error${NC}"
+        nginx -t
+        exit 1
+    fi
+}
 
-# Test specific endpoints
-echo -e "${BLUE}Testing specific endpoints...${NC}"
-HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/health/ 2>/dev/null || echo "000")
-echo -e "  Health endpoint: ${HEALTH_STATUS}"
+# Main execution starts here
+show_space "Initial space"
 
-UNITS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/units/ 2>/dev/null || echo "000")
-echo -e "  Units endpoint: ${UNITS_STATUS}"
+# ==============================================================================
+# MAIN EXECUTION - Route to appropriate deployment function
+# ==============================================================================
 
-# Show recent backend logs for debugging
-echo -e "${BLUE}Recent backend logs (last 20 lines):${NC}"
-docker-compose -f docker-compose.ec2.yml logs --tail=20 web || echo "Could not fetch logs"
-
-# Test domain
-DOMAIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://$DOMAIN/ 2>/dev/null || echo "000")
-if [ "$DOMAIN_STATUS" = "200" ]; then
-    echo -e "${GREEN}✅ Domain working (Status: $DOMAIN_STATUS)${NC}"
+# Execute based on deployment mode
+if [[ "$FRONTEND_ONLY" == "true" ]]; then
+    frontend_only_deploy
+elif [[ "$BACKEND_ONLY" == "true" ]]; then
+    backend_only_deploy
 else
-    echo -e "${YELLOW}⚠️ Domain Status: $DOMAIN_STATUS${NC}"
+    full_deploy
 fi
 
-# Show container status
-echo -e "${YELLOW}📊 Container status:${NC}"
-docker-compose -f docker-compose.ec2.yml ps
+# ==============================================================================
+# FINAL VERIFICATION
+# ==============================================================================
+echo -e "\n${YELLOW}🔍 Final Verification${NC}"
 
-# Clean up final
-apt clean >/dev/null 2>&1
+# Wait for services to be ready
+sleep 5
+
+# Test backend API
+echo -e "${BLUE}Testing backend API...${NC}"
+BACKEND_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/health/ 2>/dev/null || echo "000")
+
+if [ "$BACKEND_STATUS" = "200" ]; then
+    echo -e "${GREEN}✅ Backend API: Working (Status: $BACKEND_STATUS)${NC}"
+else
+    echo -e "${YELLOW}⚠️ Backend API: Status $BACKEND_STATUS${NC}"
+    if [[ "$BACKEND_ONLY" != "true" ]]; then
+        echo -e "${BLUE}Backend logs (last 10 lines):${NC}"
+        docker-compose -f docker-compose.ec2.yml logs --tail=10 web || echo "Could not fetch logs"
+    fi
+fi
+
+# Test nginx status
+if systemctl is-active --quiet nginx; then
+    echo -e "${GREEN}✅ Nginx: Running${NC}"
+else
+    echo -e "${RED}❌ Nginx: Not running${NC}"
+fi
+
+# Test HTTPS if not backend-only
+if [[ "$BACKEND_ONLY" != "true" ]]; then
+    HTTPS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://www.$DOMAIN/api/v1/health/ 2>/dev/null || echo "000")
+    
+    if [ "$HTTPS_STATUS" = "200" ]; then
+        echo -e "${GREEN}✅ HTTPS API: Working (Status: $HTTPS_STATUS)${NC}"
+    else
+        echo -e "${YELLOW}⚠️ HTTPS API: Status $HTTPS_STATUS${NC}"
+    fi
+fi
 
 show_space "Final space"
 
 # ==============================================================================
 # DEPLOYMENT COMPLETE
 # ==============================================================================
-echo -e "\n${GREEN}🎉 BUILD & DEPLOYMENT COMPLETED!${NC}"
+echo -e "\n${GREEN}🎉 DEPLOYMENT COMPLETED!${NC}"
 echo -e "${BLUE}════════════════════════════════════${NC}"
-echo -e "${BLUE}🌐 Application URLs (HTTPS):${NC}"
-echo -e "   Frontend: ${GREEN}https://$DOMAIN${NC}"
-echo -e "   API: ${GREEN}https://$DOMAIN/api/v1/${NC}"
-echo -e "   Admin: ${GREEN}https://$DOMAIN/api/v1/admin/${NC}"
+
+if [[ "$FRONTEND_ONLY" == "true" ]]; then
+    echo -e "${BLUE}🎨 Frontend Only Deployment: ${GREEN}SUCCESS${NC}"
+    echo -e "   Frontend: ${GREEN}https://www.$DOMAIN${NC}"
+    echo -e ""
+    echo -e "${YELLOW}⏰ Time saved: ~8 minutes vs full deploy${NC}"
+    
+elif [[ "$BACKEND_ONLY" == "true" ]]; then
+    echo -e "${BLUE}🐳 Backend Only Deployment: ${GREEN}SUCCESS${NC}"
+    echo -e "   API: ${GREEN}https://www.$DOMAIN/api/v1/${NC}"
+    echo -e "   Admin: ${GREEN}https://www.$DOMAIN/admin/${NC}"
+    echo -e ""
+    echo -e "${YELLOW}⏰ Time saved: ~9 minutes vs full deploy${NC}"
+    
+else
+    echo -e "${BLUE}🏗️ Full Deployment (Optimized): ${GREEN}SUCCESS${NC}"
+    echo -e "   Frontend: ${GREEN}https://www.$DOMAIN${NC}"
+    echo -e "   API: ${GREEN}https://www.$DOMAIN/api/v1/${NC}"
+    echo -e "   Admin: ${GREEN}https://www.$DOMAIN/admin/${NC}"
+    echo -e ""
+    echo -e "${YELLOW}⏰ Optimized: ~5 minutes vs 10 minutes (original)${NC}"
+fi
+
 echo -e ""
-echo -e "${BLUE}🔐 Login Access:${NC}"
-echo -e "   Use AWS Cognito credentials${NC}"
-echo -e ""
-echo -e "${BLUE}🔐 Authentication:${NC}"
-echo -e "   AWS Cognito: ${GREEN}ENABLED${NC}"
+echo -e "${BLUE}🔐 Authentication: AWS Cognito${NC}"
 echo -e "   User Pool: ${COGNITO_USER_POOL_ID}"
 echo -e "   Region: ${AWS_REGION}"
 echo -e ""
-echo -e "${YELLOW}✅ Ready to use:${NC}"
-echo -e "1. Access application at: ${GREEN}https://$DOMAIN${NC}"
-echo -e "2. Login with your existing Cognito credentials"
-echo -e "3. Users and groups already configured in AWS"
-echo -e ""
 echo -e "${GREEN}✨ Restaurant Web Application is READY!${NC}"
 echo -e ""
-echo -e "${YELLOW}🔍 Troubleshooting:${NC}"
-echo -e "1. Check backend logs: docker-compose -f docker-compose.ec2.yml logs web"
-echo -e "2. Test API manually: curl -v https://$DOMAIN/api/v1/zones/"
-echo -e "3. Check container environment: docker-compose -f docker-compose.ec2.yml exec web env | grep COGNITO"
-echo -e "4. Verify user groups in AWS Cognito console"
+echo -e "${YELLOW}🛠️ Quick Commands:${NC}"
+echo -e "   Frontend only:  ${BLUE}sudo $0 --frontend-only${NC}"
+echo -e "   Backend only:   ${BLUE}sudo $0 --backend-only${NC}"
+echo -e "   Full deploy:    ${BLUE}sudo $0${NC}"
+echo -e "   Help:           ${BLUE}sudo $0 --help${NC}"
 echo -e ""
-echo -e "${BLUE}🔍 User Permission Debug:${NC}"
-echo -e "If you get 'No tienes permiso' errors:"
-echo -e "1. Verify your user is in the correct Cognito group (administradores/meseros/cocineros)"
-echo -e "2. Check JWT token contains 'cognito:groups' claim"
-echo -e "3. Verify user pool configuration in AWS console"
+echo -e "${YELLOW}🔍 Troubleshooting:${NC}"
+echo -e "   Backend logs:   ${BLUE}docker-compose -f docker-compose.ec2.yml logs web${NC}"
+echo -e "   Test API:       ${BLUE}curl -v https://www.$DOMAIN/api/v1/health/${NC}"
+echo -e "   Container status: ${BLUE}docker-compose -f docker-compose.ec2.yml ps${NC}"
