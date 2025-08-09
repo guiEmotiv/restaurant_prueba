@@ -10,12 +10,7 @@ import {
   Search,
   X,
   Clock,
-  Star,
-  Filter,
-  ChevronDown,
   Info,
-  Sparkles,
-  ShoppingBag,
   Trash2,
   CreditCard,
   Users,
@@ -47,7 +42,6 @@ const TableOrderEdit = () => {
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewItems, setShowNewItems] = useState(false);
-  const [showGroupSelector, setShowGroupSelector] = useState(false);
   
   // Estados para modal de item
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -84,7 +78,6 @@ const TableOrderEdit = () => {
       setGroups(Array.isArray(groupsData) ? groupsData : []);
       setContainers(Array.isArray(containersData) ? containersData.filter(c => c.is_active) : []);
       
-      // Solo recetas activas con stock
       const availableRecipes = recipesData.filter(recipe => recipe.is_active && recipe.available !== false);
       setRecipes(availableRecipes);
     } catch (error) {
@@ -218,7 +211,6 @@ const TableOrderEdit = () => {
     try {
       setUpdatingOrder(true);
       
-      // Agregar nuevos items al pedido existente
       for (const newItem of newItems) {
         for (let i = 0; i < newItem.quantity; i++) {
           const itemData = {
@@ -265,32 +257,23 @@ const TableOrderEdit = () => {
     }).format(amount);
   };
 
-  const getSelectedGroupName = () => {
-    if (selectedGroup === 'all') return 'Todo el menú';
-    const group = groups.find(g => g.id === parseInt(selectedGroup));
-    return group ? group.name : 'Todo el menú';
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando pedido...</p>
-        </div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
 
   if (!table || !order) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center bg-white rounded-2xl p-8 shadow-lg">
-          <Info className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Pedido no encontrado</h2>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <Info className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Pedido no encontrado</h2>
           <button 
             onClick={() => navigate('/table-status')}
-            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
+            className="text-blue-600 hover:text-blue-800"
           >
             Volver al estado de mesas
           </button>
@@ -300,17 +283,17 @@ const TableOrderEdit = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Fixed */}
-      <div className="bg-white shadow-sm sticky top-0 z-40">
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/table-status')}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg"
               >
-                <ArrowLeft className="h-5 w-5 text-gray-700" />
+                <ArrowLeft className="h-5 w-5 text-gray-600" />
               </button>
               <div>
                 <h1 className="font-bold text-lg text-gray-900">Mesa {table.table_number}</h1>
@@ -319,7 +302,7 @@ const TableOrderEdit = () => {
             </div>
 
             <div className="text-right">
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-xl font-bold text-gray-900">
                 {formatCurrency(order.total_amount)}
               </div>
               <div className="text-xs text-gray-500">Total del pedido</div>
@@ -327,20 +310,24 @@ const TableOrderEdit = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="mt-3 flex gap-2">
+          <div className="flex gap-2">
             <button
               onClick={() => navigate(`/table/${tableId}/order-ecommerce`)}
               className="flex-1 bg-purple-600 text-white py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
             >
-              <Users className="h-5 w-5" />
+              <Users className="h-4 w-4" />
               Nueva cuenta
             </button>
 
             <button
               onClick={() => setShowNewItems(true)}
-              className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 relative"
+              className={`flex-1 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 relative ${
+                getNewItemsCount() > 0 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-4 w-4" />
               Agregar items
               {getNewItemsCount() > 0 && (
                 <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
@@ -354,7 +341,7 @@ const TableOrderEdit = () => {
                 onClick={handleGoToPayment}
                 className="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
               >
-                <CreditCard className="h-5 w-5" />
+                <CreditCard className="h-4 w-4" />
                 Pagar
               </button>
             )}
@@ -364,28 +351,26 @@ const TableOrderEdit = () => {
 
       {/* Order Items */}
       <div className="px-4 py-4">
-        <div className="bg-white rounded-xl shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-lg">
           <div className="p-4 border-b border-gray-100">
-            <div className="flex items-center justify-between">
-              <h2 className="font-bold text-gray-900">Items del pedido</h2>
-              <div className="text-sm text-gray-600">
-                {existingItems.filter(i => i.status === 'SERVED').length}/{existingItems.length} entregados
-              </div>
-            </div>
+            <h2 className="font-bold text-gray-900">Items del pedido</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {existingItems.filter(i => i.status === 'SERVED').length}/{existingItems.length} entregados
+            </p>
           </div>
 
           <div className="p-4">
             {existingItems.length === 0 ? (
-              <div className="text-center py-12">
-                <ShoppingBag className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-600">No hay items en el pedido</p>
+              <div className="text-center py-8">
+                <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">No hay items en el pedido</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {existingItems.map((item) => (
                   <div
                     key={item.id}
-                    className={`rounded-xl p-4 border-2 ${
+                    className={`p-4 rounded-lg border ${
                       item.status === 'SERVED' 
                         ? 'bg-green-50 border-green-200' 
                         : 'bg-orange-50 border-orange-200'
@@ -435,7 +420,7 @@ const TableOrderEdit = () => {
                             onClick={() => removeExistingItem(item.id)}
                             className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
                           >
-                            <Trash2 className="h-5 w-5" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         )}
                       </div>
@@ -448,218 +433,172 @@ const TableOrderEdit = () => {
         </div>
       </div>
 
-      {/* Add Items Modal */}
+      {/* Fullscreen Add Items Modal */}
       {showNewItems && (
-        <>
-          <div 
-            className="fixed inset-0 bg-black/50 z-50 transition-opacity"
-            onClick={() => setShowNewItems(false)}
-          />
-          <div className="fixed inset-0 z-50 flex items-end">
-            <div className="bg-white w-full max-h-[90vh] rounded-t-2xl shadow-2xl flex flex-col animate-slide-up">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Agregar items</h2>
-                  <p className="text-sm text-gray-600">
-                    {newItems.length > 0 ? `${getNewItemsCount()} items agregados` : 'Selecciona del menú'}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowNewItems(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="h-6 w-6 text-gray-600" />
-                </button>
+        <div className="fixed inset-0 bg-white z-50 flex flex-col">
+          {/* Modal Header */}
+          <div className="bg-white border-b border-gray-200 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Agregar items</h2>
+                <p className="text-sm text-gray-600">
+                  {newItems.length > 0 ? `${getNewItemsCount()} items agregados` : 'Selecciona del menú'}
+                </p>
               </div>
-
-              {/* Search and Filters */}
-              <div className="px-4 py-3 border-b border-gray-100">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                    <input
-                      type="text"
-                      placeholder="Buscar platos..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                    />
-                  </div>
-                  <button
-                    onClick={() => setShowGroupSelector(!showGroupSelector)}
-                    className="px-4 py-2 bg-gray-100 rounded-lg flex items-center gap-2 hover:bg-gray-200 transition-colors"
-                  >
-                    <Filter className="h-5 w-5 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700">{getSelectedGroupName()}</span>
-                    <ChevronDown className="h-4 w-4 text-gray-500" />
-                  </button>
-                </div>
-
-                {/* Group Selector */}
-                {showGroupSelector && (
-                  <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                    <button
-                      onClick={() => {
-                        setSelectedGroup('all');
-                        setShowGroupSelector(false);
-                      }}
-                      className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                        selectedGroup === 'all' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
-                      }`}
-                    >
-                      Todo el menú
-                    </button>
-                    {groups.map(group => (
-                      <button
-                        key={group.id}
-                        onClick={() => {
-                          setSelectedGroup(group.id.toString());
-                          setShowGroupSelector(false);
-                        }}
-                        className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-t border-gray-100 ${
-                          selectedGroup === group.id.toString() ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
-                        }`}
-                      >
-                        {group.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Menu Items */}
-              <div className="flex-1 overflow-y-auto p-4">
-                {filteredRecipes.length === 0 ? (
-                  <div className="text-center py-20">
-                    <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-600">No se encontraron platos</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4">
-                    {filteredRecipes.map((recipe) => (
-                      <div
-                        key={recipe.id}
-                        className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
-                      >
-                        <div className="p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <h3 className="font-bold text-lg text-gray-900 mb-1">{recipe.name}</h3>
-                              {recipe.description && (
-                                <p className="text-sm text-gray-600 mb-2 line-clamp-2">{recipe.description}</p>
-                              )}
-                              <div className="flex items-center gap-3 text-sm">
-                                <div className="flex items-center gap-1 text-gray-500">
-                                  <Clock className="h-4 w-4" />
-                                  <span>{recipe.preparation_time} min</span>
-                                </div>
-                                <div className="flex items-center gap-1 text-yellow-500">
-                                  <Star className="h-4 w-4 fill-current" />
-                                  <span className="text-gray-700 font-medium">4.8</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right ml-4">
-                              <div className="text-2xl font-bold text-gray-900">
-                                {formatCurrency(recipe.base_price)}
-                              </div>
-                              <div className="text-xs text-gray-500">{recipe.group_name}</div>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                addNewItem(recipe);
-                                showSuccess('Agregado');
-                              }}
-                              className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                            >
-                              <Plus className="h-5 w-5" />
-                              Agregar
-                            </button>
-                            <button
-                              onClick={() => openItemModal(recipe)}
-                              className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                              <Info className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Cart Summary */}
-              {newItems.length > 0 && (
-                <div className="border-t border-gray-200 p-4 bg-gray-50">
-                  <div className="mb-4 max-h-32 overflow-y-auto">
-                    {newItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between py-2">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
-                          <p className="text-sm text-gray-600">{formatCurrency(item.unit_price)} c/u</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="font-bold text-gray-900">
-                            {formatCurrency(item.unit_price * item.quantity)}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => updateNewItemQuantity(item.id, item.quantity - 1)}
-                              className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
-                            <span className="w-8 text-center font-medium">{item.quantity}</span>
-                            <button
-                              onClick={() => updateNewItemQuantity(item.id, item.quantity + 1)}
-                              className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between mb-4 pt-4 border-t border-gray-300">
-                    <span className="text-lg font-medium text-gray-700">Subtotal nuevos items</span>
-                    <span className="text-2xl font-bold text-gray-900">{formatCurrency(calculateNewItemsTotal())}</span>
-                  </div>
-                  
-                  <button
-                    onClick={handleUpdateOrder}
-                    disabled={updatingOrder}
-                    className="w-full bg-green-600 text-white py-4 rounded-xl text-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                  >
-                    {updatingOrder ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                        Actualizando...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-5 w-5" />
-                        Agregar al pedido
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
+              <button
+                onClick={() => setShowNewItems(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="h-6 w-6 text-gray-600" />
+              </button>
             </div>
           </div>
-        </>
+
+          {/* Search and Filters */}
+          <div className="bg-white border-b border-gray-100 px-4 py-3">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                placeholder="Buscar platos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            >
+              <option value="all">Todo el menú</option>
+              {groups.map(group => (
+                <option key={group.id} value={group.id}>{group.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Menu Items */}
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            {filteredRecipes.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="text-gray-500 mb-2">No se encontraron platos</div>
+                <div className="text-sm text-gray-400">Intenta con otros términos</div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredRecipes.map((recipe) => (
+                  <div key={recipe.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 mb-1">{recipe.name}</h3>
+                        {recipe.description && (
+                          <p className="text-sm text-gray-600 mb-2">{recipe.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Clock className="h-4 w-4" />
+                          <span>{recipe.preparation_time} min</span>
+                          <span>•</span>
+                          <span>{recipe.group_name || 'Sin categoría'}</span>
+                        </div>
+                      </div>
+                      <div className="text-right ml-4">
+                        <div className="text-xl font-bold text-gray-900">
+                          {formatCurrency(recipe.base_price)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          addNewItem(recipe);
+                          showSuccess('Agregado');
+                        }}
+                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Agregar
+                      </button>
+                      <button
+                        onClick={() => openItemModal(recipe)}
+                        className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Cart Summary */}
+          {newItems.length > 0 && (
+            <div className="bg-white border-t border-gray-200 p-4">
+              <div className="mb-4 max-h-32 overflow-y-auto">
+                {newItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between py-2">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
+                      <p className="text-sm text-gray-600">{formatCurrency(item.unit_price)} c/u</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-bold text-gray-900">
+                        {formatCurrency(item.unit_price * item.quantity)}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateNewItemQuantity(item.id, item.quantity - 1)}
+                          className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <span className="w-8 text-center font-medium">{item.quantity}</span>
+                        <button
+                          onClick={() => updateNewItemQuantity(item.id, item.quantity + 1)}
+                          className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between mb-4 pt-4 border-t border-gray-200">
+                <span className="text-lg font-medium text-gray-700">Subtotal</span>
+                <span className="text-2xl font-bold text-gray-900">{formatCurrency(calculateNewItemsTotal())}</span>
+              </div>
+              
+              <button
+                onClick={handleUpdateOrder}
+                disabled={updatingOrder}
+                className="w-full bg-green-600 text-white py-4 rounded-lg text-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              >
+                {updatingOrder ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    Actualizando...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-5 w-5" />
+                    Agregar al pedido
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Item Details Modal */}
       {selectedRecipe && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
-          <div className="bg-white rounded-t-2xl w-full max-h-[80vh] overflow-y-auto animate-slide-up">
+          <div className="bg-white rounded-t-2xl w-full max-h-[80vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
               <div className="flex items-start justify-between">
@@ -669,7 +608,7 @@ const TableOrderEdit = () => {
                 </div>
                 <button
                   onClick={() => setSelectedRecipe(null)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-gray-100 rounded-lg"
                 >
                   <X className="h-6 w-6 text-gray-600" />
                 </button>
@@ -677,7 +616,6 @@ const TableOrderEdit = () => {
             </div>
 
             <div className="p-4 space-y-4">
-              {/* Description */}
               {selectedRecipe.description && (
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Descripción</h4>
@@ -685,46 +623,43 @@ const TableOrderEdit = () => {
                 </div>
               )}
 
-              {/* Quantity Selector */}
               <div>
                 <h4 className="font-medium text-gray-900 mb-2">Cantidad</h4>
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
-                    className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
+                    className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200"
                   >
                     <Minus className="h-5 w-5 text-gray-600" />
                   </button>
                   <span className="text-xl font-bold text-gray-900 w-12 text-center">{itemQuantity}</span>
                   <button
                     onClick={() => setItemQuantity(itemQuantity + 1)}
-                    className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
+                    className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200"
                   >
                     <Plus className="h-5 w-5 text-gray-600" />
                   </button>
                 </div>
               </div>
 
-              {/* Special Instructions */}
               <div>
                 <h4 className="font-medium text-gray-900 mb-2">Instrucciones especiales</h4>
                 <textarea
                   value={itemNotes}
                   onChange={(e) => setItemNotes(e.target.value)}
                   placeholder="Ej: Sin cebolla, término medio..."
-                  className="w-full px-4 py-3 bg-gray-100 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
                   rows="3"
                 />
               </div>
 
-              {/* Options */}
               <div className="space-y-3">
-                <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
                   <div className="flex items-center gap-3">
                     <Package className="h-5 w-5 text-orange-600" />
                     <div>
                       <p className="font-medium text-gray-900">Para llevar</p>
-                      <p className="text-sm text-gray-600">Empaque especial para llevar</p>
+                      <p className="text-sm text-gray-600">Empaque especial</p>
                     </div>
                   </div>
                   <input
@@ -741,7 +676,7 @@ const TableOrderEdit = () => {
                 </label>
 
                 {itemTakeaway && (
-                  <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors ml-8">
+                  <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 ml-8">
                     <div className="flex items-center gap-3">
                       <Check className="h-5 w-5 text-green-600" />
                       <div>
@@ -760,14 +695,13 @@ const TableOrderEdit = () => {
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
               <button
                 onClick={() => {
                   addNewItem(selectedRecipe, itemQuantity, itemNotes, itemTakeaway, itemTaper);
                   showSuccess(`${itemQuantity} ${selectedRecipe.name} agregado${itemQuantity > 1 ? 's' : ''}`);
                 }}
-                className="w-full bg-blue-600 text-white py-4 rounded-xl text-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-blue-600 text-white py-4 rounded-lg text-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
               >
                 <ShoppingCart className="h-5 w-5" />
                 Agregar • {formatCurrency(selectedRecipe.base_price * itemQuantity)}
@@ -776,31 +710,6 @@ const TableOrderEdit = () => {
           </div>
         </div>
       )}
-
-      {/* Bottom Safe Area */}
-      <div className="h-20"></div>
-
-      <style jsx>{`
-        @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-          }
-          to {
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
-        }
-        
-        .line-clamp-2 {
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-      `}</style>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, MapPin, Clock, Users, ShoppingBag, ChevronRight, Star } from 'lucide-react';
+import { Search, MapPin, Clock, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -13,8 +13,6 @@ const TableStatus = () => {
   const [loading, setLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -125,19 +123,8 @@ const TableStatus = () => {
       table.table_number.toString().includes(searchTerm) ||
       getZoneName(table.zone).toLowerCase().includes(searchTerm.toLowerCase());
     
-    const tableStatus = getTableStatus(table);
-    const matchesStatus = filterStatus === 'all' ||
-      (filterStatus === 'available' && tableStatus.status === 'available') ||
-      (filterStatus === 'occupied' && tableStatus.status === 'occupied');
-    
-    return matchesZone && matchesSearch && matchesStatus;
+    return matchesZone && matchesSearch;
   });
-
-  const stats = {
-    total: tables.length,
-    available: tables.filter(t => !t.has_active_orders).length,
-    occupied: tables.filter(t => t.has_active_orders).length
-  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-PE', {
@@ -148,134 +135,54 @@ const TableStatus = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando mesas...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header E-commerce Style */}
-      <div className="bg-white shadow-sm sticky top-0 z-40">
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Mesas</h1>
-              <p className="text-sm text-gray-600">Gestiona los pedidos del restaurante</p>
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="relative p-2 bg-blue-50 text-blue-600 rounded-lg"
-            >
-              <Filter className="h-5 w-5" />
-              {(selectedZone || filterStatus !== 'all') && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
-              )}
-            </button>
-          </div>
-
-          {/* Search Bar */}
+          <h1 className="text-xl font-bold text-gray-900 mb-4">Estado de Mesas</h1>
+          
+          {/* Search */}
           <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
               type="text"
-              placeholder="Buscar mesa o zona..."
+              placeholder="Buscar mesa..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-gray-100 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
             />
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-gray-100 rounded-xl p-3 text-center">
-              <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-              <div className="text-xs text-gray-600">Total</div>
-            </div>
-            <div className="bg-green-100 rounded-xl p-3 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.available}</div>
-              <div className="text-xs text-green-700">Disponibles</div>
-            </div>
-            <div className="bg-orange-100 rounded-xl p-3 text-center">
-              <div className="text-2xl font-bold text-orange-600">{stats.occupied}</div>
-              <div className="text-xs text-orange-700">Ocupadas</div>
-            </div>
-          </div>
+          {/* Zone Filter */}
+          <select
+            value={selectedZone}
+            onChange={(e) => setSelectedZone(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+          >
+            <option value="">Todas las zonas</option>
+            {zones.map(zone => (
+              <option key={zone.id} value={zone.id}>{zone.name}</option>
+            ))}
+          </select>
         </div>
-
-        {/* Filters Panel */}
-        {showFilters && (
-          <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Zona</label>
-                <select
-                  value={selectedZone}
-                  onChange={(e) => setSelectedZone(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todas las zonas</option>
-                  {zones.map(zone => (
-                    <option key={zone.id} value={zone.id}>{zone.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setFilterStatus('all')}
-                    className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-                      filterStatus === 'all'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    Todas
-                  </button>
-                  <button
-                    onClick={() => setFilterStatus('available')}
-                    className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-                      filterStatus === 'available'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-white border border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    Libres
-                  </button>
-                  <button
-                    onClick={() => setFilterStatus('occupied')}
-                    className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-                      filterStatus === 'occupied'
-                        ? 'bg-orange-600 text-white'
-                        : 'bg-white border border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    Ocupadas
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Tables Grid E-commerce Style */}
-      <div className="px-4 py-6">
+      {/* Tables List */}
+      <div className="px-4 py-4">
         {filteredTables.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <ShoppingBag className="h-10 w-10 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron mesas</h3>
-            <p className="text-gray-600">Intenta ajustar los filtros de búsqueda</p>
+          <div className="text-center py-16">
+            <div className="text-gray-500 mb-2">Sin mesas</div>
+            <div className="text-sm text-gray-400">Revisa los filtros</div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-3">
             {filteredTables.map((table) => {
               const tableStatus = getTableStatus(table);
               const isAvailable = tableStatus.status === 'available';
@@ -284,110 +191,61 @@ const TableStatus = () => {
                 <button
                   key={table.id}
                   onClick={() => handleTableClick(table)}
-                  className={`relative overflow-hidden rounded-2xl p-4 text-left transition-all transform active:scale-[0.98] ${
+                  className={`w-full p-4 rounded-lg border transition-all ${
                     isAvailable 
-                      ? 'bg-white border-2 border-gray-200 hover:border-blue-400 hover:shadow-lg' 
-                      : 'bg-gradient-to-br from-orange-50 to-red-50 border-2 border-orange-200 hover:border-orange-400 hover:shadow-lg'
+                      ? 'bg-green-50 border-green-500 text-green-900' 
+                      : 'bg-red-50 border-red-500 text-red-900'
                   }`}
                 >
-                  {/* Status Badge */}
-                  <div className="absolute top-4 right-4">
-                    <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      isAvailable 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {isAvailable ? 'DISPONIBLE' : 'OCUPADA'}
-                    </div>
-                  </div>
-
-                  {/* Table Info */}
-                  <div className="flex items-start gap-4">
-                    <div className={`w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold ${
-                      isAvailable
-                        ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
-                        : 'bg-gradient-to-br from-orange-500 to-red-500 text-white'
-                    }`}>
-                      {table.table_number}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold text-white ${
+                        isAvailable ? 'bg-green-500' : 'bg-red-500'
+                      }`}>
+                        {table.table_number}
+                      </div>
+                      
+                      <div className="text-left">
+                        <div className="font-bold">Mesa {table.table_number}</div>
+                        <div className="text-sm opacity-75 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {getZoneName(table.zone)}
+                        </div>
+                      </div>
                     </div>
                     
-                    <div className="flex-1">
-                      <h3 className="font-bold text-lg text-gray-900 mb-1">
-                        Mesa {table.table_number}
-                      </h3>
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          <span>{getZoneName(table.zone)}</span>
-                        </div>
-                        
-                        {!isAvailable && (
-                          <>
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              <span>{tableStatus.occupancyTime}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Users className="h-4 w-4" />
-                              <span>{tableStatus.ordersCount} {tableStatus.ordersCount === 1 ? 'cuenta' : 'cuentas'}</span>
-                            </div>
-                          </>
-                        )}
+                    <div className="text-right">
+                      <div className={`px-3 py-1 rounded-full text-sm font-bold ${
+                        isAvailable 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-red-500 text-white'
+                      }`}>
+                        {isAvailable ? 'DISPONIBLE' : 'OCUPADA'}
                       </div>
-
+                      
                       {!isAvailable && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-sm text-gray-600">
-                                {tableStatus.pendingItems} de {tableStatus.totalItems} items pendientes
-                              </div>
-                              <div className="text-lg font-bold text-gray-900">
-                                {formatCurrency(tableStatus.totalAmount)}
-                              </div>
-                            </div>
-                            <ChevronRight className="h-5 w-5 text-gray-400" />
+                        <div className="text-xs mt-1 space-y-0.5">
+                          <div className="flex items-center gap-1 justify-end">
+                            <Clock className="h-3 w-3" />
+                            {tableStatus.occupancyTime}
                           </div>
-                          
-                          {/* Progress Bar */}
-                          <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300"
-                              style={{ 
-                                width: `${tableStatus.totalItems > 0 
-                                  ? ((tableStatus.totalItems - tableStatus.pendingItems) / tableStatus.totalItems) * 100 
-                                  : 0}%` 
-                              }}
-                            />
+                          <div className="flex items-center gap-1 justify-end">
+                            <Users className="h-3 w-3" />
+                            {tableStatus.ordersCount} cuenta{tableStatus.ordersCount > 1 ? 's' : ''}
+                          </div>
+                          <div className="font-semibold">
+                            {formatCurrency(tableStatus.totalAmount)}
                           </div>
                         </div>
                       )}
                     </div>
                   </div>
-
-                  {/* Quick Actions for Available Tables */}
-                  {isAvailable && (
-                    <div className="mt-4 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        <span>Mesa recomendada</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-blue-600 font-medium">
-                        <span>Crear pedido</span>
-                        <ChevronRight className="h-4 w-4" />
-                      </div>
-                    </div>
-                  )}
                 </button>
               );
             })}
           </div>
         )}
       </div>
-      
-      {/* Bottom Safe Area */}
-      <div className="h-20"></div>
     </div>
   );
 };
