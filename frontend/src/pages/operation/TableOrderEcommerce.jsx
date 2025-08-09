@@ -250,18 +250,17 @@ const TableOrderEcommerce = () => {
               </div>
             </div>
 
-            {getCartItemsCount() > 0 && (
-              <button
-                onClick={() => setShowCart(true)}
-                className="relative px-3 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors flex items-center gap-1 text-sm"
-              >
-                <ShoppingCart className="h-3 w-3" />
-                <span>{formatCurrency(calculateCartTotal())}</span>
+            <button
+              onClick={() => setShowCart(true)}
+              className="relative px-3 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors flex items-center gap-1 text-sm"
+            >
+              <ShoppingCart className="h-3 w-3" />
+              {getCartItemsCount() > 0 && (
                 <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
                   {getCartItemsCount()}
                 </div>
-              </button>
-            )}
+              )}
+            </button>
           </div>
 
           {/* Search */}
@@ -341,80 +340,59 @@ const TableOrderEcommerce = () => {
         )}
       </div>
 
-      {/* Fullscreen Cart Modal */}
+      {/* Cart Modal */}
       {showCart && (
         <div className="fixed inset-0 bg-white z-50 flex flex-col">
-          {/* Cart Header */}
-          <div className="bg-white border-b border-gray-200 px-4 py-3">
+          {/* Header */}
+          <div className="bg-white border-b border-gray-200 px-3 py-3">
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Mi Pedido</h2>
-                <p className="text-sm text-gray-600">Mesa {table.table_number}</p>
-              </div>
+              <h2 className="text-sm font-medium text-gray-900">Carrito</h2>
               <button
                 onClick={() => setShowCart(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-1 hover:bg-gray-100 rounded"
               >
-                <X className="h-6 w-6 text-gray-600" />
+                <X className="h-4 w-4 text-gray-600" />
               </button>
             </div>
           </div>
 
-          {/* Cart Items */}
-          <div className="flex-1 overflow-y-auto px-4 py-4">
+          {/* Items */}
+          <div className="flex-1 overflow-y-auto px-3 py-3">
             {cart.length === 0 ? (
-              <div className="text-center py-20">
-                <ShoppingCart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Tu carrito está vacío</h3>
-                <p className="text-gray-600">Agrega algunos platos para comenzar</p>
+              <div className="text-center py-12">
+                <ShoppingCart className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-600">Carrito vacío</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {cart.map((item) => (
-                  <div key={item.id} className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-2">
+                  <div key={item.id} className="bg-gray-50 rounded p-3">
+                    <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
-                        <p className="text-sm text-gray-600">
-                          {formatCurrency(item.unit_price)} c/u
-                        </p>
+                        <h4 className="text-sm font-medium text-gray-900">{item.recipe.name}</h4>
+                        <p className="text-xs text-gray-600">{formatCurrency(item.unit_price)} x {item.quantity}</p>
                         {item.notes && (
-                          <div className="mt-1 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                            {item.notes}
-                          </div>
+                          <p className="text-xs text-blue-600 mt-1">{item.notes}</p>
                         )}
-                        <div className="flex gap-2 mt-2">
+                        <div className="flex gap-1 mt-1">
                           {item.is_takeaway && (
-                            <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs">
-                              Para llevar
-                            </span>
+                            <span className="bg-orange-100 text-orange-700 px-1 py-0.5 rounded text-xs">Para llevar</span>
                           )}
                           {item.has_taper && (
-                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
-                              Con envase
-                            </span>
+                            <span className="bg-green-100 text-green-700 px-1 py-0.5 rounded text-xs">Con envase</span>
                           )}
                         </div>
                       </div>
-                      <div className="text-right ml-4">
-                        <div className="font-bold text-lg text-gray-900 mb-2">
+                      <div className="flex items-center gap-2 ml-3">
+                        <span className="text-sm font-semibold text-gray-900">
                           {formatCurrency(item.unit_price * item.quantity)}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
-                            className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
-                          >
-                            <Minus className="h-4 w-4 text-gray-600" />
-                          </button>
-                          <span className="w-8 text-center font-medium">{item.quantity}</span>
-                          <button
-                            onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
-                            className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
-                          >
-                            <Plus className="h-4 w-4 text-gray-600" />
-                          </button>
-                        </div>
+                        </span>
+                        <button
+                          onClick={() => updateCartItemQuantity(item.id, 0)}
+                          className="p-1 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -423,27 +401,27 @@ const TableOrderEcommerce = () => {
             )}
           </div>
 
-          {/* Cart Footer */}
+          {/* Footer */}
           {cart.length > 0 && (
-            <div className="bg-white border-t border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-lg font-medium text-gray-700">Total</span>
-                <span className="text-2xl font-bold text-gray-900">{formatCurrency(calculateCartTotal())}</span>
+            <div className="bg-white border-t border-gray-200 p-3">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-900">Total</span>
+                <span className="text-base font-semibold text-gray-900">{formatCurrency(calculateCartTotal())}</span>
               </div>
               
               <button
                 onClick={handleCreateOrder}
                 disabled={creatingOrder}
-                className="w-full bg-green-600 text-white py-4 rounded-lg text-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-green-600 text-white py-3 rounded font-medium text-sm hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
                 {creatingOrder ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                     Procesando...
                   </>
                 ) : (
                   <>
-                    <Check className="h-5 w-5" />
+                    <Check className="h-4 w-4" />
                     Confirmar Pedido
                   </>
                 )}
@@ -453,57 +431,48 @@ const TableOrderEcommerce = () => {
         </div>
       )}
 
-      {/* Item Details Modal */}
+      {/* Item Modal */}
       {selectedRecipe && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
-          <div className="bg-white rounded-t-2xl w-full max-h-[80vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
-              <div className="flex items-start justify-between">
+          <div className="bg-white rounded-t w-full max-h-[70vh] overflow-y-auto">
+            {/* Header */}
+            <div className="bg-white border-b border-gray-200 p-3">
+              <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-gray-900">{selectedRecipe.name}</h3>
-                  <p className="text-lg font-bold text-blue-600 mt-1">{formatCurrency(selectedRecipe.base_price)}</p>
+                  <h3 className="text-sm font-medium text-gray-900">{selectedRecipe.name}</h3>
+                  <p className="text-xs text-blue-600">{formatCurrency(selectedRecipe.base_price)}</p>
                 </div>
                 <button
                   onClick={() => setSelectedRecipe(null)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  className="p-1 hover:bg-gray-100 rounded"
                 >
-                  <X className="h-6 w-6 text-gray-600" />
+                  <X className="h-4 w-4 text-gray-600" />
                 </button>
               </div>
             </div>
 
-            <div className="p-4 space-y-4">
-              {/* Description */}
+            <div className="p-3 space-y-3">
               {selectedRecipe.description && (
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Descripción</h4>
-                  <p className="text-gray-600">{selectedRecipe.description}</p>
+                  <p className="text-xs text-gray-600">{selectedRecipe.description}</p>
                 </div>
               )}
 
-
-              {/* Notes */}
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Instrucciones especiales</h4>
                 <textarea
                   value={itemNotes}
                   onChange={(e) => setItemNotes(e.target.value)}
-                  placeholder="Ej: Sin cebolla, término medio..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
-                  rows="3"
+                  placeholder="Notas especiales..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:border-blue-500 resize-none"
+                  rows="2"
                 />
               </div>
 
-              {/* Options */}
-              <div className="space-y-3">
-                <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <Package className="h-5 w-5 text-orange-600" />
-                    <div>
-                      <p className="font-medium text-gray-900">Para llevar</p>
-                      <p className="text-sm text-gray-600">Empaque especial</p>
-                    </div>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-orange-600" />
+                    <span className="text-xs text-gray-900">Para llevar</span>
                   </div>
                   <input
                     type="checkbox"
@@ -514,40 +483,36 @@ const TableOrderEcommerce = () => {
                         setItemTaper(true);
                       }
                     }}
-                    className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500"
+                    className="w-4 h-4 text-orange-600 rounded"
                   />
                 </label>
 
                 {itemTakeaway && (
-                  <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 ml-8">
-                    <div className="flex items-center gap-3">
-                      <Check className="h-5 w-5 text-green-600" />
-                      <div>
-                        <p className="font-medium text-gray-900">Incluir envase</p>
-                        <p className="text-sm text-gray-600">Envase biodegradable</p>
-                      </div>
+                  <label className="flex items-center justify-between p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-xs text-gray-900">Con envase</span>
                     </div>
                     <input
                       type="checkbox"
                       checked={itemTaper}
                       onChange={(e) => setItemTaper(e.target.checked)}
-                      className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                      className="w-4 h-4 text-green-600 rounded"
                     />
                   </label>
                 )}
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+            <div className="bg-white border-t border-gray-200 p-3">
               <button
                 onClick={() => {
                   addToCart(selectedRecipe, itemQuantity, itemNotes, itemTakeaway, itemTaper);
                 }}
-                className="w-full bg-blue-600 text-white py-4 rounded-lg text-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-blue-600 text-white py-3 rounded font-medium text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
               >
-                <ShoppingCart className="h-5 w-5" />
-                Agregar al carrito • {formatCurrency(selectedRecipe.base_price * itemQuantity)}
+                <Plus className="h-4 w-4" />
+                Agregar • {formatCurrency(selectedRecipe.base_price)}
               </button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -103,11 +103,11 @@ const TablePaymentEcommerce = () => {
 
   const getPaymentMethodIcon = (method) => {
     switch (method) {
-      case 'CASH': return <Banknote className="h-6 w-6" />;
-      case 'CARD': return <CreditCard className="h-6 w-6" />;
-      case 'TRANSFER': return <Building2 className="h-6 w-6" />;
-      case 'YAPE_PLIN': return <Smartphone className="h-6 w-6" />;
-      default: return <DollarSign className="h-6 w-6" />;
+      case 'CASH': return <Banknote className="h-3 w-3" />;
+      case 'CARD': return <CreditCard className="h-3 w-3" />;
+      case 'TRANSFER': return <Building2 className="h-3 w-3" />;
+      case 'YAPE_PLIN': return <Smartphone className="h-3 w-3" />;
+      default: return <DollarSign className="h-3 w-3" />;
     }
   };
 
@@ -122,16 +122,6 @@ const TablePaymentEcommerce = () => {
     return names[method] || method;
   };
 
-  const getPaymentMethodColor = (method) => {
-    const colors = {
-      'CASH': 'from-green-500 to-green-600',
-      'CARD': 'from-blue-500 to-blue-600',
-      'TRANSFER': 'from-purple-500 to-purple-600',
-      'YAPE_PLIN': 'from-pink-500 to-pink-600',
-      'OTHER': 'from-gray-500 to-gray-600'
-    };
-    return colors[method] || colors['OTHER'];
-  };
 
   const handleFullPayment = async () => {
     try {
@@ -401,8 +391,8 @@ const TablePaymentEcommerce = () => {
                         : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}
                   >
-                    <div className={`w-8 h-8 mx-auto mb-2 rounded bg-gradient-to-r ${getPaymentMethodColor(method)} text-white flex items-center justify-center`}>
-                      {React.cloneElement(getPaymentMethodIcon(method), { className: 'h-4 w-4' })}
+                    <div className="w-6 h-6 mx-auto mb-1 rounded bg-gray-600 text-white flex items-center justify-center">
+                      {getPaymentMethodIcon(method)}
                     </div>
                     <span className={`text-xs font-medium ${
                       paymentMethod === method ? 'text-blue-900' : 'text-gray-700'
@@ -570,8 +560,8 @@ const TablePaymentEcommerce = () => {
                         }`}
                       >
                         <div className="flex items-center gap-1">
-                          <div className={`w-6 h-6 rounded bg-gradient-to-r ${getPaymentMethodColor(method)} text-white flex items-center justify-center`}>
-                            {React.cloneElement(getPaymentMethodIcon(method), { className: 'h-3 w-3' })}
+                          <div className="w-5 h-5 rounded bg-gray-600 text-white flex items-center justify-center">
+                            {getPaymentMethodIcon(method)}
                           </div>
                           <span className={`text-xs font-medium ${
                             currentSplitMethod === method ? 'text-blue-900' : 'text-gray-700'

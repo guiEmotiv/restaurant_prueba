@@ -326,13 +326,9 @@ const TableOrderEdit = () => {
 
             <button
               onClick={() => setShowNewItems(true)}
-              className={`flex-1 py-2 rounded font-medium transition-colors flex items-center justify-center gap-1 relative text-sm ${
-                getNewItemsCount() > 0 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className="flex-1 py-2 rounded font-medium transition-colors flex items-center justify-center gap-1 relative text-sm bg-blue-600 text-white hover:bg-blue-700"
             >
-              {getNewItemsCount() > 0 ? <ShoppingCart className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+              <ShoppingCart className="h-3 w-3" />
               Agregar items
               {getNewItemsCount() > 0 && (
                 <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
@@ -438,44 +434,44 @@ const TableOrderEdit = () => {
         </div>
       </div>
 
-      {/* Fullscreen Add Items Modal */}
+      {/* Add Items Modal */}
       {showNewItems && (
         <div className="fixed inset-0 bg-white z-50 flex flex-col">
-          {/* Modal Header */}
-          <div className="bg-white border-b border-gray-200 px-4 py-3">
+          {/* Header */}
+          <div className="bg-white border-b border-gray-200 px-3 py-3">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Agregar items</h2>
-                <p className="text-sm text-gray-600">
-                  {newItems.length > 0 ? `${getNewItemsCount()} items agregados` : 'Selecciona del menú'}
-                </p>
+                <h2 className="text-sm font-medium text-gray-900">Agregar items</h2>
+                {newItems.length > 0 && (
+                  <p className="text-xs text-gray-600">{getNewItemsCount()} items</p>
+                )}
               </div>
               <button
                 onClick={() => setShowNewItems(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-1 hover:bg-gray-100 rounded"
               >
-                <X className="h-6 w-6 text-gray-600" />
+                <X className="h-4 w-4 text-gray-600" />
               </button>
             </div>
           </div>
 
           {/* Search and Filters */}
-          <div className="bg-white border-b border-gray-100 px-4 py-3">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <div className="bg-white border-b border-gray-100 px-3 py-3">
+            <div className="relative mb-2">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
               <input
                 type="text"
-                placeholder="Buscar platos..."
+                placeholder="Buscar..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:border-blue-500"
               />
             </div>
 
             <select
               value={selectedGroup}
               onChange={(e) => setSelectedGroup(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+              className="w-full px-2 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:border-blue-500"
             >
               <option value="all">Todo el menú</option>
               {groups.map(group => (
@@ -485,31 +481,30 @@ const TableOrderEdit = () => {
           </div>
 
           {/* Menu Items */}
-          <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="flex-1 overflow-y-auto px-3 py-3">
             {filteredRecipes.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="text-gray-500 mb-2">No se encontraron platos</div>
-                <div className="text-sm text-gray-400">Intenta con otros términos</div>
+              <div className="text-center py-12">
+                <p className="text-sm text-gray-500">No se encontraron platos</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {filteredRecipes.map((recipe) => (
-                  <div key={recipe.id} className="bg-white border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
+                  <div key={recipe.id} className="bg-white border border-gray-200 rounded p-3">
+                    <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h3 className="font-bold text-gray-900 mb-1">{recipe.name}</h3>
+                        <h3 className="font-medium text-sm text-gray-900 mb-1">{recipe.name}</h3>
                         {recipe.description && (
-                          <p className="text-sm text-gray-600 mb-2">{recipe.description}</p>
+                          <p className="text-xs text-gray-600 mb-1">{recipe.description}</p>
                         )}
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <Clock className="h-4 w-4" />
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <Clock className="h-3 w-3" />
                           <span>{recipe.preparation_time} min</span>
                           <span>•</span>
                           <span>{recipe.group_name || 'Sin categoría'}</span>
                         </div>
                       </div>
-                      <div className="text-right ml-4">
-                        <div className="text-xl font-bold text-gray-900">
+                      <div className="text-right ml-3">
+                        <div className="text-sm font-semibold text-gray-900">
                           {formatCurrency(recipe.base_price)}
                         </div>
                       </div>
@@ -518,16 +513,16 @@ const TableOrderEdit = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => addNewItem(recipe)}
-                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-1 text-sm"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-3 w-3" />
                         Agregar
                       </button>
                       <button
                         onClick={() => openItemModal(recipe)}
-                        className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                        className="px-3 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
                       >
-                        <Info className="h-4 w-4" />
+                        <Info className="h-3 w-3" />
                       </button>
                     </div>
                   </div>
@@ -536,22 +531,22 @@ const TableOrderEdit = () => {
             )}
           </div>
 
-          {/* Update Button - Fixed at bottom when items selected */}
+          {/* Update Button */}
           {newItems.length > 0 && (
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40">
+            <div className="bg-white border-t border-gray-200 p-3">
               <button
                 onClick={handleUpdateOrder}
                 disabled={updatingOrder}
-                className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-green-600 text-white py-3 rounded font-medium text-sm hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
                 {updatingOrder ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                     Actualizando...
                   </>
                 ) : (
                   <>
-                    <Check className="h-5 w-5" />
+                    <Check className="h-4 w-4" />
                     Agregar {getNewItemsCount()} items • {formatCurrency(calculateNewItemsTotal())}
                   </>
                 )}
@@ -561,72 +556,48 @@ const TableOrderEdit = () => {
         </div>
       )}
 
-      {/* Item Details Modal */}
+      {/* Item Modal */}
       {selectedRecipe && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
-          <div className="bg-white rounded-t-2xl w-full max-h-[80vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
-              <div className="flex items-start justify-between">
+          <div className="bg-white rounded-t w-full max-h-[70vh] overflow-y-auto">
+            {/* Header */}
+            <div className="bg-white border-b border-gray-200 p-3">
+              <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-gray-900">{selectedRecipe.name}</h3>
-                  <p className="text-lg font-bold text-blue-600 mt-1">{formatCurrency(selectedRecipe.base_price)}</p>
+                  <h3 className="text-sm font-medium text-gray-900">{selectedRecipe.name}</h3>
+                  <p className="text-xs text-blue-600">{formatCurrency(selectedRecipe.base_price)}</p>
                 </div>
                 <button
                   onClick={() => setSelectedRecipe(null)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  className="p-1 hover:bg-gray-100 rounded"
                 >
-                  <X className="h-6 w-6 text-gray-600" />
+                  <X className="h-4 w-4 text-gray-600" />
                 </button>
               </div>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="p-3 space-y-3">
               {selectedRecipe.description && (
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Descripción</h4>
-                  <p className="text-gray-600">{selectedRecipe.description}</p>
+                  <p className="text-xs text-gray-600">{selectedRecipe.description}</p>
                 </div>
               )}
 
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Cantidad</h4>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
-                    className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200"
-                  >
-                    <Minus className="h-5 w-5 text-gray-600" />
-                  </button>
-                  <span className="text-xl font-bold text-gray-900 w-12 text-center">{itemQuantity}</span>
-                  <button
-                    onClick={() => setItemQuantity(itemQuantity + 1)}
-                    className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200"
-                  >
-                    <Plus className="h-5 w-5 text-gray-600" />
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-medium text-gray-900 mb-2">Instrucciones especiales</h4>
                 <textarea
                   value={itemNotes}
                   onChange={(e) => setItemNotes(e.target.value)}
-                  placeholder="Ej: Sin cebolla, término medio..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
-                  rows="3"
+                  placeholder="Notas especiales..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:border-blue-500 resize-none"
+                  rows="2"
                 />
               </div>
 
-              <div className="space-y-3">
-                <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <Package className="h-5 w-5 text-orange-600" />
-                    <div>
-                      <p className="font-medium text-gray-900">Para llevar</p>
-                      <p className="text-sm text-gray-600">Empaque especial</p>
-                    </div>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-orange-600" />
+                    <span className="text-xs text-gray-900">Para llevar</span>
                   </div>
                   <input
                     type="checkbox"
@@ -637,39 +608,36 @@ const TableOrderEdit = () => {
                         setItemTaper(true);
                       }
                     }}
-                    className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500"
+                    className="w-4 h-4 text-orange-600 rounded"
                   />
                 </label>
 
                 {itemTakeaway && (
-                  <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 ml-8">
-                    <div className="flex items-center gap-3">
-                      <Check className="h-5 w-5 text-green-600" />
-                      <div>
-                        <p className="font-medium text-gray-900">Incluir envase</p>
-                        <p className="text-sm text-gray-600">Envase biodegradable</p>
-                      </div>
+                  <label className="flex items-center justify-between p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-xs text-gray-900">Con envase</span>
                     </div>
                     <input
                       type="checkbox"
                       checked={itemTaper}
                       onChange={(e) => setItemTaper(e.target.checked)}
-                      className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                      className="w-4 h-4 text-green-600 rounded"
                     />
                   </label>
                 )}
               </div>
             </div>
 
-            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+            <div className="bg-white border-t border-gray-200 p-3">
               <button
                 onClick={() => {
                   addNewItem(selectedRecipe, itemQuantity, itemNotes, itemTakeaway, itemTaper);
                 }}
-                className="w-full bg-blue-600 text-white py-4 rounded-lg text-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-blue-600 text-white py-3 rounded font-medium text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
               >
-                <ShoppingCart className="h-5 w-5" />
-                Agregar • {formatCurrency(selectedRecipe.base_price * itemQuantity)}
+                <Plus className="h-4 w-4" />
+                Agregar • {formatCurrency(selectedRecipe.base_price)}
               </button>
             </div>
           </div>
