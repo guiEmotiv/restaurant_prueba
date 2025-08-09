@@ -25,8 +25,7 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom'],
           'vendor-router': ['react-router-dom'],
           'vendor-icons': ['lucide-react'],
-          'vendor-aws': ['aws-amplify', '@aws-amplify/ui-react'],
-          'vendor-utils': ['date-fns']
+          'vendor-aws': ['aws-amplify', '@aws-amplify/ui-react']
         }
       }
     }
