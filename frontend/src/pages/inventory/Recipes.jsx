@@ -268,6 +268,9 @@ const Recipes = () => {
                   Grupo
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Envase
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Precio Base
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -290,7 +293,7 @@ const Recipes = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {recipes.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
                     No hay recetas disponibles
                   </td>
                 </tr>
@@ -323,6 +326,15 @@ const Recipes = () => {
                         </span>
                       ) : (
                         <span className="text-gray-400 italic">Sin grupo</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                      {recipe.container_name ? (
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">
+                          {recipe.container_name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 italic">Sin envase</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
@@ -445,6 +457,18 @@ const Recipes = () => {
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                             {recipe.profit_percentage}%
                           </span>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium text-gray-500">Envase</dt>
+                        <dd className="text-base font-semibold text-gray-900">
+                          {recipe.container_name ? (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">
+                              {recipe.container_name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">Sin envase</span>
+                          )}
                         </dd>
                       </div>
                       <div>

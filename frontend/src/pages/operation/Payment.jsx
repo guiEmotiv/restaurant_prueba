@@ -4,12 +4,14 @@ import { ArrowLeft, CreditCard, Split, Receipt, CheckCircle, X, AlertTriangle, P
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 import bluetoothPrinter from '../../services/bluetoothPrinter';
 
 const Payment = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
+  const { hasPermission } = useAuth();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -30,8 +32,14 @@ const Payment = () => {
   const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
+    // Verificar permisos - solo administradores pueden procesar pagos
+    if (!hasPermission('canManagePayments')) {
+      showError('No tienes permisos para procesar pagos. Solo administradores pueden realizar esta acción.');
+      navigate('/orders');
+      return;
+    }
     loadOrder();
-  }, [id]);
+  }, [id, hasPermission]);
 
   // Cargar items ya pagados cuando se carga la orden
   useEffect(() => {
@@ -450,15 +458,17 @@ const Payment = () => {
       {!paymentMode && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
-            {/* Header del modal */}
-            <div className="text-center mb-6">
-              <h1 className="text-xl font-bold text-gray-900">Procesar Pago</h1>
-              <p className="text-gray-600 mt-2">
-                Orden #{order.id} - Mesa {order.table_number}
-              </p>
-              <p className="text-2xl font-bold text-blue-600 mt-4">
-                {formatCurrency(order.total_amount)}
-              </p>
+            {/* Header del modal - Estandarizado */}
+            <div className="mb-6">
+              <div className="text-center">
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Procesar Pago</h1>
+                <p className="text-sm md:text-base text-gray-600 mt-1">
+                  Orden #{order.id} - Mesa {order.table_number}
+                </p>
+                <p className="text-2xl font-bold text-blue-600 mt-3">
+                  {formatCurrency(order.total_amount)}
+                </p>
+              </div>
             </div>
 
             {/* Mensaje informativo si hay items pagados */}
@@ -487,6 +497,9 @@ const Payment = () => {
                   <div className={`font-semibold ${paidItems.size > 0 ? 'text-gray-500' : ''}`}>
                     Pago Completo
                   </div>
+                  <div className={`text-sm ${paidItems.size > 0 ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {order.items ? order.items.length : 0} items
+                  </div>
                 </div>
               </Button>
               
@@ -500,6 +513,9 @@ const Payment = () => {
                 <Split className="h-6 w-6" />
                 <div className="text-center">
                   <div className="font-semibold">Dividir Cuenta</div>
+                  <div className="text-sm text-gray-600">
+                    {order.items ? order.items.filter(item => !paidItems.has(item.id)).length : 0} items disponibles
+                  </div>
                 </div>
               </Button>
             </div>

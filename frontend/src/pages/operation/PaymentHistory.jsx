@@ -34,8 +34,8 @@ const PaymentHistory = () => {
         });
       }
       
-      // Ordenar por fecha de pago más reciente primero
-      paidOrders.sort((a, b) => new Date(b.paid_at || b.created_at) - new Date(a.paid_at || a.created_at));
+      // Ordenar por ID descendente (más reciente primero)
+      paidOrders.sort((a, b) => b.id - a.id);
       
       setOrders(paidOrders);
     } catch (error) {
@@ -143,7 +143,7 @@ const PaymentHistory = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Orden
+                  ID
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Mesa

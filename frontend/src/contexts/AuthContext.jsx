@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
       canManageOrders: true,      // Necesario para crear/modificar pedidos desde Estado Mesas
       canViewKitchen: false,
       canViewTableStatus: true,
-      canManagePayments: true,    // Necesario para procesar pagos desde Estado Mesas  
+      canManagePayments: false,   // SOLO administradores pueden procesar pagos
       canViewHistory: false,
     },
     [ROLES.COOK]: {

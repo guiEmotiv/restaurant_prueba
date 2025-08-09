@@ -4,11 +4,13 @@ import { Plus, Edit, CreditCard, Trash2 } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Orders = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showSuccess, showError } = useToast();
+  const { hasPermission } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -312,7 +314,7 @@ const Orders = () => {
                           <Edit className="h-4 w-4" />
                         </button>
                         
-                        {order.all_items_delivered && (
+                        {order.all_items_delivered && hasPermission('canManagePayments') && (
                           <button
                             onClick={() => handlePayment(order)}
                             className="text-green-600 hover:text-green-900 p-1 rounded"
