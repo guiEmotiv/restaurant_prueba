@@ -38,6 +38,10 @@ const Operations = () => {
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setOrderItems(Array.isArray(orderItemsData) ? orderItemsData : []);
       setZones(Array.isArray(zonesData) ? zonesData : []);
+      
+      // Debug: mostrar estructura de datos
+      console.log('Tables data:', tablesData);
+      console.log('Sample table:', tablesData[0]);
     } catch (error) {
       console.error('Error loading data:', error);
       showError('Error al cargar datos');
@@ -185,7 +189,9 @@ const Operations = () => {
                                 }`}></div>
                               </div>
                               <div>
-                                <h3 className="text-sm font-semibold text-gray-900">{table.name}</h3>
+                                <h3 className="text-sm font-semibold text-gray-900">
+                                  {table.name || table.number || `Mesa ${table.id}`}
+                                </h3>
                               </div>
                             </div>
                             <div className={`w-2 h-2 rounded-full ${

@@ -48,6 +48,11 @@ const OrderCreate = () => {
       setRecipes(Array.isArray(recipesData) ? recipesData : []);
       setGroups(Array.isArray(groupsData) ? groupsData : []);
       setContainers(Array.isArray(containersData) ? containersData : []);
+      
+      // Debug: mostrar estructura de datos
+      console.log('Recipes data:', recipesData);
+      console.log('Sample recipe:', recipesData[0]);
+      console.log('Table data:', tableData);
     } catch (error) {
       console.error('Error loading data:', error);
       showError('Error al cargar datos');
@@ -73,7 +78,7 @@ const OrderCreate = () => {
     if (!selectedItem) return;
     
     const containerPrice = isForTakeaway ? (containers[0]?.price || 0) : 0;
-    const totalPrice = parseFloat(selectedItem.price || 0) + containerPrice;
+    const totalPrice = parseFloat(selectedItem.price || selectedItem.unit_price || selectedItem.cost || 0) + containerPrice;
     
     const cartItem = {
       recipe: selectedItem,
@@ -251,16 +256,17 @@ const OrderCreate = () => {
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-900">{recipe.name || 'Sin nombre'}</h3>
                   <p className="text-lg font-bold text-green-600 mt-2">
-                    {formatCurrency(parseFloat(recipe.price) || 0)}
+                    {formatCurrency(parseFloat(recipe.price || recipe.unit_price || recipe.cost) || 0)}
                   </p>
                 </div>
                 
                 <div className="ml-4 space-y-2">
                   <button
                     onClick={() => {
-                      const totalPrice = parseFloat(recipe.price) || 0;
+                      const totalPrice = parseFloat(recipe.price || recipe.unit_price || recipe.cost) || 0;
                       
                       if (totalPrice === 0) {
+                        console.log('Recipe with no price:', recipe);
                         showError('Esta receta no tiene precio configurado');
                         return;
                       }
@@ -417,7 +423,7 @@ const OrderCreate = () => {
                 <h3 className="font-semibold text-gray-900 mb-1">{selectedItem.name}</h3>
                 <p className="text-sm text-gray-600">{selectedItem.description}</p>
                 <p className="text-lg font-bold text-green-600 mt-2">
-                  {formatCurrency(selectedItem.price || 0)}
+                  {formatCurrency(selectedItem.price || selectedItem.unit_price || selectedItem.cost || 0)}
                 </p>
               </div>
               
@@ -470,7 +476,7 @@ const OrderCreate = () => {
               <div className="flex items-center justify-between mb-3">
                 <span className="font-medium text-gray-900">Total:</span>
                 <span className="text-lg font-bold text-green-600">
-                  {formatCurrency((selectedItem.price || 0) + (isForTakeaway ? (containers[0]?.price || 0) : 0))}
+                  {formatCurrency((selectedItem.price || selectedItem.unit_price || selectedItem.cost || 0) + (isForTakeaway ? (containers[0]?.price || 0) : 0))}
                 </span>
               </div>
               
