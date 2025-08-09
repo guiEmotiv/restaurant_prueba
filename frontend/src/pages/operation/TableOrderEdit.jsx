@@ -6,22 +6,20 @@ import {
   Plus, 
   Minus, 
   Package, 
-  StickyNote, 
   Check,
-  AlertCircle,
-  Filter,
   Search,
-  Users,
-  Clock,
-  Trash2,
-  CheckCircle,
-  CreditCard,
-  Star,
-  Coffee,
   X,
-  Edit3,
-  Utensils,
-  Eye
+  Clock,
+  Star,
+  Filter,
+  ChevronDown,
+  Info,
+  Sparkles,
+  ShoppingBag,
+  Trash2,
+  CreditCard,
+  Users,
+  CheckCircle
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -49,9 +47,11 @@ const TableOrderEdit = () => {
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewItems, setShowNewItems] = useState(false);
+  const [showGroupSelector, setShowGroupSelector] = useState(false);
   
   // Estados para modal de item
   const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [itemQuantity, setItemQuantity] = useState(1);
   const [itemNotes, setItemNotes] = useState('');
   const [itemTakeaway, setItemTakeaway] = useState(false);
   const [itemTaper, setItemTaper] = useState(false);
@@ -96,7 +96,7 @@ const TableOrderEdit = () => {
     }
   };
 
-  const addNewItem = (recipe, notes = '', isTakeaway = false, hasTaper = false) => {
+  const addNewItem = (recipe, quantity = 1, notes = '', isTakeaway = false, hasTaper = false) => {
     const existingNewItem = newItems.find(item => 
       item.recipe.id === recipe.id && 
       item.notes === notes && 
@@ -107,14 +107,14 @@ const TableOrderEdit = () => {
     if (existingNewItem) {
       setNewItems(newItems.map(item => 
         item === existingNewItem 
-          ? { ...item, quantity: item.quantity + 1 }
+          ? { ...item, quantity: item.quantity + quantity }
           : item
       ));
     } else {
       const newItem = {
-        id: Date.now() + Math.random(), // ID único temporal
+        id: Date.now() + Math.random(),
         recipe,
-        quantity: 1,
+        quantity,
         notes: notes || '',
         is_takeaway: isTakeaway,
         has_taper: hasTaper,
@@ -124,21 +124,19 @@ const TableOrderEdit = () => {
       setNewItems([...newItems, newItem]);
     }
     
-    // Cerrar modal si está abierto
     setSelectedRecipe(null);
     resetItemModal();
   };
 
-  const removeNewItem = (itemId) => {
-    const item = newItems.find(i => i.id === itemId);
-    if (item && item.quantity > 1) {
+  const updateNewItemQuantity = (itemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      setNewItems(newItems.filter(i => i.id !== itemId));
+    } else {
       setNewItems(newItems.map(i => 
         i.id === itemId 
-          ? { ...i, quantity: i.quantity - 1 }
+          ? { ...i, quantity: newQuantity }
           : i
       ));
-    } else {
-      setNewItems(newItems.filter(i => i.id !== itemId));
     }
   };
 
@@ -153,15 +151,12 @@ const TableOrderEdit = () => {
 
     const isLastItem = existingItems.length === 1 && newItems.length === 0;
     
-    const confirmMessage = isLastItem 
+    if (window.confirm(isLastItem 
       ? '¿Estás seguro? Este es el último item del pedido. Al eliminarlo se eliminará toda la orden.'
-      : '¿Estás seguro de que deseas eliminar este item del pedido?';
-
-    if (window.confirm(confirmMessage)) {
+      : '¿Estás seguro de que deseas eliminar este item?')) {
       try {
         await apiService.orderItems.delete(itemId);
         
-        // Si era el último item, eliminar la orden completa
         if (isLastItem) {
           try {
             await apiService.orders.delete(order.id);
@@ -170,13 +165,11 @@ const TableOrderEdit = () => {
             return;
           } catch (deleteOrderError) {
             console.error('Error deleting order:', deleteOrderError);
-            // Continuar con el flujo normal si no se pudo eliminar la orden
           }
         }
         
         setExistingItems(existingItems.filter(i => i.id !== itemId));
         showSuccess('Item eliminado del pedido');
-        // Recargar orden para actualizar total
         await loadData();
       } catch (error) {
         console.error('Error deleting item:', error);
@@ -186,6 +179,7 @@ const TableOrderEdit = () => {
   };
 
   const resetItemModal = () => {
+    setItemQuantity(1);
     setItemNotes('');
     setItemTakeaway(false);
     setItemTaper(false);
@@ -194,11 +188,6 @@ const TableOrderEdit = () => {
   const openItemModal = (recipe) => {
     setSelectedRecipe(recipe);
     resetItemModal();
-  };
-
-  const handleQuickAdd = (recipe) => {
-    addNewItem(recipe);
-    showSuccess('Agregado al pedido');
   };
 
   const calculateNewItemsTotal = () => {
@@ -240,7 +229,6 @@ const TableOrderEdit = () => {
             quantity: 1
           };
 
-          // Si el item tiene taper, agregar el contenedor por defecto
           if (newItem.has_taper && containers.length > 0) {
             itemData.selected_container = containers[0].id;
           }
@@ -251,9 +239,9 @@ const TableOrderEdit = () => {
 
       showSuccess(`${getNewItemsCount()} items agregados al pedido`);
       
-      // Recargar datos y limpiar nuevos items
       await loadData();
       setNewItems([]);
+      setShowNewItems(false);
       
     } catch (error) {
       console.error('Error updating order:', error);
@@ -277,30 +265,18 @@ const TableOrderEdit = () => {
     }).format(amount);
   };
 
-  const getItemStatusColor = (status) => {
-    switch (status) {
-      case 'CREATED': return 'bg-amber-100 text-amber-800 border-amber-300';
-      case 'SERVED': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const getItemStatusText = (status) => {
-    switch (status) {
-      case 'CREATED': return 'Pendiente';
-      case 'SERVED': return 'Entregado';
-      default: return status;
-    }
+  const getSelectedGroupName = () => {
+    if (selectedGroup === 'all') return 'Todo el menú';
+    const group = groups.find(g => g.id === parseInt(selectedGroup));
+    return group ? group.name : 'Todo el menú';
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-200 border-t-blue-600"></div>
-          </div>
-          <p className="text-gray-600 font-medium">Cargando pedido...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando pedido...</p>
         </div>
       </div>
     );
@@ -308,13 +284,13 @@ const TableOrderEdit = () => {
 
   if (!table || !order) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center">
-        <div className="text-center bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center bg-white rounded-2xl p-8 shadow-lg">
+          <Info className="h-16 w-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Pedido no encontrado</h2>
           <button 
             onClick={() => navigate('/table-status')}
-            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors"
           >
             Volver al estado de mesas
           </button>
@@ -325,51 +301,49 @@ const TableOrderEdit = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header Fijo */}
-      <div className="bg-white shadow-sm sticky top-0 z-50 border-b">
+      {/* Header Fixed */}
+      <div className="bg-white shadow-sm sticky top-0 z-40">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/table-status')}
-                className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-900"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-5 w-5 text-gray-700" />
               </button>
-              
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="font-semibold text-gray-900">Mesa {table.table_number}</h1>
-                  <span className="text-sm text-gray-500">#{order.id}</span>
-                </div>
-                <p className="text-xs text-gray-500">{table.zone_name}</p>
+              <div>
+                <h1 className="font-bold text-lg text-gray-900">Mesa {table.table_number}</h1>
+                <p className="text-sm text-gray-600">Pedido #{order.id}</p>
               </div>
             </div>
 
             <div className="text-right">
-              <p className="text-xs text-gray-500">Total</p>
-              <p className="font-bold text-lg text-gray-900">{formatCurrency(order.total_amount)}</p>
+              <div className="text-2xl font-bold text-gray-900">
+                {formatCurrency(order.total_amount)}
+              </div>
+              <div className="text-xs text-gray-500">Total del pedido</div>
             </div>
           </div>
 
-          {/* Botones de Acción */}
+          {/* Action Buttons */}
           <div className="mt-3 flex gap-2">
             <button
               onClick={() => navigate(`/table/${tableId}/order-ecommerce`)}
-              className="bg-purple-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors flex items-center gap-1"
+              className="flex-1 bg-purple-600 text-white py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
             >
-              <Users className="h-4 w-4" />
-              Nueva Cuenta
+              <Users className="h-5 w-5" />
+              Nueva cuenta
             </button>
 
             <button
-              onClick={() => setShowNewItems(!showNewItems)}
-              className="relative bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1"
+              onClick={() => setShowNewItems(true)}
+              className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 relative"
             >
-              <Plus className="h-4 w-4" />
-              Agregar Items
+              <Plus className="h-5 w-5" />
+              Agregar items
               {getNewItemsCount() > 0 && (
-                <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
                   {getNewItemsCount()}
                 </div>
               )}
@@ -378,9 +352,9 @@ const TableOrderEdit = () => {
             {checkAllItemsDelivered() && hasPermission('canManagePayments') && (
               <button
                 onClick={handleGoToPayment}
-                className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-1"
+                className="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
               >
-                <CreditCard className="h-4 w-4" />
+                <CreditCard className="h-5 w-5" />
                 Pagar
               </button>
             )}
@@ -388,88 +362,82 @@ const TableOrderEdit = () => {
         </div>
       </div>
 
-      {/* Contenido */}
+      {/* Order Items */}
       <div className="px-4 py-4">
-        {/* Items del Pedido */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-4">
-          <div className="px-4 py-3 border-b bg-gray-50">
-            <h3 className="font-medium text-gray-900">Items del Pedido</h3>
-            <p className="text-sm text-gray-500">
-              {existingItems.length} items • {existingItems.filter(i => i.status === 'SERVED').length} entregados
-            </p>
+        <div className="bg-white rounded-xl shadow-sm">
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-gray-900">Items del pedido</h2>
+              <div className="text-sm text-gray-600">
+                {existingItems.filter(i => i.status === 'SERVED').length}/{existingItems.length} entregados
+              </div>
+            </div>
           </div>
 
           <div className="p-4">
             {existingItems.length === 0 ? (
-              <div className="text-center py-8">
-                <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                <div className="text-gray-500 text-sm">Sin items en el pedido</div>
+              <div className="text-center py-12">
+                <ShoppingBag className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-600">No hay items en el pedido</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {existingItems.map((item) => (
                   <div
                     key={item.id}
-                    className={`p-3 rounded-lg border ${
+                    className={`rounded-xl p-4 border-2 ${
                       item.status === 'SERVED' 
                         ? 'bg-green-50 border-green-200' 
-                        : 'bg-yellow-50 border-yellow-200'
+                        : 'bg-orange-50 border-orange-200'
                     }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Coffee className="h-6 w-6 text-orange-500" />
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 truncate">{item.recipe_name}</h4>
-                            <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                              item.status === 'SERVED' 
-                                ? 'bg-green-500 text-white' 
-                                : 'bg-yellow-500 text-white'
-                            }`}>
-                              {getItemStatusText(item.status)}
-                            </span>
-                          </div>
-                          
-                          <div className="text-lg font-bold text-gray-900 ml-2">
-                            {formatCurrency(item.total_price)}
-                          </div>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-bold text-gray-900">{item.recipe_name}</h3>
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                            item.status === 'SERVED' 
+                              ? 'bg-green-600 text-white' 
+                              : 'bg-orange-600 text-white'
+                          }`}>
+                            {item.status === 'SERVED' ? 'Entregado' : 'Pendiente'}
+                          </span>
                         </div>
-
+                        
                         {item.notes && (
-                          <div className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded mb-2">
+                          <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-lg inline-block mb-2">
                             {item.notes}
                           </div>
                         )}
-
-                        <div className="flex items-center justify-between">
-                          <div className="flex gap-1">
-                            {item.is_takeaway && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
-                                <Package className="h-2 w-2" />
-                                Llevar
-                              </span>
-                            )}
-                            {item.has_taper && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
-                                <Check className="h-2 w-2" />
-                                Envase
-                              </span>
-                            )}
-                          </div>
-
-                          {item.status === 'CREATED' && (
-                            <button
-                              onClick={() => removeExistingItem(item.id)}
-                              className="w-8 h-8 bg-red-100 text-red-600 rounded-lg flex items-center justify-center hover:bg-red-200 transition-colors"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                        
+                        <div className="flex items-center gap-3 text-sm">
+                          {item.is_takeaway && (
+                            <span className="flex items-center gap-1 text-orange-600">
+                              <Package className="h-4 w-4" />
+                              Para llevar
+                            </span>
+                          )}
+                          {item.has_taper && (
+                            <span className="flex items-center gap-1 text-green-600">
+                              <CheckCircle className="h-4 w-4" />
+                              Con envase
+                            </span>
                           )}
                         </div>
+                      </div>
+                      
+                      <div className="text-right ml-4">
+                        <div className="text-xl font-bold text-gray-900 mb-2">
+                          {formatCurrency(item.total_price)}
+                        </div>
+                        {item.status === 'CREATED' && (
+                          <button
+                            onClick={() => removeExistingItem(item.id)}
+                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -480,220 +448,285 @@ const TableOrderEdit = () => {
         </div>
       </div>
 
-      {/* Modal para Agregar Items */}
+      {/* Add Items Modal */}
       {showNewItems && (
         <>
           <div 
-            className="fixed inset-0 bg-black/50 z-50"
+            className="fixed inset-0 bg-black/50 z-50 transition-opacity"
             onClick={() => setShowNewItems(false)}
           />
-          <div className="fixed bottom-0 left-0 right-0 bg-white z-50 max-h-[80vh] overflow-hidden rounded-t-lg shadow-xl border-t">
-            {/* Header */}
-            <div className="px-4 py-3 border-b">
-              <div className="flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-end">
+            <div className="bg-white w-full max-h-[90vh] rounded-t-2xl shadow-2xl flex flex-col animate-slide-up">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200">
                 <div>
-                  <h2 className="font-semibold text-gray-900">Agregar Items</h2>
-                  <p className="text-sm text-gray-500">
-                    {getNewItemsCount() > 0 ? `${getNewItemsCount()} items • ${formatCurrency(calculateNewItemsTotal())}` : 'Selecciona platos'}
+                  <h2 className="text-xl font-bold text-gray-900">Agregar items</h2>
+                  <p className="text-sm text-gray-600">
+                    {newItems.length > 0 ? `${getNewItemsCount()} items agregados` : 'Selecciona del menú'}
                   </p>
                 </div>
                 <button
                   onClick={() => setShowNewItems(false)}
-                  className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-900"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-6 w-6 text-gray-600" />
                 </button>
               </div>
-            </div>
 
-            {/* Filtros */}
-            <div className="px-4 py-3 border-b bg-gray-50">
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    placeholder="Buscar platos..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+              {/* Search and Filters */}
+              <div className="px-4 py-3 border-b border-gray-100">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                    <input
+                      type="text"
+                      placeholder="Buscar platos..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setShowGroupSelector(!showGroupSelector)}
+                    className="px-4 py-2 bg-gray-100 rounded-lg flex items-center gap-2 hover:bg-gray-200 transition-colors"
+                  >
+                    <Filter className="h-5 w-5 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-700">{getSelectedGroupName()}</span>
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  </button>
                 </div>
 
-                <select
-                  value={selectedGroup}
-                  onChange={(e) => setSelectedGroup(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="all">Todos los grupos</option>
-                  {groups.map(group => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Lista de Recetas */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 max-h-60">
-              {filteredRecipes.length === 0 ? (
-                <div className="text-center py-8">
-                  <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                  <div className="text-gray-500 text-sm">Sin resultados</div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredRecipes.map((recipe) => (
-                    <div
-                      key={recipe.id}
-                      className="bg-gray-50 rounded-lg p-3 border border-gray-200"
+                {/* Group Selector */}
+                {showGroupSelector && (
+                  <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setSelectedGroup('all');
+                        setShowGroupSelector(false);
+                      }}
+                      className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                        selectedGroup === 'all' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Coffee className="h-6 w-6 text-orange-500" />
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 truncate">{recipe.name}</h4>
-                              <p className="text-xs text-gray-500">{recipe.group_name || 'Sin grupo'}</p>
+                      Todo el menú
+                    </button>
+                    {groups.map(group => (
+                      <button
+                        key={group.id}
+                        onClick={() => {
+                          setSelectedGroup(group.id.toString());
+                          setShowGroupSelector(false);
+                        }}
+                        className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-t border-gray-100 ${
+                          selectedGroup === group.id.toString() ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
+                        }`}
+                      >
+                        {group.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Menu Items */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {filteredRecipes.length === 0 ? (
+                  <div className="text-center py-20">
+                    <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-600">No se encontraron platos</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {filteredRecipes.map((recipe) => (
+                      <div
+                        key={recipe.id}
+                        className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+                      >
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <h3 className="font-bold text-lg text-gray-900 mb-1">{recipe.name}</h3>
+                              {recipe.description && (
+                                <p className="text-sm text-gray-600 mb-2 line-clamp-2">{recipe.description}</p>
+                              )}
+                              <div className="flex items-center gap-3 text-sm">
+                                <div className="flex items-center gap-1 text-gray-500">
+                                  <Clock className="h-4 w-4" />
+                                  <span>{recipe.preparation_time} min</span>
+                                </div>
+                                <div className="flex items-center gap-1 text-yellow-500">
+                                  <Star className="h-4 w-4 fill-current" />
+                                  <span className="text-gray-700 font-medium">4.8</span>
+                                </div>
+                              </div>
                             </div>
-                            
-                            <div className="text-lg font-bold text-green-600 ml-2">
-                              {formatCurrency(recipe.base_price)}
+                            <div className="text-right ml-4">
+                              <div className="text-2xl font-bold text-gray-900">
+                                {formatCurrency(recipe.base_price)}
+                              </div>
+                              <div className="text-xs text-gray-500">{recipe.group_name}</div>
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <Clock className="h-3 w-3" />
-                              <span>{recipe.preparation_time}min</span>
-                            </div>
-                            
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleQuickAdd(recipe)}
-                                className="bg-green-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-1"
-                              >
-                                <Plus className="h-3 w-3" />
-                                Agregar
-                              </button>
-                              <button
-                                onClick={() => openItemModal(recipe)}
-                                className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm hover:bg-gray-200 transition-colors"
-                              >
-                                <StickyNote className="h-4 w-4" />
-                              </button>
-                            </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                addNewItem(recipe);
+                                showSuccess('Agregado');
+                              }}
+                              className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                              <Plus className="h-5 w-5" />
+                              Agregar
+                            </button>
+                            <button
+                              onClick={() => openItemModal(recipe)}
+                              className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                            >
+                              <Info className="h-5 w-5" />
+                            </button>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-            {/* Footer con Nuevos Items */}
-            {newItems.length > 0 && (
-              <div className="border-t px-4 py-3 bg-gray-50">
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900 mb-2">Items a Agregar ({getNewItemsCount()})</h4>
-                  <div className="space-y-2 max-h-24 overflow-y-auto">
+              {/* Cart Summary */}
+              {newItems.length > 0 && (
+                <div className="border-t border-gray-200 p-4 bg-gray-50">
+                  <div className="mb-4 max-h-32 overflow-y-auto">
                     {newItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between bg-blue-50 rounded-lg p-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 text-sm truncate">{item.recipe.name}</div>
-                          <div className="text-xs text-gray-600">
-                            {item.quantity}x {formatCurrency(item.unit_price)}
-                          </div>
+                      <div key={item.id} className="flex items-center justify-between py-2">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
+                          <p className="text-sm text-gray-600">{formatCurrency(item.unit_price)} c/u</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="font-medium text-gray-900">
+                          <div className="font-bold text-gray-900">
                             {formatCurrency(item.unit_price * item.quantity)}
                           </div>
-                          <button
-                            onClick={() => removeNewItem(item.id)}
-                            className="w-6 h-6 bg-red-100 text-red-600 rounded flex items-center justify-center hover:bg-red-200 transition-colors"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => updateNewItemQuantity(item.id, item.quantity - 1)}
+                              className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                            <span className="w-8 text-center font-medium">{item.quantity}</span>
+                            <button
+                              onClick={() => updateNewItemQuantity(item.id, item.quantity + 1)}
+                              className="w-8 h-8 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="flex items-center justify-between mt-3 pt-2 border-t">
-                    <span className="font-medium text-gray-700">Subtotal:</span>
-                    <span className="text-lg font-bold text-gray-900">{formatCurrency(calculateNewItemsTotal())}</span>
+                  <div className="flex items-center justify-between mb-4 pt-4 border-t border-gray-300">
+                    <span className="text-lg font-medium text-gray-700">Subtotal nuevos items</span>
+                    <span className="text-2xl font-bold text-gray-900">{formatCurrency(calculateNewItemsTotal())}</span>
                   </div>
+                  
+                  <button
+                    onClick={handleUpdateOrder}
+                    disabled={updatingOrder}
+                    className="w-full bg-green-600 text-white py-4 rounded-xl text-lg font-bold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {updatingOrder ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                        Actualizando...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-5 w-5" />
+                        Agregar al pedido
+                      </>
+                    )}
+                  </button>
                 </div>
-
-                <button
-                  onClick={handleUpdateOrder}
-                  disabled={updatingOrder}
-                  className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
-                >
-                  {updatingOrder ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      Actualizando...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="h-4 w-4" />
-                      Actualizar Pedido
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </>
       )}
 
-      {/* Modal para personalizar item */}
+      {/* Item Details Modal */}
       {selectedRecipe && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full shadow-xl">
-            {/* Header */}
-            <div className="px-4 py-3 border-b flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">
-                {selectedRecipe.name}
-              </h3>
-              <button
-                onClick={() => setSelectedRecipe(null)}
-                className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-900"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+          <div className="bg-white rounded-t-2xl w-full max-h-[80vh] overflow-y-auto animate-slide-up">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-900">{selectedRecipe.name}</h3>
+                  <p className="text-lg font-bold text-blue-600 mt-1">{formatCurrency(selectedRecipe.base_price)}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedRecipe(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="h-6 w-6 text-gray-600" />
+                </button>
+              </div>
             </div>
 
             <div className="p-4 space-y-4">
-              {/* Precio */}
-              <div className="text-lg font-bold text-green-600">
-                {formatCurrency(selectedRecipe.base_price)}
+              {/* Description */}
+              {selectedRecipe.description && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Descripción</h4>
+                  <p className="text-gray-600">{selectedRecipe.description}</p>
+                </div>
+              )}
+
+              {/* Quantity Selector */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Cantidad</h4>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
+                    className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
+                  >
+                    <Minus className="h-5 w-5 text-gray-600" />
+                  </button>
+                  <span className="text-xl font-bold text-gray-900 w-12 text-center">{itemQuantity}</span>
+                  <button
+                    onClick={() => setItemQuantity(itemQuantity + 1)}
+                    className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
+                  >
+                    <Plus className="h-5 w-5 text-gray-600" />
+                  </button>
+                </div>
               </div>
 
-              {/* Notas */}
+              {/* Special Instructions */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notas especiales
-                </label>
-                <input
-                  type="text"
+                <h4 className="font-medium text-gray-900 mb-2">Instrucciones especiales</h4>
+                <textarea
                   value={itemNotes}
                   onChange={(e) => setItemNotes(e.target.value)}
-                  placeholder="Sin cebolla, término medio..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ej: Sin cebolla, término medio..."
+                  className="w-full px-4 py-3 bg-gray-100 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows="3"
                 />
               </div>
 
-              {/* Opciones */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+              {/* Options */}
+              <div className="space-y-3">
+                <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Package className="h-5 w-5 text-orange-600" />
+                    <div>
+                      <p className="font-medium text-gray-900">Para llevar</p>
+                      <p className="text-sm text-gray-600">Empaque especial para llevar</p>
+                    </div>
+                  </div>
                   <input
                     type="checkbox"
                     checked={itemTakeaway}
@@ -703,49 +736,71 @@ const TableOrderEdit = () => {
                         setItemTaper(true);
                       }
                     }}
-                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                    className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500"
                   />
-                  <Package className="h-4 w-4 text-orange-600" />
-                  <span className="text-sm font-medium text-gray-900">Para llevar</span>
                 </label>
 
                 {itemTakeaway && (
-                  <label className="flex items-center gap-2 p-3 ml-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors ml-8">
+                    <div className="flex items-center gap-3">
+                      <Check className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="font-medium text-gray-900">Incluir envase</p>
+                        <p className="text-sm text-gray-600">Envase biodegradable</p>
+                      </div>
+                    </div>
                     <input
                       type="checkbox"
                       checked={itemTaper}
                       onChange={(e) => setItemTaper(e.target.checked)}
-                      className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                      className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
                     />
-                    <Check className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium text-gray-900">Incluir envase</span>
                   </label>
                 )}
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="border-t px-4 py-3 flex gap-3">
-              <button
-                onClick={() => setSelectedRecipe(null)}
-                className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
+            {/* Modal Footer */}
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
               <button
                 onClick={() => {
-                  addNewItem(selectedRecipe, itemNotes, itemTakeaway, itemTaper);
-                  showSuccess(`${selectedRecipe.name} agregado`);
+                  addNewItem(selectedRecipe, itemQuantity, itemNotes, itemTakeaway, itemTaper);
+                  showSuccess(`${itemQuantity} ${selectedRecipe.name} agregado${itemQuantity > 1 ? 's' : ''}`);
                 }}
-                className="flex-1 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-blue-600 text-white py-4 rounded-xl text-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
               >
-                <Plus className="h-4 w-4" />
-                Agregar
+                <ShoppingCart className="h-5 w-5" />
+                Agregar • {formatCurrency(selectedRecipe.base_price * itemQuantity)}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Bottom Safe Area */}
+      <div className="h-20"></div>
+
+      <style jsx>{`
+        @keyframes slide-up {
+          from {
+            transform: translateY(100%);
+          }
+          to {
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
+        }
+        
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      `}</style>
     </div>
   );
 };
