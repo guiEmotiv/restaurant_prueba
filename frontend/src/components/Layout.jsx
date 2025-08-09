@@ -27,7 +27,6 @@ import { useAuth } from '../contexts/AuthContext';
 const Layout = ({ children }) => {
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const location = useLocation();
 
@@ -109,33 +108,15 @@ const Layout = ({ children }) => {
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
-    // En móvil, también cerrar sidebar si está abierto
-    if (!isDesktop && isSidebarOpen) {
-      setIsSidebarOpen(false);
-    }
-  };
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-    // En móvil, también cerrar menú si está abierto
-    if (!isDesktop && isMenuOpen) {
-      setIsMenuOpen(false);
-    }
   };
 
   const handleNavClick = () => {
-    // Cerrar todos los menús al navegar
+    // Cerrar menú al navegar
     setIsMenuOpen(false);
-    setIsSidebarOpen(false);
   };
 
-  // Función para manejar el toggle según el contexto
   const handleToggle = () => {
-    if (isDesktop) {
-      toggleSidebar();
-    } else {
-      toggleMenu();
-    }
+    toggleMenu();
   };
 
   return (
@@ -149,14 +130,14 @@ const Layout = ({ children }) => {
         />
       )}
 
-      {/* Menu Toggle Button - Top Left - Mejorado */}
+      {/* Menu Toggle Button - Top Left - Optimizado */}
       <button
         onClick={handleToggle}
         className="fixed top-4 left-4 z-[60] inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white text-gray-700 shadow-lg border border-gray-200 hover:bg-gray-50 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 hover:scale-105"
-        aria-label={isMenuOpen || isSidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+        aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
       >
-        <div className={`transform transition-transform duration-200 ${(isMenuOpen || isSidebarOpen) ? 'rotate-90' : 'rotate-0'}`}>
-          {(isMenuOpen || isSidebarOpen) ? (
+        <div className={`transform transition-transform duration-200 ${isMenuOpen ? 'rotate-90' : 'rotate-0'}`}>
+          {isMenuOpen ? (
             <X className="w-5 h-5" />
           ) : (
             <Menu className="w-5 h-5" />
@@ -164,11 +145,9 @@ const Layout = ({ children }) => {
         </div>
       </button>
 
-      {/* Unified Sidebar - Responsive */}
+      {/* Sidebar Navigation - Responsive */}
       <div className={`${
         isMenuOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0 ${
-        isSidebarOpen ? 'lg:translate-x-0' : 'lg:-translate-x-full'
       } fixed inset-y-0 left-0 z-50 w-80 lg:w-64 bg-white shadow-xl transition-transform duration-300 ease-in-out`}>
         <div className="flex flex-col h-full">
           {/* Header with integrated toggle space */}
@@ -253,10 +232,8 @@ const Layout = ({ children }) => {
       </div>
 
       {/* Main content */}
-      <div className="min-h-screen transition-all duration-300">
-        <main className={`p-4 lg:p-8 pt-20 lg:pt-8 transition-all duration-300 ${
-          isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
-        }`}>
+      <div className="min-h-screen">
+        <main className="p-4 lg:p-8 pt-20 lg:pt-8">
           {children}
         </main>
       </div>
