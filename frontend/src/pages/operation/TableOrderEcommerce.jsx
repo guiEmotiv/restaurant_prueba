@@ -64,7 +64,8 @@ const TableOrderEcommerce = () => {
       setAccounts(orders.map(order => ({
         id: order.id,
         items: order.items || [],
-        total: parseFloat(order.total_amount) || 0,
+        total: parseFloat(order.grand_total || order.total_amount || 0),
+        containers_total: parseFloat(order.containers_total || 0),
         created_at: order.created_at
       })));
     } else {
@@ -88,21 +89,65 @@ const TableOrderEcommerce = () => {
     setCurrentStep('menu');
   };
 
-  const editAccount = (accountIndex) => {
+  const editAccount = async (accountIndex) => {
     setCurrentAccountIndex(accountIndex);
     const account = accounts[accountIndex];
-    // Convertir items existentes al formato de carrito
-    const cartItems = account.items.map(item => ({
-      recipe: item.recipe,
-      quantity: item.quantity,
-      notes: item.notes || '',
-      is_takeaway: item.is_takeaway || false,
-      has_taper: item.has_taper || false,
-      container: item.container || null,
-      status: item.status || 'CREATED', // Incluir estado del item
-      id: item.id // Incluir ID para identificar items existentes
-    }));
-    setCart(cartItems);
+    
+    // Si la cuenta tiene ID, recargar desde el backend para tener datos actualizados
+    if (account.id) {
+      try {
+        const updatedOrder = await apiService.orders.getById(account.id);
+        
+        // Convertir items existentes al formato de carrito con datos completos
+        const cartItems = updatedOrder.items.map(item => ({
+          recipe: {
+            id: item.recipe,
+            name: item.recipe_name,
+            base_price: item.unit_price,
+            preparation_time: item.recipe_preparation_time
+          },
+          quantity: item.quantity,
+          notes: item.notes || '',
+          is_takeaway: item.is_takeaway || false,
+          has_taper: item.has_taper || false,
+          container: null, // Los containers ya están en container_sales
+          status: item.status || 'CREATED',
+          id: item.id,
+          total_price: item.total_price // Incluir precio total del item
+        }));
+        
+        // Actualizar la cuenta con datos frescos del backend
+        const updatedAccount = {
+          ...account,
+          items: updatedOrder.items || [],
+          total: parseFloat(updatedOrder.grand_total || updatedOrder.total_amount || 0),
+          containers_total: parseFloat(updatedOrder.containers_total || 0)
+        };
+        
+        const updatedAccounts = [...accounts];
+        updatedAccounts[accountIndex] = updatedAccount;
+        setAccounts(updatedAccounts);
+        
+        setCart(cartItems);
+      } catch (error) {
+        console.error('Error loading account details:', error);
+        showError('Error al cargar los detalles de la cuenta');
+      }
+    } else {
+      // Nueva cuenta, solo convertir items locales
+      const cartItems = account.items.map(item => ({
+        recipe: item.recipe,
+        quantity: item.quantity,
+        notes: item.notes || '',
+        is_takeaway: item.is_takeaway || false,
+        has_taper: item.has_taper || false,
+        container: item.container || null,
+        status: item.status || 'CREATED',
+        id: item.id
+      }));
+      setCart(cartItems);
+    }
+    
     setCurrentStep('menu');
   };
 
@@ -157,14 +202,18 @@ const TableOrderEcommerce = () => {
 
   const getCartTotal = () => {
     // Total para mostrar en el modal (incluye todos los items)
-    const itemsTotal = cart.reduce((sum, item) => sum + (parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)), 0);
-    const containersTotal = cart.reduce((sum, item) => {
-      if (item.has_taper && item.container) {
-        return sum + (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1));
+    return cart.reduce((sum, item) => {
+      // Si el item tiene total_price del backend, usarlo
+      if (item.total_price !== undefined) {
+        return sum + parseFloat(item.total_price || 0);
       }
-      return sum;
+      // Si no, calcular basado en precio base
+      const itemTotal = parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1);
+      const containerTotal = item.has_taper && item.container 
+        ? parseFloat(item.container.price || 0) * parseInt(item.quantity || 1) 
+        : 0;
+      return sum + itemTotal + containerTotal;
     }, 0);
-    return itemsTotal + containersTotal;
   };
 
   const getNewItemsTotal = () => {
@@ -272,7 +321,8 @@ const TableOrderEcommerce = () => {
         ...currentAccount,
         id: order.id,
         items: updatedOrder.items || [],
-        total: parseFloat(updatedOrder.total_amount || 0)
+        total: parseFloat(updatedOrder.grand_total || updatedOrder.total_amount || 0),
+        containers_total: parseFloat(updatedOrder.containers_total || 0)
       };
 
       const updatedAccounts = [...accounts];
@@ -281,6 +331,21 @@ const TableOrderEcommerce = () => {
 
       showSuccess('Cuenta actualizada exitosamente');
       setCart([]);
+      
+      // Recargar todas las cuentas para tener totales actualizados
+      if (selectedTable) {
+        const orders = await loadTableOrders(selectedTable.id);
+        if (orders.length > 0) {
+          setAccounts(orders.map(order => ({
+            id: order.id,
+            items: order.items || [],
+            total: parseFloat(order.grand_total || order.total_amount || 0),
+            containers_total: parseFloat(order.containers_total || 0),
+            created_at: order.created_at
+          })));
+        }
+      }
+      
       setCurrentStep('accounts');
 
     } catch (error) {
