@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db import transaction
 from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem, ContainerSale
 from config.serializers import TableSerializer
 from inventory.serializers import RecipeSerializer, IngredientSerializer
@@ -151,7 +152,25 @@ class OrderDetailSerializer(OrderSerializer):
     
     def get_payments(self, obj):
         from .serializers import PaymentSerializer
+        # Use prefetched payments to avoid N+1 queries
         return PaymentSerializer(obj.payments.all(), many=True).data
+    
+    @classmethod
+    def setup_eager_loading(cls, queryset):
+        """
+        Optimize queries for OrderDetailSerializer to prevent N+1 problems
+        """
+        return queryset.select_related(
+            'table',
+            'table__zone'
+        ).prefetch_related(
+            'orderitem_set__recipe',
+            'orderitem_set__recipe__group',
+            'orderitem_set__orderitemingredient_set__ingredient',
+            'orderitem_set__orderitemingredient_set__ingredient__unit',
+            'container_sales__container',
+            'payments__payment_items__order_item'
+        )
 
 
 class OrderItemCreateSerializer(serializers.ModelSerializer):
@@ -192,7 +211,11 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         
         return value
     
+    @transaction.atomic
     def create(self, validated_data):
+        """
+        Crear OrderItem con transacción atómica para garantizar consistencia.
+        """
         selected_container_id = validated_data.pop('selected_container', None)
         quantity = validated_data.get('quantity', 1)
         
@@ -201,33 +224,41 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         if not order:
             raise serializers.ValidationError("Order not found in context")
         
-        # Crear UN SOLO OrderItem con la cantidad especificada
-        order_item = OrderItem.objects.create(order=order, **validated_data)
-        
-        # Si tiene taper y hay container seleccionado, crear ContainerSale
-        if order_item.has_taper and selected_container_id:
+        # Pre-validar stock de container si aplica
+        container = None
+        if validated_data.get('has_taper', False) and selected_container_id:
             from config.models import Container
             try:
-                container = Container.objects.get(id=selected_container_id, is_active=True)
-                
-                # Verificar stock suficiente
-                if container.stock < quantity:
-                    raise serializers.ValidationError(f"Stock insuficiente de {container.name}. Disponible: {container.stock}, Requerido: {quantity}")
-                
-                # Reducir stock del envase
-                container.stock -= quantity
-                container.save()
-                
-                # Crear ContainerSale con la cantidad de envases
-                ContainerSale.objects.create(
-                    order=order,
-                    container=container,
-                    quantity=quantity,
-                    unit_price=container.price,
-                    total_price=container.price * quantity
+                container = Container.objects.select_for_update().get(
+                    id=selected_container_id, is_active=True
                 )
+                if container.stock < quantity:
+                    raise serializers.ValidationError(
+                        f"Stock insuficiente de {container.name}. "
+                        f"Disponible: {container.stock}, Requerido: {quantity}"
+                    )
             except Container.DoesNotExist:
-                pass
+                raise serializers.ValidationError(
+                    "El envase seleccionado no existe o no está disponible"
+                )
+        
+        # Crear OrderItem
+        order_item = OrderItem.objects.create(order=order, **validated_data)
+        
+        # Crear ContainerSale si aplica
+        if container:
+            # Reducir stock del envase
+            container.stock -= quantity
+            container.save()
+            
+            # Crear ContainerSale
+            ContainerSale.objects.create(
+                order=order,
+                container=container,
+                quantity=quantity,
+                unit_price=container.price,
+                total_price=container.price * quantity
+            )
         
         # Calcular el precio total después de crear el item
         order_item.calculate_total_price()
@@ -260,30 +291,56 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         model = Order
         fields = ['table', 'waiter', 'items']
     
+    @transaction.atomic
     def create(self, validated_data):
+        """
+        Crear orden con transacción atómica para garantizar consistencia.
+        Si cualquier operación falla, toda la transacción se revierte.
+        """
         items_data = validated_data.pop('items')
         
         # Crear orden
         order = Order.objects.create(**validated_data)
         
-        # Crear items y containers
+        # Pre-validar stock de containers antes de crear items
+        containers_to_reduce = []
+        for item_data in items_data:
+            selected_container_id = item_data.get('selected_container')
+            quantity = item_data.get('quantity', 1)
+            has_taper = item_data.get('has_taper', False)
+            
+            if has_taper and selected_container_id:
+                from config.models import Container
+                try:
+                    container = Container.objects.select_for_update().get(
+                        id=selected_container_id, is_active=True
+                    )
+                    if container.stock < quantity:
+                        raise serializers.ValidationError(
+                            f"Stock insuficiente de {container.name}. "
+                            f"Disponible: {container.stock}, Requerido: {quantity}"
+                        )
+                    containers_to_reduce.append((container, quantity))
+                except Container.DoesNotExist:
+                    raise serializers.ValidationError(
+                        f"El envase seleccionado no existe o no está disponible"
+                    )
+        
+        # Crear items y containers (ya validado el stock)
         for item_data in items_data:
             selected_container_id = item_data.pop('selected_container', None)
             quantity = item_data.get('quantity', 1)
             
-            # Crear UN SOLO OrderItem con la cantidad especificada
+            # Crear OrderItem
             order_item = OrderItem.objects.create(order=order, **item_data)
             
-            # Si tiene taper y hay container seleccionado, crear ContainerSale
+            # Crear ContainerSale si aplica
             if order_item.has_taper and selected_container_id:
-                from config.models import Container
-                try:
-                    container = Container.objects.get(id=selected_container_id, is_active=True)
-                    
-                    # Verificar stock suficiente
-                    if container.stock < quantity:
-                        raise serializers.ValidationError(f"Stock insuficiente de {container.name}. Disponible: {container.stock}, Requerido: {quantity}")
-                    
+                container = next(
+                    (c for c, q in containers_to_reduce if c.id == selected_container_id), 
+                    None
+                )
+                if container:
                     # Reducir stock del envase
                     container.stock -= quantity
                     container.save()
@@ -296,8 +353,6 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                         unit_price=container.price,
                         total_price=container.price * quantity
                     )
-                except Container.DoesNotExist:
-                    pass
         
         # Consumir ingredientes
         order.consume_ingredients_on_creation()

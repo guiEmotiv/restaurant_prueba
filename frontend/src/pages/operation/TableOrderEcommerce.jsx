@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { ArrowLeft, Users, Clock, ShoppingCart, Plus, Minus, Package, StickyNote, CreditCard, Edit3, PlusCircle, Filter, X, Trash2 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -20,9 +20,9 @@ const TableOrderEcommerce = () => {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [loadInitialData]);
 
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     try {
       const [tablesData, recipesData, containersData] = await Promise.all([
         apiService.tables.getAll(),
@@ -39,9 +39,9 @@ const TableOrderEcommerce = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
 
-  const loadTableOrders = async (tableId) => {
+  const loadTableOrders = useCallback(async (tableId) => {
     try {
       const orders = await apiService.tables.getActiveOrders(tableId);
       return Array.isArray(orders) ? orders.filter(order => order.status === 'CREATED') : [];
@@ -49,14 +49,14 @@ const TableOrderEcommerce = () => {
       console.error('Error loading table orders:', error);
       return [];
     }
-  };
+  }, []);
 
-  const getTableStatus = async (table) => {
+  const getTableStatus = useCallback(async (table) => {
     const orders = await loadTableOrders(table.id);
     return orders.length > 0 ? 'occupied' : 'available';
-  };
+  }, [loadTableOrders]);
 
-  const handleTableSelect = async (table) => {
+  const handleTableSelect = useCallback(async (table) => {
     setSelectedTable(table);
     const orders = await loadTableOrders(table.id);
     
@@ -76,7 +76,7 @@ const TableOrderEcommerce = () => {
     }
     
     setCurrentStep('accounts');
-  };
+  }, [loadTableOrders]);
 
   const createNewAccount = () => {
     const newAccount = {
@@ -228,7 +228,21 @@ const TableOrderEcommerce = () => {
    * - Order.get_grand_total() = Total completo
    */
 
-  const getItemFoodPrice = (item) => {
+  // ===== VALORES MEMOIZADOS PARA PERFORMANCE =====
+  
+  const newItems = useMemo(() => 
+    cart.filter(item => item.status !== 'SERVED'), 
+    [cart]
+  );
+
+  const existingItems = useMemo(() => 
+    cart.filter(item => item.status === 'SERVED' || item.id), 
+    [cart]
+  );
+
+  // ===== FUNCIONES MEMOIZADAS PARA PERFORMANCE =====
+  
+  const getItemFoodPrice = useCallback((item) => {
     // REGLA FUNDAMENTAL: Items existentes NUNCA se recalculan
     if (item.id && item.total_price !== undefined) {
       return parseFloat(item.total_price);
@@ -238,9 +252,9 @@ const TableOrderEcommerce = () => {
     const quantity = parseInt(item.quantity || 1);
     const unitPrice = parseFloat(item.recipe?.base_price || 0);
     return unitPrice * quantity;
-  };
+  }, []);
 
-  const getItemContainerPrice = (item) => {
+  const getItemContainerPrice = useCallback((item) => {
     // REGLA FUNDAMENTAL: Solo items NUEVOS calculan containers individualmente
     // Items existentes: containers están en ContainerSales a nivel de ORDER
     if (!item.id && item.has_taper && item.container) {
@@ -251,22 +265,22 @@ const TableOrderEcommerce = () => {
     
     // Items existentes: CERO (containers están separados en el backend)
     return 0;
-  };
+  }, []);
 
   // Nueva función: obtener containers de orden existente
-  const getOrderContainerTotal = () => {
+  const getOrderContainerTotal = useCallback(() => {
     const currentAccount = accounts[currentAccountIndex];
     if (currentAccount && currentAccount.containers_total) {
       return parseFloat(currentAccount.containers_total);
     }
     return 0;
-  };
+  }, [accounts, currentAccountIndex]);
 
-  const getItemTotalPrice = (item) => {
+  const getItemTotalPrice = useCallback((item) => {
     return getItemFoodPrice(item) + getItemContainerPrice(item);
-  };
+  }, [getItemFoodPrice, getItemContainerPrice]);
 
-  const getCartTotals = () => {
+  const getCartTotals = useCallback(() => {
     const foodTotal = cart.reduce((sum, item) => sum + getItemFoodPrice(item), 0);
     
     // Containers: suma items NUEVOS + containers de la ORDEN existente
@@ -283,11 +297,10 @@ const TableOrderEcommerce = () => {
       orderContainers: orderContainerTotal,
       grand: grandTotal
     };
-  };
+  }, [cart, getItemFoodPrice, getItemContainerPrice, getOrderContainerTotal]);
 
-  const getNewItemsTotal = () => {
+  const getNewItemsTotal = useCallback(() => {
     // Total solo de items nuevos (para procesar)
-    const newItems = cart.filter(item => item.status !== 'SERVED');
     const itemsTotal = newItems.reduce((sum, item) => sum + (parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)), 0);
     const containersTotal = newItems.reduce((sum, item) => {
       if (item.has_taper && item.container) {
@@ -296,7 +309,7 @@ const TableOrderEcommerce = () => {
       return sum;
     }, 0);
     return itemsTotal + containersTotal;
-  };
+  }, [newItems]);
 
   const saveCurrentAccount = async () => {
     if (!selectedTable?.id || cart.length === 0) {
@@ -306,7 +319,6 @@ const TableOrderEcommerce = () => {
     
     // Validar que todos los items nuevos del carrito tengan recipe válida
     // Solo validar items que no están entregados (los entregados no se procesarán)
-    const newItems = cart.filter(item => item.status !== 'SERVED');
     const invalidItems = newItems.filter(item => !item.recipe?.id);
     if (invalidItems.length > 0) {
       showError('Algunos items nuevos del carrito no tienen receta válida');
@@ -319,8 +331,8 @@ const TableOrderEcommerce = () => {
       const currentAccount = accounts[currentAccountIndex] || {};
       let order;
 
-      // Solo procesar items nuevos (no entregados)
-      const newCartItems = cart.filter(item => item.status !== 'SERVED');
+      // Solo procesar items nuevos (no entregados) - usar items memoizados
+      const newCartItems = newItems;
 
       if (currentAccount.id) {
         // Cuenta existente - actualizar
@@ -606,7 +618,7 @@ const TableOrderEcommerce = () => {
   );
 };
 
-const TableSelection = ({ tables, onTableSelect, getTableStatus }) => {
+const TableSelection = memo(({ tables, onTableSelect, getTableStatus }) => {
   const [tableStatuses, setTableStatuses] = useState({});
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'available', 'occupied'
   const [zoneFilter, setZoneFilter] = useState('all');
@@ -736,9 +748,9 @@ const TableSelection = ({ tables, onTableSelect, getTableStatus }) => {
       ))}
     </div>
   );
-};
+});
 
-const AccountsManagement = ({ 
+const AccountsManagement = memo(({ 
   accounts, 
   onCreateNewAccount, 
   onEditAccount, 
@@ -853,9 +865,9 @@ const AccountsManagement = ({
 
     </div>
   );
-};
+});
 
-const MenuSelection = ({ 
+const MenuSelection = memo(({ 
   recipes, 
   containers, 
   cart, 
@@ -998,9 +1010,9 @@ const MenuSelection = ({
       )}
     </div>
   );
-};
+});
 
-const FloatingCart = ({ 
+const FloatingCart = memo(({ 
   cart, 
   containers, 
   onUpdateCart, 
@@ -1242,9 +1254,9 @@ const FloatingCart = ({
       )}
     </>
   );
-};
+});
 
-const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
+const RecipeModal = memo(({ recipe, containers, onAdd, onClose }) => {
   const [notes, setNotes] = useState('');
   const [isForTakeaway, setIsForTakeaway] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
@@ -1361,7 +1373,7 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
       </div>
     </>
   );
-};
+});
 
 // CartItem component removed - was causing getItemPrice ReferenceError
 

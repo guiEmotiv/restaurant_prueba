@@ -20,7 +20,11 @@ from .serializers import (
 
 
 class OrderViewSet(viewsets.ModelViewSet):
-    queryset = Order.objects.all().order_by('-created_at')
+    queryset = Order.objects.select_related('table__zone').prefetch_related(
+        'orderitem_set__recipe__group',
+        'container_sales__container',
+        'payments'
+    ).order_by('-created_at')
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
     pagination_class = None  # Deshabilitar paginación para órdenes
     
@@ -32,7 +36,17 @@ class OrderViewSet(viewsets.ModelViewSet):
         return OrderSerializer
     
     def get_queryset(self):
-        queryset = Order.objects.all().order_by('-created_at')
+        # Base queryset with common optimizations
+        queryset = Order.objects.select_related('table__zone').prefetch_related(
+            'orderitem_set__recipe__group',
+            'container_sales__container',
+            'payments'
+        ).order_by('-created_at')
+        
+        # Further optimize if using detail serializer (retrieve, update)
+        if self.action in ['retrieve', 'update', 'partial_update']:
+            queryset = OrderDetailSerializer.setup_eager_loading(queryset)
+        
         status_filter = self.request.query_params.get('status')
         table = self.request.query_params.get('table')
         zone = self.request.query_params.get('zone')
@@ -52,8 +66,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         order = serializer.save()
         
+        # Optimize the query for OrderDetailSerializer
+        optimized_order = OrderDetailSerializer.setup_eager_loading(
+            Order.objects.filter(id=order.id)
+        ).first()
+        
         # Return the order with full details using OrderDetailSerializer
-        response_serializer = OrderDetailSerializer(order)
+        response_serializer = OrderDetailSerializer(optimized_order)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['post'])
