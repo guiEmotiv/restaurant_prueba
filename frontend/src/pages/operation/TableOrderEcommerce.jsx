@@ -107,19 +107,41 @@ const TableOrderEcommerce = () => {
   };
 
   const addToCart = (recipeData) => {
+    let newItem;
+    
     // Si recipeData es solo una receta, crear el objeto completo
     if (recipeData.id) {
-      setCart([...cart, {
+      newItem = {
         recipe: recipeData,
         quantity: 1,
         notes: '',
         is_takeaway: false,
         has_taper: false,
         container: null
-      }]);
+      };
     } else {
       // Si ya viene como objeto completo del modal
-      setCart([...cart, recipeData]);
+      newItem = recipeData;
+    }
+
+    // Buscar si ya existe un item similar (misma receta, notas, opciones)
+    const existingIndex = cart.findIndex(item => 
+      item.recipe?.id === newItem.recipe?.id &&
+      item.notes === newItem.notes &&
+      item.is_takeaway === newItem.is_takeaway &&
+      item.has_taper === newItem.has_taper &&
+      item.container?.id === newItem.container?.id &&
+      !item.id // Solo agrupar items nuevos, no items existentes del pedido
+    );
+
+    if (existingIndex >= 0) {
+      // Si existe, incrementar cantidad
+      const updatedCart = [...cart];
+      updatedCart[existingIndex].quantity += newItem.quantity;
+      setCart(updatedCart);
+    } else {
+      // Si no existe, agregar nuevo
+      setCart([...cart, newItem]);
     }
   };
 
@@ -136,6 +158,24 @@ const TableOrderEcommerce = () => {
   const getCartTotal = () => {
     const itemsTotal = cart.reduce((sum, item) => sum + (parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)), 0);
     const containersTotal = cart.reduce((sum, item) => {
+      if (item.has_taper && item.container) {
+        return sum + (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1));
+      }
+      return sum;
+    }, 0);
+    return itemsTotal + containersTotal;
+  };
+
+  const getCartDisplayTotal = () => {
+    // Total para mostrar en el modal (incluye todos los items)
+    return getCartTotal();
+  };
+
+  const getNewItemsTotal = () => {
+    // Total solo de items nuevos (para procesar)
+    const newItems = cart.filter(item => item.status !== 'SERVED');
+    const itemsTotal = newItems.reduce((sum, item) => sum + (parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)), 0);
+    const containersTotal = newItems.reduce((sum, item) => {
       if (item.has_taper && item.container) {
         return sum + (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1));
       }
@@ -223,12 +263,15 @@ const TableOrderEcommerce = () => {
         return sum + itemTotal + containerTotal;
       }, 0);
 
-      // Actualizar la cuenta en el estado
+      // Recargar la orden actualizada desde el backend para obtener el total correcto
+      const updatedOrder = await apiService.orders.getById(order.id);
+
+      // Actualizar la cuenta en el estado con datos reales del backend
       const updatedAccount = {
         ...currentAccount,
         id: order.id,
-        items: [...(currentAccount.items || []), ...newCartItems],
-        total: parseFloat(currentAccount.total || 0) + parseFloat(newItemsTotal || 0)
+        items: updatedOrder.items || [],
+        total: parseFloat(updatedOrder.total_amount || 0)
       };
 
       const updatedAccounts = [...accounts];
@@ -406,7 +449,7 @@ const TableOrderEcommerce = () => {
             onUpdateCart={updateCartItem}
             onRemoveFromCart={removeFromCart}
             onSaveAccount={saveCurrentAccount}
-            getCartTotal={getCartTotal}
+            getCartTotal={getCartDisplayTotal}
             loading={loading}
           />
         )}
@@ -783,7 +826,7 @@ const MenuSelection = ({
         onUpdateCart={onUpdateCart}
         onRemoveFromCart={onRemoveFromCart}
         onSaveAccount={onSaveAccount}
-        getCartTotal={getCartTotal}
+        getCartTotal={getCartDisplayTotal}
         loading={loading}
       />
 
@@ -854,12 +897,23 @@ const FloatingCart = ({
             
             {/* Items del carrito - Solo mostrar y eliminar */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {cart.map((item, index) => (
+              {cart
+                .slice() // Crear copia para no mutar el array original
+                .sort((a, b) => {
+                  // Ordenar: nuevos primero, luego por status
+                  if (a.status === 'SERVED' && b.status !== 'SERVED') return 1;
+                  if (a.status !== 'SERVED' && b.status === 'SERVED') return -1;
+                  return 0;
+                })
+                .map((item, index) => (
                 <div key={index} className={`rounded-lg p-3 flex justify-between items-center ${
                   item.status === 'SERVED' ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
                 }`}>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
+                      <span className="text-xs bg-gray-200 text-gray-700 rounded-full w-6 h-6 flex items-center justify-center font-bold">
+                        {index + 1}
+                      </span>
                       <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
                       {item.status === 'SERVED' ? (
                         <div className="flex items-center gap-1 text-green-600 text-xs">
