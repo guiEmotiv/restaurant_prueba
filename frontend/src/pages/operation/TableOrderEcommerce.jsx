@@ -155,33 +155,46 @@ const TableOrderEcommerce = () => {
         // Cuenta existente - actualizar
         order = await apiService.orders.getById(currentAccount.id);
       } else {
-        // Nueva cuenta - crear orden
+        // Nueva cuenta - crear orden con items
+        const itemsData = cart.map(cartItem => ({
+          recipe: cartItem.recipe.id,
+          quantity: cartItem.quantity,
+          notes: cartItem.notes || '',
+          is_takeaway: cartItem.is_takeaway || false,
+          has_taper: cartItem.has_taper || false,
+          selected_container: cartItem.has_taper && cartItem.container ? cartItem.container.id : null
+        }));
+
         const orderData = {
           table: selectedTable.id,
           waiter: user?.username || 'Sistema',
+          items: itemsData
         };
+
         order = await apiService.orders.create(orderData);
       }
 
-      // Agregar nuevos items al pedido
-      for (const cartItem of cart) {
-        const itemData = {
-          recipe: cartItem.recipe.id,
-          quantity: cartItem.quantity,
-          notes: cartItem.notes,
-          is_takeaway: cartItem.is_takeaway,
-          has_taper: cartItem.has_taper
-        };
+      // Si la cuenta ya existía, agregar nuevos items
+      if (currentAccount.id) {
+        for (const cartItem of cart) {
+          const itemData = {
+            recipe: cartItem.recipe.id,
+            quantity: cartItem.quantity,
+            notes: cartItem.notes,
+            is_takeaway: cartItem.is_takeaway,
+            has_taper: cartItem.has_taper
+          };
 
-        await apiService.orders.addItem(order.id, itemData);
+          await apiService.orders.addItem(order.id, itemData);
 
-        // Si es para llevar y tiene envase, crear venta de envase
-        if (cartItem.has_taper && cartItem.container) {
-          await apiService.containerSales.create({
-            order: order.id,
-            container: cartItem.container.id,
-            quantity: cartItem.quantity
-          });
+          // Si es para llevar y tiene envase, crear venta de envase
+          if (cartItem.has_taper && cartItem.container) {
+            await apiService.containerSales.create({
+              order: order.id,
+              container: cartItem.container.id,
+              quantity: cartItem.quantity
+            });
+          }
         }
       }
 
