@@ -18,10 +18,6 @@ const TableOrderEcommerce = () => {
   const { showSuccess, showError } = useToast();
   const { user } = useAuth();
 
-  useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
-
   const loadInitialData = useCallback(async () => {
     try {
       const [tablesData, recipesData, containersData] = await Promise.all([
@@ -40,6 +36,11 @@ const TableOrderEcommerce = () => {
       setLoading(false);
     }
   }, [showError]);
+
+  useEffect(() => {
+    loadInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadTableOrders = useCallback(async (tableId) => {
     try {
