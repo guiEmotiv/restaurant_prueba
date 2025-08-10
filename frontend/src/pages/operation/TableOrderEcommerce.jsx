@@ -64,7 +64,7 @@ const TableOrderEcommerce = () => {
       setAccounts(orders.map(order => ({
         id: order.id,
         items: order.items || [],
-        total: order.total_amount || 0,
+        total: parseFloat(order.total_amount) || 0,
         created_at: order.created_at
       })));
     } else {
@@ -132,10 +132,10 @@ const TableOrderEcommerce = () => {
   };
 
   const getCartTotal = () => {
-    const itemsTotal = cart.reduce((sum, item) => sum + (item.recipe.base_price * item.quantity), 0);
+    const itemsTotal = cart.reduce((sum, item) => sum + (parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)), 0);
     const containersTotal = cart.reduce((sum, item) => {
       if (item.has_taper && item.container) {
-        return sum + (item.container.price * item.quantity);
+        return sum + (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1));
       }
       return sum;
     }, 0);
@@ -203,7 +203,7 @@ const TableOrderEcommerce = () => {
         ...currentAccount,
         id: order.id,
         items: [...(currentAccount.items || []), ...cart],
-        total: (currentAccount.total || 0) + getCartTotal()
+        total: parseFloat(currentAccount.total || 0) + parseFloat(getCartTotal() || 0)
       };
 
       const updatedAccounts = [...accounts];
@@ -559,7 +559,7 @@ const AccountsManagement = ({
                   {account.items.slice(0, 3).map((item, itemIndex) => (
                     <div key={itemIndex} className="flex justify-between text-sm">
                       <span>{item.recipe?.name} x{item.quantity}</span>
-                      <span>S/ {(item.unit_price * item.quantity).toFixed(2)}</span>
+                      <span>S/ {(parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)).toFixed(2)}</span>
                     </div>
                   ))}
                   {account.items.length > 3 && (
@@ -798,7 +798,7 @@ const FloatingCart = ({
                     <div className="text-sm text-gray-600 flex items-center gap-2">
                       <span>Cantidad: {item.quantity}</span>
                       <span>•</span>
-                      <span>S/ {((item.recipe.base_price * item.quantity) + (item.container && item.has_taper ? (item.container.price * item.quantity) : 0)).toFixed(2)}</span>
+                      <span>S/ {((parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)) + (item.container && item.has_taper ? (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)) : 0)).toFixed(2)}</span>
                     </div>
                     {item.is_takeaway && (
                       <div className="text-xs text-orange-600 flex items-center gap-1">
@@ -865,9 +865,9 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
   }, [isForTakeaway, recipe.container, containers, selectedContainer]);
 
   const getTotal = () => {
-    let total = recipe.base_price * quantity;
+    let total = parseFloat(recipe?.base_price || 0) * parseInt(quantity || 1);
     if (isForTakeaway && selectedContainer) {
-      total += selectedContainer.price * quantity;
+      total += parseFloat(selectedContainer.price || 0) * parseInt(quantity || 1);
     }
     return total;
   };
@@ -977,7 +977,7 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
 
                 {selectedContainer && (
                   <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
-                    + S/ {(selectedContainer.price * quantity).toFixed(2)} por envase
+                    + S/ {(parseFloat(selectedContainer.price || 0) * parseInt(quantity || 1)).toFixed(2)} por envase
                   </div>
                 )}
               </div>
@@ -989,7 +989,7 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
         <div className="p-4 border-t space-y-4">
           <div className="flex justify-between items-center text-xl font-bold">
             <span>Total:</span>
-            <span>S/ {getTotal().toFixed(2)}</span>
+            <span>S/ {parseFloat(getTotal() || 0).toFixed(2)}</span>
           </div>
           <button
             onClick={handleAdd}
@@ -1032,7 +1032,7 @@ const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
             <Plus className="h-4 w-4" />
           </button>
         </div>
-        <span className="font-semibold">S/ {(item.recipe.base_price * item.quantity).toFixed(2)}</span>
+        <span className="font-semibold">S/ {(parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)).toFixed(2)}</span>
       </div>
 
       {/* Notas */}
@@ -1112,7 +1112,7 @@ const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
 
                 {item.container && (
                   <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                    + S/ {(item.container.price * item.quantity).toFixed(2)} por envase
+                    + S/ {(parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)).toFixed(2)} por envase
                   </div>
                 )}
               </>
