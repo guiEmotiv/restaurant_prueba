@@ -22,12 +22,6 @@ import Ingredients from './pages/inventory/Ingredients';
 import Recipes from './pages/inventory/Recipes';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import Kitchen from './pages/operation/Kitchen';
-import Operations from './pages/Operations';
-import OrderCreate from './pages/operations/OrderCreate';
-import OrderManage from './pages/operations/OrderManage';
-import OrderAddItems from './pages/operations/OrderAddItems';
-import OrderEdit from './pages/operations/OrderEdit';
-import PaymentProcess from './pages/operations/PaymentProcess';
 
 // Debug environment variables with persistent logging
 const logWithTimestamp = (message, data) => {
@@ -124,37 +118,6 @@ const AppContent = () => {
             </RoleProtectedRoute>
           } />
 
-          {/* Operations - Sistema completo ecommerce */}
-          <Route path="/operations" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <Operations />
-            </ProtectedRoute>
-          } />
-          <Route path="/operations/table/:tableId/new" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <OrderCreate />
-            </ProtectedRoute>
-          } />
-          <Route path="/operations/table/:tableId/manage" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <OrderManage />
-            </ProtectedRoute>
-          } />
-          <Route path="/operations/table/:tableId/payment" element={
-            <ProtectedRoute requiredPermission="canManagePayments">
-              <PaymentProcess />
-            </ProtectedRoute>
-          } />
-          <Route path="/operations/table/:tableId/add-items" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <OrderAddItems />
-            </ProtectedRoute>
-          } />
-          <Route path="/operations/table/:tableId/order/:orderId/edit" element={
-            <ProtectedRoute requiredPermission="canManageOrders">
-              <OrderEdit />
-            </ProtectedRoute>
-          } />
 
           {/* Operation routes */}
           <Route path="/kitchen" element={
