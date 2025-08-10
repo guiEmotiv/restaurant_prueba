@@ -29,10 +29,26 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     }
   }, [isOpen, recipe]);
 
+  // Actualizar stock de ingredientes cuando se cargan los availableIngredients
+  useEffect(() => {
+    if (availableIngredients.length > 0 && recipeItems.length > 0) {
+      setRecipeItems(prev => prev.map(item => {
+        const ingredient = availableIngredients.find(ing => ing.id === parseInt(item.ingredient));
+        return {
+          ...item,
+          ingredient_current_stock: ingredient?.current_stock || 0
+        };
+      }));
+    }
+  }, [availableIngredients]);
+
   const loadData = async () => {
-    await loadAvailableIngredients();
-    await loadAvailableGroups();
-    await loadAvailableContainers();
+    // Primero cargar los datos de referencia
+    await Promise.all([
+      loadAvailableIngredients(),
+      loadAvailableGroups(), 
+      loadAvailableContainers()
+    ]);
     
     if (recipe) {
       // Modo edición
@@ -45,6 +61,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
         profit_percentage: recipe.profit_percentage || '0.00',
         is_active: recipe.is_active !== undefined ? recipe.is_active : true
       });
+      
       // Cargar items después de que los ingredientes estén disponibles
       await loadRecipeItems();
     } else {
@@ -99,8 +116,26 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     if (!recipe?.id) return;
     
     try {
+      // Si la receta ya tiene ingredients_list del backend, usarla
+      if (recipe.ingredients_list && Array.isArray(recipe.ingredients_list)) {
+        console.log('Using ingredients_list from recipe:', recipe.ingredients_list);
+        setRecipeItems(recipe.ingredients_list.map(item => ({
+          id: null, // Los items del backend no tienen id local
+          ingredient: item.id,
+          ingredient_name: item.name,
+          ingredient_unit: item.unit,
+          ingredient_unit_price: item.unit_price,
+          ingredient_current_stock: 0, // Se actualizará desde availableIngredients
+          quantity: item.quantity
+        })));
+        return;
+      }
+      
+      // Si no, hacer la llamada al API
       const response = await apiService.recipeItems.getByRecipe(recipe.id);
       const items = Array.isArray(response) ? response : [];
+      console.log('Loading recipe items from API:', items);
+      
       setRecipeItems(items.map(item => {
         // Buscar el stock actual del ingrediente
         const ingredient = availableIngredients.find(ing => ing.id === item.ingredient);
@@ -404,7 +439,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                       <option value="">Seleccionar envase...</option>
                       {availableContainers.map(container => (
                         <option key={container.id} value={container.id}>
-                          {container.name} - S/ {container.price}
+                          {container.name}
                         </option>
                       ))}
                     </select>
