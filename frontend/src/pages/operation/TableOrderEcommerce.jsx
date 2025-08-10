@@ -320,7 +320,7 @@ const TableOrderEcommerce = () => {
         <div className="max-w-4xl mx-auto px-4 py-6">
           <h1 className="text-2xl font-bold text-gray-900 text-center mb-4">
             {currentStep === 'tables' && 'Seleccionar Mesa'}
-            {currentStep === 'accounts' && `Mesa ${selectedTable?.table_number} - Cuentas`}
+            {currentStep === 'accounts' && `Mesa ${selectedTable?.table_number}`}
             {currentStep === 'menu' && `Cuenta ${currentAccountIndex + 1}`}
             {currentStep === 'payment' && 'Procesar Pago'}
           </h1>
@@ -334,6 +334,18 @@ const TableOrderEcommerce = () => {
               >
                 <ArrowLeft className="h-4 w-4" />
                 Atrás
+              </button>
+            )}
+            {currentStep === 'accounts' && (
+              <button
+                onClick={() => {
+                  setCurrentAccountIndex(accounts.length);
+                  setCurrentStep('menu');
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Nueva Cuenta
               </button>
             )}
           </div>
@@ -385,17 +397,30 @@ const TableSelection = ({ tables, onTableSelect, getTableStatus }) => {
 
   useEffect(() => {
     const loadStatuses = async () => {
+      if (tables.length === 0) return;
+      
+      // Cargar estados en paralelo para mayor velocidad
+      const statusPromises = tables.map(async (table) => {
+        const status = await getTableStatus(table);
+        return { tableId: table.id, status };
+      });
+      
+      const results = await Promise.all(statusPromises);
       const statuses = {};
-      for (const table of tables) {
-        statuses[table.id] = await getTableStatus(table);
-      }
+      results.forEach(({ tableId, status }) => {
+        statuses[tableId] = status;
+      });
       setTableStatuses(statuses);
     };
     
     if (tables.length > 0) {
       loadStatuses();
+      
+      // Actualización en tiempo real cada 10 segundos
+      const interval = setInterval(loadStatuses, 10000);
+      return () => clearInterval(interval);
     }
-  }, [tables]);
+  }, [tables, getTableStatus]);
 
   // Obtener zonas únicas
   const zones = [...new Set(tables.map(table => table.zone_name || 'Sin Zona'))];
@@ -518,58 +543,84 @@ const AccountsManagement = ({
     checkDeliveryStatus();
   }, [accounts, checkAllItemsDelivered]);
 
+  // Función para verificar si todos los items de una cuenta están entregados
+  const isAccountReadyForPayment = (account) => {
+    if (!account.items || account.items.length === 0) return false;
+    return account.items.every(item => item.status === 'SERVED');
+  };
+
   return (
     <div className="space-y-6">
-      {/* Botón para crear nueva cuenta */}
-      <div className="text-center">
-        <button
-          onClick={onCreateNewAccount}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
-        >
-          <PlusCircle className="h-5 w-5" />
-          Crear Nueva Cuenta
-        </button>
-      </div>
 
       {/* Lista de cuentas existentes */}
       {accounts.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Cuentas Existentes</h3>
           <div className="grid gap-4">
-            {accounts.map((account, index) => (
-              <div key={index} className="bg-white rounded-lg border border-gray-200 p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Cuenta {index + 1}</h4>
-                    <p className="text-sm text-gray-600">
-                      {account.items.length} items - S/ {account.total.toFixed(2)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => onEditAccount(index)}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                    <ShoppingCart className="h-4 w-4" />
-                  </button>
-                </div>
-                
-                {/* Items de la cuenta */}
-                <div className="space-y-2">
-                  {account.items.slice(0, 3).map((item, itemIndex) => (
-                    <div key={itemIndex} className="flex justify-between text-sm">
-                      <span>{item.recipe?.name} x{item.quantity}</span>
-                      <span>S/ {(parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)).toFixed(2)}</span>
+            {accounts.map((account, index) => {
+              const readyForPayment = isAccountReadyForPayment(account);
+              
+              return (
+                <div key={index} className="bg-white rounded-lg border border-gray-200 p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Cuenta {index + 1}</h4>
+                      <p className="text-sm text-gray-600">
+                        {account.items.length} items - S/ {account.total.toFixed(2)}
+                      </p>
+                      {readyForPayment && (
+                        <p className="text-sm text-green-600 font-medium">
+                          ✓ Listo para pagar
+                        </p>
+                      )}
                     </div>
-                  ))}
-                  {account.items.length > 3 && (
-                    <p className="text-sm text-gray-500">
-                      ... y {account.items.length - 3} items más
-                    </p>
-                  )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onEditAccount(index)}
+                        className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                        <ShoppingCart className="h-4 w-4" />
+                      </button>
+                      {readyForPayment && (
+                        <button
+                          className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          onClick={() => {
+                            // TODO: Implementar procesamiento de pago individual
+                            console.log('Procesar pago de cuenta:', index + 1);
+                          }}
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          Procesar Pago
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Items de la cuenta */}
+                  <div className="space-y-2">
+                    {account.items.slice(0, 3).map((item, itemIndex) => (
+                      <div key={itemIndex} className="flex justify-between items-center text-sm">
+                        <span>{item.recipe?.name} x{item.quantity}</span>
+                        <div className="flex items-center gap-2">
+                          <span>S/ {(parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)).toFixed(2)}</span>
+                          {item.status === 'SERVED' ? (
+                            <span className="text-green-600 text-xs">✓</span>
+                          ) : (
+                            <span className="text-orange-600 text-xs">⏳</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {account.items.length > 3 && (
+                      <p className="text-sm text-gray-500">
+                        ... y {account.items.length - 3} items más
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
