@@ -513,6 +513,7 @@ const TableOrderEcommerce = () => {
             onRemoveFromCart={removeFromCart}
             onSaveAccount={saveCurrentAccount}
             getCartTotal={getCartTotal}
+            getItemPrice={getItemPrice}
             loading={loading}
           />
         )}
@@ -779,6 +780,7 @@ const MenuSelection = ({
   onRemoveFromCart, 
   onSaveAccount,
   getCartTotal,
+  getItemPrice,
   loading 
 }) => {
   const [groupFilter, setGroupFilter] = useState('all');
@@ -1176,125 +1178,6 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
   );
 };
 
-const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
-  return (
-    <div className="border border-gray-200 rounded-lg p-3 space-y-3">
-      <div className="flex justify-between items-start">
-        <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
-        <button
-          onClick={() => onRemove(index)}
-          className="text-red-600 hover:text-red-700"
-        >
-          ×
-        </button>
-      </div>
-      
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onUpdate(index, { quantity: Math.max(1, item.quantity - 1) })}
-            className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <span className="font-medium">{item.quantity}</span>
-          <button
-            onClick={() => onUpdate(index, { quantity: item.quantity + 1 })}
-            className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-        <span className="font-semibold">S/ {((parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)) + (item.has_taper && item.container ? (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)) : 0)).toFixed(2)}</span>
-      </div>
-
-      {/* Notas */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <StickyNote className="h-4 w-4 text-gray-500" />
-          <label className="text-sm font-medium text-gray-700">Notas:</label>
-        </div>
-        <textarea
-          value={item.notes}
-          onChange={(e) => onUpdate(index, { notes: e.target.value })}
-          placeholder="Agregar notas especiales..."
-          className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          rows={2}
-        />
-      </div>
-
-      {/* Para llevar con botones específicos */}
-      <div className="space-y-3">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={item.is_takeaway}
-            onChange={(e) => onUpdate(index, { 
-              is_takeaway: e.target.checked,
-              has_taper: e.target.checked ? item.has_taper : false 
-            })}
-            className="rounded"
-          />
-          <Package className="h-4 w-4 text-orange-600" />
-          <span className="text-sm font-medium">Para llevar</span>
-        </label>
-
-        {item.is_takeaway && (
-          <div className="ml-6 space-y-3">
-            {/* Botones específicos como solicitado en el requerimiento */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => onUpdate(index, { has_taper: true })}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  item.has_taper 
-                    ? 'bg-orange-100 text-orange-700 border border-orange-200' 
-                    : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                }`}
-              >
-                Agregar Receta
-              </button>
-              <button
-                onClick={() => onUpdate(index, { 
-                  is_takeaway: true, 
-                  has_taper: item.has_taper,
-                  notes: item.notes + (item.notes ? ' | ' : '') + 'Para llevar adicional'
-                })}
-                className="flex-1 py-2 px-3 rounded-lg text-sm font-medium bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 transition-colors"
-              >
-                Agregar Más
-              </button>
-            </div>
-
-            {item.has_taper && (
-              <>
-                <select
-                  value={item.container?.id || ''}
-                  onChange={(e) => {
-                    const container = containers.find(c => c.id === parseInt(e.target.value));
-                    onUpdate(index, { container });
-                  }}
-                  className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                >
-                  <option value="">Seleccionar envase</option>
-                  {containers.map(container => (
-                    <option key={container.id} value={container.id}>
-                      {container.name} - S/ {container.price}
-                    </option>
-                  ))}
-                </select>
-
-                {item.container && (
-                  <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                    + S/ {(parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)).toFixed(2)} por envase(s)
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+// CartItem component removed - was causing getItemPrice ReferenceError
 
 export default TableOrderEcommerce;
