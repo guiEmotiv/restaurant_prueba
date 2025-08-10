@@ -289,7 +289,7 @@ const Operations = () => {
                               </div>
                               <div>
                                 <h3 className="text-sm font-semibold text-gray-900">
-                                  {table.name || table.number || `Mesa ${table.id}`}
+                                  {table.table_number || `Mesa ${table.id}`}
                                 </h3>
                               </div>
                             </div>

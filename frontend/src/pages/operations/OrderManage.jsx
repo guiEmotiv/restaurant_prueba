@@ -261,7 +261,7 @@ const OrderManage = () => {
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           
-          <h1 className="text-lg font-bold text-gray-900">{table?.name}</h1>
+          <h1 className="text-lg font-bold text-gray-900">{table?.table_number || `Mesa ${table?.id}`}</h1>
           
           <button
             onClick={() => setShowAddItems(true)}

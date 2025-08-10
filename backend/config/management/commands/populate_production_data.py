@@ -76,7 +76,7 @@ class Command(BaseCommand):
             zones = [
                 Zone.objects.create(name="Salón Principal", description="Área principal del restaurante"),
                 Zone.objects.create(name="Terraza", description="Área exterior con vista"),
-                Zone.objects.create(name="Bar", description="Área de bar y bebidas"),
+                Zone.objects.create(name="Barra", description="Área de bar y bebidas"),
                 Zone.objects.create(name="VIP", description="Área reservada para clientes VIP"),
             ]
             self.stdout.write(f"✅ Created {len(zones)} zones")
@@ -86,44 +86,32 @@ class Command(BaseCommand):
             # Salón Principal (20 mesas)
             for i in range(1, 21):
                 table = Table.objects.create(
-                    name=f"J{i:02d}",
-                    table_number=str(i),
-                    zone=zones[0],
-                    capacity=4,
-                    description=f"Mesa {i} del salón principal"
+                    table_number=f"J{i:02d}",
+                    zone=zones[0]
                 )
                 tables.append(table)
             
             # Terraza (10 mesas)
             for i in range(1, 11):
                 table = Table.objects.create(
-                    name=f"T{i:02d}",
-                    table_number=f"T{i}",
-                    zone=zones[1],
-                    capacity=6,
-                    description=f"Mesa {i} de la terraza"
+                    table_number=f"T{i:02d}",
+                    zone=zones[1]
                 )
                 tables.append(table)
             
-            # Bar (8 mesas)
+            # Barra (8 mesas)
             for i in range(1, 9):
                 table = Table.objects.create(
-                    name=f"B{i:02d}",
-                    table_number=f"B{i}",
-                    zone=zones[2],
-                    capacity=2,
-                    description=f"Mesa {i} del bar"
+                    table_number=f"B{i:02d}",
+                    zone=zones[2]
                 )
                 tables.append(table)
             
             # VIP (5 mesas)
             for i in range(1, 6):
                 table = Table.objects.create(
-                    name=f"V{i:02d}",
-                    table_number=f"V{i}",
-                    zone=zones[3],
-                    capacity=8,
-                    description=f"Mesa {i} VIP"
+                    table_number=f"V{i:02d}",
+                    zone=zones[3]
                 )
                 tables.append(table)
             

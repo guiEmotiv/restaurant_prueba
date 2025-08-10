@@ -3,6 +3,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.db import connection
 from django.conf import settings
+from datetime import datetime
 import os
 
 from .models import Unit, Zone, Table, Container
@@ -57,10 +58,9 @@ def database_debug(request):
             sample_data['tables'] = [
                 {
                     'id': table.id,
-                    'name': table.name,
                     'table_number': table.table_number,
                     'zone_name': table.zone.name if table.zone else None,
-                    'capacity': table.capacity
+                    'zone_id': table.zone.id if table.zone else None
                 }
                 for table in Table.objects.all()[:10]
             ]
@@ -81,10 +81,10 @@ def database_debug(request):
             counts['error'] = str(e)
             
         return Response({
-            'timestamp': str(db_config.get('NAME')),
+            'timestamp': str(datetime.now()),
             'database': {
                 'engine': db_config['ENGINE'],
-                'path': db_path,
+                'path': str(db_path),
                 'file_exists': file_exists,
                 'file_size_kb': round(file_size, 2),
                 'connection_ok': connection_ok

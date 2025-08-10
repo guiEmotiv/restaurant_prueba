@@ -11,14 +11,15 @@ cd /opt/restaurant-web
 # 2. Hacer pull de los últimos cambios
 sudo git pull origin main
 
-# 3. DEPLOYMENT COMPLETO (incluye población de datos)
+# 3. DEPLOYMENT COMPLETO (limpia datos antiguos + puebla nuevos)
 sudo ./deploy/build-deploy.sh
 
 # 4. Solo frontend (si solo hay cambios de UI)
 sudo ./deploy/build-deploy.sh --frontend-only
 
-# 5. Verificar base de datos manualmente (opcional)
-sudo docker-compose -f docker-compose.ec2.yml exec web python manage.py check_database
+# 5. Forzar limpieza completa de datos (si hay problemas)
+sudo docker-compose -f docker-compose.ec2.yml exec web python manage.py clean_database --confirm
+sudo docker-compose -f docker-compose.ec2.yml exec web python manage.py populate_production_data
 ```
 
 ## 🔧 Cambios Realizados para Forzar Actualización

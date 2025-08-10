@@ -237,18 +237,10 @@ EOF
     wait $BACKEND_PID
     sleep 15
     
-    # Setup database
-    echo -e "${BLUE}💾 Setting up database...${NC}"
-    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
+    # Setup database completely
+    echo -e "${BLUE}💾 Setting up database completely...${NC}"
     docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput --clear
-    
-    # Check database state
-    echo -e "${BLUE}🔍 Checking database state...${NC}"
-    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py check_database
-    
-    # Populate production data
-    echo -e "${BLUE}📊 Populating production data...${NC}"
-    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py populate_production_data --force
+    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py ensure_database_ready
     
     # Configure nginx with SSL detection
     configure_nginx

@@ -25,10 +25,11 @@ class TableSerializer(serializers.ModelSerializer):
     zone_name = serializers.CharField(source='zone.name', read_only=True)
     active_orders_count = serializers.SerializerMethodField()
     has_active_orders = serializers.SerializerMethodField()
+    name = serializers.CharField(source='table_number', read_only=True)  # Alias para compatibilidad
     
     class Meta:
         model = Table
-        fields = ['id', 'zone', 'zone_name', 'table_number', 'created_at', 
+        fields = ['id', 'zone', 'zone_name', 'table_number', 'name', 'created_at', 
                   'active_orders_count', 'has_active_orders']
         read_only_fields = ['id', 'created_at']
     
