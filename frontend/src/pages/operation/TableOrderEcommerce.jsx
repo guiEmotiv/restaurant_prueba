@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Users, Clock, ShoppingCart, Plus, Minus, Package, StickyNote, CreditCard, Edit3, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Users, Clock, ShoppingCart, Plus, Minus, Package, StickyNote, CreditCard, Edit3, PlusCircle, Filter, X, Trash2 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -102,28 +102,20 @@ const TableOrderEcommerce = () => {
     setCurrentStep('menu');
   };
 
-  const addToCart = (recipe) => {
-    const existingItem = cart.find(item => 
-      item.recipe.id === recipe.id && 
-      !item.is_takeaway && 
-      item.notes === ''
-    );
-
-    if (existingItem) {
-      setCart(cart.map(item => 
-        item === existingItem 
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      ));
-    } else {
+  const addToCart = (recipeData) => {
+    // Si recipeData es solo una receta, crear el objeto completo
+    if (recipeData.id) {
       setCart([...cart, {
-        recipe,
+        recipe: recipeData,
         quantity: 1,
         notes: '',
         is_takeaway: false,
         has_taper: false,
         container: null
       }]);
+    } else {
+      // Si ya viene como objeto completo del modal
+      setCart([...cart, recipeData]);
     }
   };
 
@@ -324,15 +316,6 @@ const TableOrderEcommerce = () => {
                 Atrás
               </button>
             )}
-            
-            {currentStep === 'menu' && (
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold text-blue-600">
-                  {cart.reduce((sum, item) => sum + item.quantity, 0)} items
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -377,6 +360,8 @@ const TableOrderEcommerce = () => {
 
 const TableSelection = ({ tables, onTableSelect, getTableStatus }) => {
   const [tableStatuses, setTableStatuses] = useState({});
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'available', 'occupied'
+  const [zoneFilter, setZoneFilter] = useState('all');
 
   useEffect(() => {
     const loadStatuses = async () => {
@@ -392,7 +377,23 @@ const TableSelection = ({ tables, onTableSelect, getTableStatus }) => {
     }
   }, [tables]);
 
-  const tablesByZone = tables.reduce((acc, table) => {
+  // Obtener zonas únicas
+  const zones = [...new Set(tables.map(table => table.zone_name || 'Sin Zona'))];
+
+  // Filtrar mesas
+  const filteredTables = tables.filter(table => {
+    const status = tableStatuses[table.id];
+    const statusMatch = statusFilter === 'all' || 
+                       (statusFilter === 'available' && status === 'available') ||
+                       (statusFilter === 'occupied' && status === 'occupied');
+    
+    const zoneMatch = zoneFilter === 'all' || 
+                      (table.zone_name || 'Sin Zona') === zoneFilter;
+    
+    return statusMatch && zoneMatch;
+  });
+
+  const tablesByZone = filteredTables.reduce((acc, table) => {
     const zoneName = table.zone_name || 'Sin Zona';
     if (!acc[zoneName]) acc[zoneName] = [];
     acc[zoneName].push(table);
@@ -401,6 +402,39 @@ const TableSelection = ({ tables, onTableSelect, getTableStatus }) => {
 
   return (
     <div className="space-y-6">
+      {/* Filtros */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Filtros:</span>
+          </div>
+          
+          {/* Filtro de disponibilidad */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all">Todas las mesas</option>
+            <option value="available">Solo disponibles</option>
+            <option value="occupied">Solo ocupadas</option>
+          </select>
+          
+          {/* Filtro de zonas */}
+          <select
+            value={zoneFilter}
+            onChange={(e) => setZoneFilter(e.target.value)}
+            className="text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all">Todas las zonas</option>
+            {zones.map(zone => (
+              <option key={zone} value={zone}>{zone}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {Object.entries(tablesByZone).map(([zoneName, zoneTables]) => (
         <div key={zoneName} className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-900 border-b pb-2">
@@ -558,15 +592,59 @@ const MenuSelection = ({
   getCartTotal,
   loading 
 }) => {
-  const recipesByGroup = recipes.reduce((acc, recipe) => {
+  const [groupFilter, setGroupFilter] = useState('all');
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
+
+  // Obtener grupos únicos
+  const groups = [...new Set(recipes.map(recipe => recipe.group_name || 'Sin Grupo'))];
+
+  // Filtrar recetas por grupo
+  const filteredRecipes = groupFilter === 'all' 
+    ? recipes 
+    : recipes.filter(recipe => (recipe.group_name || 'Sin Grupo') === groupFilter);
+
+  const recipesByGroup = filteredRecipes.reduce((acc, recipe) => {
     const groupName = recipe.group_name || 'Sin Grupo';
     if (!acc[groupName]) acc[groupName] = [];
     acc[groupName].push(recipe);
     return acc;
   }, {});
 
+  const handleRecipeClick = (recipe) => {
+    setSelectedRecipe(recipe);
+    setShowRecipeModal(true);
+  };
+
+  const handleAddRecipeWithOptions = (recipeData) => {
+    onAddToCart(recipeData);
+    setShowRecipeModal(false);
+    setSelectedRecipe(null);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Filtro de grupos */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Filtrar por grupo:</span>
+          </div>
+          
+          <select
+            value={groupFilter}
+            onChange={(e) => setGroupFilter(e.target.value)}
+            className="text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all">Todos los grupos</option>
+            {groups.map(group => (
+              <option key={group} value={group}>{group}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Menú */}
       <div className="space-y-6">
         {Object.entries(recipesByGroup).map(([groupName, groupRecipes]) => (
@@ -592,7 +670,7 @@ const MenuSelection = ({
                     </div>
                     
                     <button
-                      onClick={() => onAddToCart(recipe)}
+                      onClick={() => handleRecipeClick(recipe)}
                       className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                     >
                       <Plus className="h-4 w-4" />
@@ -616,6 +694,19 @@ const MenuSelection = ({
         getCartTotal={getCartTotal}
         loading={loading}
       />
+
+      {/* Modal de recetas */}
+      {showRecipeModal && selectedRecipe && (
+        <RecipeModal
+          recipe={selectedRecipe}
+          containers={containers}
+          onAdd={handleAddRecipeWithOptions}
+          onClose={() => {
+            setShowRecipeModal(false);
+            setSelectedRecipe(null);
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -669,17 +760,36 @@ const FloatingCart = ({
               </button>
             </div>
             
-            {/* Items del carrito */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Items del carrito - Solo mostrar y eliminar */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {cart.map((item, index) => (
-                <CartItem
-                  key={index}
-                  item={item}
-                  index={index}
-                  containers={containers}
-                  onUpdate={onUpdateCart}
-                  onRemove={onRemoveFromCart}
-                />
+                <div key={index} className="bg-gray-50 rounded-lg p-3 flex justify-between items-center">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
+                    <div className="text-sm text-gray-600 flex items-center gap-2">
+                      <span>Cantidad: {item.quantity}</span>
+                      <span>•</span>
+                      <span>S/ {((item.recipe.base_price * item.quantity) + (item.container && item.has_taper ? (item.container.price * item.quantity) : 0)).toFixed(2)}</span>
+                    </div>
+                    {item.is_takeaway && (
+                      <div className="text-xs text-orange-600 flex items-center gap-1">
+                        <Package className="h-3 w-3" />
+                        Para llevar
+                      </div>
+                    )}
+                    {item.notes && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Nota: {item.notes}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onRemoveFromCart(index)}
+                    className="text-red-600 hover:text-red-700 p-1"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               ))}
             </div>
             
@@ -705,6 +815,161 @@ const FloatingCart = ({
           </div>
         </>
       )}
+    </>
+  );
+};
+
+const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
+  const [quantity, setQuantity] = useState(1);
+  const [notes, setNotes] = useState('');
+  const [isForTakeaway, setIsForTakeaway] = useState(false);
+  const [selectedContainer, setSelectedContainer] = useState(null);
+
+  // Encontrar el envase recomendado para esta receta
+  useEffect(() => {
+    if (isForTakeaway && recipe.container && !selectedContainer) {
+      const containerForRecipe = containers.find(c => c.id === recipe.container);
+      if (containerForRecipe) {
+        setSelectedContainer(containerForRecipe);
+      }
+    }
+  }, [isForTakeaway, recipe.container, containers, selectedContainer]);
+
+  const getTotal = () => {
+    let total = recipe.base_price * quantity;
+    if (isForTakeaway && selectedContainer) {
+      total += selectedContainer.price * quantity;
+    }
+    return total;
+  };
+
+  const handleAdd = () => {
+    const recipeData = {
+      recipe,
+      quantity,
+      notes,
+      is_takeaway: isForTakeaway,
+      has_taper: isForTakeaway && !!selectedContainer,
+      container: isForTakeaway ? selectedContainer : null
+    };
+    onAdd(recipeData);
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
+      <div className="fixed inset-x-4 top-20 bottom-20 bg-white rounded-lg shadow-xl z-50 flex flex-col max-w-md mx-auto">
+        {/* Header */}
+        <div className="p-4 border-b flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">{recipe.name}</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Contenido */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Precio base */}
+          <div className="text-center">
+            <span className="text-2xl font-bold text-blue-600">S/ {recipe.base_price}</span>
+            <div className="text-sm text-gray-600 flex items-center justify-center gap-2 mt-1">
+              <Clock className="h-4 w-4" />
+              <span>{recipe.preparation_time} min</span>
+            </div>
+          </div>
+
+          {/* Cantidad */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Cantidad:</label>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <span className="text-xl font-bold w-12 text-center">{quantity}</span>
+              <button
+                onClick={() => setQuantity(quantity + 1)}
+                className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Notas */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <StickyNote className="h-4 w-4" />
+              Notas especiales:
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Agregar instrucciones especiales..."
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              rows={3}
+            />
+          </div>
+
+          {/* Para llevar */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isForTakeaway}
+                onChange={(e) => setIsForTakeaway(e.target.checked)}
+                className="rounded"
+              />
+              <Package className="h-4 w-4 text-orange-600" />
+              <span className="text-sm font-medium">Para llevar</span>
+            </label>
+
+            {isForTakeaway && (
+              <div className="ml-6 space-y-2">
+                <label className="text-sm font-medium text-gray-700">Seleccionar envase:</label>
+                <select
+                  value={selectedContainer?.id || ''}
+                  onChange={(e) => {
+                    const container = containers.find(c => c.id === parseInt(e.target.value));
+                    setSelectedContainer(container);
+                  }}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  <option value="">Sin envase</option>
+                  {containers.map(container => (
+                    <option key={container.id} value={container.id}>
+                      {container.name} - S/ {container.price}
+                      {recipe.container === container.id ? ' (Recomendado)' : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedContainer && (
+                  <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
+                    + S/ {(selectedContainer.price * quantity).toFixed(2)} por envase
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t space-y-4">
+          <div className="flex justify-between items-center text-xl font-bold">
+            <span>Total:</span>
+            <span>S/ {getTotal().toFixed(2)}</span>
+          </div>
+          <button
+            onClick={handleAdd}
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+          >
+            Agregar al Carrito
+          </button>
+        </div>
+      </div>
     </>
   );
 };
