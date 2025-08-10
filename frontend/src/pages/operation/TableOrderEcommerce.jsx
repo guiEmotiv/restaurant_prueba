@@ -849,25 +849,24 @@ const FloatingCart = ({
 };
 
 const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
-  const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
-  const [isForTakeaway, setIsForTakeaway] = useState(false);
+  const [isForTakeaway, setIsForTakeaway] = useState(true);
   const [selectedContainer, setSelectedContainer] = useState(null);
 
-  // Encontrar el envase recomendado para esta receta
+  // Encontrar el envase de la receta automáticamente
   useEffect(() => {
-    if (isForTakeaway && recipe.container && !selectedContainer) {
+    if (recipe.container) {
       const containerForRecipe = containers.find(c => c.id === recipe.container);
       if (containerForRecipe) {
         setSelectedContainer(containerForRecipe);
       }
     }
-  }, [isForTakeaway, recipe.container, containers, selectedContainer]);
+  }, [recipe.container, containers]);
 
   const getTotal = () => {
-    let total = parseFloat(recipe?.base_price || 0) * parseInt(quantity || 1);
+    let total = parseFloat(recipe?.base_price || 0);
     if (isForTakeaway && selectedContainer) {
-      total += parseFloat(selectedContainer.price || 0) * parseInt(quantity || 1);
+      total += parseFloat(selectedContainer.price || 0);
     }
     return total;
   };
@@ -875,7 +874,7 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
   const handleAdd = () => {
     const recipeData = {
       recipe,
-      quantity,
+      quantity: 1,
       notes,
       is_takeaway: isForTakeaway,
       has_taper: isForTakeaway && !!selectedContainer,
@@ -907,25 +906,6 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
             </div>
           </div>
 
-          {/* Cantidad */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Cantidad:</label>
-            <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="text-xl font-bold w-12 text-center">{quantity}</span>
-              <button
-                onClick={() => setQuantity(quantity + 1)}
-                className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
 
           {/* Notas */}
           <div className="space-y-2">
@@ -955,31 +935,13 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
               <span className="text-sm font-medium">Para llevar</span>
             </label>
 
-            {isForTakeaway && (
+            {isForTakeaway && selectedContainer && (
               <div className="ml-6 space-y-2">
-                <label className="text-sm font-medium text-gray-700">Seleccionar envase:</label>
-                <select
-                  value={selectedContainer?.id || ''}
-                  onChange={(e) => {
-                    const container = containers.find(c => c.id === parseInt(e.target.value));
-                    setSelectedContainer(container);
-                  }}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                >
-                  <option value="">Sin envase</option>
-                  {containers.map(container => (
-                    <option key={container.id} value={container.id}>
-                      {container.name} - S/ {container.price}
-                      {recipe.container === container.id ? ' (Recomendado)' : ''}
-                    </option>
-                  ))}
-                </select>
-
-                {selectedContainer && (
-                  <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
-                    + S/ {(parseFloat(selectedContainer.price || 0) * parseInt(quantity || 1)).toFixed(2)} por envase
-                  </div>
-                )}
+                <div className="text-sm font-medium text-gray-700">Envase incluido:</div>
+                <div className="bg-gray-50 p-3 rounded border">
+                  <div className="font-medium">{selectedContainer.name}</div>
+                  <div className="text-sm text-orange-600">+ S/ {parseFloat(selectedContainer.price || 0).toFixed(2)}</div>
+                </div>
               </div>
             )}
           </div>
