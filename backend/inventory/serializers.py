@@ -63,11 +63,15 @@ class RecipeSerializer(serializers.ModelSerializer):
     is_available_calculated = serializers.SerializerMethodField()
     ingredients_cost = serializers.SerializerMethodField()
     profit_amount = serializers.SerializerMethodField()
+    # Aliases para compatibilidad con frontend
+    price = serializers.DecimalField(source='base_price', max_digits=10, decimal_places=2, read_only=True)
+    unit_price = serializers.DecimalField(source='base_price', max_digits=10, decimal_places=2, read_only=True)
+    cost = serializers.DecimalField(source='base_price', max_digits=10, decimal_places=2, read_only=True)
     
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'name', 'version', 'base_price', 'profit_percentage', 
+            'id', 'group', 'group_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage', 
             'ingredients_cost', 'profit_amount', 'is_available', 'is_active', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'created_at', 'updated_at'
         ]
@@ -142,11 +146,15 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     is_available_calculated = serializers.SerializerMethodField()
     ingredients_cost = serializers.SerializerMethodField()
     profit_amount = serializers.SerializerMethodField()
+    # Aliases para compatibilidad con frontend
+    price = serializers.DecimalField(source='base_price', max_digits=10, decimal_places=2, read_only=True)
+    unit_price = serializers.DecimalField(source='base_price', max_digits=10, decimal_places=2, read_only=True)
+    cost = serializers.DecimalField(source='base_price', max_digits=10, decimal_places=2, read_only=True)
     
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'name', 'version', 'base_price', 'profit_percentage',
+            'id', 'group', 'group_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage',
             'ingredients_cost', 'profit_amount', 'is_available', 'is_active', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'created_at', 'updated_at', 
             'recipe_items'

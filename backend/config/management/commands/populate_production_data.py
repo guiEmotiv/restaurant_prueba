@@ -206,14 +206,12 @@ class Command(BaseCommand):
             ]
             
             ingredients = []
-            for name, unit, group, cost, stock in ingredients_data:
+            for name, unit, category, unit_price, stock in ingredients_data:
                 ingredient = Ingredient.objects.create(
                     name=name,
                     unit=unit,
-                    group=group,
-                    cost=cost,
+                    unit_price=unit_price,
                     current_stock=stock,
-                    min_stock=stock * 0.2,  # 20% del stock actual como mínimo
                     is_active=True
                 )
                 ingredients.append(ingredient)
@@ -226,10 +224,8 @@ class Command(BaseCommand):
                 {
                     'name': 'Lomo Saltado',
                     'group': groups[10],  # Platos Principales
-                    'description': 'Clásico lomo saltado peruano con papas fritas',
                     'price': 28.00,
                     'preparation_time': 25,
-                    'portions': 1,
                     'ingredients': [
                         (ingredients[0], 0.25),  # Carne de res
                         (ingredients[9], 0.10),   # Cebolla
@@ -240,10 +236,8 @@ class Command(BaseCommand):
                 {
                     'name': 'Ají de Gallina',
                     'group': groups[10],
-                    'description': 'Cremoso ají de gallina con arroz',
                     'price': 24.00,
                     'preparation_time': 30,
-                    'portions': 1,
                     'ingredients': [
                         (ingredients[4], 0.20),   # Pechuga de pollo
                         (ingredients[19], 0.10),  # Queso fresco
@@ -253,10 +247,8 @@ class Command(BaseCommand):
                 {
                     'name': 'Ceviche de Pescado',
                     'group': groups[10],
-                    'description': 'Fresco ceviche con pescado del día',
                     'price': 32.00,
                     'preparation_time': 20,
-                    'portions': 1,
                     'ingredients': [
                         (ingredients[8], 0.25),   # Pescado corvina
                         (ingredients[9], 0.05),   # Cebolla
@@ -268,10 +260,8 @@ class Command(BaseCommand):
                 {
                     'name': 'Papa a la Huancaína',
                     'group': groups[9],  # Entradas
-                    'description': 'Papas bañadas en salsa huancaína',
                     'price': 15.00,
                     'preparation_time': 15,
-                    'portions': 1,
                     'ingredients': [
                         (ingredients[19], 0.05),  # Queso fresco
                         (ingredients[20], 0.05),  # Leche
@@ -280,10 +270,8 @@ class Command(BaseCommand):
                 {
                     'name': 'Anticuchos',
                     'group': groups[9],
-                    'description': 'Brochetas de corazón a la parrilla',
                     'price': 18.00,
                     'preparation_time': 20,
-                    'portions': 1,
                     'ingredients': [
                         (ingredients[0], 0.15),   # Carne de res
                         (ingredients[11], 0.01),  # Ajo
@@ -294,19 +282,15 @@ class Command(BaseCommand):
                 {
                     'name': 'Chicha Morada',
                     'group': groups[7],  # Bebidas
-                    'description': 'Refrescante chicha morada natural',
                     'price': 8.00,
                     'preparation_time': 5,
-                    'portions': 1,
                     'ingredients': []  # Sin ingredientes específicos por simplicidad
                 },
                 {
                     'name': 'Pisco Sour',
                     'group': groups[7],
-                    'description': 'Clásico pisco sour peruano',
                     'price': 18.00,
                     'preparation_time': 5,
-                    'portions': 1,
                     'ingredients': []
                 },
             ]
@@ -316,10 +300,8 @@ class Command(BaseCommand):
                 recipe = Recipe.objects.create(
                     name=recipe_data['name'],
                     group=recipe_data['group'],
-                    description=recipe_data['description'],
-                    price=recipe_data['price'],
+                    base_price=recipe_data['price'],
                     preparation_time=recipe_data['preparation_time'],
-                    portions=recipe_data['portions'],
                     is_active=True,
                     is_available=True
                 )
