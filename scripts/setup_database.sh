@@ -183,7 +183,7 @@ def populate_database():
         ingredients.append(ingredient)
     created_objects["ingredients"] = {ing.name: ing for ing in ingredients}
     
-    # Recetas
+    # Recetas - TODAS las recetas DEBEN tener envase asignado
     print("👨‍🍳 Creando recetas...")
     containers = list(Container.objects.all())
     recipes_data = [
@@ -218,12 +218,19 @@ def populate_database():
         recipes.append(recipe)
     created_objects["recipes"] = {recipe.name: recipe for recipe in recipes}
     
-    # Items de recetas
+    # Items de recetas - TODAS las recetas DEBEN tener ingredientes
     print("🍖 Creando items de recetas...")
     recipe_ingredients = [
-        ("Parrillada Mixta", [("Lomo de Res", 0.3), ("Chorizo Parrillero", 0.2), ("Papa Amarilla", 0.3)]),
-        ("Lomo Saltado", [("Lomo de Res", 0.25), ("Papa Amarilla", 0.2), ("Cebolla Roja", 0.1)]),
+        ("Parrillada Mixta", [("Lomo de Res", 0.3), ("Chorizo Parrillero", 0.2), ("Costillas de Cerdo", 0.2), ("Papa Amarilla", 0.3), ("Sal", 0.01), ("Pimienta", 0.005)]),
+        ("Lomo Saltado", [("Lomo de Res", 0.25), ("Papa Amarilla", 0.2), ("Cebolla Roja", 0.1), ("Tomate", 0.1), ("Ají Amarillo", 0.02)]),
+        ("Pollo a la Brasa", [("Pollo Entero", 0.5), ("Papa Amarilla", 0.3), ("Sal", 0.01), ("Pimienta", 0.005)]),
+        ("Costillas BBQ", [("Costillas de Cerdo", 0.4), ("Papa Amarilla", 0.2), ("Sal", 0.01), ("Ají Amarillo", 0.01)]),
         ("Coca Cola Personal", [("Coca Cola", 0.5)]),
+        ("Cerveza Pilsen", [("Cerveza Pilsen", 1.0)]),
+        ("Agua Mineral", [("Agua Mineral", 1.0)]),
+        ("Papas Fritas", [("Papa Amarilla", 0.5), ("Sal", 0.005)]),
+        ("Ensalada Mixta", [("Lechuga", 0.2), ("Tomate", 0.15), ("Cebolla Roja", 0.05)]),
+        ("Arroz Chaufa", [("Arroz Blanco", 0.2), ("Pollo Entero", 0.1), ("Cebolla Roja", 0.05), ("Sal", 0.005)]),
     ]
     
     for recipe_name, ingredients in recipe_ingredients:
@@ -280,6 +287,20 @@ def show_summary():
     print(f"   • Items de recetas: {RecipeItem.objects.count()}")
     print(f"   • Órdenes: {Order.objects.count()}")
     print(f"   • Items de órdenes: {OrderItem.objects.count()}")
+    
+    # Verificar que todas las recetas tienen ingredientes y envases
+    recipes_without_ingredients = Recipe.objects.filter(recipeitem__isnull=True).count()
+    recipes_without_containers = Recipe.objects.filter(container__isnull=True).count()
+    
+    print(f"\n✅ VALIDACIONES:")
+    print(f"   • Recetas sin ingredientes: {recipes_without_ingredients} (debe ser 0)")
+    print(f"   • Recetas sin envase: {recipes_without_containers} (debe ser 0)")
+    
+    if recipes_without_ingredients > 0 or recipes_without_containers > 0:
+        print("\n❌ ERROR: Hay recetas sin ingredientes o envases!")
+        raise Exception("Todas las recetas deben tener ingredientes y envase asignado")
+    else:
+        print("\n✅ Todas las recetas tienen ingredientes y envases correctamente asignados")
 
 if __name__ == "__main__":
     print("🌱 CONFIGURACIÓN COMPLETA DE BASE DE DATOS")
@@ -342,7 +363,7 @@ echo "📊 Datos incluidos:"
 echo "   • 5 zonas del restaurante"
 echo "   • 15 mesas distribuidas"
 echo "   • 16 ingredientes con stock"
-echo "   • 10 recetas de parrillas y bebidas"
+echo "   • 10 recetas de parrillas y bebidas (TODAS con ingredientes y envases)"
 echo "   • Órdenes de ejemplo"
 echo ""
 echo "✨ ¡El Fogón de Don Soto está listo para operar!"

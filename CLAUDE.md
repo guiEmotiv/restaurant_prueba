@@ -2,120 +2,108 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+## Project Architecture
 
-### Frontend Development (React + Vite)
+This is a full-stack restaurant management system with:
+- **Backend**: Django REST Framework (Python 3.12, Django 5.2, DRF 3.16)
+- **Frontend**: React 19 + Vite + TailwindCSS + Lucide icons
+- **Authentication**: AWS Cognito integration
+- **Database**: SQLite (development), PostgreSQL 17 (production)
+- **Deployment**: Docker containers on EC2 with Nginx
+
+### Core Apps Structure
+- `config/`: Restaurant configuration (units, zones, tables, containers)
+- `inventory/`: Inventory management (groups, ingredients, recipes)
+- `operation/`: Order management and payment processing
+- `frontend/src/pages/`: React pages organized by domain (config, inventory, operation)
+
+## Development Commands
+
+### Backend (Django)
+```bash
+# Setup and run backend
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+pip install -r requirements-dev.txt
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+
+# Using Makefile shortcuts
+make run          # Start development server
+make migrate      # Apply migrations
+make test         # Run pytest
+make shell        # Django shell
+```
+
+### Frontend (React)
 ```bash
 cd frontend
-npm install          # Install dependencies
-npm run dev          # Start development server on port 5173
-npm run build        # Build for production
-npm run lint         # Run ESLint
-npm run preview      # Preview production build
+npm install
+npm run dev       # Development server on port 5173
+npm run build     # Production build
+npm run build:prod  # Production build with memory optimization
+npm run lint      # ESLint
+npm run preview   # Preview production build
 ```
 
-### Backend Development (Django + DRF)
+### Production Deployment (EC2)
 ```bash
-cd backend
-python manage.py runserver 0.0.0.0:8000    # Start Django dev server
-python manage.py migrate                    # Apply database migrations
-python manage.py makemigrations            # Create new migrations
-python manage.py test                      # Run tests
-python manage.py populate_test_data        # Populate test data
-python manage.py clean_database            # Clean database
+# After git push, run on EC2 server:
+cd /opt/restaurant-web
+sudo git pull origin main
+sudo ./deploy/build-deploy.sh              # Full deployment
+sudo ./deploy/build-deploy.sh --frontend-only  # Frontend only
 ```
 
-### Docker Deployment
-```bash
-# Development
-docker-compose up -d
-
-# EC2 Production
-docker-compose -f docker-compose.ec2.yml up -d
-docker-compose -f docker-compose.ec2.yml logs web
-docker-compose -f docker-compose.ec2.yml restart
-```
-
-### Deployment Scripts
-```bash
-sudo ./deploy/setup-initial.sh      # Initial EC2 setup
-sudo ./deploy/build-deploy.sh       # Build and deploy
-sudo ./deploy/debug-cognito-permissions.sh  # Debug auth issues
-```
-
-## Architecture
-
-### Stack Overview
-- **Frontend**: React 19 + Vite + Tailwind CSS + AWS Amplify (Auth)
-- **Backend**: Django 5.2 + Django REST Framework 3.16
-- **Database**: SQLite (development and production)
-- **Authentication**: AWS Cognito with JWT tokens
-- **Deployment**: Docker + Nginx on EC2
-
-### Project Structure
-```
-restaurant-web/
-├── frontend/           # React SPA
-│   ├── src/
-│   │   ├── components/ # Reusable UI components
-│   │   ├── contexts/   # React contexts (Auth, Toast)
-│   │   ├── pages/      # Page components by module
-│   │   └── services/   # API client
-│   └── dist/          # Production build
-├── backend/           # Django REST API
-│   ├── config/        # Restaurant configuration (tables, zones, units)
-│   ├── inventory/     # Ingredients and recipes
-│   ├── operation/     # Orders and payments
-│   └── backend/       # Django settings and auth middleware
-└── deploy/           # Deployment scripts
-```
-
-### Key API Endpoints
-- `/api/v1/health/` - Health check (no auth required)
-- `/api/v1/units/` - Measurement units
-- `/api/v1/zones/` - Restaurant zones
-- `/api/v1/tables/` - Tables management
-- `/api/v1/waiters/` - Waiters management
-- `/api/v1/groups/` - Ingredient groups
-- `/api/v1/ingredients/` - Ingredients inventory
-- `/api/v1/recipes/` - Recipe management
-- `/api/v1/orders/` - Order processing
-- `/api/v1/payments/` - Payment handling
+## Key Technical Details
 
 ### Authentication Flow
-1. Frontend uses AWS Amplify to authenticate with Cognito
-2. JWT token sent in Authorization header: `Bearer <token>`
-3. Backend middleware validates JWT and extracts user groups
-4. Permissions based on Cognito groups:
-   - `administradores`: Full access
-   - `meseros`: Orders and payments access
-   - `cocineros`: Kitchen view access
+- Uses AWS Cognito for authentication with role-based access
+- Backend middleware: `backend.cognito_auth.CognitoAuthenticationMiddleware`
+- Frontend contexts: `AuthContext` and role-based route protection
+- Roles determine dashboard access (operational vs financial)
 
-### Important Files
-- `frontend/src/config/amplify.js` - AWS Cognito configuration
-- `backend/backend/cognito_auth.py` - JWT validation middleware
-- `backend/backend/cognito_permissions.py` - Role-based permissions
-- `frontend/src/services/api.js` - API client with auth headers
+### API Architecture
+- REST API at `/api/v1/` with no pagination (pagination_class = None)
+- Debug endpoints: `/api/v1/debug/database/` and `/api/v1/debug/api/`
+- Health check: `/api/v1/health/`
+- CORS configured for localhost:5173 and production domain
 
-### Environment Variables
-Frontend production (`frontend/.env.production`):
-- `VITE_API_URL` - Backend API URL
-- `VITE_COGNITO_USER_POOL_ID` - AWS Cognito User Pool ID
-- `VITE_COGNITO_CLIENT_ID` - AWS Cognito App Client ID
-- `VITE_AWS_REGION` - AWS region
+### Data Models Hierarchy
+- **Config**: Unit → Zone → Table, Container (standalone)
+- **Inventory**: Group → Recipe → RecipeIngredient → Ingredient
+- **Operation**: Order → OrderItem → Recipe, Payment (linked to Order)
 
-Backend (`backend/.env`):
-- `DJANGO_SECRET_KEY` - Django secret key
-- `DEBUG` - Debug mode (0/1)
-- `ALLOWED_HOSTS` - Comma-separated allowed hosts
-- `COGNITO_USER_POOL_ID` - AWS Cognito User Pool ID
-- `COGNITO_APP_CLIENT_ID` - AWS Cognito App Client ID
-- `AWS_REGION` - AWS region
+### Frontend State Management
+- React Context for auth and toasts
+- Axios for API calls with base configuration in `services/api.js`
+- React Router for routing with role protection
 
-### Database Schema
-The system uses three main Django apps:
-1. **config**: Restaurant setup (zones, tables, units, waiters)
-2. **inventory**: Ingredients and recipes management
-3. **operation**: Order processing and payments
+### Build Optimization
+- Frontend uses cache busting with unique filenames
+- Memory optimization: `NODE_OPTIONS='--max-old-space-size=4096'` for builds
+- Version indicator in UI footer for deployment verification
 
-Relationships follow a hierarchical structure where orders contain items, items reference recipes, and recipes contain ingredients with specific quantities.
+## Management Commands
+- `python manage.py check_database`: Verify database state
+- `python manage.py clean_database --confirm`: Clean all data
+- `python manage.py populate_production_data`: Populate with sample data
+- `python manage.py ensure_database_ready`: Initialize database
+- `./scripts/setup_database.sh`: Complete database setup script (EC2) - cleans and populates database
+
+## Database Population Rules
+- **All recipes MUST have ingredients**: Every recipe requires at least one RecipeItem linking to an Ingredient
+- **All recipes MUST have a container**: Every recipe requires a Container assignment for packaging/serving
+- Recipe creation will fail validation without both ingredients and container assignment
+
+## Environment Variables
+- Backend uses `.env` file with DATABASE_NAME, COGNITO configs, ALLOWED_HOSTS
+- Frontend uses Vite env vars: VITE_API_URL, VITE_AWS_* for Cognito
+- Production uses docker-compose.ec2.yml with environment-specific settings
+
+## Common Issues & Fixes
+- **Empty API responses**: Likely pagination enabled - ensure `pagination_class = None` in ViewSets
+- **Build memory errors**: Use `build:prod` script with reduced memory allocation
+- **CORS issues**: Check ALLOWED_HOSTS in Django and CORS_ALLOWED_ORIGINS
+- **Cache issues**: Frontend implements cache busting, check version indicator in UI
