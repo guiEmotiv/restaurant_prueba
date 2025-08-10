@@ -534,7 +534,7 @@ const TableOrderEcommerce = () => {
     }
   };
 
-  const goBack = () => {
+  const goBack = async () => {
     switch (currentStep) {
       case 'accounts':
         setCurrentStep('tables');
