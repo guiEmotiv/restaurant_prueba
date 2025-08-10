@@ -281,30 +281,44 @@ const TableOrderEcommerce = () => {
   };
 
   const updateCartItem = async (index, updates) => {
-    // For Cart API, we need to update via API
-    // Note: This is a simplified version - full implementation would require
-    // getting the item ID from currentCart and calling updateItem API
-    console.warn('updateCartItem needs full Cart API implementation');
-    
-    // Fallback: just reload the cart
-    if (cartSessionId) {
-      try {
-        const updatedCart = await apiService.carts.getById(cartSessionId);
-        setCurrentCart(updatedCart);
-      } catch (error) {
-        console.error('Error updating cart item:', error);
-      }
+    if (!currentCart?.items?.[index]?.id || !cartSessionId) {
+      showError('No se puede actualizar el item');
+      return false;
+    }
+
+    try {
+      const itemId = currentCart.items[index].id;
+      await apiService.carts.updateItem(cartSessionId, itemId, updates);
+      
+      // Reload cart to get updated totals
+      const updatedCart = await apiService.carts.getById(cartSessionId);
+      setCurrentCart(updatedCart);
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating cart item:', error);
+      showError('Error al actualizar item del carrito');
+      return false;
     }
   };
 
   const removeFromCart = async (index) => {
-    // For Cart API, we need to get the item ID and remove via API
-    if (currentCart && currentCart.items && currentCart.items[index]) {
+    if (!currentCart?.items?.[index]?.id) {
+      showError('No se puede remover el item');
+      return false;
+    }
+
+    try {
       const itemId = currentCart.items[index].id;
       const success = await removeItemFromCart(itemId);
       if (!success) {
         showError('Error al remover item del carrito');
       }
+      return success;
+    } catch (error) {
+      console.error('Error removing item from cart:', error);
+      showError('Error al remover item del carrito');
+      return false;
     }
   };
 
@@ -375,12 +389,12 @@ const TableOrderEcommerce = () => {
   }, [getItemFoodPrice, getItemContainerPrice]);
 
   const getCartTotals = useCallback(() => {
-    // Use Cart API totals if available
+    // Use Cart API totals if available (normalized field names)
     if (currentCart) {
       return {
-        food: parseFloat(currentCart.food_total || 0),
+        food: parseFloat(currentCart.food_total || currentCart.subtotal || 0),
         containers: parseFloat(currentCart.containers_total || 0),
-        grand: parseFloat(currentCart.total_amount || 0),
+        grand: parseFloat(currentCart.total_amount || currentCart.grand_total || 0),
         newItemsContainers: parseFloat(currentCart.containers_total || 0),
         orderContainers: 0 // Cart API handles all containers
       };
@@ -994,8 +1008,8 @@ const MenuSelection = memo(({
                       </div>
                     </div>
                     
-                    {/* Acciones rápidas en una sola fila */}
-                    <div className="grid grid-cols-4 gap-1">
+                    {/* Acciones simplificadas - solo 2 botones */}
+                    <div className="grid grid-cols-2 gap-1">
                       {/* Agregar simple */}
                       <button
                         onClick={() => onAddToCart(recipe)}
@@ -1005,42 +1019,13 @@ const MenuSelection = memo(({
                         <Plus className="h-4 w-4" />
                       </button>
                       
-                      {/* Para llevar rápido */}
-                      <button
-                        onClick={() => {
-                          const containerForRecipe = containers.find(c => c.id === recipe.container);
-                          const quickTakeaway = {
-                            recipe,
-                            quantity: 1,
-                            notes: '',
-                            is_takeaway: true,
-                            has_taper: !!containerForRecipe,
-                            container: containerForRecipe || null
-                          };
-                          onAddToCart(quickTakeaway);
-                        }}
-                        className="bg-orange-600 text-white py-2 px-2 rounded-md hover:bg-orange-700 transition-colors flex items-center justify-center"
-                        title="Para llevar"
-                      >
-                        <Package className="h-3 w-3" />
-                      </button>
-                      
-                      {/* Con nota */}
+                      {/* Con opciones (modal) */}
                       <button
                         onClick={() => handleRecipeClick(recipe)}
                         className="bg-green-600 text-white py-2 px-2 rounded-md hover:bg-green-700 transition-colors flex items-center justify-center"
-                        title="Con notas"
+                        title="Con opciones"
                       >
-                        <StickyNote className="h-3 w-3" />
-                      </button>
-                      
-                      {/* Múltiple (abrir modal) */}
-                      <button
-                        onClick={() => handleRecipeClick(recipe)}
-                        className="bg-purple-600 text-white py-2 px-2 rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center text-xs font-bold"
-                        title="Cantidad múltiple"
-                      >
-                        2+
+                        <StickyNote className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
@@ -1094,7 +1079,10 @@ const FloatingCart = memo(({
   loading 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const totalItems = cart?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  const totalItems = useMemo(() => {
+    if (!cart || !Array.isArray(cart)) return 0;
+    return cart.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
+  }, [cart]);
 
   if (totalItems === 0) return null;
 

@@ -636,7 +636,7 @@ class CartViewSet(viewsets.ModelViewSet):
     ).order_by('-updated_at')
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
     pagination_class = None  # Deshabilitar paginación
-    lookup_field = 'session_id'  # Usar session_id en lugar de ID
+    lookup_field = 'pk'  # Usar ID normal para consistencia con frontend
     
     def get_serializer_class(self):
         if self.action == 'create':

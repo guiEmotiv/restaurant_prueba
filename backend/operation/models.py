@@ -555,7 +555,8 @@ class CartItem(models.Model):
         verbose_name_plural = 'Items de Carrito'
         ordering = ['created_at']
         # Evitar duplicados exactos en el mismo carrito
-        unique_together = ['cart', 'recipe', 'notes', 'is_takeaway', 'has_taper', 'container']
+        # Permitir múltiples items de la misma receta con diferentes cantidades
+        # unique_together = ['cart', 'recipe']  # Comentado para permitir duplicados
 
     def __str__(self):
         return f"{self.cart} - {self.recipe.name} x{self.quantity}"
