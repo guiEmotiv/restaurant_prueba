@@ -274,6 +274,11 @@ const Layout = ({ children }) => {
             {children}
           </div>
         </main>
+        
+        {/* Build version indicator */}
+        <div className="fixed bottom-1 right-1 text-xs text-gray-300 opacity-30 hover:opacity-100 transition-opacity duration-300 bg-gray-900 px-2 py-1 rounded z-50">
+          v{new Date().toISOString().slice(0, 16).replace('T', ' ')}
+        </div>
       </div>
       
     </div>

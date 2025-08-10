@@ -200,6 +200,15 @@ const Operations = () => {
       </div>
 
       <div className="pt-32 px-3 space-y-6">
+        {/* Build Info Banner - Only show in first 30 seconds */}
+        {!loading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+            <div className="text-xs text-blue-700">
+              🚀 Sistema actualizado - Build: {new Date().toISOString().slice(0, 16).replace('T', ' ')} | Paginación deshabilitada para todos los datos
+            </div>
+          </div>
+        )}
+
         {/* Error State */}
         {error && !loading && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">

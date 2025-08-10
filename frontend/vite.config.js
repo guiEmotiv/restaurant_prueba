@@ -1,9 +1,19 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+// Plugin to inject build time
+const injectBuildTime = () => {
+  return {
+    name: 'inject-build-time',
+    transformIndexHtml(html) {
+      return html.replace('BUILDTIME_PLACEHOLDER', new Date().toISOString());
+    }
+  };
+};
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), injectBuildTime()],
   server: {
     port: 5173,
     strictPort: true,
@@ -20,6 +30,10 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
+        // Force new filenames to break cache
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}.[ext]`,
         manualChunks: {
           // Split vendor chunks to reduce memory usage during build
           'vendor-react': ['react', 'react-dom'],
