@@ -11,11 +11,14 @@ cd /opt/restaurant-web
 # 2. Hacer pull de los últimos cambios
 sudo git pull origin main
 
-# 3. Rebuild completo (SOLO FRONTEND - más rápido)
+# 3. DEPLOYMENT COMPLETO (incluye población de datos)
+sudo ./deploy/build-deploy.sh
+
+# 4. Solo frontend (si solo hay cambios de UI)
 sudo ./deploy/build-deploy.sh --frontend-only
 
-# 4. O deployment completo si hay cambios de backend
-sudo ./deploy/build-deploy.sh
+# 5. Verificar base de datos manualmente (opcional)
+sudo docker-compose -f docker-compose.ec2.yml exec web python manage.py check_database
 ```
 
 ## 🔧 Cambios Realizados para Forzar Actualización
@@ -30,13 +33,17 @@ sudo ./deploy/build-deploy.sh
 ### Backend (Django):
 - ✅ **Paginación deshabilitada**: Todos los ViewSets críticos
 - ✅ **Logs mejorados**: Debug completo de API responses
+- ✅ **Comandos management**: `check_database` y `populate_production_data`
+- ✅ **Endpoints debug**: `/api/v1/debug/database/` y `/api/v1/debug/api/`
+- ✅ **Auto-population**: Script deployment puebla datos automáticamente
 
 ## 📱 Verificar Actualización en EC2
 
 1. **Check version**: En la esquina inferior derecha debe aparecer timestamp actual
 2. **Build banner**: Banner azul mostrando "Sistema actualizado"
-3. **API Health**: Debe mostrar "Conectado" con punto verde
-4. **Debug panel**: Debe mostrar conteos de registros reales
+3. **API Health**: Debe mostrar "Conectado" con punto verde  
+4. **Datos visibles**: Mesas organizadas por zonas (Salón Principal, Terraza, Bar, VIP)
+5. **Si NO hay datos**: Panel amarillo de debug con diagnóstico y soluciones
 
 ## 🐛 Troubleshooting
 
@@ -50,6 +57,12 @@ sudo docker-compose -f docker-compose.ec2.yml ps
 # Test API health
 curl -v https://www.xn--elfogndedonsoto-zrb.com/api/v1/health/
 
+# Debug base de datos
+curl -v https://www.xn--elfogndedonsoto-zrb.com/api/v1/debug/database/
+
+# Poblar datos manualmente si es necesario
+sudo docker-compose -f docker-compose.ec2.yml exec web python manage.py populate_production_data --force
+
 # Restart completo si es necesario
 sudo docker-compose -f docker-compose.ec2.yml down
 sudo ./deploy/build-deploy.sh
@@ -57,14 +70,24 @@ sudo ./deploy/build-deploy.sh
 
 ## 🎯 Problema Resuelto
 
-**Antes**: Paginación limitaba a 20 registros
-**Después**: Todos los registros se cargan sin paginación
+### Problema Original:
+1. **Paginación**: API limitaba a 20 registros por página
+2. **Base de datos vacía**: Sin datos de producción en EC2
+3. **Cache**: Frontend no se actualizaba por cache del navegador
+
+### Solución Implementada:
+1. **Paginación deshabilitada**: `pagination_class = None` en todos los ViewSets
+2. **Auto-population**: Script deployment puebla datos automáticamente
+3. **Cache busting**: Archivos únicos en cada build
+4. **Debug tools**: Comandos y endpoints para diagnosticar problemas
 
 **Archivos modificados**:
-- `backend/config/views.py`: TableViewSet, ZoneViewSet
-- `backend/operation/views.py`: OrderViewSet, OrderItemViewSet  
-- `backend/inventory/views.py`: GroupViewSet, RecipeViewSet
-- `frontend/`: Cache busting + version indicators
+- `backend/config/views.py`: TableViewSet, ZoneViewSet sin paginación
+- `backend/operation/views.py`: OrderViewSet, OrderItemViewSet sin paginación
+- `backend/inventory/views.py`: GroupViewSet, RecipeViewSet sin paginación
+- `backend/config/management/commands/`: Nuevos comandos de debug y población
+- `frontend/`: Cache busting + version indicators + debug panel
+- `deploy/build-deploy.sh`: Auto-población de datos
 
 ## ⚠️ IMPORTANTE
 

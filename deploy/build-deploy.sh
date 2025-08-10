@@ -242,31 +242,13 @@ EOF
     docker-compose -f docker-compose.ec2.yml exec -T web python manage.py migrate
     docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput --clear
     
-    # Create initial data if needed
-    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py shell << 'EOF'
-from config.models import Unit, Zone, Table
-from inventory.models import Group
-
-if Unit.objects.count() == 0:
-    Unit.objects.create(name="Kilogramo", abbreviation="kg")
-    Unit.objects.create(name="Litro", abbreviation="lt")
-    Unit.objects.create(name="Unidad", abbreviation="un")
-    Unit.objects.create(name="Gramo", abbreviation="g")
-    print("✅ Units created")
-
-if Zone.objects.count() == 0:
-    zone = Zone.objects.create(name="Salón Principal")
-    print("✅ Zone created")
+    # Check database state
+    echo -e "${BLUE}🔍 Checking database state...${NC}"
+    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py check_database
     
-    if Table.objects.count() == 0:
-        for i in range(1, 11):
-            Table.objects.create(table_number=str(i), zone=zone, capacity=4)
-        print("✅ Tables created")
-
-if Group.objects.count() == 0:
-    Group.objects.create(name="General")
-    print("✅ Group created")
-EOF
+    # Populate production data
+    echo -e "${BLUE}📊 Populating production data...${NC}"
+    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py populate_production_data --force
     
     # Configure nginx with SSL detection
     configure_nginx

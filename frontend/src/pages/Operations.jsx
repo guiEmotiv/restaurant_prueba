@@ -37,6 +37,17 @@ const Operations = () => {
       const response = await api.get('/health/');
       console.log('✅ API Health:', response.data);
       setApiHealthy(true);
+      
+      // También hacer check de debug de base de datos
+      try {
+        const debugResponse = await api.get('/debug/database/');
+        console.log('🔍 Database Debug:', debugResponse.data);
+        if (debugResponse.data.status === 'needs_data') {
+          console.warn('⚠️ Database needs data population');
+        }
+      } catch (debugError) {
+        console.warn('Debug endpoint not available:', debugError);
+      }
     } catch (error) {
       console.error('❌ API Health check failed:', error);
       setApiHealthy(false);
@@ -351,14 +362,26 @@ const Operations = () => {
         {/* Data Debug Info */}
         {!loading && tables.length === 0 && zones.length === 0 && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h4 className="text-sm font-medium text-yellow-900 mb-2">Información de depuración:</h4>
+            <h4 className="text-sm font-medium text-yellow-900 mb-2">🐛 Información de depuración:</h4>
             <ul className="text-xs text-yellow-700 space-y-1">
               <li>API Health: {apiHealthy ? '✅ Conectado' : '❌ Sin conexión'}</li>
               <li>Tables: {tables.length} registros</li>
               <li>Zones: {zones.length} registros</li>
               <li>Orders: {orders.length} registros</li>
               <li>Order Items: {orderItems.length} registros</li>
+              <li>API URL: {import.meta.env.VITE_API_URL || 'No configurada'}</li>
+              <li>Mode: {import.meta.env.MODE}</li>
             </ul>
+            <div className="mt-3 text-xs text-yellow-800">
+              <p><strong>Posibles causas:</strong></p>
+              <ul className="ml-4 list-disc">
+                <li>Base de datos vacía en EC2</li>
+                <li>Migraciones no ejecutadas</li>
+                <li>Datos no poblados en producción</li>
+                <li>Error de conexión a base de datos</li>
+              </ul>
+              <p className="mt-2"><strong>Solución:</strong> Ejecutar en EC2: <code>sudo ./deploy/build-deploy.sh</code></p>
+            </div>
           </div>
         )}
       </div>

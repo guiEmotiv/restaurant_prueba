@@ -4,6 +4,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # Import ViewSets
 from config.views import UnitViewSet, ZoneViewSet, TableViewSet, ContainerViewSet, operational_info
+from config.views_debug import database_debug, api_debug
 from inventory.views import GroupViewSet, IngredientViewSet, RecipeViewSet, RecipeItemViewSet
 from operation.views import (
     OrderViewSet, OrderItemViewSet, OrderItemIngredientViewSet, PaymentViewSet
@@ -35,6 +36,8 @@ router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 urlpatterns = [
     path('', include(router.urls)),  # Remove api/ prefix from here
     path('restaurant-config/operational_info/', operational_info, name='operational-info'),
+    path('debug/database/', database_debug, name='database-debug'),
+    path('debug/api/', api_debug, name='api-debug'),
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]
