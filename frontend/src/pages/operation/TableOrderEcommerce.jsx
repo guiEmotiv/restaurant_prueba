@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Users, Clock, ShoppingCart, Plus, Minus, Package, StickyNote, CreditCard } from 'lucide-react';
+import { ArrowLeft, Users, Clock, ShoppingCart, Plus, Minus, Package, StickyNote, CreditCard, Edit3, PlusCircle } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
 const TableOrderEcommerce = () => {
-  const [currentStep, setCurrentStep] = useState('tables'); // 'tables', 'menu', 'payment'
+  const [currentStep, setCurrentStep] = useState('tables'); // 'tables', 'accounts', 'menu', 'payment'
   const [tables, setTables] = useState([]);
   const [recipes, setRecipes] = useState([]);
   const [containers, setContainers] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
-  const [currentOrder, setCurrentOrder] = useState(null);
+  const [accounts, setAccounts] = useState([]); // Múltiples cuentas por mesa
+  const [currentAccountIndex, setCurrentAccountIndex] = useState(0);
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   const { showSuccess, showError } = useToast();
@@ -57,25 +58,47 @@ const TableOrderEcommerce = () => {
     const orders = await loadTableOrders(table.id);
     
     if (orders.length > 0) {
-      // Mesa ocupada - mostrar opción de continuar orden existente
-      setCurrentOrder(orders[0]);
-      // Cargar items existentes al carrito
-      const existingItems = orders[0].items || [];
-      const cartItems = existingItems.map(item => ({
-        recipe: item.recipe,
-        quantity: item.quantity,
-        notes: item.notes || '',
-        is_takeaway: item.is_takeaway || false,
-        has_taper: item.has_taper || false,
-        container: item.container || null
-      }));
-      setCart(cartItems);
+      // Mesa ocupada - cargar cuentas existentes
+      setAccounts(orders.map(order => ({
+        id: order.id,
+        items: order.items || [],
+        total: order.total_amount || 0,
+        created_at: order.created_at
+      })));
     } else {
-      // Mesa disponible - nueva orden
-      setCurrentOrder(null);
-      setCart([]);
+      // Mesa disponible - preparar para nuevas cuentas
+      setAccounts([]);
     }
     
+    setCurrentStep('accounts');
+  };
+
+  const createNewAccount = () => {
+    const newAccount = {
+      id: null, // Se asignará al crear la orden
+      items: [],
+      total: 0,
+      created_at: new Date().toISOString()
+    };
+    setAccounts([...accounts, newAccount]);
+    setCurrentAccountIndex(accounts.length);
+    setCart([]);
+    setCurrentStep('menu');
+  };
+
+  const editAccount = (accountIndex) => {
+    setCurrentAccountIndex(accountIndex);
+    const account = accounts[accountIndex];
+    // Convertir items existentes al formato de carrito
+    const cartItems = account.items.map(item => ({
+      recipe: item.recipe,
+      quantity: item.quantity,
+      notes: item.notes || '',
+      is_takeaway: item.is_takeaway || false,
+      has_taper: item.has_taper || false,
+      container: item.container || null
+    }));
+    setCart(cartItems);
     setCurrentStep('menu');
   };
 
@@ -125,21 +148,28 @@ const TableOrderEcommerce = () => {
     return itemsTotal + containersTotal;
   };
 
-  const createOrder = async () => {
+  const saveCurrentAccount = async () => {
     if (!selectedTable || cart.length === 0) return;
 
     try {
       setLoading(true);
       
-      // Crear orden
-      const orderData = {
-        table: selectedTable.id,
-        waiter: 'Sistema', // Aquí podrías usar el usuario actual
-      };
+      const currentAccount = accounts[currentAccountIndex];
+      let order;
 
-      const order = currentOrder || await apiService.orders.create(orderData);
+      if (currentAccount.id) {
+        // Cuenta existente - actualizar
+        order = await apiService.orders.getById(currentAccount.id);
+      } else {
+        // Nueva cuenta - crear orden
+        const orderData = {
+          table: selectedTable.id,
+          waiter: 'Sistema',
+        };
+        order = await apiService.orders.create(orderData);
+      }
 
-      // Agregar items al pedido
+      // Agregar nuevos items al pedido
       for (const cartItem of cart) {
         const itemData = {
           recipe: cartItem.recipe.id,
@@ -161,47 +191,76 @@ const TableOrderEcommerce = () => {
         }
       }
 
-      showSuccess('Pedido creado exitosamente');
+      // Actualizar la cuenta en el estado
+      const updatedAccount = {
+        ...currentAccount,
+        id: order.id,
+        items: [...(currentAccount.items || []), ...cart],
+        total: (currentAccount.total || 0) + getCartTotal()
+      };
+
+      const updatedAccounts = [...accounts];
+      updatedAccounts[currentAccountIndex] = updatedAccount;
+      setAccounts(updatedAccounts);
+
+      showSuccess('Cuenta actualizada exitosamente');
       setCart([]);
-      setCurrentStep('payment');
-      
-      // Recargar orden para obtener datos actualizados
-      const updatedOrder = await apiService.orders.getById(order.id);
-      setCurrentOrder(updatedOrder);
+      setCurrentStep('accounts');
 
     } catch (error) {
-      console.error('Error creating order:', error);
-      showError('Error al crear el pedido');
+      console.error('Error saving account:', error);
+      showError('Error al guardar la cuenta');
     } finally {
       setLoading(false);
     }
   };
 
-  const processPayment = async () => {
-    if (!currentOrder) return;
+  const checkAllItemsDelivered = async () => {
+    // Verificar que todos los items de todas las cuentas estén entregados
+    for (const account of accounts) {
+      if (account.id) {
+        try {
+          const order = await apiService.orders.getById(account.id);
+          const hasUndeliveredItems = order.items?.some(item => item.status === 'CREATED');
+          if (hasUndeliveredItems) {
+            return false;
+          }
+        } catch (error) {
+          console.error('Error checking order status:', error);
+          return false;
+        }
+      }
+    }
+    return true;
+  };
 
+  const processPayment = async () => {
     try {
       setLoading(true);
 
-      // Crear pago por el total de la orden
-      const paymentData = {
-        order: currentOrder.id,
-        payment_method: 'CASH', // Por defecto, luego se puede hacer más dinámico
-        amount: currentOrder.total_amount || getCartTotal(),
-        notes: 'Pago procesado desde vista ecommerce'
-      };
+      // Procesar pago para todas las cuentas
+      for (const account of accounts) {
+        if (account.id && account.total > 0) {
+          const paymentData = {
+            order: account.id,
+            payment_method: 'CASH',
+            amount: account.total,
+            notes: 'Pago procesado desde vista ecommerce'
+          };
 
-      await apiService.payments.create(paymentData);
+          await apiService.payments.create(paymentData);
+        }
+      }
       
-      showSuccess('Pago procesado exitosamente');
+      showSuccess('Pago procesado exitosamente para todas las cuentas');
       
-      // Volver a la selección de mesas
+      // Limpiar estado y volver a selección de mesas
       setCurrentStep('tables');
       setSelectedTable(null);
-      setCurrentOrder(null);
+      setAccounts([]);
       setCart([]);
+      setCurrentAccountIndex(0);
       
-      // Recargar datos
       await loadInitialData();
 
     } catch (error) {
@@ -214,14 +273,17 @@ const TableOrderEcommerce = () => {
 
   const goBack = () => {
     switch (currentStep) {
-      case 'menu':
+      case 'accounts':
         setCurrentStep('tables');
         setSelectedTable(null);
-        setCurrentOrder(null);
+        setAccounts([]);
+        break;
+      case 'menu':
+        setCurrentStep('accounts');
         setCart([]);
         break;
       case 'payment':
-        setCurrentStep('menu');
+        setCurrentStep('accounts');
         break;
       default:
         break;
@@ -241,25 +303,27 @@ const TableOrderEcommerce = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header con título centrado y navegación debajo */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {currentStep !== 'tables' && (
-                <button
-                  onClick={goBack}
-                  className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
-                >
-                  <ArrowLeft className="h-5 w-5 text-gray-600" />
-                </button>
-              )}
-              <h1 className="text-xl font-bold text-gray-900">
-                {currentStep === 'tables' && 'Seleccionar Mesa'}
-                {currentStep === 'menu' && `Mesa ${selectedTable?.table_number}`}
-                {currentStep === 'payment' && 'Procesar Pago'}
-              </h1>
-            </div>
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <h1 className="text-2xl font-bold text-gray-900 text-center mb-4">
+            {currentStep === 'tables' && 'Seleccionar Mesa'}
+            {currentStep === 'accounts' && `Mesa ${selectedTable?.table_number} - Cuentas`}
+            {currentStep === 'menu' && `Cuenta ${currentAccountIndex + 1} - Menú`}
+            {currentStep === 'payment' && 'Procesar Pago'}
+          </h1>
+          
+          {/* Botones de navegación centrados debajo del título */}
+          <div className="flex justify-center gap-4">
+            {currentStep !== 'tables' && (
+              <button
+                onClick={goBack}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Atrás
+              </button>
+            )}
             
             {currentStep === 'menu' && (
               <div className="flex items-center gap-2">
@@ -282,6 +346,17 @@ const TableOrderEcommerce = () => {
           />
         )}
 
+        {currentStep === 'accounts' && (
+          <AccountsManagement
+            accounts={accounts}
+            onCreateNewAccount={createNewAccount}
+            onEditAccount={editAccount}
+            onProcessPayment={processPayment}
+            checkAllItemsDelivered={checkAllItemsDelivered}
+            loading={loading}
+          />
+        )}
+
         {currentStep === 'menu' && (
           <MenuSelection
             recipes={recipes}
@@ -290,16 +365,8 @@ const TableOrderEcommerce = () => {
             onAddToCart={addToCart}
             onUpdateCart={updateCartItem}
             onRemoveFromCart={removeFromCart}
-            onCreateOrder={createOrder}
+            onSaveAccount={saveCurrentAccount}
             getCartTotal={getCartTotal}
-            loading={loading}
-          />
-        )}
-
-        {currentStep === 'payment' && (
-          <PaymentFlow
-            order={currentOrder}
-            onProcessPayment={processPayment}
             loading={loading}
           />
         )}
@@ -325,7 +392,6 @@ const TableSelection = ({ tables, onTableSelect, getTableStatus }) => {
     }
   }, [tables]);
 
-  // Agrupar mesas por zona
   const tablesByZone = tables.reduce((acc, table) => {
     const zoneName = table.zone_name || 'Sin Zona';
     if (!acc[zoneName]) acc[zoneName] = [];
@@ -377,6 +443,110 @@ const TableSelection = ({ tables, onTableSelect, getTableStatus }) => {
   );
 };
 
+const AccountsManagement = ({ 
+  accounts, 
+  onCreateNewAccount, 
+  onEditAccount, 
+  onProcessPayment, 
+  checkAllItemsDelivered,
+  loading 
+}) => {
+  const [allItemsDelivered, setAllItemsDelivered] = useState(false);
+
+  useEffect(() => {
+    const checkDeliveryStatus = async () => {
+      if (accounts.length > 0) {
+        const delivered = await checkAllItemsDelivered();
+        setAllItemsDelivered(delivered);
+      }
+    };
+    
+    checkDeliveryStatus();
+  }, [accounts, checkAllItemsDelivered]);
+
+  return (
+    <div className="space-y-6">
+      {/* Botón para crear nueva cuenta */}
+      <div className="text-center">
+        <button
+          onClick={onCreateNewAccount}
+          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+        >
+          <PlusCircle className="h-5 w-5" />
+          Crear Nueva Cuenta
+        </button>
+      </div>
+
+      {/* Lista de cuentas existentes */}
+      {accounts.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">Cuentas Existentes</h3>
+          <div className="grid gap-4">
+            {accounts.map((account, index) => (
+              <div key={index} className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Cuenta {index + 1}</h4>
+                    <p className="text-sm text-gray-600">
+                      {account.items.length} items - S/ {account.total.toFixed(2)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onEditAccount(index)}
+                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                    <ShoppingCart className="h-4 w-4" />
+                  </button>
+                </div>
+                
+                {/* Items de la cuenta */}
+                <div className="space-y-2">
+                  {account.items.slice(0, 3).map((item, itemIndex) => (
+                    <div key={itemIndex} className="flex justify-between text-sm">
+                      <span>{item.recipe?.name} x{item.quantity}</span>
+                      <span>S/ {(item.unit_price * item.quantity).toFixed(2)}</span>
+                    </div>
+                  ))}
+                  {account.items.length > 3 && (
+                    <p className="text-sm text-gray-500">
+                      ... y {account.items.length - 3} items más
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Botón de procesar pago */}
+      {accounts.length > 0 && (
+        <div className="text-center">
+          {!allItemsDelivered && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <p className="text-yellow-800 text-sm">
+                ⏱ Algunos items aún están en preparación. El pago estará disponible cuando todos los items sean servidos.
+              </p>
+            </div>
+          )}
+
+          {allItemsDelivered && (
+            <button
+              onClick={onProcessPayment}
+              disabled={loading}
+              className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center gap-2 mx-auto"
+            >
+              <CreditCard className="h-5 w-5" />
+              {loading ? 'Procesando pago...' : 'Procesar Pago de Todas las Cuentas'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MenuSelection = ({ 
   recipes, 
   containers, 
@@ -384,11 +554,10 @@ const MenuSelection = ({
   onAddToCart, 
   onUpdateCart, 
   onRemoveFromCart, 
-  onCreateOrder,
+  onSaveAccount,
   getCartTotal,
   loading 
 }) => {
-  // Agrupar recetas por grupo
   const recipesByGroup = recipes.reduce((acc, recipe) => {
     const groupName = recipe.group_name || 'Sin Grupo';
     if (!acc[groupName]) acc[groupName] = [];
@@ -472,11 +641,12 @@ const MenuSelection = ({
                   </div>
                   
                   <button
-                    onClick={onCreateOrder}
+                    onClick={onSaveAccount}
                     disabled={loading || cart.length === 0}
-                    className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+                    className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center gap-2"
                   >
-                    {loading ? 'Procesando...' : 'Crear Pedido'}
+                    <ShoppingCart className="h-5 w-5" />
+                    {loading ? 'Guardando...' : 'Guardar en Cuenta'}
                   </button>
                 </div>
               </>
@@ -535,8 +705,8 @@ const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
         />
       </div>
 
-      {/* Para llevar */}
-      <div className="space-y-2">
+      {/* Para llevar con botones específicos */}
+      <div className="space-y-3">
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -552,103 +722,58 @@ const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
         </label>
 
         {item.is_takeaway && (
-          <div className="ml-6 space-y-2">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={item.has_taper}
-                onChange={(e) => onUpdate(index, { has_taper: e.target.checked })}
-                className="rounded"
-              />
-              <span className="text-sm">Con envase</span>
-            </label>
+          <div className="ml-6 space-y-3">
+            {/* Botones específicos para para llevar */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => onUpdate(index, { has_taper: true })}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  item.has_taper 
+                    ? 'bg-orange-100 text-orange-700 border border-orange-200' 
+                    : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                }`}
+              >
+                Agregar Envase
+              </button>
+              <button
+                onClick={() => onUpdate(index, { 
+                  is_takeaway: true, 
+                  has_taper: item.has_taper,
+                  notes: item.notes + (item.notes ? ' | ' : '') + 'Para llevar'
+                })}
+                className="flex-1 py-2 px-3 rounded-lg text-sm font-medium bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 transition-colors"
+              >
+                Agregar Más
+              </button>
+            </div>
 
             {item.has_taper && (
-              <select
-                value={item.container?.id || ''}
-                onChange={(e) => {
-                  const container = containers.find(c => c.id === parseInt(e.target.value));
-                  onUpdate(index, { container });
-                }}
-                className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="">Seleccionar envase</option>
-                {containers.map(container => (
-                  <option key={container.id} value={container.id}>
-                    {container.name} - S/ {container.price}
-                  </option>
-                ))}
-              </select>
-            )}
+              <>
+                <select
+                  value={item.container?.id || ''}
+                  onChange={(e) => {
+                    const container = containers.find(c => c.id === parseInt(e.target.value));
+                    onUpdate(index, { container });
+                  }}
+                  className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  <option value="">Seleccionar envase</option>
+                  {containers.map(container => (
+                    <option key={container.id} value={container.id}>
+                      {container.name} - S/ {container.price}
+                    </option>
+                  ))}
+                </select>
 
-            {item.has_taper && item.container && (
-              <div className="text-xs text-gray-600">
-                + S/ {(item.container.price * item.quantity).toFixed(2)} por envase
-              </div>
+                {item.container && (
+                  <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                    + S/ {(item.container.price * item.quantity).toFixed(2)} por envase
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
-      </div>
-    </div>
-  );
-};
-
-const PaymentFlow = ({ order, onProcessPayment, loading }) => {
-  if (!order) return null;
-
-  const allItemsServed = order.items?.every(item => item.status === 'SERVED') || false;
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Resumen del Pedido #{order.id}
-        </h2>
-
-        <div className="space-y-4">
-          <div className="border-b pb-4">
-            <h3 className="font-semibold text-gray-900 mb-2">Items:</h3>
-            {order.items?.map(item => (
-              <div key={item.id} className="flex justify-between items-center py-2">
-                <div>
-                  <span className="font-medium">{item.recipe_name}</span>
-                  <span className="text-gray-600"> x{item.quantity}</span>
-                  {item.status === 'SERVED' && (
-                    <span className="ml-2 text-green-600 text-sm">✓ Servido</span>
-                  )}
-                  {item.status === 'CREATED' && (
-                    <span className="ml-2 text-orange-600 text-sm">⏱ En cocina</span>
-                  )}
-                </div>
-                <span>S/ {item.total_price}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex justify-between items-center text-xl font-bold">
-            <span>Total:</span>
-            <span>S/ {order.total_amount}</span>
-          </div>
-
-          {!allItemsServed && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-yellow-800 text-sm">
-                ⏱ Algunos items aún están en preparación. El pago estará disponible cuando todos los items sean servidos.
-              </p>
-            </div>
-          )}
-
-          {allItemsServed && (
-            <button
-              onClick={onProcessPayment}
-              disabled={loading}
-              className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center gap-2"
-            >
-              <CreditCard className="h-5 w-5" />
-              {loading ? 'Procesando pago...' : 'Procesar Pago'}
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
