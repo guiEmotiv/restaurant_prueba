@@ -15,18 +15,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='containersale',
-            name='operational_date',
-        ),
-        migrations.RemoveField(
-            model_name='order',
-            name='operational_date',
-        ),
-        migrations.RemoveField(
-            model_name='payment',
-            name='operational_date',
-        ),
+        # RemoveField operations moved to 0016_safe_remove_operational_date_fields
+        # to handle cases where fields don't exist
         migrations.CreateModel(
             name='Cart',
             fields=[
