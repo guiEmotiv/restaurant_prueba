@@ -447,6 +447,63 @@ export const apiService = {
     delete: (id) => apiService.delete('container-sales', id),
   },
 
+  // ===== NEW CART API =====
+  carts: {
+    getAll: () => apiService.getAll('carts'),
+    getById: (sessionId) => apiService.getById('carts', sessionId),
+    create: (data) => apiService.create('carts', data),
+    update: (sessionId, data) => apiService.update('carts', sessionId, data),
+    delete: (sessionId) => apiService.delete('carts', sessionId),
+    
+    // Get or create cart for session
+    getOrCreate: async (sessionId, tableId, user = '') => {
+      const response = await api.get(`/carts/get_or_create/?session_id=${sessionId}&table_id=${tableId}&user=${encodeURIComponent(user)}`);
+      return response.data;
+    },
+    
+    // Add item to cart
+    addItem: async (sessionId, itemData) => {
+      const response = await api.post(`/carts/${sessionId}/add_item/`, itemData);
+      return response.data;
+    },
+    
+    // Remove item from cart
+    removeItem: async (sessionId, itemId) => {
+      const response = await api.post(`/carts/${sessionId}/remove_item/`, { item_id: itemId });
+      return response.data;
+    },
+    
+    // Update item in cart
+    updateItem: async (sessionId, itemId, itemData) => {
+      const response = await api.post(`/carts/${sessionId}/update_item/`, { item_id: itemId, ...itemData });
+      return response.data;
+    },
+    
+    // Clear cart
+    clear: async (sessionId) => {
+      const response = await api.post(`/carts/${sessionId}/clear/`);
+      return response.data;
+    },
+    
+    // Convert cart to order
+    convertToOrder: async (sessionId) => {
+      const response = await api.post(`/carts/${sessionId}/convert_to_order/`, {});
+      return response.data;
+    }
+  },
+
+  cartItems: {
+    getAll: (params = {}) => {
+      const queryParams = new URLSearchParams(params).toString();
+      const url = queryParams ? `/cart-items/?${queryParams}` : '/cart-items/';
+      return api.get(url).then(response => response.data);
+    },
+    getById: (id) => apiService.getById('cart-items', id),
+    create: (data) => apiService.create('cart-items', data),
+    update: (id, data) => apiService.update('cart-items', id, data),
+    delete: (id) => apiService.delete('cart-items', id),
+  },
+
 };
 
 export default api;

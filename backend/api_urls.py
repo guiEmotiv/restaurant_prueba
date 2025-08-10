@@ -7,7 +7,8 @@ from config.views import UnitViewSet, ZoneViewSet, TableViewSet, ContainerViewSe
 from config.views_debug import database_debug, api_debug
 from inventory.views import GroupViewSet, IngredientViewSet, RecipeViewSet, RecipeItemViewSet
 from operation.views import (
-    OrderViewSet, OrderItemViewSet, OrderItemIngredientViewSet, PaymentViewSet, ContainerSaleViewSet
+    OrderViewSet, OrderItemViewSet, OrderItemIngredientViewSet, PaymentViewSet, ContainerSaleViewSet,
+    CartViewSet, CartItemViewSet
 )
 from operation.views_dashboard import DashboardViewSet
 
@@ -33,6 +34,10 @@ router.register(r'order-item-ingredients', OrderItemIngredientViewSet, basename=
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'container-sales', ContainerSaleViewSet, basename='containersale')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
+
+# Cart app routes - NEW ARCHITECTURE
+router.register(r'carts', CartViewSet, basename='cart')
+router.register(r'cart-items', CartItemViewSet, basename='cartitem')
 
 urlpatterns = [
     path('', include(router.urls)),  # Remove api/ prefix from here
