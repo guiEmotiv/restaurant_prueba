@@ -768,6 +768,39 @@ class CartViewSet(viewsets.ModelViewSet):
         cart.clear()
         return Response({'message': 'Carrito limpiado exitosamente'})
     
+    @action(detail=True, methods=['get'])
+    def debug(self, request, session_id=None):
+        """Debug endpoint para verificar datos del carrito"""
+        cart = self.get_object()
+        items_data = []
+        
+        for item in cart.cartitem_set.all():
+            items_data.append({
+                'id': item.id,
+                'recipe_id': item.recipe.id,
+                'recipe_name': item.recipe.name,
+                'recipe_base_price': str(item.recipe.base_price),
+                'quantity': item.quantity,
+                'unit_price': str(item.unit_price) if item.unit_price else None,
+                'notes': item.notes,
+                'is_takeaway': item.is_takeaway,
+                'has_taper': item.has_taper,
+                'container_id': item.container.id if item.container else None,
+                'container_name': item.container.name if item.container else None,
+                'food_total': str(item.get_food_total()),
+                'container_total': str(item.get_container_total()),
+                'item_total': str(item.get_item_total()),
+            })
+        
+        return Response({
+            'cart_session_id': cart.session_id,
+            'items_count': cart.cartitem_set.count(),
+            'items': items_data,
+            'subtotal': str(cart.get_subtotal()),
+            'containers_total': str(cart.get_containers_total()),
+            'grand_total': str(cart.get_grand_total())
+        })
+    
     @action(detail=True, methods=['post'])
     def convert_to_order(self, request, session_id=None):
         """Convertir carrito a orden confirmada"""

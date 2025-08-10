@@ -561,8 +561,9 @@ class CartItemCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CartItem
         fields = [
-            'recipe', 'quantity', 'notes', 'is_takeaway', 'has_taper', 'container'
+            'recipe', 'quantity', 'unit_price', 'notes', 'is_takeaway', 'has_taper', 'container'
         ]
+        read_only_fields = ['unit_price']  # Se calcula automáticamente en save()
     
     def validate_recipe(self, value):
         if not value.is_active:
