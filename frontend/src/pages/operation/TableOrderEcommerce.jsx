@@ -150,10 +150,12 @@ const TableOrderEcommerce = () => {
       return;
     }
     
-    // Validar que todos los items del carrito tengan recipe válida
-    const invalidItems = cart.filter(item => !item.recipe?.id);
+    // Validar que todos los items nuevos del carrito tengan recipe válida
+    // Solo validar items que no están entregados (los entregados no se procesarán)
+    const newItems = cart.filter(item => item.status !== 'SERVED');
+    const invalidItems = newItems.filter(item => !item.recipe?.id);
     if (invalidItems.length > 0) {
-      showError('Algunos items del carrito no tienen receta válida');
+      showError('Algunos items nuevos del carrito no tienen receta válida');
       return;
     }
 
@@ -163,12 +165,15 @@ const TableOrderEcommerce = () => {
       const currentAccount = accounts[currentAccountIndex] || {};
       let order;
 
+      // Solo procesar items nuevos (no entregados)
+      const newCartItems = cart.filter(item => item.status !== 'SERVED');
+
       if (currentAccount.id) {
         // Cuenta existente - actualizar
         order = await apiService.orders.getById(currentAccount.id);
       } else {
         // Nueva cuenta - crear orden con items
-        const itemsData = cart.map(cartItem => ({
+        const itemsData = newCartItems.map(cartItem => ({
           recipe: cartItem.recipe?.id,
           quantity: cartItem.quantity,
           notes: cartItem.notes || '',
@@ -188,7 +193,7 @@ const TableOrderEcommerce = () => {
 
       // Si la cuenta ya existía, agregar nuevos items
       if (currentAccount.id) {
-        for (const cartItem of cart) {
+        for (const cartItem of newCartItems) {
           const itemData = {
             recipe: cartItem.recipe?.id,
             quantity: cartItem.quantity,
@@ -211,12 +216,19 @@ const TableOrderEcommerce = () => {
         }
       }
 
+      // Calcular total solo de items nuevos
+      const newItemsTotal = newCartItems.reduce((sum, item) => {
+        const itemTotal = parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1);
+        const containerTotal = item.has_taper && item.container ? parseFloat(item.container.price || 0) * parseInt(item.quantity || 1) : 0;
+        return sum + itemTotal + containerTotal;
+      }, 0);
+
       // Actualizar la cuenta en el estado
       const updatedAccount = {
         ...currentAccount,
         id: order.id,
-        items: [...(currentAccount.items || []), ...cart],
-        total: parseFloat(currentAccount.total || 0) + parseFloat(getCartTotal() || 0)
+        items: [...(currentAccount.items || []), ...newCartItems],
+        total: parseFloat(currentAccount.total || 0) + parseFloat(newItemsTotal || 0)
       };
 
       const updatedAccounts = [...accounts];
@@ -576,7 +588,7 @@ const AccountsManagement = ({
               const totalItems = account.items?.length || 0;
               
               return (
-                <div key={index} className="bg-white rounded-lg border border-gray-200 p-6 relative">
+                <div key={index} className={`bg-white rounded-lg border border-gray-200 p-6 relative ${readyForPayment ? 'pb-16' : ''}`}>
                   {/* Header */}
                   <div className="flex justify-between items-start mb-4">
                     <div>
