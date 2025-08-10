@@ -171,22 +171,23 @@ const TableOrderEcommerce = () => {
     }
 
     // Buscar si ya existe un item similar (misma receta, notas, opciones)
+    // Solo agrupar items completamente nuevos (sin ID y sin status)
     const existingIndex = cart.findIndex(item => 
       item.recipe?.id === newItem.recipe?.id &&
       item.notes === newItem.notes &&
       item.is_takeaway === newItem.is_takeaway &&
       item.has_taper === newItem.has_taper &&
       item.container?.id === newItem.container?.id &&
-      !item.id // Solo agrupar items nuevos, no items existentes del pedido
+      !item.id && !item.status // Solo agrupar items completamente nuevos
     );
 
-    if (existingIndex >= 0) {
-      // Si existe, incrementar cantidad
+    if (existingIndex >= 0 && !newItem.id && !newItem.status) {
+      // Si existe un item nuevo similar, incrementar cantidad
       const updatedCart = [...cart];
       updatedCart[existingIndex].quantity += newItem.quantity;
       setCart(updatedCart);
     } else {
-      // Si no existe, agregar nuevo
+      // Si no existe o es un item existente, agregar como nuevo
       setCart([...cart, newItem]);
     }
   };
@@ -202,23 +203,37 @@ const TableOrderEcommerce = () => {
   };
 
   const getItemPrice = (item) => {
-    // Cálculo consistente del precio de un item individual
+    // Para items existentes (que ya tienen ID), usar el total_price del backend
+    if (item.id && item.total_price) {
+      return parseFloat(item.total_price);
+    }
+    
+    // Para items nuevos, calcular precio
     const quantity = parseInt(item.quantity || 1);
     const unitPrice = parseFloat(item.recipe?.base_price || 0);
     const foodPrice = unitPrice * quantity;
     
-    // Solo agregar precio de container si es un item nuevo con container
-    let containerPrice = 0;
-    if (item.has_taper && item.container && !item.id) {
-      containerPrice = parseFloat(item.container.price || 0) * quantity;
-    }
-    
-    return foodPrice + containerPrice;
+    // Para items nuevos, NO agregar precio de container aquí
+    // Los containers se manejan por separado en ContainerSale
+    return foodPrice;
   };
 
   const getCartTotal = () => {
-    // Sumar todos los items usando la función helper
-    return cart.reduce((sum, item) => sum + getItemPrice(item), 0);
+    // Calcular total de comida (items)
+    const foodTotal = cart.reduce((sum, item) => sum + getItemPrice(item), 0);
+    
+    // Calcular total de containers por separado (solo para items nuevos)
+    const containerTotal = cart.reduce((sum, item) => {
+      // Solo sumar containers para items nuevos (sin ID) que tienen container
+      if (!item.id && item.has_taper && item.container) {
+        const quantity = parseInt(item.quantity || 1);
+        const containerPrice = parseFloat(item.container.price || 0);
+        return sum + (containerPrice * quantity);
+      }
+      return sum;
+    }, 0);
+
+    return foodTotal + containerTotal;
   };
 
   const getNewItemsTotal = () => {
@@ -422,6 +437,18 @@ const TableOrderEcommerce = () => {
         setAccounts([]);
         break;
       case 'menu':
+        // Si el carrito está vacío y la cuenta actual no tiene ID, eliminarla
+        const currentAccount = accounts[currentAccountIndex] || {};
+        if (cart.length === 0 && !currentAccount.id) {
+          const updatedAccounts = accounts.filter((_, index) => index !== currentAccountIndex);
+          setAccounts(updatedAccounts);
+          // Ajustar el índice si es necesario
+          if (currentAccountIndex >= updatedAccounts.length && updatedAccounts.length > 0) {
+            setCurrentAccountIndex(updatedAccounts.length - 1);
+          } else if (updatedAccounts.length === 0) {
+            setCurrentAccountIndex(0);
+          }
+        }
         setCurrentStep('accounts');
         setCart([]);
         break;
