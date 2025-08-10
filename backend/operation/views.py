@@ -46,6 +46,16 @@ class OrderViewSet(viewsets.ModelViewSet):
             
         return queryset
     
+    def create(self, request, *args, **kwargs):
+        """Override create to return full order details after creation"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        order = serializer.save()
+        
+        # Return the order with full details using OrderDetailSerializer
+        response_serializer = OrderDetailSerializer(order)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+    
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None):
         """Actualizar estado de una orden"""

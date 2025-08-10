@@ -206,9 +206,7 @@ const TableOrderEcommerce = () => {
 
       if (currentAccount.id) {
         // Cuenta existente - actualizar
-        console.log('🔍 Loading existing order:', currentAccount.id);
         order = await apiService.orders.getById(currentAccount.id);
-        console.log('✅ Existing order loaded:', order);
       } else {
         // Nueva cuenta - crear orden con items
         const itemsData = newCartItems.map(cartItem => ({
@@ -226,14 +224,7 @@ const TableOrderEcommerce = () => {
           items: itemsData
         };
 
-        console.log('🔍 Creating new order with data:', orderData);
         order = await apiService.orders.create(orderData);
-        console.log('✅ Order creation response:', order);
-        
-        if (!order || !order.id) {
-          console.error('🚨 Order creation failed - no ID returned:', order);
-          throw new Error('Error: La orden no fue creada correctamente. Por favor intenta nuevamente.');
-        }
       }
 
       // Si la cuenta ya existía, agregar nuevos items
@@ -269,16 +260,12 @@ const TableOrderEcommerce = () => {
       }, 0);
 
       // Validar que la orden tenga ID antes de recargar
-      console.log('🔍 Final order before reload:', order);
       if (!order?.id) {
-        console.error('🚨 Order validation failed - missing ID:', order);
         throw new Error('Error: La orden no fue creada correctamente o no tiene ID válido');
       }
 
       // Recargar la orden actualizada desde el backend para obtener el total correcto
-      console.log('🔍 Reloading order with ID:', order.id);
       const updatedOrder = await apiService.orders.getById(order.id);
-      console.log('✅ Order reloaded successfully:', updatedOrder);
 
       // Actualizar la cuenta en el estado con datos reales del backend
       const updatedAccount = {
