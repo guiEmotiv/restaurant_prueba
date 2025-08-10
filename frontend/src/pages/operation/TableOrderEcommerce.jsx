@@ -565,69 +565,111 @@ const AccountsManagement = ({
       {/* Lista de cuentas existentes */}
       {accounts.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Cuentas Existentes</h3>
           <div className="grid gap-4">
             {accounts.map((account, index) => {
               const readyForPayment = isAccountReadyForPayment(account);
+              const servedItems = account.items?.filter(item => item.status === 'SERVED').length || 0;
+              const pendingItems = account.items?.filter(item => item.status !== 'SERVED').length || 0;
+              const totalItems = account.items?.length || 0;
               
               return (
-                <div key={index} className="bg-white rounded-lg border border-gray-200 p-4">
-                  <div className="flex justify-between items-start mb-3">
+                <div key={index} className="bg-white rounded-lg border border-gray-200 p-6 relative">
+                  {/* Header */}
+                  <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h4 className="font-semibold text-gray-900">Cuenta {index + 1}</h4>
-                      <p className="text-sm text-gray-600">
-                        {account.items.length} items - S/ {account.total.toFixed(2)}
-                      </p>
-                      {readyForPayment && (
-                        <p className="text-sm text-green-600 font-medium">
-                          ✓ Listo para pagar
-                        </p>
-                      )}
+                      <h4 className="text-xl font-bold text-gray-900">Cuenta {index + 1}</h4>
+                      <div className="flex items-center gap-4 mt-2">
+                        <span className="text-2xl font-bold text-blue-600">S/ {account.total.toFixed(2)}</span>
+                        <div className="flex items-center gap-2 text-sm">
+                          {readyForPayment ? (
+                            <div className="flex items-center gap-1 text-green-600">
+                              <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                              <span className="font-medium">Todo listo</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-orange-600">
+                              <div className="w-2 h-2 bg-orange-600 rounded-full animate-pulse"></div>
+                              <span className="font-medium">En preparación</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => onEditAccount(index)}
-                        className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                        <ShoppingCart className="h-4 w-4" />
-                      </button>
-                      {readyForPayment && (
-                        <button
-                          className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          onClick={() => {
-                            // TODO: Implementar procesamiento de pago individual
-                            console.log('Procesar pago de cuenta:', index + 1);
-                          }}
-                        >
-                          <CreditCard className="h-4 w-4" />
-                          Procesar Pago
-                        </button>
-                      )}
+                    <button
+                      onClick={() => onEditAccount(index)}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                      <span className="font-medium">Editar</span>
+                    </button>
+                  </div>
+
+                  {/* Resumen de estado */}
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div className="text-2xl font-bold text-gray-900">{totalItems}</div>
+                        <div className="text-sm text-gray-600">Total Items</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-green-600">{servedItems}</div>
+                        <div className="text-sm text-gray-600">Entregados</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-orange-600">{pendingItems}</div>
+                        <div className="text-sm text-gray-600">Pendientes</div>
+                      </div>
                     </div>
                   </div>
-                  
-                  {/* Items de la cuenta */}
+
+                  {/* Lista de items */}
                   <div className="space-y-2">
-                    {account.items.slice(0, 3).map((item, itemIndex) => (
-                      <div key={itemIndex} className="flex justify-between items-center text-sm">
-                        <span>{item.recipe?.name} x{item.quantity}</span>
-                        <div className="flex items-center gap-2">
-                          <span>S/ {(parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)).toFixed(2)}</span>
+                    {account.items.slice(0, 4).map((item, itemIndex) => (
+                      <div key={itemIndex} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                        <div className="flex-1">
+                          <span className="font-medium text-gray-900">{item.recipe?.name}</span>
+                          <span className="text-gray-600 ml-2">x{item.quantity}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-gray-900">
+                            S/ {(parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)).toFixed(2)}
+                          </span>
                           {item.status === 'SERVED' ? (
-                            <span className="text-green-600 text-xs">✓</span>
+                            <div className="flex items-center gap-1 text-green-600 text-sm">
+                              <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                              <span>Listo</span>
+                            </div>
                           ) : (
-                            <span className="text-orange-600 text-xs">⏳</span>
+                            <div className="flex items-center gap-1 text-orange-600 text-sm">
+                              <div className="w-2 h-2 bg-orange-600 rounded-full animate-pulse"></div>
+                              <span>Preparando</span>
+                            </div>
                           )}
                         </div>
                       </div>
                     ))}
-                    {account.items.length > 3 && (
-                      <p className="text-sm text-gray-500">
-                        ... y {account.items.length - 3} items más
-                      </p>
+                    {account.items.length > 4 && (
+                      <div className="text-center py-2 text-sm text-gray-500">
+                        ... y {account.items.length - 4} items más
+                      </div>
                     )}
                   </div>
+
+                  {/* Botón procesar pago - esquina inferior derecha */}
+                  {readyForPayment && (
+                    <div className="absolute bottom-4 right-4">
+                      <button
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg"
+                        onClick={() => {
+                          // TODO: Implementar procesamiento de pago individual
+                          console.log('Procesar pago de cuenta:', index + 1);
+                        }}
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span className="font-medium">Procesar Pago</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -635,29 +677,6 @@ const AccountsManagement = ({
         </div>
       )}
 
-      {/* Botón de procesar pago */}
-      {accounts.length > 0 && (
-        <div className="text-center">
-          {!allItemsDelivered && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-              <p className="text-yellow-800 text-sm">
-                ⏱ Algunos items aún están en preparación. El pago estará disponible cuando todos los items sean servidos.
-              </p>
-            </div>
-          )}
-
-          {allItemsDelivered && (
-            <button
-              onClick={onProcessPayment}
-              disabled={loading}
-              className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center gap-2 mx-auto"
-            >
-              <CreditCard className="h-5 w-5" />
-              {loading ? 'Procesando pago...' : 'Procesar Pago de Todas las Cuentas'}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 };
@@ -914,6 +933,18 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
   const [isForTakeaway, setIsForTakeaway] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
 
+  // Cuando se selecciona "para llevar", automáticamente asignar el envase de la receta
+  useEffect(() => {
+    if (isForTakeaway && recipe.container && !selectedContainer) {
+      const containerForRecipe = containers.find(c => c.id === recipe.container);
+      if (containerForRecipe) {
+        setSelectedContainer(containerForRecipe);
+      }
+    } else if (!isForTakeaway) {
+      setSelectedContainer(null);
+    }
+  }, [isForTakeaway, recipe.container, containers, selectedContainer]);
+
   const getTotal = () => {
     let total = parseFloat(recipe?.base_price || 0);
     if (isForTakeaway && selectedContainer) {
@@ -986,31 +1017,13 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
               <span className="text-sm font-medium">Para llevar</span>
             </label>
 
-            {isForTakeaway && (
+            {isForTakeaway && selectedContainer && (
               <div className="ml-6 space-y-2">
-                <label className="text-sm font-medium text-gray-700">Seleccionar envase:</label>
-                <select
-                  value={selectedContainer?.id || ''}
-                  onChange={(e) => {
-                    const container = containers.find(c => c.id === parseInt(e.target.value));
-                    setSelectedContainer(container);
-                  }}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                >
-                  <option value="">Sin envase</option>
-                  {containers.map(container => (
-                    <option key={container.id} value={container.id}>
-                      {container.name} - S/ {container.price}
-                      {recipe.container === container.id ? ' (Recomendado)' : ''}
-                    </option>
-                  ))}
-                </select>
-
-                {selectedContainer && (
-                  <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
-                    + S/ {parseFloat(selectedContainer.price || 0).toFixed(2)} por envase
-                  </div>
-                )}
+                <div className="text-sm font-medium text-gray-700">Envase incluido:</div>
+                <div className="bg-orange-50 border border-orange-200 p-3 rounded-md">
+                  <div className="font-medium text-gray-900">{selectedContainer.name}</div>
+                  <div className="text-sm text-orange-600">+ S/ {parseFloat(selectedContainer.price || 0).toFixed(2)}</div>
+                </div>
               </div>
             )}
           </div>
