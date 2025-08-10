@@ -20,7 +20,8 @@ import {
   Users,
   LogOut,
   Activity,
-  DollarSign
+  DollarSign,
+  Eye
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -81,7 +82,16 @@ const Layout = ({ children }) => {
         { name: 'Recetas', href: '/recipes', icon: ChefHat, permission: 'canManageInventory' },
       ]
     },
-    { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
+    { 
+      name: 'Operaciones', 
+      icon: ShoppingCart,
+      permission: 'canViewKitchen',
+      children: [
+        { name: 'Tomar Pedido', href: '/table-order', icon: ShoppingCart, permission: 'canViewKitchen' },
+        { name: 'Estado de Mesas', href: '/table-status', icon: Eye, permission: 'canViewKitchen' },
+        { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
+      ]
+    },
     { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
   ];
 

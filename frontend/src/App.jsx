@@ -22,6 +22,8 @@ import Ingredients from './pages/inventory/Ingredients';
 import Recipes from './pages/inventory/Recipes';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import Kitchen from './pages/operation/Kitchen';
+import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
+import TableStatus from './pages/operation/TableStatus';
 
 // Debug environment variables with persistent logging
 const logWithTimestamp = (message, data) => {
@@ -123,6 +125,16 @@ const AppContent = () => {
           <Route path="/kitchen" element={
             <RoleProtectedRoute requiredPermission="canViewKitchen">
               <Kitchen />
+            </RoleProtectedRoute>
+          } />
+          <Route path="/table-order" element={
+            <RoleProtectedRoute requiredPermission="canViewKitchen">
+              <TableOrderEcommerce />
+            </RoleProtectedRoute>
+          } />
+          <Route path="/table-status" element={
+            <RoleProtectedRoute requiredPermission="canViewKitchen">
+              <TableStatus />
             </RoleProtectedRoute>
           } />
 

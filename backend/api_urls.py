@@ -7,7 +7,7 @@ from config.views import UnitViewSet, ZoneViewSet, TableViewSet, ContainerViewSe
 from config.views_debug import database_debug, api_debug
 from inventory.views import GroupViewSet, IngredientViewSet, RecipeViewSet, RecipeItemViewSet
 from operation.views import (
-    OrderViewSet, OrderItemViewSet, OrderItemIngredientViewSet, PaymentViewSet
+    OrderViewSet, OrderItemViewSet, OrderItemIngredientViewSet, PaymentViewSet, ContainerSaleViewSet
 )
 from operation.views_dashboard import DashboardViewSet
 
@@ -31,6 +31,7 @@ router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'order-items', OrderItemViewSet, basename='orderitem')
 router.register(r'order-item-ingredients', OrderItemIngredientViewSet, basename='orderitemingredient')
 router.register(r'payments', PaymentViewSet, basename='payment')
+router.register(r'container-sales', ContainerSaleViewSet, basename='containersale')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 
 urlpatterns = [

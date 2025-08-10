@@ -9,12 +9,13 @@ from backend.cognito_permissions import (
     CognitoOrderStatusPermission,
     CognitoPaymentPermission
 )
-from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem
+from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem, ContainerSale
 from .serializers import (
     OrderSerializer, OrderDetailSerializer, OrderCreateSerializer,
     OrderItemSerializer, OrderItemCreateSerializer,
     OrderItemIngredientSerializer, OrderItemIngredientCreateSerializer,
-    PaymentSerializer, OrderStatusUpdateSerializer, SplitPaymentSerializer
+    PaymentSerializer, OrderStatusUpdateSerializer, SplitPaymentSerializer,
+    ContainerSaleSerializer
 )
 
 
@@ -582,3 +583,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
             'method_breakdown': method_totals,
             'payments': PaymentSerializer(payments, many=True).data
         })
+
+
+class ContainerSaleViewSet(viewsets.ModelViewSet):
+    queryset = ContainerSale.objects.all().order_by('-created_at')
+    serializer_class = ContainerSaleSerializer
+    permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    pagination_class = None  # Deshabilitar paginación

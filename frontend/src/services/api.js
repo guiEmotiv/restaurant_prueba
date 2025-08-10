@@ -439,6 +439,14 @@ export const apiService = {
     delete: (id) => apiService.delete('containers', id),
   },
 
+  containerSales: {
+    getAll: () => apiService.getAll('container-sales'),
+    getById: (id) => apiService.getById('container-sales', id),
+    create: (data) => apiService.create('container-sales', data),
+    update: (id, data) => apiService.update('container-sales', id, data),
+    delete: (id) => apiService.delete('container-sales', id),
+  },
+
 };
 
 export default api;
