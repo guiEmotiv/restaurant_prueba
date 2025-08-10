@@ -943,36 +943,66 @@ const MenuSelection = memo(({
               {groupName}
             </h2>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {groupRecipes.map(recipe => (
-                <div key={recipe.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                  <div className="space-y-3">
+                <div key={recipe.id} className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition-shadow">
+                  <div className="space-y-2">
+                    {/* Header compacto */}
                     <div className="flex justify-between items-start">
-                      <h3 className="font-semibold text-gray-900">{recipe.name}</h3>
-                      <span className="text-lg font-bold text-blue-600">
-                        S/ {recipe.base_price}
-                      </span>
+                      <h3 className="font-semibold text-gray-900 text-sm leading-tight">{recipe.name}</h3>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-blue-600">S/ {recipe.base_price}</div>
+                        <div className="text-xs text-gray-500">{recipe.preparation_time}min</div>
+                      </div>
                     </div>
                     
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Clock className="h-4 w-4" />
-                      <span>{recipe.preparation_time} min</span>
-                    </div>
-                    
-                    <div className="flex gap-2">
+                    {/* Acciones rápidas en una sola fila */}
+                    <div className="grid grid-cols-4 gap-1">
+                      {/* Agregar simple */}
                       <button
                         onClick={() => onAddToCart(recipe)}
-                        className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                        className="bg-blue-600 text-white py-2 px-2 rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center"
+                        title="Agregar al carrito"
                       >
                         <Plus className="h-4 w-4" />
-                        Agregar
                       </button>
+                      
+                      {/* Para llevar rápido */}
+                      <button
+                        onClick={() => {
+                          const containerForRecipe = containers.find(c => c.id === recipe.container);
+                          const quickTakeaway = {
+                            recipe,
+                            quantity: 1,
+                            notes: '',
+                            is_takeaway: true,
+                            has_taper: !!containerForRecipe,
+                            container: containerForRecipe || null
+                          };
+                          onAddToCart(quickTakeaway);
+                        }}
+                        className="bg-orange-600 text-white py-2 px-2 rounded-md hover:bg-orange-700 transition-colors flex items-center justify-center"
+                        title="Para llevar"
+                      >
+                        <Package className="h-3 w-3" />
+                      </button>
+                      
+                      {/* Con nota */}
                       <button
                         onClick={() => handleRecipeClick(recipe)}
-                        className="flex-1 bg-green-600 text-white py-2 px-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                        className="bg-green-600 text-white py-2 px-2 rounded-md hover:bg-green-700 transition-colors flex items-center justify-center"
+                        title="Con notas"
                       >
-                        <StickyNote className="h-4 w-4" />
-                        Con Nota
+                        <StickyNote className="h-3 w-3" />
+                      </button>
+                      
+                      {/* Múltiple (abrir modal) */}
+                      <button
+                        onClick={() => handleRecipeClick(recipe)}
+                        className="bg-purple-600 text-white py-2 px-2 rounded-md hover:bg-purple-700 transition-colors flex items-center justify-center text-xs font-bold"
+                        title="Cantidad múltiple"
+                      >
+                        2+
                       </button>
                     </div>
                   </div>
@@ -1032,20 +1062,22 @@ const FloatingCart = memo(({
 
   return (
     <>
-      {/* Botón flotante */}
+      {/* Botón flotante mejorado */}
       <button
         onClick={() => setIsExpanded(true)}
-        className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-40 flex items-center gap-2"
+        className="fixed bottom-6 right-6 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-all hover:scale-105 z-40 min-w-[120px]"
       >
-        <ShoppingCart className="h-6 w-6" />
-        <span className="bg-white text-blue-600 rounded-full min-w-[24px] h-6 flex items-center justify-center text-sm font-bold">
-          {totalItems}
-        </span>
-        {totalItems > 0 && (
-          <span className="ml-2 text-xs bg-green-600 text-white px-2 py-1 rounded-full">
+        <div className="p-3 text-center">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <ShoppingCart className="h-5 w-5" />
+            <span className="bg-white text-blue-600 rounded-full min-w-[20px] h-5 flex items-center justify-center text-xs font-bold">
+              {totalItems}
+            </span>
+          </div>
+          <div className="text-xs font-semibold">
             S/ {getCartTotals().grand.toFixed(2)}
-          </span>
-        )}
+          </div>
+        </div>
       </button>
 
       {/* Modal del carrito expandido */}
@@ -1125,33 +1157,20 @@ const FloatingCart = memo(({
                         </div>
                       )}
                     </div>
-                    {/* ===== ARQUITECTURA RESTAURANTE: DESGLOSE POR COMPONENTES ===== */}
+                    {/* ===== INFORMACIÓN SIMPLIFICADA Y PRÁCTICA ===== */}
                     <div className="text-sm text-gray-600 space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex justify-between items-center">
                         <span>Cantidad: {item.quantity}</span>
-                        <span>•</span>
-                        <span>Comida: S/ {getItemFoodPrice(item).toFixed(2)}</span>
+                        <span className="font-semibold text-gray-900">S/ {getItemTotalPrice(item).toFixed(2)}</span>
                       </div>
                       
-                      {/* Mostrar envase solo si tiene precio calculable */}
-                      {getItemContainerPrice(item) > 0 && (
-                        <div className="flex items-center gap-2 text-xs">
-                          <Package className="h-3 w-3 text-orange-600" />
-                          <span>Envase: S/ {getItemContainerPrice(item).toFixed(2)}</span>
+                      {/* Información de envase simplificada */}
+                      {item.has_taper && (
+                        <div className="flex items-center gap-1 text-xs text-orange-600">
+                          <Package className="h-3 w-3" />
+                          <span>Con envase</span>
                         </div>
                       )}
-                      
-                      {/* Para items existentes con envase: mostrar info arquitectónica */}
-                      {item.has_taper && item.id && (
-                        <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 rounded px-2 py-1">
-                          <Package className="h-3 w-3 text-blue-600" />
-                          <span>✅ Envase incluido en total de orden</span>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center gap-2 font-medium">
-                        <span>Total item: S/ {getItemTotalPrice(item).toFixed(2)}</span>
-                      </div>
                     </div>
                     {item.is_takeaway && (
                       <div className="text-xs text-orange-600 flex items-center gap-1 mt-1">
@@ -1182,58 +1201,32 @@ const FloatingCart = memo(({
               ))}
             </div>
             
-            {/* ===== FOOTER ARQUITECTÓNICO: TOTALES SEPARADOS ===== */}
-            <div className="p-4 border-t space-y-4">
+            {/* ===== TOTALES SIMPLIFICADOS ===== */}
+            <div className="p-4 border-t space-y-3">
               {(() => {
                 const totals = getCartTotals();
                 
                 return (
                   <div className="space-y-2">
-                    {/* Subtotal comida */}
-                    <div className="flex justify-between items-center text-sm text-gray-600">
-                      <span>🍽️ Subtotal comida:</span>
-                      <span>S/ {totals.food.toFixed(2)}</span>
-                    </div>
-                    
-                    {/* Subtotal envases: desglosado por fuente */}
+                    {/* Subtotales solo si hay envases */}
                     {totals.containers > 0 && (
-                      <div className="space-y-1">
-                        {/* Envases de items nuevos */}
-                        {totals.newItemsContainers > 0 && (
-                          <div className="flex justify-between items-center text-xs text-orange-600">
-                            <span>📦 Envases nuevos:</span>
-                            <span>S/ {totals.newItemsContainers.toFixed(2)}</span>
-                          </div>
-                        )}
-                        
-                        {/* Envases de orden existente */}
-                        {totals.orderContainers > 0 && (
-                          <div className="flex justify-between items-center text-xs text-blue-600">
-                            <span>📦 Envases de orden:</span>
-                            <span>S/ {totals.orderContainers.toFixed(2)}</span>
-                          </div>
-                        )}
-                        
-                        {/* Total envases */}
-                        <div className="flex justify-between items-center text-sm text-gray-700 bg-gray-50 px-2 py-1 rounded">
-                          <span>📦 Total envases:</span>
+                      <>
+                        <div className="flex justify-between items-center text-sm text-gray-600">
+                          <span>Comida:</span>
+                          <span>S/ {totals.food.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm text-gray-600">
+                          <span>Envases:</span>
                           <span>S/ {totals.containers.toFixed(2)}</span>
                         </div>
-                      </div>
+                      </>
                     )}
                     
-                    {/* Total general */}
-                    <div className="flex justify-between items-center text-lg font-bold border-t pt-2 text-green-700">
-                      <span>💰 TOTAL GENERAL:</span>
+                    {/* Total general destacado */}
+                    <div className="flex justify-between items-center text-xl font-bold border-t pt-2 text-blue-600">
+                      <span>TOTAL:</span>
                       <span>S/ {totals.grand.toFixed(2)}</span>
                     </div>
-                    
-                    {/* Información arquitectónica para debugging */}
-                    {process.env.NODE_ENV === 'development' && (
-                      <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-50 rounded">
-                        <div>📊 Food={totals.food.toFixed(2)} + New={totals.newItemsContainers.toFixed(2)} + Order={totals.orderContainers.toFixed(2)} = {totals.grand.toFixed(2)}</div>
-                      </div>
-                    )}
                   </div>
                 );
               })()}
@@ -1259,6 +1252,7 @@ const FloatingCart = memo(({
 
 const RecipeModal = memo(({ recipe, containers, onAdd, onClose }) => {
   const [notes, setNotes] = useState('');
+  const [quantity, setQuantity] = useState(1);
   const [isForTakeaway, setIsForTakeaway] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
 
@@ -1275,17 +1269,17 @@ const RecipeModal = memo(({ recipe, containers, onAdd, onClose }) => {
   }, [isForTakeaway, recipe.container, containers, selectedContainer]);
 
   const getTotal = () => {
-    let total = parseFloat(recipe?.base_price || 0);
+    let unitTotal = parseFloat(recipe?.base_price || 0);
     if (isForTakeaway && selectedContainer) {
-      total += parseFloat(selectedContainer.price || 0);
+      unitTotal += parseFloat(selectedContainer.price || 0);
     }
-    return total;
+    return unitTotal * quantity;
   };
 
   const handleAdd = () => {
     const recipeData = {
       recipe,
-      quantity: 1,
+      quantity,
       notes,
       is_takeaway: isForTakeaway,
       has_taper: isForTakeaway && !!selectedContainer,
@@ -1306,67 +1300,75 @@ const RecipeModal = memo(({ recipe, containers, onAdd, onClose }) => {
           </button>
         </div>
 
-        {/* Contenido */}
+        {/* Contenido simplificado */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Precio base */}
-          <div className="text-center">
-            <span className="text-2xl font-bold text-blue-600">S/ {recipe.base_price}</span>
-            <div className="text-sm text-gray-600 flex items-center justify-center gap-2 mt-1">
-              <Clock className="h-4 w-4" />
-              <span>{recipe.preparation_time} min</span>
+          {/* Precio y tiempo compacto */}
+          <div className="text-center bg-blue-50 rounded-lg p-3">
+            <div className="text-2xl font-bold text-blue-600">S/ {recipe.base_price}</div>
+            <div className="text-sm text-gray-600">{recipe.preparation_time} minutos</div>
+          </div>
+
+          {/* Cantidad */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Cantidad:</label>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <span className="text-xl font-semibold w-8 text-center">{quantity}</span>
+              <button 
+                onClick={() => setQuantity(quantity + 1)}
+                className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
           </div>
 
-
           {/* Notas */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <StickyNote className="h-4 w-4" />
-              Notas especiales:
-            </label>
+            <label className="text-sm font-medium text-gray-700">Notas especiales:</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Agregar instrucciones especiales..."
+              placeholder="Ej: Sin cebolla, punto medio..."
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              rows={3}
+              rows={2}
             />
           </div>
 
-          {/* Para llevar */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isForTakeaway}
-                onChange={(e) => setIsForTakeaway(e.target.checked)}
-                className="rounded"
-              />
-              <Package className="h-4 w-4 text-orange-600" />
-              <span className="text-sm font-medium">Para llevar</span>
-            </label>
-
-            {isForTakeaway && selectedContainer && (
-              <div className="ml-6 space-y-2">
-                <div className="text-sm font-medium text-gray-700">Envase incluido:</div>
-                <div className="bg-orange-50 border border-orange-200 p-3 rounded-md">
-                  <div className="font-medium text-gray-900">{selectedContainer.name}</div>
-                  <div className="text-sm text-orange-600">+ S/ {parseFloat(selectedContainer.price || 0).toFixed(2)}</div>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Para llevar - más simple */}
+          <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isForTakeaway}
+              onChange={(e) => setIsForTakeaway(e.target.checked)}
+              className="rounded"
+            />
+            <Package className="h-4 w-4 text-orange-600" />
+            <span className="text-sm font-medium">Para llevar {isForTakeaway && selectedContainer ? `(+S/ ${parseFloat(selectedContainer.price || 0).toFixed(2)})` : ''}</span>
+          </label>
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t space-y-4">
-          <div className="flex justify-between items-center text-xl font-bold">
-            <span>Total:</span>
-            <span>S/ {parseFloat(getTotal() || 0).toFixed(2)}</span>
+        <div className="p-4 border-t space-y-3">
+          <div className="bg-green-50 rounded-lg p-3">
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-semibold text-gray-700">Total:</span>
+              <span className="text-2xl font-bold text-green-600">S/ {parseFloat(getTotal() || 0).toFixed(2)}</span>
+            </div>
+            {quantity > 1 && (
+              <div className="text-sm text-gray-600 text-center mt-1">
+                S/ {(parseFloat(recipe?.base_price || 0) + (isForTakeaway && selectedContainer ? parseFloat(selectedContainer.price || 0) : 0)).toFixed(2)} × {quantity}
+              </div>
+            )}
           </div>
           <button
             onClick={handleAdd}
-            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg"
           >
             Agregar al Carrito
           </button>
