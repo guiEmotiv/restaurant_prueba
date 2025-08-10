@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 
 const TableOrderEcommerce = () => {
+  // Version 2025.01.10.1 - Fix getItemPrice error in unused CartItem component
   const [currentStep, setCurrentStep] = useState('tables'); // 'tables', 'accounts', 'menu', 'payment'
   const [tables, setTables] = useState([]);
   const [recipes, setRecipes] = useState([]);
