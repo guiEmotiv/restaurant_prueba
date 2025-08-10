@@ -1026,13 +1026,30 @@ const FloatingCart = ({
                         </div>
                       )}
                     </div>
-                    <div className="text-sm text-gray-600 flex items-center gap-2">
-                      <span>Cantidad: {item.quantity}</span>
-                      <span>•</span>
-                      <span>S/ {getItemPrice(item).toFixed(2)}</span>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span>Cantidad: {item.quantity}</span>
+                        <span>•</span>
+                        <span>Comida: S/ {getItemPrice(item).toFixed(2)}</span>
+                      </div>
+                      {!item.id && item.has_taper && item.container && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <Package className="h-3 w-3 text-orange-600" />
+                          <span>Envase: S/ {(parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)).toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 font-medium">
+                        <span>Total: S/ {(() => {
+                          let total = getItemPrice(item);
+                          if (!item.id && item.has_taper && item.container) {
+                            total += parseFloat(item.container.price || 0) * parseInt(item.quantity || 1);
+                          }
+                          return total.toFixed(2);
+                        })()}</span>
+                      </div>
                     </div>
                     {item.is_takeaway && (
-                      <div className="text-xs text-orange-600 flex items-center gap-1">
+                      <div className="text-xs text-orange-600 flex items-center gap-1 mt-1">
                         <Package className="h-3 w-3" />
                         Para llevar
                       </div>
@@ -1062,10 +1079,35 @@ const FloatingCart = ({
             
             {/* Footer con total y botón */}
             <div className="p-4 border-t space-y-4">
-              <div className="flex justify-between items-center text-lg font-bold">
-                <span>Total:</span>
-                <span>S/ {getCartTotal().toFixed(2)}</span>
-              </div>
+              {(() => {
+                const foodTotal = cart.reduce((sum, item) => sum + getItemPrice(item), 0);
+                const containerTotal = cart.reduce((sum, item) => {
+                  if (!item.id && item.has_taper && item.container) {
+                    return sum + (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1));
+                  }
+                  return sum;
+                }, 0);
+                const grandTotal = foodTotal + containerTotal;
+
+                return (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm text-gray-600">
+                      <span>Subtotal comida:</span>
+                      <span>S/ {foodTotal.toFixed(2)}</span>
+                    </div>
+                    {containerTotal > 0 && (
+                      <div className="flex justify-between items-center text-sm text-gray-600">
+                        <span>Subtotal envases:</span>
+                        <span>S/ {containerTotal.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-lg font-bold border-t pt-2">
+                      <span>Total:</span>
+                      <span>S/ {grandTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
               
               <button
                 onClick={() => {
