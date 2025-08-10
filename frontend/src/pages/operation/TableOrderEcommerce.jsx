@@ -1204,7 +1204,7 @@ const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
             <Plus className="h-4 w-4" />
           </button>
         </div>
-        <span className="font-semibold">S/ {getItemPrice(item).toFixed(2)}</span>
+        <span className="font-semibold">S/ {((parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)) + (item.has_taper && item.container ? (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)) : 0)).toFixed(2)}</span>
       </div>
 
       {/* Notas */}
