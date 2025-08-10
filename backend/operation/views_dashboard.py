@@ -23,22 +23,15 @@ class DashboardViewSet(viewsets.ViewSet):
         Cada fila incluye: Orden, Item, Receta, Ingredientes, Costos, Mesa, Zona, Pago, etc.
         """
         try:
-            print(f"🔍 Dashboard report started - Request: {request.method} {request.path}")
-            
             # Obtener fecha del parámetro o usar hoy
             date_param = request.query_params.get('date')
             if date_param:
                 try:
                     selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
-                    print(f"✅ Parsed date from parameter: {selected_date}")
                 except ValueError:
                     selected_date = timezone.now().date()
-                    print(f"⚠️ Invalid date format, using today: {selected_date}")
             else:
                 selected_date = timezone.now().date()
-                print(f"✅ Using current date: {selected_date}")
-            
-            print(f"🔍 Generating detailed report for date: {selected_date}")
             
             # Obtener datos detallados completos
             detailed_data = self._get_detailed_order_data(selected_date)
@@ -46,13 +39,9 @@ class DashboardViewSet(viewsets.ViewSet):
             # Generar dashboard desde los datos detallados
             dashboard_data = self._generate_dashboard_from_details(detailed_data, selected_date)
             
-            print(f"✅ Generated {len(detailed_data)} detailed rows and dashboard summary")
             return Response(dashboard_data)
         
         except Exception as e:
-            print(f"❌ CRITICAL ERROR in dashboard report: {str(e)}")
-            import traceback
-            traceback.print_exc()
             return Response({
                 'error': f'Error processing dashboard request: {str(e)}',
                 'date': None,
@@ -67,8 +56,6 @@ class DashboardViewSet(viewsets.ViewSet):
         Obtiene datos completamente detallados por fila
         Cada fila representa un OrderItem con TODA su información relacionada
         """
-        print("🔍 Building detailed order data query...")
-        
         # Obtener órdenes PAID con todas las relaciones
         paid_orders = Order.objects.filter(
             status='PAID',
@@ -87,17 +74,10 @@ class DashboardViewSet(viewsets.ViewSet):
         ).order_by('paid_at')
         
         orders_count = paid_orders.count()
-        print(f"✅ Found {orders_count} paid orders for {selected_date}")
-        
-        # Debug: mostrar algunas órdenes para verificar datos
-        if orders_count > 0:
-            sample_order = paid_orders.first()
-            print(f"📋 Sample order {sample_order.id}: created={sample_order.created_at}, paid={sample_order.paid_at}, status={sample_order.status}")
         
         detailed_rows = []
         
         for order in paid_orders:
-            print(f"🔍 Processing order {order.id} with {order.orderitem_set.count()} items")
             
             # Información básica de la orden
             order_info = {
@@ -118,9 +98,6 @@ class DashboardViewSet(viewsets.ViewSet):
                 service_time_seconds = (order.paid_at - order.created_at).total_seconds()
                 service_time_minutes = max(1, int(service_time_seconds / 60))  # Mínimo 1 minuto
                 order_info['service_time_minutes'] = service_time_minutes
-                print(f"⏱️ Order {order.id}: {service_time_minutes} minutes service time")
-            else:
-                print(f"⚠️ Order {order.id}: Missing timestamps - created_at: {order.created_at}, paid_at: {order.paid_at}")
             
             # Información de pagos
             payments_info = []
@@ -145,7 +122,6 @@ class DashboardViewSet(viewsets.ViewSet):
             
             # Procesar cada item de la orden
             for order_item in order.orderitem_set.all():
-                print(f"  🔍 Processing item: {order_item.recipe.name if order_item.recipe else 'No recipe'}")
                 
                 # Información del item
                 item_info = {
@@ -211,17 +187,13 @@ class DashboardViewSet(viewsets.ViewSet):
                 
                 detailed_rows.append(detailed_row)
         
-        print(f"✅ Generated {len(detailed_rows)} detailed rows")
         return detailed_rows
     
     def _generate_dashboard_from_details(self, detailed_data, selected_date):
         """
         Genera el dashboard completo desde los datos detallados
         """
-        print("🔍 Generating dashboard from detailed data...")
-        
         if not detailed_data:
-            print("⚠️ No detailed data available")
             return {
                 'date': selected_date.isoformat(),
                 'detailed_data': [],
@@ -309,10 +281,8 @@ class DashboardViewSet(viewsets.ViewSet):
         average_ticket = total_revenue / total_orders if total_orders > 0 else Decimal('0')
         if service_times:
             average_service_time = sum(service_times) / len(service_times)
-            print(f"⏱️ Average service time calculated: {average_service_time:.1f} minutes from {len(service_times)} orders")
         else:
             average_service_time = 0
-            print("⚠️ No service times available for average calculation")
         
         # Procesar stats (igual que antes pero desde datos detallados)
         # Categorías
@@ -381,15 +351,6 @@ class DashboardViewSet(viewsets.ViewSet):
                 'percentage': float(percentage)
             })
         
-        print(f"✅ Dashboard Summary:")
-        print(f"   📊 Total orders: {total_orders}")
-        print(f"   💰 Total revenue: S/ {total_revenue:.2f}")
-        print(f"   🎫 Average ticket: S/ {average_ticket:.2f}")
-        print(f"   ⏱️ Average service time: {average_service_time:.1f} min")
-        print(f"   📋 Detailed items: {len(detailed_data)}")
-        print(f"   🏷️ Categories: {len(category_breakdown)}")
-        print(f"   🏪 Zones: {len(zone_performance)}")
-        print(f"   🪑 Tables: {len(top_tables)}")
         
         return {
             'date': selected_date.isoformat(),
@@ -414,8 +375,6 @@ class DashboardViewSet(viewsets.ViewSet):
         Exporta datos detallados completos a Excel/CSV
         """
         try:
-            print("🔍 Starting detailed Excel/CSV export...")
-            
             # Obtener datos detallados
             report_response = self.report(request)
             if report_response.status_code != 200:
@@ -423,8 +382,6 @@ class DashboardViewSet(viewsets.ViewSet):
             
             response_data = report_response.data
             detailed_data = response_data.get('detailed_data', [])
-            
-            print(f"✅ Got {len(detailed_data)} detailed rows for export")
             
             # Intentar Excel, fallback a CSV
             try:
@@ -434,9 +391,6 @@ class DashboardViewSet(viewsets.ViewSet):
                 return self._generate_detailed_csv(response_data)
                 
         except Exception as e:
-            print(f"❌ Error generating export: {str(e)}")
-            import traceback
-            traceback.print_exc()
             return Response({
                 'error': f'Error generating export: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -448,8 +402,6 @@ class DashboardViewSet(viewsets.ViewSet):
         import csv
         from django.http import HttpResponse
         import io
-        
-        print("📊 Generating detailed CSV export...")
         
         output = io.StringIO()
         writer = csv.writer(output)
@@ -526,7 +478,6 @@ class DashboardViewSet(viewsets.ViewSet):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         response.write(output.getvalue())
         
-        print("✅ Detailed CSV generated successfully")
         return response
     
     def _generate_detailed_excel(self, response_data):
@@ -536,8 +487,6 @@ class DashboardViewSet(viewsets.ViewSet):
         import openpyxl
         from openpyxl.styles import Font, PatternFill, Alignment
         from django.http import HttpResponse
-        
-        print("📊 Generating detailed Excel export...")
         
         wb = openpyxl.Workbook()
         
@@ -625,5 +574,4 @@ class DashboardViewSet(viewsets.ViewSet):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         wb.save(response)
-        print("✅ Detailed Excel generated successfully")
         return response

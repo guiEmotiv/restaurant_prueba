@@ -33,23 +33,9 @@ const Operations = () => {
 
   const checkAPIHealth = async () => {
     try {
-      console.log('🏥 Checking API health...');
       const response = await api.get('/health/');
-      console.log('✅ API Health:', response.data);
       setApiHealthy(true);
-      
-      // También hacer check de debug de base de datos
-      try {
-        const debugResponse = await api.get('/debug/database/');
-        console.log('🔍 Database Debug:', debugResponse.data);
-        if (debugResponse.data.status === 'needs_data') {
-          console.warn('⚠️ Database needs data population');
-        }
-      } catch (debugError) {
-        console.warn('Debug endpoint not available:', debugError);
-      }
     } catch (error) {
-      console.error('❌ API Health check failed:', error);
       setApiHealthy(false);
     }
   };
@@ -57,7 +43,6 @@ const Operations = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Loading data from API...');
       
       const [tablesData, ordersData, orderItemsData, zonesData] = await Promise.all([
         apiService.tables.getAll(),
@@ -66,37 +51,12 @@ const Operations = () => {
         apiService.zones.getAll()
       ]);
       
-      // Debug completo de datos
-      console.log('📊 Data loaded from API:');
-      console.log('  - Tables:', tablesData);
-      console.log('  - Orders:', ordersData);
-      console.log('  - Order Items:', orderItemsData);
-      console.log('  - Zones:', zonesData);
-      
       // Validar y establecer datos
       setTables(Array.isArray(tablesData) ? tablesData : []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setOrderItems(Array.isArray(orderItemsData) ? orderItemsData : []);
       setZones(Array.isArray(zonesData) ? zonesData : []);
-      
-      // Debug: mostrar estructura de datos
-      if (tablesData && tablesData.length > 0) {
-        console.log('📋 Sample table structure:', tablesData[0]);
-        console.log('  Fields:', Object.keys(tablesData[0]));
-      } else {
-        console.warn('⚠️ No tables data received');
-      }
-      
-      if (zonesData && zonesData.length > 0) {
-        console.log('📋 Sample zone structure:', zonesData[0]);
-      } else {
-        console.warn('⚠️ No zones data received');
-      }
     } catch (error) {
-      console.error('❌ Error loading data:', error);
-      console.error('  Error details:', error.response?.data);
-      console.error('  Status:', error.response?.status);
-      console.error('  URL:', error.config?.url);
       setError(error.response?.data?.detail || error.message);
       showError(`Error al cargar datos: ${error.response?.data?.detail || error.message}`);
     } finally {
@@ -211,14 +171,6 @@ const Operations = () => {
       </div>
 
       <div className="pt-32 px-3 space-y-6">
-        {/* Build Info Banner - Only show in first 30 seconds */}
-        {!loading && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-            <div className="text-xs text-blue-700">
-              🚀 Sistema actualizado - Build: {new Date().toISOString().slice(0, 16).replace('T', ' ')} | Paginación deshabilitada para todos los datos
-            </div>
-          </div>
-        )}
 
         {/* Error State */}
         {error && !loading && (

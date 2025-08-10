@@ -49,10 +49,6 @@ const OrderCreate = () => {
       setGroups(Array.isArray(groupsData) ? groupsData : []);
       setContainers(Array.isArray(containersData) ? containersData : []);
       
-      // Debug: mostrar estructura de datos
-      console.log('Recipes data:', recipesData);
-      console.log('Sample recipe:', recipesData[0]);
-      console.log('Table data:', tableData);
     } catch (error) {
       console.error('Error loading data:', error);
       showError('Error al cargar datos');
@@ -151,28 +147,16 @@ const OrderCreate = () => {
         items: orderItems
       };
 
-      console.log('Creating order with data:', orderData);
       const result = await apiService.orders.create(orderData);
-      console.log('Order created:', result);
 
       showSuccess('Pedido creado exitosamente');
       navigate(`/operations/table/${tableId}/manage`);
     } catch (error) {
-      console.error('Error creating order:', error);
-      console.error('Error details:', error.response?.data);
-      
-      // Mostrar detalles específicos del error de validación
-      if (error.response?.data?.items) {
-        const validationErrors = error.response.data.items;
-        console.error('Validation errors:', validationErrors);
-        showError('Error de validación: ' + JSON.stringify(validationErrors));
-      } else {
-        const errorMessage = error.response?.data?.detail || 
-                             error.response?.data?.error || 
-                             error.response?.data?.message ||
-                             'Error al crear el pedido';
-        showError(errorMessage);
-      }
+      const errorMessage = error.response?.data?.detail || 
+                           error.response?.data?.error || 
+                           error.response?.data?.message ||
+                           'Error al crear el pedido';
+      showError(errorMessage);
     } finally {
       setCreating(false);
     }
@@ -266,7 +250,6 @@ const OrderCreate = () => {
                       const totalPrice = parseFloat(recipe.price || recipe.unit_price || recipe.cost) || 0;
                       
                       if (totalPrice === 0) {
-                        console.log('Recipe with no price:', recipe);
                         showError('Esta receta no tiene precio configurado');
                         return;
                       }
