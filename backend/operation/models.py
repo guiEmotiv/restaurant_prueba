@@ -36,12 +36,12 @@ class Order(models.Model):
 
 
     def calculate_total(self):
-        """Calcula el total de items (incluyendo envases distribuidos)"""
+        """Calcula el total de items (NO incluye envases - están en container_sales)"""
         if self.pk:
-            # Total de items (ahora incluye envases distribuidos)
+            # Total solo de items de comida
             items_total = sum(item.total_price for item in self.orderitem_set.all())
             
-            # El total_amount ahora incluye todo (comida + envases)
+            # total_amount es solo la comida, los envases están separados
             self.total_amount = items_total
             super().save()  # Usar super() para evitar recursión
             return items_total
@@ -54,8 +54,8 @@ class Order(models.Model):
         return Decimal('0.00')
     
     def get_grand_total(self):
-        """Obtiene el total general (ya incluye envases distribuidos)"""
-        return self.total_amount
+        """Obtiene el total general (comida + envases)"""
+        return self.total_amount + self.get_containers_total()
 
     def consume_ingredients_on_creation(self):
         """Método separado para consumir ingredientes cuando se crea la orden"""
@@ -144,29 +144,20 @@ class OrderItem(models.Model):
             self.order.calculate_total()
 
     def calculate_total_price(self):
-        """Calcula el precio total del item incluyendo customizaciones, cantidad y envases"""
+        """Calcula el precio total del item incluyendo customizaciones y cantidad"""
+        # Precio base: precio unitario * cantidad
         base_total = self.unit_price * self.quantity
-        customization_total = Decimal('0.00')
-        container_total = Decimal('0.00')
         
-        # Solo buscar customizaciones si el objeto ya está guardado
+        # Agregar customizaciones si existen
+        customization_total = Decimal('0.00')
         if self.pk:
             customization_total = sum(
                 item.total_price for item in self.orderitemingredient_set.all()
             )
         
-        # Incluir precio de envases si es para llevar
-        if self.has_taper and self.pk:
-            # Buscar envases asociados a este pedido y calcular proporcionalmente
-            container_sales = self.order.container_sales.all()
-            if container_sales.exists():
-                # Distribuir el costo de envases entre todos los items para llevar
-                takeaway_items_count = self.order.orderitem_set.filter(has_taper=True).count()
-                if takeaway_items_count > 0:
-                    total_container_cost = sum(cs.total_price for cs in container_sales)
-                    container_total = total_container_cost / takeaway_items_count
-        
-        self.total_price = base_total + customization_total + container_total
+        # NO incluir precio de envases aquí - los envases se manejan por separado en ContainerSale
+        # Esto evita la distribución proporcional que causa cambios en precios
+        self.total_price = base_total + customization_total
         
         # Solo guardar si ya existe en la BD para evitar recursión
         if self.pk:

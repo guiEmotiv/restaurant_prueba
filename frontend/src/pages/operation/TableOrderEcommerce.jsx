@@ -200,20 +200,24 @@ const TableOrderEcommerce = () => {
     setCart(cart.filter((_, i) => i !== index));
   };
 
+  const getItemPrice = (item) => {
+    // Cálculo consistente del precio de un item individual
+    const quantity = parseInt(item.quantity || 1);
+    const unitPrice = parseFloat(item.recipe?.base_price || 0);
+    const foodPrice = unitPrice * quantity;
+    
+    // Solo agregar precio de container si es un item nuevo con container
+    let containerPrice = 0;
+    if (item.has_taper && item.container && !item.id) {
+      containerPrice = parseFloat(item.container.price || 0) * quantity;
+    }
+    
+    return foodPrice + containerPrice;
+  };
+
   const getCartTotal = () => {
-    // Total para mostrar en el modal (incluye todos los items)
-    return cart.reduce((sum, item) => {
-      // Si el item tiene total_price del backend, usarlo
-      if (item.total_price !== undefined) {
-        return sum + parseFloat(item.total_price || 0);
-      }
-      // Si no, calcular basado en precio base
-      const itemTotal = parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1);
-      const containerTotal = item.has_taper && item.container 
-        ? parseFloat(item.container.price || 0) * parseInt(item.quantity || 1) 
-        : 0;
-      return sum + itemTotal + containerTotal;
-    }, 0);
+    // Sumar todos los items usando la función helper
+    return cart.reduce((sum, item) => sum + getItemPrice(item), 0);
   };
 
   const getNewItemsTotal = () => {
@@ -289,15 +293,7 @@ const TableOrderEcommerce = () => {
           };
 
           await apiService.orders.addItem(order.id, itemData);
-
-          // Si es para llevar y tiene envase, crear venta de envase
-          if (cartItem.has_taper && cartItem.container) {
-            await apiService.containerSales.create({
-              order: order.id,
-              container: cartItem.container.id,
-              quantity: cartItem.quantity
-            });
-          }
+          // NO crear ContainerSale aquí - el backend ya lo maneja en addItem
         }
       }
 
@@ -893,6 +889,7 @@ const MenuSelection = ({
         onRemoveFromCart={onRemoveFromCart}
         onSaveAccount={onSaveAccount}
         getCartTotal={getCartTotal}
+        getItemPrice={getItemPrice}
         loading={loading}
       />
 
@@ -918,7 +915,8 @@ const FloatingCart = ({
   onUpdateCart, 
   onRemoveFromCart, 
   onSaveAccount, 
-  getCartTotal, 
+  getCartTotal,
+  getItemPrice, 
   loading 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -1001,7 +999,7 @@ const FloatingCart = ({
                     <div className="text-sm text-gray-600 flex items-center gap-2">
                       <span>Cantidad: {item.quantity}</span>
                       <span>•</span>
-                      <span>S/ {((parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)) + (item.container && item.has_taper ? (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)) : 0)).toFixed(2)}</span>
+                      <span>S/ {getItemPrice(item).toFixed(2)}</span>
                     </div>
                     {item.is_takeaway && (
                       <div className="text-xs text-orange-600 flex items-center gap-1">
@@ -1206,7 +1204,7 @@ const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
             <Plus className="h-4 w-4" />
           </button>
         </div>
-        <span className="font-semibold">S/ {(parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)).toFixed(2)}</span>
+        <span className="font-semibold">S/ {getItemPrice(item).toFixed(2)}</span>
       </div>
 
       {/* Notas */}
@@ -1286,7 +1284,7 @@ const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
 
                 {item.container && (
                   <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
-                    + S/ {(parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)).toFixed(2)} por envase
+                    + S/ {(parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)).toFixed(2)} por envase(s)
                   </div>
                 )}
               </>
