@@ -98,7 +98,9 @@ const TableOrderEcommerce = () => {
       notes: item.notes || '',
       is_takeaway: item.is_takeaway || false,
       has_taper: item.has_taper || false,
-      container: item.container || null
+      container: item.container || null,
+      status: item.status || 'CREATED', // Incluir estado del item
+      id: item.id // Incluir ID para identificar items existentes
     }));
     setCart(cartItems);
     setCurrentStep('menu');
@@ -192,7 +194,8 @@ const TableOrderEcommerce = () => {
             quantity: cartItem.quantity,
             notes: cartItem.notes,
             is_takeaway: cartItem.is_takeaway,
-            has_taper: cartItem.has_taper
+            has_taper: cartItem.has_taper,
+            selected_container: cartItem.has_taper && cartItem.container ? cartItem.container.id : null
           };
 
           await apiService.orders.addItem(order.id, itemData);
@@ -622,38 +625,6 @@ const AccountsManagement = ({
                     </div>
                   </div>
 
-                  {/* Lista de items */}
-                  <div className="space-y-2">
-                    {account.items.slice(0, 4).map((item, itemIndex) => (
-                      <div key={itemIndex} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                        <div className="flex-1">
-                          <span className="font-medium text-gray-900">{item.recipe?.name}</span>
-                          <span className="text-gray-600 ml-2">x{item.quantity}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium text-gray-900">
-                            S/ {(parseFloat(item.unit_price || 0) * parseInt(item.quantity || 1)).toFixed(2)}
-                          </span>
-                          {item.status === 'SERVED' ? (
-                            <div className="flex items-center gap-1 text-green-600 text-sm">
-                              <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                              <span>Listo</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 text-orange-600 text-sm">
-                              <div className="w-2 h-2 bg-orange-600 rounded-full animate-pulse"></div>
-                              <span>Preparando</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {account.items.length > 4 && (
-                      <div className="text-center py-2 text-sm text-gray-500">
-                        ... y {account.items.length - 4} items más
-                      </div>
-                    )}
-                  </div>
 
                   {/* Botón procesar pago - esquina inferior derecha */}
                   {readyForPayment && (
@@ -872,9 +843,29 @@ const FloatingCart = ({
             {/* Items del carrito - Solo mostrar y eliminar */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {cart.map((item, index) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-3 flex justify-between items-center">
+                <div key={index} className={`rounded-lg p-3 flex justify-between items-center ${
+                  item.status === 'SERVED' ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
+                }`}>
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
+                      {item.status === 'SERVED' ? (
+                        <div className="flex items-center gap-1 text-green-600 text-xs">
+                          <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                          <span>Entregado</span>
+                        </div>
+                      ) : item.status === 'CREATED' && item.id ? (
+                        <div className="flex items-center gap-1 text-orange-600 text-xs">
+                          <div className="w-2 h-2 bg-orange-600 rounded-full animate-pulse"></div>
+                          <span>Preparando</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-blue-600 text-xs">
+                          <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                          <span>Nuevo</span>
+                        </div>
+                      )}
+                    </div>
                     <div className="text-sm text-gray-600 flex items-center gap-2">
                       <span>Cantidad: {item.quantity}</span>
                       <span>•</span>
@@ -892,12 +883,19 @@ const FloatingCart = ({
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => onRemoveFromCart(index)}
-                    className="text-red-600 hover:text-red-700 p-1"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {item.status === 'SERVED' ? (
+                    <div className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">
+                      No se puede eliminar
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => onRemoveFromCart(index)}
+                      className="text-red-600 hover:text-red-700 p-1"
+                      title={item.id ? "Eliminar item existente" : "Eliminar item nuevo"}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
