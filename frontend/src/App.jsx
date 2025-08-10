@@ -25,6 +25,8 @@ import Kitchen from './pages/operation/Kitchen';
 import Operations from './pages/Operations';
 import OrderCreate from './pages/operations/OrderCreate';
 import OrderManage from './pages/operations/OrderManage';
+import OrderAddItems from './pages/operations/OrderAddItems';
+import OrderEdit from './pages/operations/OrderEdit';
 import PaymentProcess from './pages/operations/PaymentProcess';
 
 // Debug environment variables with persistent logging
@@ -141,6 +143,16 @@ const AppContent = () => {
           <Route path="/operations/table/:tableId/payment" element={
             <ProtectedRoute requiredPermission="canManagePayments">
               <PaymentProcess />
+            </ProtectedRoute>
+          } />
+          <Route path="/operations/table/:tableId/add-items" element={
+            <ProtectedRoute requiredPermission="canManageOrders">
+              <OrderAddItems />
+            </ProtectedRoute>
+          } />
+          <Route path="/operations/table/:tableId/order/:orderId/edit" element={
+            <ProtectedRoute requiredPermission="canManageOrders">
+              <OrderEdit />
             </ProtectedRoute>
           } />
 
