@@ -636,7 +636,7 @@ class CartViewSet(viewsets.ModelViewSet):
     ).order_by('-updated_at')
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
     pagination_class = None  # Deshabilitar paginación
-    lookup_field = 'pk'  # Usar ID normal para consistencia con frontend
+    lookup_field = 'session_id'  # Buscar carritos por session_id
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -673,7 +673,7 @@ class CartViewSet(viewsets.ModelViewSet):
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['post'])
-    def add_item(self, request, pk=None):
+    def add_item(self, request, session_id=None):
         """Agregar item al carrito"""
         cart = self.get_object()
         serializer = CartItemCreateSerializer(data=request.data)
@@ -711,7 +711,7 @@ class CartViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'])
-    def remove_item(self, request, pk=None):
+    def remove_item(self, request, session_id=None):
         """Remover item del carrito"""
         cart = self.get_object()
         item_id = request.data.get('item_id')
@@ -733,7 +733,7 @@ class CartViewSet(viewsets.ModelViewSet):
             )
     
     @action(detail=True, methods=['post'])
-    def update_item(self, request, pk=None):
+    def update_item(self, request, session_id=None):
         """Actualizar item del carrito"""
         cart = self.get_object()
         item_id = request.data.get('item_id')
@@ -762,7 +762,7 @@ class CartViewSet(viewsets.ModelViewSet):
             )
     
     @action(detail=True, methods=['post'])
-    def clear(self, request, pk=None):
+    def clear(self, request, session_id=None):
         """Limpiar todos los items del carrito"""
         cart = self.get_object()
         cart.clear()
