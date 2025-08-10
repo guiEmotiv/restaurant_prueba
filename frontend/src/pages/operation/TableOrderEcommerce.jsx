@@ -1328,31 +1328,7 @@ const RecipeModal = memo(({ recipe, containers, onAdd, onClose }) => {
 
         {/* Contenido simplificado */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Precio y tiempo compacto */}
-          <div className="text-center bg-blue-50 rounded-lg p-3">
-            <div className="text-2xl font-bold text-blue-600">S/ {recipe.base_price}</div>
-            <div className="text-sm text-gray-600">{recipe.preparation_time} minutos</div>
-          </div>
 
-          {/* Cantidad */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Cantidad:</label>
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="text-xl font-semibold w-8 text-center">{quantity}</span>
-              <button 
-                onClick={() => setQuantity(quantity + 1)}
-                className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
 
           {/* Notas */}
           <div className="space-y-2">
