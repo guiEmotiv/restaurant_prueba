@@ -143,12 +143,22 @@ const TableOrderEcommerce = () => {
   };
 
   const saveCurrentAccount = async () => {
-    if (!selectedTable || cart.length === 0) return;
+    if (!selectedTable?.id || cart.length === 0) {
+      showError('Debe seleccionar una mesa y tener items en el carrito');
+      return;
+    }
+    
+    // Validar que todos los items del carrito tengan recipe válida
+    const invalidItems = cart.filter(item => !item.recipe?.id);
+    if (invalidItems.length > 0) {
+      showError('Algunos items del carrito no tienen receta válida');
+      return;
+    }
 
     try {
       setLoading(true);
       
-      const currentAccount = accounts[currentAccountIndex];
+      const currentAccount = accounts[currentAccountIndex] || {};
       let order;
 
       if (currentAccount.id) {
@@ -157,7 +167,7 @@ const TableOrderEcommerce = () => {
       } else {
         // Nueva cuenta - crear orden con items
         const itemsData = cart.map(cartItem => ({
-          recipe: cartItem.recipe.id,
+          recipe: cartItem.recipe?.id,
           quantity: cartItem.quantity,
           notes: cartItem.notes || '',
           is_takeaway: cartItem.is_takeaway || false,
@@ -166,7 +176,7 @@ const TableOrderEcommerce = () => {
         }));
 
         const orderData = {
-          table: selectedTable.id,
+          table: selectedTable?.id,
           waiter: user?.username || 'Sistema',
           items: itemsData
         };
@@ -178,7 +188,7 @@ const TableOrderEcommerce = () => {
       if (currentAccount.id) {
         for (const cartItem of cart) {
           const itemData = {
-            recipe: cartItem.recipe.id,
+            recipe: cartItem.recipe?.id,
             quantity: cartItem.quantity,
             notes: cartItem.notes,
             is_takeaway: cartItem.is_takeaway,
@@ -901,18 +911,8 @@ const FloatingCart = ({
 
 const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
   const [notes, setNotes] = useState('');
-  const [isForTakeaway, setIsForTakeaway] = useState(true);
+  const [isForTakeaway, setIsForTakeaway] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
-
-  // Encontrar el envase de la receta automáticamente
-  useEffect(() => {
-    if (recipe.container) {
-      const containerForRecipe = containers.find(c => c.id === recipe.container);
-      if (containerForRecipe) {
-        setSelectedContainer(containerForRecipe);
-      }
-    }
-  }, [recipe.container, containers]);
 
   const getTotal = () => {
     let total = parseFloat(recipe?.base_price || 0);
@@ -986,13 +986,31 @@ const RecipeModal = ({ recipe, containers, onAdd, onClose }) => {
               <span className="text-sm font-medium">Para llevar</span>
             </label>
 
-            {isForTakeaway && selectedContainer && (
+            {isForTakeaway && (
               <div className="ml-6 space-y-2">
-                <div className="text-sm font-medium text-gray-700">Envase incluido:</div>
-                <div className="bg-gray-50 p-3 rounded border">
-                  <div className="font-medium">{selectedContainer.name}</div>
-                  <div className="text-sm text-orange-600">+ S/ {parseFloat(selectedContainer.price || 0).toFixed(2)}</div>
-                </div>
+                <label className="text-sm font-medium text-gray-700">Seleccionar envase:</label>
+                <select
+                  value={selectedContainer?.id || ''}
+                  onChange={(e) => {
+                    const container = containers.find(c => c.id === parseInt(e.target.value));
+                    setSelectedContainer(container);
+                  }}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                >
+                  <option value="">Sin envase</option>
+                  {containers.map(container => (
+                    <option key={container.id} value={container.id}>
+                      {container.name} - S/ {container.price}
+                      {recipe.container === container.id ? ' (Recomendado)' : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedContainer && (
+                  <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
+                    + S/ {parseFloat(selectedContainer.price || 0).toFixed(2)} por envase
+                  </div>
+                )}
               </div>
             )}
           </div>
