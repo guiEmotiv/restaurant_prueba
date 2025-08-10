@@ -10,6 +10,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     name: '',
     version: '1.0',
     group: '',
+    container: '',
     preparation_time: '',
     profit_percentage: '0.00',
     is_active: true
@@ -18,6 +19,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
   const [recipeItems, setRecipeItems] = useState([]);
   const [availableIngredients, setAvailableIngredients] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
+  const [availableContainers, setAvailableContainers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -30,6 +32,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
   const loadData = async () => {
     await loadAvailableIngredients();
     await loadAvailableGroups();
+    await loadAvailableContainers();
     
     if (recipe) {
       // Modo edición
@@ -37,6 +40,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
         name: recipe.name || '',
         version: recipe.version || '1.0',
         group: recipe.group || '',
+        container: recipe.container || '',
         preparation_time: recipe.preparation_time || '',
         profit_percentage: recipe.profit_percentage || '0.00',
         is_active: recipe.is_active !== undefined ? recipe.is_active : true
@@ -54,6 +58,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       name: '',
       version: '1.0',
       group: '',
+      container: '',
       preparation_time: '',
       profit_percentage: '0.00',
       is_active: true
@@ -78,6 +83,15 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       setAvailableGroups(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading groups:', error);
+    }
+  };
+
+  const loadAvailableContainers = async () => {
+    try {
+      const data = await apiService.containers.getAll();
+      setAvailableContainers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error loading containers:', error);
     }
   };
 
@@ -174,6 +188,10 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       newErrors.version = 'La versión es obligatoria';
     }
     
+    if (!formData.container.trim()) {
+      newErrors.container = 'Debe seleccionar un envase';
+    }
+    
     if (!formData.preparation_time || parseInt(formData.preparation_time) <= 0) {
       newErrors.preparation_time = 'El tiempo de preparación debe ser mayor a 0';
     }
@@ -255,6 +273,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
         name: formData.name.trim(),
         version: formData.version || '1.0',
         group: formData.group || null,
+        container: formData.container || null,
         base_price: finalPrice > 0 ? finalPrice.toFixed(2) : "0.01", // Backend requiere precio mínimo como string
         profit_percentage: parseFloat(formData.profit_percentage) || 0,
         preparation_time: parseInt(formData.preparation_time),
@@ -368,8 +387,37 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                   </div>
                 </div>
 
-                {/* Segunda fila: Versión y Tiempo de Preparación */}
+                {/* Segunda fila: Envase y Versión */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Envase *
+                    </label>
+                    <select
+                      name="container"
+                      value={formData.container}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                        errors.container ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    >
+                      <option value="">Seleccionar envase...</option>
+                      {availableContainers.map(container => (
+                        <option key={container.id} value={container.id}>
+                          {container.name} - S/ {container.price}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.container && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.container}
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Envase recomendado para pedidos para llevar
+                    </p>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Versión *
@@ -390,7 +438,10 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                       </p>
                     )}
                   </div>
+                </div>
 
+                {/* Tercera fila: Tiempo de Preparación y Porcentaje de Ganancia */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Tiempo de Preparación (min) *
@@ -412,10 +463,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                       </p>
                     )}
                   </div>
-                </div>
 
-                {/* Tercera fila: Porcentaje de Ganancia y Estado Activo */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Porcentaje de Ganancia (%)
@@ -439,7 +487,10 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                       </p>
                     )}
                   </div>
+                </div>
 
+                {/* Cuarta fila: Estado Activo */}
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Estado

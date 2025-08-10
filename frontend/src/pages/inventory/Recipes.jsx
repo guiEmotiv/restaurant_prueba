@@ -341,23 +341,11 @@ const Recipes = () => {
                         {recipe.profit_percentage}%
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 text-center">
-                      <div className="flex items-center justify-center mb-2">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                      <div className="flex items-center justify-center">
                         <Package className="h-4 w-4 text-gray-400 mr-1" />
                         <span className="text-gray-600">{recipe.ingredients_count || 0} ingredientes</span>
                       </div>
-                      {recipe.ingredients_list && recipe.ingredients_list.length > 0 ? (
-                        <div className="text-xs bg-gray-50 rounded p-2 max-w-xs">
-                          {recipe.ingredients_list.map((ingredient, index) => (
-                            <div key={index} className="flex justify-between items-center py-1 border-b border-gray-200 last:border-b-0">
-                              <span className="font-medium text-gray-700">{ingredient.name}</span>
-                              <span className="text-gray-500">{ingredient.quantity} {ingredient.unit}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-gray-400 italic">Sin ingredientes</div>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {recipe.is_available_calculated ? (
@@ -485,26 +473,13 @@ const Recipes = () => {
                       </div>
                     </div>
                     
-                    {/* Ingredients */}
+                    {/* Ingredients count */}
                     <div>
-                      <dt className="text-sm font-medium text-gray-500 mb-2">Ingredientes ({recipe.ingredients_count || 0})</dt>
-                      {recipe.ingredients_list && recipe.ingredients_list.length > 0 ? (
-                        <dd className="text-sm text-gray-900">
-                          <div className="bg-gray-50 rounded p-2 space-y-1">
-                            {recipe.ingredients_list.map((ingredient, index) => (
-                              <div key={index} className="flex justify-between items-center py-1 border-b border-gray-200 last:border-b-0">
-                                <span className="font-medium text-gray-700">{ingredient.name}</span>
-                                <span className="text-gray-500 text-xs">{ingredient.quantity} {ingredient.unit}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </dd>
-                      ) : (
-                        <dd className="text-sm text-gray-400 italic flex items-center">
-                          <Package className="h-4 w-4 text-gray-400 mr-1" />
-                          Sin ingredientes
-                        </dd>
-                      )}
+                      <dt className="text-sm font-medium text-gray-500">Ingredientes</dt>
+                      <dd className="text-sm text-gray-900 flex items-center">
+                        <Package className="h-4 w-4 text-gray-400 mr-1" />
+                        <span>{recipe.ingredients_count || 0} ingredientes</span>
+                      </dd>
                     </div>
                     
                     {/* Date */}
