@@ -62,22 +62,22 @@ class Command(BaseCommand):
             
             self.stdout.write("📦 Creating units...")
             units = [
-                Unit.objects.create(name="Kilogramo", abbreviation="kg"),
-                Unit.objects.create(name="Litro", abbreviation="lt"),
-                Unit.objects.create(name="Unidad", abbreviation="un"),
-                Unit.objects.create(name="Gramo", abbreviation="g"),
-                Unit.objects.create(name="Mililitro", abbreviation="ml"),
-                Unit.objects.create(name="Cucharada", abbreviation="cda"),
-                Unit.objects.create(name="Taza", abbreviation="tza"),
+                Unit.objects.create(name="Kilogramo"),
+                Unit.objects.create(name="Litro"),
+                Unit.objects.create(name="Unidad"),
+                Unit.objects.create(name="Gramo"),
+                Unit.objects.create(name="Mililitro"),
+                Unit.objects.create(name="Cucharada"),
+                Unit.objects.create(name="Taza"),
             ]
             self.stdout.write(f"✅ Created {len(units)} units")
             
             self.stdout.write("🏢 Creating zones...")
             zones = [
-                Zone.objects.create(name="Salón Principal", description="Área principal del restaurante"),
-                Zone.objects.create(name="Terraza", description="Área exterior con vista"),
-                Zone.objects.create(name="Barra", description="Área de bar y bebidas"),
-                Zone.objects.create(name="VIP", description="Área reservada para clientes VIP"),
+                Zone.objects.create(name="Salón Principal"),
+                Zone.objects.create(name="Terraza"),
+                Zone.objects.create(name="Barra"),
+                Zone.objects.create(name="VIP"),
             ]
             self.stdout.write(f"✅ Created {len(zones)} zones")
             
@@ -121,19 +121,16 @@ class Command(BaseCommand):
             containers = [
                 Container.objects.create(
                     name="Envase Pequeño",
-                    size="P",
                     price=1.50,
                     description="Para porciones individuales"
                 ),
                 Container.objects.create(
                     name="Envase Mediano", 
-                    size="M",
                     price=2.00,
                     description="Para porciones familiares"
                 ),
                 Container.objects.create(
                     name="Envase Grande",
-                    size="L", 
                     price=2.50,
                     description="Para porciones grandes"
                 ),
@@ -142,18 +139,18 @@ class Command(BaseCommand):
             
             self.stdout.write("🏷️ Creating ingredient groups...")
             groups = [
-                Group.objects.create(name="Carnes", description="Carnes rojas y blancas"),
-                Group.objects.create(name="Aves", description="Pollo, pavo y otras aves"),
-                Group.objects.create(name="Mariscos", description="Pescados y mariscos frescos"),
-                Group.objects.create(name="Verduras", description="Vegetales y hortalizas"),
-                Group.objects.create(name="Condimentos", description="Especias y condimentos"),
-                Group.objects.create(name="Lácteos", description="Leche, queso y derivados"),
-                Group.objects.create(name="Granos", description="Arroz, quinua, menestras"),
-                Group.objects.create(name="Bebidas", description="Bebidas alcohólicas y no alcohólicas"),
-                Group.objects.create(name="Postres", description="Dulces y postres"),
-                Group.objects.create(name="Entradas", description="Aperitivos y entradas"),
-                Group.objects.create(name="Platos Principales", description="Platos fuertes"),
-                Group.objects.create(name="Acompañamientos", description="Guarniciones"),
+                Group.objects.create(name="Carnes"),
+                Group.objects.create(name="Aves"),
+                Group.objects.create(name="Mariscos"),
+                Group.objects.create(name="Verduras"),
+                Group.objects.create(name="Condimentos"),
+                Group.objects.create(name="Lácteos"),
+                Group.objects.create(name="Granos"),
+                Group.objects.create(name="Bebidas"),
+                Group.objects.create(name="Postres"),
+                Group.objects.create(name="Entradas"),
+                Group.objects.create(name="Platos Principales"),
+                Group.objects.create(name="Acompañamientos"),
             ]
             self.stdout.write(f"✅ Created {len(groups)} groups")
             
