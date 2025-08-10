@@ -100,34 +100,38 @@ const TableOrderEcommerce = () => {
       try {
         const updatedOrder = await apiService.orders.getById(account.id);
         
-        // Convertir items existentes al formato de carrito con datos completos
-        const cartItems = updatedOrder.items.map(item => {
-          // Para items existentes con container, buscar el container en container_sales
-          let containerInfo = null;
-          if (item.has_taper && updatedOrder.container_sales) {
-            const containerSale = updatedOrder.container_sales.find(cs => cs.order === updatedOrder.id);
-            if (containerSale) {
-              containerInfo = containers.find(c => c.id === containerSale.container);
-            }
-          }
+        // ===== CONVERSIÓN ARQUITECTÓNICA: BACKEND → FRONTEND =====
+        
+        // 1. Convertir items del backend manteniendo arquitectura
+        const cartItems = updatedOrder.items.map(item => ({
+          // Datos del item
+          recipe: {
+            id: item.recipe,
+            name: item.recipe_name,
+            base_price: item.unit_price,
+            preparation_time: item.recipe_preparation_time
+          },
+          quantity: item.quantity,
+          notes: item.notes || '',
+          is_takeaway: item.is_takeaway || false,
+          has_taper: item.has_taper || false,
           
-          return {
-            recipe: {
-              id: item.recipe,
-              name: item.recipe_name,
-              base_price: item.unit_price,
-              preparation_time: item.recipe_preparation_time
-            },
-            quantity: item.quantity,
-            notes: item.notes || '',
-            is_takeaway: item.is_takeaway || false,
-            has_taper: item.has_taper || false,
-            container: containerInfo, // Incluir info del container si existe
-            status: item.status || 'CREATED',
-            id: item.id,
-            total_price: item.total_price // Incluir precio total del item
-          };
-        });
+          // Estado del backend
+          status: item.status || 'CREATED',
+          id: item.id,
+          total_price: item.total_price, // SOLO comida (arquitectura backend)
+          
+          // Container info: NO calculamos precios aquí
+          // Los containers se manejan separadamente en container_sales
+          container: null, // Se hidrata después si es necesario
+          container_price: 0 // Se obtiene del backend
+        }));
+
+        // 2. Si hay container_sales, anotar la información pero NO mezclar precios
+        if (updatedOrder.container_sales && updatedOrder.container_sales.length > 0) {
+          // Los containers se manejan a nivel de orden, no por item individual
+          // Esto es correcto según la arquitectura del backend
+        }
         
         // Actualizar la cuenta con datos frescos del backend
         const updatedAccount = {
@@ -214,42 +218,54 @@ const TableOrderEcommerce = () => {
     setCart(cart.filter((_, i) => i !== index));
   };
 
-  const getItemPrice = (item) => {
-    // Para items existentes (que ya tienen ID), usar el total_price del backend
-    // Esto incluye solo el precio de la comida, no del container
-    if (item.id && item.total_price) {
+  // ===== ARQUITECTURA RESTAURANTE: CÁLCULOS BASADOS EN BACKEND =====
+  
+  /**
+   * PRINCIPIO: El backend es la fuente única de verdad
+   * - Order.total_amount = Solo comida (OrderItems)
+   * - Order.get_containers_total() = Solo envases (ContainerSales)  
+   * - Order.get_grand_total() = Total completo
+   */
+
+  const getItemFoodPrice = (item) => {
+    // Para items del backend: usar total_price (solo comida, sin envases)
+    if (item.id && item.total_price !== undefined) {
       return parseFloat(item.total_price);
     }
     
-    // Para items nuevos, calcular precio base de comida
+    // Para items nuevos: calcular precio base * cantidad
     const quantity = parseInt(item.quantity || 1);
     const unitPrice = parseFloat(item.recipe?.base_price || 0);
-    const foodPrice = unitPrice * quantity;
-    
-    // Para items nuevos, NO agregar precio de container aquí
-    // Los containers se manejan por separado en ContainerSale
-    return foodPrice;
+    return unitPrice * quantity;
   };
 
-  // Función helper para obtener el precio total de un item incluyendo container
-  const getItemTotalPrice = (item) => {
-    const basePrice = getItemPrice(item);
-    
-    // Para items nuevos con container, sumar el precio del container
+  const getItemContainerPrice = (item) => {
+    // Items nuevos con envase
     if (!item.id && item.has_taper && item.container) {
       const quantity = parseInt(item.quantity || 1);
       const containerPrice = parseFloat(item.container.price || 0);
-      return basePrice + (containerPrice * quantity);
+      return containerPrice * quantity;
     }
     
-    // Para items existentes, el total_price ya incluye todo lo necesario
-    // pero los containers están separados en container_sales
-    return basePrice;
+    // Items existentes: container price viene del backend separadamente
+    // No calculamos aquí, viene en container_sales
+    return 0;
   };
 
-  const getCartTotal = () => {
-    // Usar la función helper que maneja correctamente todos los casos
-    return cart.reduce((sum, item) => sum + getItemTotalPrice(item), 0);
+  const getItemTotalPrice = (item) => {
+    return getItemFoodPrice(item) + getItemContainerPrice(item);
+  };
+
+  const getCartTotals = () => {
+    const foodTotal = cart.reduce((sum, item) => sum + getItemFoodPrice(item), 0);
+    const containerTotal = cart.reduce((sum, item) => sum + getItemContainerPrice(item), 0);
+    const grandTotal = foodTotal + containerTotal;
+    
+    return {
+      food: foodTotal,
+      containers: containerTotal,
+      grand: grandTotal
+    };
   };
 
   const getNewItemsTotal = () => {
@@ -357,10 +373,14 @@ const TableOrderEcommerce = () => {
       updatedAccounts[currentAccountIndex] = updatedAccount;
       setAccounts(updatedAccounts);
 
-      showSuccess('Cuenta actualizada exitosamente');
+      // ===== LIMPIEZA ARQUITECTÓNICA DEL STATE =====
+      
+      showSuccess(`Cuenta ${currentAccount.id ? 'actualizada' : 'creada'} exitosamente`);
+      
+      // 1. Limpiar carrito completamente (evita estados inconsistentes)
       setCart([]);
       
-      // Recargar todas las cuentas para tener totales actualizados
+      // 2. Recargar TODAS las cuentas desde el backend (fuente de verdad)
       if (selectedTable) {
         const orders = await loadTableOrders(selectedTable.id);
         if (orders.length > 0) {
@@ -368,13 +388,14 @@ const TableOrderEcommerce = () => {
           setAccounts(sortedOrders.map(order => ({
             id: order.id,
             items: order.items || [],
-            total: parseFloat(order.grand_total || order.total_amount || 0),
+            total: parseFloat(order.grand_total || order.total_amount || 0), // Backend es fuente de verdad
             containers_total: parseFloat(order.containers_total || 0),
             created_at: order.created_at
           })));
         }
       }
       
+      // 3. Volver a cuentas con estado limpio
       setCurrentStep('accounts');
 
     } catch (error) {
@@ -556,8 +577,9 @@ const TableOrderEcommerce = () => {
             onUpdateCart={updateCartItem}
             onRemoveFromCart={removeFromCart}
             onSaveAccount={saveCurrentAccount}
-            getCartTotal={getCartTotal}
-            getItemPrice={getItemPrice}
+            getCartTotals={getCartTotals}
+            getItemFoodPrice={getItemFoodPrice}
+            getItemContainerPrice={getItemContainerPrice}
             getItemTotalPrice={getItemTotalPrice}
             loading={loading}
           />
@@ -824,8 +846,9 @@ const MenuSelection = ({
   onUpdateCart, 
   onRemoveFromCart, 
   onSaveAccount,
-  getCartTotal,
-  getItemPrice,
+  getCartTotals,
+  getItemFoodPrice,
+  getItemContainerPrice,
   getItemTotalPrice,
   loading 
 }) => {
@@ -937,8 +960,9 @@ const MenuSelection = ({
         onUpdateCart={onUpdateCart}
         onRemoveFromCart={onRemoveFromCart}
         onSaveAccount={onSaveAccount}
-        getCartTotal={getCartTotal}
-        getItemPrice={getItemPrice}
+        getCartTotals={getCartTotals}
+        getItemFoodPrice={getItemFoodPrice}
+        getItemContainerPrice={getItemContainerPrice}
         getItemTotalPrice={getItemTotalPrice}
         loading={loading}
       />
@@ -965,8 +989,9 @@ const FloatingCart = ({
   onUpdateCart, 
   onRemoveFromCart, 
   onSaveAccount, 
-  getCartTotal,
-  getItemPrice,
+  getCartTotals,
+  getItemFoodPrice,
+  getItemContainerPrice,
   getItemTotalPrice,
   loading 
 }) => {
@@ -986,6 +1011,11 @@ const FloatingCart = ({
         <span className="bg-white text-blue-600 rounded-full min-w-[24px] h-6 flex items-center justify-center text-sm font-bold">
           {totalItems}
         </span>
+        {totalItems > 0 && (
+          <span className="ml-2 text-xs bg-green-600 text-white px-2 py-1 rounded-full">
+            S/ {getCartTotals().grand.toFixed(2)}
+          </span>
+        )}
       </button>
 
       {/* Modal del carrito expandido */}
@@ -1051,26 +1081,32 @@ const FloatingCart = ({
                         </div>
                       )}
                     </div>
+                    {/* ===== ARQUITECTURA RESTAURANTE: DESGLOSE POR COMPONENTES ===== */}
                     <div className="text-sm text-gray-600 space-y-1">
                       <div className="flex items-center gap-2">
                         <span>Cantidad: {item.quantity}</span>
                         <span>•</span>
-                        <span>Comida: S/ {getItemPrice(item).toFixed(2)}</span>
+                        <span>Comida: S/ {getItemFoodPrice(item).toFixed(2)}</span>
                       </div>
-                      {item.has_taper && item.container && (
+                      
+                      {/* Mostrar envase solo si tiene precio calculable */}
+                      {getItemContainerPrice(item) > 0 && (
                         <div className="flex items-center gap-2 text-xs">
                           <Package className="h-3 w-3 text-orange-600" />
-                          <span>Envase: S/ {(parseFloat(item.container.price || 0) * parseInt(item.quantity || 1)).toFixed(2)}</span>
+                          <span>Envase: S/ {getItemContainerPrice(item).toFixed(2)}</span>
                         </div>
                       )}
-                      {item.has_taper && !item.container && item.id && (
-                        <div className="flex items-center gap-2 text-xs">
+                      
+                      {/* Para items existentes con envase pero sin precio local */}
+                      {item.has_taper && getItemContainerPrice(item) === 0 && item.id && (
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
                           <Package className="h-3 w-3 text-orange-600" />
-                          <span>Con envase (incluido en total)</span>
+                          <span>Con envase (calculado por orden)</span>
                         </div>
                       )}
+                      
                       <div className="flex items-center gap-2 font-medium">
-                        <span>Total: S/ {getItemTotalPrice(item).toFixed(2)}</span>
+                        <span>Total item: S/ {getItemTotalPrice(item).toFixed(2)}</span>
                       </div>
                     </div>
                     {item.is_takeaway && (
@@ -1102,35 +1138,39 @@ const FloatingCart = ({
               ))}
             </div>
             
-            {/* Footer con total y botón */}
+            {/* ===== FOOTER ARQUITECTÓNICO: TOTALES SEPARADOS ===== */}
             <div className="p-4 border-t space-y-4">
               {(() => {
-                const foodTotal = cart.reduce((sum, item) => sum + getItemPrice(item), 0);
-                const containerTotal = cart.reduce((sum, item) => {
-                  // Solo mostrar containers que tienen información disponible
-                  if (item.has_taper && item.container) {
-                    return sum + (parseFloat(item.container.price || 0) * parseInt(item.quantity || 1));
-                  }
-                  return sum;
-                }, 0);
-                const grandTotal = cart.reduce((sum, item) => sum + getItemTotalPrice(item), 0);
-
+                const totals = getCartTotals();
+                
                 return (
                   <div className="space-y-2">
+                    {/* Subtotal comida */}
                     <div className="flex justify-between items-center text-sm text-gray-600">
-                      <span>Subtotal comida:</span>
-                      <span>S/ {foodTotal.toFixed(2)}</span>
+                      <span>🍽️ Subtotal comida:</span>
+                      <span>S/ {totals.food.toFixed(2)}</span>
                     </div>
-                    {containerTotal > 0 && (
+                    
+                    {/* Subtotal envases (solo si hay) */}
+                    {totals.containers > 0 && (
                       <div className="flex justify-between items-center text-sm text-gray-600">
-                        <span>Subtotal envases:</span>
-                        <span>S/ {containerTotal.toFixed(2)}</span>
+                        <span>📦 Subtotal envases:</span>
+                        <span>S/ {totals.containers.toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between items-center text-lg font-bold border-t pt-2">
-                      <span>Total:</span>
-                      <span>S/ {grandTotal.toFixed(2)}</span>
+                    
+                    {/* Total general */}
+                    <div className="flex justify-between items-center text-lg font-bold border-t pt-2 text-green-700">
+                      <span>💰 TOTAL GENERAL:</span>
+                      <span>S/ {totals.grand.toFixed(2)}</span>
                     </div>
+                    
+                    {/* Información arquitectónica para debugging */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-50 rounded">
+                        <div>📊 Debug: Food={totals.food.toFixed(2)} + Containers={totals.containers.toFixed(2)} = {totals.grand.toFixed(2)}</div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
