@@ -309,7 +309,7 @@ const TableOrderEcommerce = () => {
           <h1 className="text-2xl font-bold text-gray-900 text-center mb-4">
             {currentStep === 'tables' && 'Seleccionar Mesa'}
             {currentStep === 'accounts' && `Mesa ${selectedTable?.table_number} - Cuentas`}
-            {currentStep === 'menu' && `Cuenta ${currentAccountIndex + 1} - Menú`}
+            {currentStep === 'menu' && `Cuenta ${currentAccountIndex + 1}`}
             {currentStep === 'payment' && 'Procesar Pago'}
           </h1>
           
@@ -566,16 +566,16 @@ const MenuSelection = ({
   }, {});
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="space-y-6">
       {/* Menú */}
-      <div className="lg:col-span-2 space-y-6">
+      <div className="space-y-6">
         {Object.entries(recipesByGroup).map(([groupName, groupRecipes]) => (
           <div key={groupName} className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900 border-b pb-2">
               {groupName}
             </h2>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {groupRecipes.map(recipe => (
                 <div key={recipe.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
                   <div className="space-y-3">
@@ -606,55 +606,106 @@ const MenuSelection = ({
         ))}
       </div>
 
-      {/* Carrito */}
-      <div className="space-y-4">
-        <div className="bg-white rounded-lg border border-gray-200 sticky top-4">
-          <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              Carrito ({cart.reduce((sum, item) => sum + item.quantity, 0)})
-            </h2>
-          </div>
-          
-          <div className="p-4 space-y-4">
-            {cart.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">
-                No hay items en el carrito
-              </p>
-            ) : (
-              <>
-                {cart.map((item, index) => (
-                  <CartItem
-                    key={index}
-                    item={item}
-                    index={index}
-                    containers={containers}
-                    onUpdate={onUpdateCart}
-                    onRemove={onRemoveFromCart}
-                  />
-                ))}
-                
-                <div className="border-t pt-4 space-y-4">
-                  <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Total:</span>
-                    <span>S/ {getCartTotal().toFixed(2)}</span>
-                  </div>
-                  
-                  <button
-                    onClick={onSaveAccount}
-                    disabled={loading || cart.length === 0}
-                    className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center gap-2"
-                  >
-                    <ShoppingCart className="h-5 w-5" />
-                    {loading ? 'Guardando...' : 'Guardar en Cuenta'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Carrito flotante en inferior derecha */}
+      <FloatingCart
+        cart={cart}
+        containers={containers}
+        onUpdateCart={onUpdateCart}
+        onRemoveFromCart={onRemoveFromCart}
+        onSaveAccount={onSaveAccount}
+        getCartTotal={getCartTotal}
+        loading={loading}
+      />
     </div>
+  );
+};
+
+const FloatingCart = ({ 
+  cart, 
+  containers, 
+  onUpdateCart, 
+  onRemoveFromCart, 
+  onSaveAccount, 
+  getCartTotal, 
+  loading 
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  if (totalItems === 0) return null;
+
+  return (
+    <>
+      {/* Botón flotante */}
+      <button
+        onClick={() => setIsExpanded(true)}
+        className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-40 flex items-center gap-2"
+      >
+        <ShoppingCart className="h-6 w-6" />
+        <span className="bg-white text-blue-600 rounded-full min-w-[24px] h-6 flex items-center justify-center text-sm font-bold">
+          {totalItems}
+        </span>
+      </button>
+
+      {/* Modal del carrito expandido */}
+      {isExpanded && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-50"
+            onClick={() => setIsExpanded(false)}
+          />
+          <div className="fixed inset-x-4 bottom-4 top-20 bg-white rounded-lg shadow-xl z-50 flex flex-col max-w-md mx-auto">
+            {/* Header del carrito */}
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Carrito ({totalItems})
+              </h2>
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* Items del carrito */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {cart.map((item, index) => (
+                <CartItem
+                  key={index}
+                  item={item}
+                  index={index}
+                  containers={containers}
+                  onUpdate={onUpdateCart}
+                  onRemove={onRemoveFromCart}
+                />
+              ))}
+            </div>
+            
+            {/* Footer con total y botón */}
+            <div className="p-4 border-t space-y-4">
+              <div className="flex justify-between items-center text-lg font-bold">
+                <span>Total:</span>
+                <span>S/ {getCartTotal().toFixed(2)}</span>
+              </div>
+              
+              <button
+                onClick={() => {
+                  onSaveAccount();
+                  setIsExpanded(false);
+                }}
+                disabled={loading || cart.length === 0}
+                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center gap-2"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {loading ? 'Guardando...' : 'Guardar en Cuenta'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 };
 
@@ -723,7 +774,7 @@ const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
 
         {item.is_takeaway && (
           <div className="ml-6 space-y-3">
-            {/* Botones específicos para para llevar */}
+            {/* Botones específicos como solicitado en el requerimiento */}
             <div className="flex gap-2">
               <button
                 onClick={() => onUpdate(index, { has_taper: true })}
@@ -733,13 +784,13 @@ const CartItem = ({ item, index, containers, onUpdate, onRemove }) => {
                     : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
                 }`}
               >
-                Agregar Envase
+                Agregar Receta
               </button>
               <button
                 onClick={() => onUpdate(index, { 
                   is_takeaway: true, 
                   has_taper: item.has_taper,
-                  notes: item.notes + (item.notes ? ' | ' : '') + 'Para llevar'
+                  notes: item.notes + (item.notes ? ' | ' : '') + 'Para llevar adicional'
                 })}
                 className="flex-1 py-2 px-3 rounded-lg text-sm font-medium bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 transition-colors"
               >
