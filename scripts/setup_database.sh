@@ -131,14 +131,17 @@ def populate_database():
         ("Botella Plástica", "Botella para bebidas frías 500ml", 1.00, 200),
     ]
     
+    containers = []
     for name, desc, price, stock in containers_data:
-        Container.objects.create(
+        container = Container.objects.create(
             name=name,
             description=desc,
             price=Decimal(str(price)),
             stock=stock,
             is_active=True
         )
+        containers.append(container)
+    created_objects["containers"] = {cont.name: cont for cont in containers}
     
     # Grupos
     print("🏷️  Creando grupos...")
@@ -185,7 +188,6 @@ def populate_database():
     
     # Recetas - TODAS las recetas DEBEN tener envase asignado
     print("👨‍🍳 Creando recetas...")
-    containers = list(Container.objects.all())
     recipes_data = [
         ("Parrillada Mixta", "Carnes", 45.00, 150.0, 25, "1.0", "Bandeja Grande"),
         ("Lomo Saltado", "Carnes", 28.00, 140.0, 15, "1.0", "Bandeja Grande"),
@@ -199,7 +201,6 @@ def populate_database():
         ("Arroz Chaufa", "Cereales", 15.00, 180.0, 12, "1.0", "Bandeja Grande"),
     ]
     
-    created_objects["containers"] = {cont.name: cont for cont in containers}
     recipes = []
     for name, group_name, price, profit, prep_time, version, container_name in recipes_data:
         group = created_objects["groups"][group_name]
@@ -295,6 +296,13 @@ def show_summary():
     print(f"\n✅ VALIDACIONES:")
     print(f"   • Recetas sin ingredientes: {recipes_without_ingredients} (debe ser 0)")
     print(f"   • Recetas sin envase: {recipes_without_containers} (debe ser 0)")
+    
+    # Mostrar detalles de cada receta para debug
+    print(f"\n📋 DETALLES DE RECETAS:")
+    for recipe in Recipe.objects.all():
+        ingredients_count = recipe.recipeitem_set.count()
+        container_name = recipe.container.name if recipe.container else "SIN ENVASE"
+        print(f"   • {recipe.name}: {ingredients_count} ingredientes, Envase: {container_name}")
     
     if recipes_without_ingredients > 0 or recipes_without_containers > 0:
         print("\n❌ ERROR: Hay recetas sin ingredientes o envases!")
