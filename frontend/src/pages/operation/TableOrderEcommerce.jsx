@@ -156,6 +156,7 @@ const TableOrderEcommerce = () => {
   };
 
   const getCartTotal = () => {
+    // Total para mostrar en el modal (incluye todos los items)
     const itemsTotal = cart.reduce((sum, item) => sum + (parseFloat(item.recipe?.base_price || 0) * parseInt(item.quantity || 1)), 0);
     const containersTotal = cart.reduce((sum, item) => {
       if (item.has_taper && item.container) {
@@ -164,11 +165,6 @@ const TableOrderEcommerce = () => {
       return sum;
     }, 0);
     return itemsTotal + containersTotal;
-  };
-
-  const getCartDisplayTotal = () => {
-    // Total para mostrar en el modal (incluye todos los items)
-    return getCartTotal();
   };
 
   const getNewItemsTotal = () => {
@@ -449,7 +445,7 @@ const TableOrderEcommerce = () => {
             onUpdateCart={updateCartItem}
             onRemoveFromCart={removeFromCart}
             onSaveAccount={saveCurrentAccount}
-            getCartTotal={getCartDisplayTotal}
+            getCartTotal={getCartTotal}
             loading={loading}
           />
         )}
@@ -826,7 +822,7 @@ const MenuSelection = ({
         onUpdateCart={onUpdateCart}
         onRemoveFromCart={onRemoveFromCart}
         onSaveAccount={onSaveAccount}
-        getCartTotal={getCartDisplayTotal}
+        getCartTotal={getCartTotal}
         loading={loading}
       />
 
