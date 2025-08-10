@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Users, Clock, ShoppingCart, Plus, Minus, Package, StickyNote, CreditCard, Edit3, PlusCircle, Filter, X, Trash2 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const TableOrderEcommerce = () => {
   const [currentStep, setCurrentStep] = useState('tables'); // 'tables', 'accounts', 'menu', 'payment'
@@ -14,6 +15,7 @@ const TableOrderEcommerce = () => {
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   const { showSuccess, showError } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadInitialData();
@@ -156,7 +158,7 @@ const TableOrderEcommerce = () => {
         // Nueva cuenta - crear orden
         const orderData = {
           table: selectedTable.id,
-          waiter: 'Sistema',
+          waiter: user?.username || 'Sistema',
         };
         order = await apiService.orders.create(orderData);
       }
@@ -201,7 +203,12 @@ const TableOrderEcommerce = () => {
 
     } catch (error) {
       console.error('Error saving account:', error);
-      showError('Error al guardar la cuenta');
+      console.error('Error response:', error.response?.data);
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.error || 
+                          JSON.stringify(error.response?.data) ||
+                          'Error al guardar la cuenta';
+      showError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -237,7 +244,7 @@ const TableOrderEcommerce = () => {
             order: account.id,
             payment_method: 'CASH',
             amount: account.total,
-            notes: 'Pago procesado desde vista ecommerce'
+            notes: `Pago procesado por ${user?.username || 'Sistema'} desde vista ecommerce`
           };
 
           await apiService.payments.create(paymentData);
@@ -669,13 +676,22 @@ const MenuSelection = ({
                       <span>{recipe.preparation_time} min</span>
                     </div>
                     
-                    <button
-                      onClick={() => handleRecipeClick(recipe)}
-                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Agregar
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onAddToCart(recipe)}
+                        className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Agregar
+                      </button>
+                      <button
+                        onClick={() => handleRecipeClick(recipe)}
+                        className="flex-1 bg-green-600 text-white py-2 px-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <StickyNote className="h-4 w-4" />
+                        Con Nota
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
