@@ -102,9 +102,13 @@ const TableOrderEcommerce = () => {
         
         // ===== CONVERSIÓN ARQUITECTÓNICA: BACKEND → FRONTEND =====
         
-        // 1. Convertir items del backend manteniendo arquitectura
-        const cartItems = updatedOrder.items.map(item => ({
-          // Datos del item
+        // 1. Convertir items manteniendo orden de creación (created_at)
+        const sortedItems = updatedOrder.items.sort((a, b) => 
+          new Date(a.created_at || 0) - new Date(b.created_at || 0)
+        );
+        
+        const cartItems = sortedItems.map(item => ({
+          // Datos del item (INMUTABLES del backend)
           recipe: {
             id: item.recipe,
             name: item.recipe_name,
@@ -116,22 +120,19 @@ const TableOrderEcommerce = () => {
           is_takeaway: item.is_takeaway || false,
           has_taper: item.has_taper || false,
           
-          // Estado del backend
+          // Estado inmutable del backend
           status: item.status || 'CREATED',
           id: item.id,
-          total_price: item.total_price, // SOLO comida (arquitectura backend)
+          total_price: item.total_price, // FIJO del backend - NO recalcular
+          created_at: item.created_at, // Para ordenamiento
           
-          // Container info: NO calculamos precios aquí
-          // Los containers se manejan separadamente en container_sales
-          container: null, // Se hidrata después si es necesario
-          container_price: 0 // Se obtiene del backend
+          // Container info: Items existentes NO tienen container individual
+          container: null, 
+          container_price: 0 // Containers están en ContainerSales de ORDER
         }));
 
-        // 2. Si hay container_sales, anotar la información pero NO mezclar precios
-        if (updatedOrder.container_sales && updatedOrder.container_sales.length > 0) {
-          // Los containers se manejan a nivel de orden, no por item individual
-          // Esto es correcto según la arquitectura del backend
-        }
+        // 2. Containers están separados en container_sales (nivel ORDER)
+        // NO asignar containers a items individuales - arquitectura incorrecta
         
         // Actualizar la cuenta con datos frescos del backend
         const updatedAccount = {
@@ -228,7 +229,7 @@ const TableOrderEcommerce = () => {
    */
 
   const getItemFoodPrice = (item) => {
-    // Para items del backend: usar total_price (solo comida, sin envases)
+    // REGLA FUNDAMENTAL: Items existentes NUNCA se recalculan
     if (item.id && item.total_price !== undefined) {
       return parseFloat(item.total_price);
     }
@@ -240,15 +241,24 @@ const TableOrderEcommerce = () => {
   };
 
   const getItemContainerPrice = (item) => {
-    // Items nuevos con envase
+    // REGLA FUNDAMENTAL: Solo items NUEVOS calculan containers individualmente
+    // Items existentes: containers están en ContainerSales a nivel de ORDER
     if (!item.id && item.has_taper && item.container) {
       const quantity = parseInt(item.quantity || 1);
       const containerPrice = parseFloat(item.container.price || 0);
       return containerPrice * quantity;
     }
     
-    // Items existentes: container price viene del backend separadamente
-    // No calculamos aquí, viene en container_sales
+    // Items existentes: CERO (containers están separados en el backend)
+    return 0;
+  };
+
+  // Nueva función: obtener containers de orden existente
+  const getOrderContainerTotal = () => {
+    const currentAccount = accounts[currentAccountIndex];
+    if (currentAccount && currentAccount.containers_total) {
+      return parseFloat(currentAccount.containers_total);
+    }
     return 0;
   };
 
@@ -258,12 +268,19 @@ const TableOrderEcommerce = () => {
 
   const getCartTotals = () => {
     const foodTotal = cart.reduce((sum, item) => sum + getItemFoodPrice(item), 0);
-    const containerTotal = cart.reduce((sum, item) => sum + getItemContainerPrice(item), 0);
+    
+    // Containers: suma items NUEVOS + containers de la ORDEN existente
+    const newItemsContainerTotal = cart.reduce((sum, item) => sum + getItemContainerPrice(item), 0);
+    const orderContainerTotal = getOrderContainerTotal();
+    const containerTotal = newItemsContainerTotal + orderContainerTotal;
+    
     const grandTotal = foodTotal + containerTotal;
     
     return {
       food: foodTotal,
       containers: containerTotal,
+      newItemsContainers: newItemsContainerTotal,
+      orderContainers: orderContainerTotal,
       grand: grandTotal
     };
   };
@@ -1045,13 +1062,27 @@ const FloatingCart = ({
               {cart
                 .slice() // Crear copia para no mutar el array original
                 .sort((a, b) => {
-                  // Prioridad: nuevos items primero, luego items existentes por status
-                  if (!a.id && b.id) return -1; // Items nuevos primero
-                  if (a.id && !b.id) return 1; // Items nuevos primero
+                  // ARQUITECTURA CORRECTA: Items nuevos primero (más recientes)
+                  // Luego items existentes por orden de creación (1, 2, 3...)
                   
-                  // Para items del mismo tipo, los entregados al final
+                  // 1. Items nuevos (sin ID) siempre primero
+                  if (!a.id && b.id) return -1;
+                  if (a.id && !b.id) return 1;
+                  
+                  // 2. Entre items nuevos: más recientes primero (orden inverso de adición)
+                  if (!a.id && !b.id) return 0; // Mantener orden de adición
+                  
+                  // 3. Entre items existentes: orden de creación (1, 2, 3...)
+                  if (a.id && b.id) {
+                    if (a.created_at && b.created_at) {
+                      return new Date(a.created_at) - new Date(b.created_at);
+                    }
+                  }
+                  
+                  // 4. Items entregados al final
                   if (a.status === 'SERVED' && b.status !== 'SERVED') return 1;
                   if (a.status !== 'SERVED' && b.status === 'SERVED') return -1;
+                  
                   return 0;
                 })
                 .map((item, index) => (
@@ -1097,11 +1128,11 @@ const FloatingCart = ({
                         </div>
                       )}
                       
-                      {/* Para items existentes con envase pero sin precio local */}
-                      {item.has_taper && getItemContainerPrice(item) === 0 && item.id && (
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <Package className="h-3 w-3 text-orange-600" />
-                          <span>Con envase (calculado por orden)</span>
+                      {/* Para items existentes con envase: mostrar info arquitectónica */}
+                      {item.has_taper && item.id && (
+                        <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 rounded px-2 py-1">
+                          <Package className="h-3 w-3 text-blue-600" />
+                          <span>✅ Envase incluido en total de orden</span>
                         </div>
                       )}
                       
@@ -1151,11 +1182,30 @@ const FloatingCart = ({
                       <span>S/ {totals.food.toFixed(2)}</span>
                     </div>
                     
-                    {/* Subtotal envases (solo si hay) */}
+                    {/* Subtotal envases: desglosado por fuente */}
                     {totals.containers > 0 && (
-                      <div className="flex justify-between items-center text-sm text-gray-600">
-                        <span>📦 Subtotal envases:</span>
-                        <span>S/ {totals.containers.toFixed(2)}</span>
+                      <div className="space-y-1">
+                        {/* Envases de items nuevos */}
+                        {totals.newItemsContainers > 0 && (
+                          <div className="flex justify-between items-center text-xs text-orange-600">
+                            <span>📦 Envases nuevos:</span>
+                            <span>S/ {totals.newItemsContainers.toFixed(2)}</span>
+                          </div>
+                        )}
+                        
+                        {/* Envases de orden existente */}
+                        {totals.orderContainers > 0 && (
+                          <div className="flex justify-between items-center text-xs text-blue-600">
+                            <span>📦 Envases de orden:</span>
+                            <span>S/ {totals.orderContainers.toFixed(2)}</span>
+                          </div>
+                        )}
+                        
+                        {/* Total envases */}
+                        <div className="flex justify-between items-center text-sm text-gray-700 bg-gray-50 px-2 py-1 rounded">
+                          <span>📦 Total envases:</span>
+                          <span>S/ {totals.containers.toFixed(2)}</span>
+                        </div>
                       </div>
                     )}
                     
@@ -1168,7 +1218,7 @@ const FloatingCart = ({
                     {/* Información arquitectónica para debugging */}
                     {process.env.NODE_ENV === 'development' && (
                       <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-50 rounded">
-                        <div>📊 Debug: Food={totals.food.toFixed(2)} + Containers={totals.containers.toFixed(2)} = {totals.grand.toFixed(2)}</div>
+                        <div>📊 Food={totals.food.toFixed(2)} + New={totals.newItemsContainers.toFixed(2)} + Order={totals.orderContainers.toFixed(2)} = {totals.grand.toFixed(2)}</div>
                       </div>
                     )}
                   </div>
