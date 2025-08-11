@@ -507,7 +507,13 @@ class OrderDetailSerializer(serializers.ModelSerializer):
                         pass
         
         # Recalcular totales
-        instance.calculate_total()
+        print(f"🔧 SERIALIZER: Llamando calculate_total para orden {instance.id}")
+        result = instance.calculate_total()
+        print(f"🔧 SERIALIZER: calculate_total retornó {result}")
+        
+        # Forzar reload para verificar
+        instance.refresh_from_db()
+        print(f"🔧 SERIALIZER: Total después de refresh: {instance.total_amount}")
         
         return instance
 
