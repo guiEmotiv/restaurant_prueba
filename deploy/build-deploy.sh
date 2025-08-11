@@ -217,11 +217,8 @@ backend_only_deploy() {
     
     cd "$PROJECT_DIR"
     
-    # Use simple docker compose if available, fall back to ec2
+    # Always use simple docker compose (has nginx + django)
     COMPOSE_FILE="docker-compose.simple.yml"
-    if [ ! -f "$COMPOSE_FILE" ]; then
-        COMPOSE_FILE="docker-compose.ec2.yml"
-    fi
     
     # Restart backend container
     echo -e "${BLUE}🔄 Restarting backend...${NC}"
@@ -285,7 +282,7 @@ EOF
     cd "$PROJECT_DIR"
     echo -e "${BLUE}🐳 Starting backend...${NC}"
     
-    # Use simple docker compose configuration
+    # Always use simple docker compose configuration (has nginx + django)
     COMPOSE_FILE="docker-compose.simple.yml"
     if [ ! -f "$COMPOSE_FILE" ]; then
         echo -e "${YELLOW}Creating docker-compose.simple.yml...${NC}"
@@ -352,11 +349,8 @@ else
     echo -e "${YELLOW}⚠️ Backend API: Status $BACKEND_STATUS${NC}"
     if [[ "$BACKEND_ONLY" != "true" ]]; then
         echo -e "${BLUE}Backend logs (last 10 lines):${NC}"
-        # Use simple compose if available
+        # Use simple compose (has nginx + django)
         COMPOSE_FILE="docker-compose.simple.yml"
-        if [ ! -f "$COMPOSE_FILE" ]; then
-            COMPOSE_FILE="docker-compose.ec2.yml"
-        fi
         docker-compose -f "$COMPOSE_FILE" logs --tail=10 web || echo "Could not fetch logs"
     fi
 fi
@@ -377,9 +371,6 @@ else
         echo -e "${YELLOW}⚠️ Tables endpoint issue in Django backend${NC}"
         # Check if tables model/endpoint exists
         COMPOSE_FILE="docker-compose.simple.yml"
-        if [ ! -f "$COMPOSE_FILE" ]; then
-            COMPOSE_FILE="docker-compose.ec2.yml"
-        fi
         echo -e "${BLUE}Checking Django URLs...${NC}"
         docker-compose -f "$COMPOSE_FILE" exec -T web python manage.py show_urls 2>/dev/null | grep tables || echo "No tables URL found"
     fi
@@ -387,9 +378,6 @@ fi
 
 # Test Docker nginx status
 COMPOSE_FILE="docker-compose.simple.yml"
-if [ ! -f "$COMPOSE_FILE" ]; then
-    COMPOSE_FILE="docker-compose.ec2.yml"
-fi
 
 NGINX_RUNNING=$(docker-compose -f "$COMPOSE_FILE" ps nginx 2>/dev/null | grep -c "Up" || echo "0")
 if [ "$NGINX_RUNNING" -gt 0 ]; then
@@ -454,6 +442,6 @@ echo -e "   Full deploy:    ${BLUE}sudo $0${NC}"
 echo -e "   Help:           ${BLUE}sudo $0 --help${NC}"
 echo -e ""
 echo -e "${YELLOW}🔍 Troubleshooting:${NC}"
-echo -e "   Backend logs:   ${BLUE}docker-compose -f docker-compose.ec2.yml logs web${NC}"
+echo -e "   Backend logs:   ${BLUE}docker-compose -f docker-compose.simple.yml logs web${NC}"
 echo -e "   Test API:       ${BLUE}curl -v https://www.$DOMAIN/api/v1/health/${NC}"
-echo -e "   Container status: ${BLUE}docker-compose -f docker-compose.ec2.yml ps${NC}"
+echo -e "   Container status: ${BLUE}docker-compose -f docker-compose.simple.yml ps${NC}"
