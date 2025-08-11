@@ -39,29 +39,43 @@ class Order(models.Model):
     def calculate_total(self):
         """Calcula el total de items (NO incluye envases - están en container_sales)"""
         if self.pk:
-            # Método más simple y directo - recalcular desde cero
             try:
+                # Debug: agregar logging para verificar ejecución
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"🔧 CALCULATE_TOTAL llamado para orden {self.pk}")
+                
                 # Obtener todos los items de esta orden directamente de DB
                 from django.db import models
                 items_total = self.orderitem_set.all().aggregate(
                     total=models.Sum('total_price')
                 )['total'] or Decimal('0.00')
                 
-                # Solo actualizar si hay cambio real
-                if self.total_amount != items_total:
-                    self.total_amount = items_total
-                    # Usar update para evitar signals y recursión
-                    Order.objects.filter(pk=self.pk).update(total_amount=items_total)
+                logger.error(f"🔧 Items total calculado: {items_total}")
+                logger.error(f"🔧 Total actual en orden: {self.total_amount}")
+                
+                # FORZAR actualización siempre, sin condición
+                self.total_amount = items_total
+                
+                # Usar save normal para asegurar actualización
+                super().save(update_fields=['total_amount'])
+                
+                logger.error(f"🔧 Orden actualizada con nuevo total: {items_total}")
                 
                 return items_total
             except Exception as e:
-                # Fallback: calcular manualmente
+                # Fallback con logging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"🔧 ERROR en calculate_total: {e}")
+                
                 items_total = Decimal('0.00')
                 for item in self.orderitem_set.all():
                     items_total += item.total_price or Decimal('0.00')
                 
                 self.total_amount = items_total
-                Order.objects.filter(pk=self.pk).update(total_amount=items_total)
+                super().save(update_fields=['total_amount'])
+                
                 return items_total
         return Decimal('0.00')
     
