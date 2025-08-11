@@ -47,32 +47,11 @@ class Order(models.Model):
     def calculate_total(self):
         """Calcula el total de items (NO incluye envases - están en container_sales)"""
         if self.pk:
-            # Método ORM más seguro pero con recarga forzada
-            try:
-                # Calcular total directamente desde DB
-                from django.db import models
-                items_total = self.orderitem_set.aggregate(
-                    total=models.Sum('total_price')
-                )['total'] or Decimal('0.00')
-                
-                # Actualizar directamente en DB sin usar el ORM cache
-                Order.objects.filter(pk=self.pk).update(total_amount=items_total)
-                
-                # Actualizar instancia local
-                self.total_amount = items_total
-                
-                return items_total
-            except Exception as e:
-                # Fallback con cálculo manual
-                items_total = Decimal('0.00')
-                for item in self.orderitem_set.all():
-                    items_total += item.total_price or Decimal('0.00')
-                
-                # Actualizar
-                Order.objects.filter(pk=self.pk).update(total_amount=items_total)
-                self.total_amount = items_total
-                
-                return items_total
+            # Método simple y seguro
+            items_total = sum(item.total_price for item in self.orderitem_set.all())
+            self.total_amount = items_total
+            self.save(update_fields=['total_amount'])
+            return items_total
         return Decimal('0.00')
     
     def get_containers_total(self):
