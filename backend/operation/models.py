@@ -39,23 +39,29 @@ class Order(models.Model):
     def calculate_total(self):
         """Calcula el total de items (NO incluye envases - están en container_sales)"""
         if self.pk:
-            # Forzar recarga completa desde DB para evitar cache stale
-            from django.db import connection, transaction
-            
-            # Force close and reopen DB connection to avoid cache issues
-            connection.close()
-            
-            # Use fresh query with transaction to ensure consistency
-            with transaction.atomic():
-                # Recalcular directamente desde DB sin usar cache de ORM
+            # Método más simple y directo - recalcular desde cero
+            try:
+                # Obtener todos los items de esta orden directamente de DB
                 from django.db import models
-                items_total = OrderItem.objects.filter(order_id=self.pk).aggregate(
+                items_total = self.orderitem_set.all().aggregate(
                     total=models.Sum('total_price')
                 )['total'] or Decimal('0.00')
                 
-                # Actualizar total_amount
+                # Solo actualizar si hay cambio real
+                if self.total_amount != items_total:
+                    self.total_amount = items_total
+                    # Usar update para evitar signals y recursión
+                    Order.objects.filter(pk=self.pk).update(total_amount=items_total)
+                
+                return items_total
+            except Exception as e:
+                # Fallback: calcular manualmente
+                items_total = Decimal('0.00')
+                for item in self.orderitem_set.all():
+                    items_total += item.total_price or Decimal('0.00')
+                
                 self.total_amount = items_total
-                super().save()  # Usar super() para evitar recursión
+                Order.objects.filter(pk=self.pk).update(total_amount=items_total)
                 return items_total
         return Decimal('0.00')
     
