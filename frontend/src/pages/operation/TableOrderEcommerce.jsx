@@ -15,6 +15,7 @@ const TableOrderEcommerce = () => {
   const [recipes, setRecipes] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [step, setStep] = useState('tables'); // 'tables', 'orders', 'menu'
 
   // Estados carrito
@@ -84,7 +85,7 @@ const TableOrderEcommerce = () => {
     if (orders.length === 0) return null;
     
     const totalAmount = orders.reduce((sum, order) => 
-      sum + parseFloat(order.grand_total || order.total_amount || 0), 0
+      sum + parseFloat(order.total_amount || 0), 0
     );
     const totalItems = orders.reduce((sum, order) => 
       sum + (order.items?.length || 0), 0
@@ -173,7 +174,7 @@ const TableOrderEcommerce = () => {
     }
 
     try {
-      setLoading(true);
+      setSaving(true);
       
       const orderData = {
         items_data: cart.map(item => ({
@@ -186,7 +187,11 @@ const TableOrderEcommerce = () => {
       };
       
       if (currentOrder) {
-        await api.put(`/orders/${currentOrder.id}/`, orderData);
+        const response = await api.put(`/orders/${currentOrder.id}/`, orderData);
+        // Actualizar estado local con la respuesta del backend
+        const updatedOrder = response.data;
+        setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+        setAllOrders(allOrders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
         showToast('Pedido actualizado', 'success');
       } else {
         const newOrderData = {
@@ -194,7 +199,11 @@ const TableOrderEcommerce = () => {
           waiter: user?.username || 'Sistema',
           items: orderData.items_data
         };
-        await api.post('/orders/', newOrderData);
+        const response = await api.post('/orders/', newOrderData);
+        // Agregar nuevo pedido al estado local
+        const newOrder = response.data;
+        setOrders([...orders, newOrder]);
+        setAllOrders([...allOrders, newOrder]);
         showToast('Pedido creado', 'success');
       }
 
@@ -207,9 +216,23 @@ const TableOrderEcommerce = () => {
       setCurrentOrder(null);
       setStep('orders');
     } catch (error) {
-      showToast('Error al guardar pedido', 'error');
+      // Manejo mejorado de errores del backend
+      if (error.response?.status === 400) {
+        const errorMsg = error.response.data?.error || 
+                        error.response.data?.items?.[0] ||
+                        error.response.data?.detail ||
+                        'Error de validación';
+        showToast(errorMsg, 'error');
+      } else if (error.response?.status === 404) {
+        showToast('Pedido no encontrado', 'error');
+      } else if (error.response?.status === 422) {
+        showToast('Datos inválidos en el pedido', 'error');
+      } else {
+        showToast('Error al guardar pedido', 'error');
+      }
+      console.error('Error saving order:', error);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -450,10 +473,10 @@ const TableOrderEcommerce = () => {
                   </div>
                   <button
                     onClick={saveOrder}
-                    disabled={loading}
-                    className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 disabled:opacity-50"
+                    disabled={saving || cart.length === 0}
+                    className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {currentOrder ? 'Actualizar Pedido' : 'Crear Pedido'}
+                    {saving ? 'Guardando...' : (currentOrder ? 'Actualizar Pedido' : 'Crear Pedido')}
                   </button>
                 </div>
               </div>
