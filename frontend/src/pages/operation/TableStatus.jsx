@@ -29,7 +29,7 @@ const TableStatus = () => {
       else setLoading(true);
 
       const [tablesRes, ordersRes] = await Promise.all([
-        api.get('/config/tables/'),
+        api.get('/tables/'),
         api.get('/operation/orders/?status=CREATED')
       ]);
       

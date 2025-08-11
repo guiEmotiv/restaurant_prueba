@@ -37,9 +37,9 @@ const TableOrderEcommerce = () => {
     try {
       setLoading(true);
       const [tablesRes, recipesRes, containersRes, groupsRes] = await Promise.all([
-        api.get('/config/tables/'),
+        api.get('/tables/'),
         api.get('/inventory/recipes/'),
-        api.get('/config/containers/'),
+        api.get('/containers/'),
         api.get('/inventory/groups/')
       ]);
       
