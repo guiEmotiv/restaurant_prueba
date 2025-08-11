@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import api from '../../services/api';
+import { apiService } from '../../services/api';
 
 const TableOrderEcommerce = () => {
   const { user } = useAuth();
@@ -28,19 +28,21 @@ const TableOrderEcommerce = () => {
   const loadInitialData = useCallback(async () => {
     try {
       setLoading(true);
-      const [tablesRes, recipesRes, groupsRes, allOrdersRes] = await Promise.all([
-        api.get('/tables/'),
-        api.get('/recipes/?is_active=true&is_available=true'),
-        api.get('/groups/'),
-        api.get('/orders/?status=CREATED')
+      const [tables, recipes, groups, allOrders] = await Promise.all([
+        apiService.tables.getAll(),
+        apiService.recipes.getAll({ is_active: true, is_available: true }),
+        apiService.groups.getAll(),
+        apiService.orders.getAll()
       ]);
       
-      setTables(tablesRes.data || []);
-      setRecipes(recipesRes.data || []);
-      setGroups(groupsRes.data || []);
-      setAllOrders(allOrdersRes.data || []);
+      setTables(tables || []);
+      setRecipes(recipes || []);
+      setGroups(groups || []);
+      // Filtrar órdenes activas en frontend para mayor control
+      setAllOrders(allOrders?.filter(o => o.status === 'CREATED') || []);
     } catch (error) {
-      showToast('Error al cargar datos', 'error');
+      console.error('Error loading data:', error);
+      showToast(`Error al cargar datos: ${error.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -55,20 +57,19 @@ const TableOrderEcommerce = () => {
   // Cargar órdenes de mesa específica
   const loadTableOrders = async (tableId) => {
     try {
-      const response = await api.get(`/tables/${tableId}/active_orders/`);
-      setOrders(response.data || []);
+      const orders = await apiService.tables.getActiveOrders(tableId);
+      setOrders(orders || []);
     } catch (error) {
-      showToast('Error al cargar pedidos', 'error');
+      console.error('Error loading table orders:', error);
+      showToast(`Error al cargar pedidos de mesa: ${error.message}`, 'error');
     }
   };
 
   // Obtener órdenes de una mesa
   const getTableOrders = useCallback((tableId) => {
     return allOrders.filter(order => {
-      const orderTableId = 
-        (typeof order.table === 'object' && order.table?.id) ||
-        (typeof order.table === 'number' && order.table) ||
-        order.table_id;
+      // Manejo robusto de diferentes estructuras de datos del backend
+      const orderTableId = order.table?.id || order.table || order.table_id;
       return orderTableId === tableId;
     });
   }, [allOrders]);
@@ -79,19 +80,18 @@ const TableOrderEcommerce = () => {
     return orders.length > 0 ? 'occupied' : 'available';
   }, [getTableOrders]);
 
-  // Resumen de mesa
+  // Resumen de mesa optimizado con un solo reduce
   const getTableSummary = useCallback((tableId) => {
     const orders = getTableOrders(tableId);
     if (orders.length === 0) return null;
     
-    const totalAmount = orders.reduce((sum, order) => 
-      sum + parseFloat(order.total_amount || 0), 0
-    );
-    const totalItems = orders.reduce((sum, order) => 
-      sum + (order.items?.length || 0), 0
-    );
+    const summary = orders.reduce((acc, order) => ({
+      orderCount: acc.orderCount + 1,
+      totalAmount: acc.totalAmount + parseFloat(order.grand_total || order.total_amount || 0),
+      totalItems: acc.totalItems + (order.items?.length || 0)
+    }), { orderCount: 0, totalAmount: 0, totalItems: 0 });
     
-    return { orderCount: orders.length, totalAmount, totalItems };
+    return summary;
   }, [getTableOrders]);
 
   // Seleccionar mesa
@@ -117,7 +117,7 @@ const TableOrderEcommerce = () => {
     setStep('menu');
   };
 
-  // Agregar al carrito
+  // Agregar al carrito con campo de precio consistente
   const addToCart = (recipe) => {
     const existingIndex = cart.findIndex(item => item.recipe.id === recipe.id);
     
@@ -127,13 +127,14 @@ const TableOrderEcommerce = () => {
       newCart[existingIndex].total_price = newCart[existingIndex].unit_price * newCart[existingIndex].quantity;
       setCart(newCart);
     } else {
+      const price = parseFloat(recipe.price || recipe.base_price || 0);
       setCart([...cart, {
         recipe,
         quantity: 1,
         notes: '',
         is_takeaway: false,
-        unit_price: parseFloat(recipe.base_price),
-        total_price: parseFloat(recipe.base_price)
+        unit_price: price,
+        total_price: price
       }]);
     }
   };
@@ -160,7 +161,38 @@ const TableOrderEcommerce = () => {
     return cart.reduce((total, item) => total + item.total_price, 0);
   };
 
-  // Guardar pedido
+  // Función unificada de mapeo de items del carrito
+  const mapCartItemToOrderData = (item) => ({
+    recipe: item.recipe.id,
+    quantity: item.quantity,
+    notes: item.notes || '',
+    is_takeaway: item.is_takeaway || false,
+    has_taper: item.is_takeaway || false
+  });
+
+  // Manejo especializado de errores
+  const handleSaveOrderError = (error) => {
+    console.error('Error saving order:', error);
+    
+    if (error.response?.status === 400) {
+      const errorDetails = error.response.data;
+      if (errorDetails.details?.recipe) {
+        showToast('Receta no válida o no disponible', 'error');
+      } else if (errorDetails.details?.quantity) {
+        showToast('Cantidad no válida', 'error');
+      } else {
+        showToast(errorDetails.error || 'Datos inválidos en el pedido', 'error');
+      }
+    } else if (error.response?.status === 404) {
+      showToast('Pedido no encontrado', 'error');
+    } else if (error.response?.status === 422) {
+      showToast('No hay stock suficiente para el pedido', 'error');
+    } else {
+      showToast('Error al guardar pedido. Intente nuevamente.', 'error');
+    }
+  };
+
+  // Guardar pedido optimizado
   const saveOrder = async () => {
     if (cart.length === 0) {
       showToast('Agregue items al pedido', 'error');
@@ -170,67 +202,35 @@ const TableOrderEcommerce = () => {
     try {
       setSaving(true);
       
-      const orderData = {
-        items_data: cart.map(item => ({
-          recipe: item.recipe.id,
-          quantity: item.quantity,
-          notes: item.notes || '',
-          is_takeaway: item.is_takeaway || false,
-          has_taper: item.is_takeaway || false
-        }))
-      };
-      
       if (currentOrder) {
-        // Para órdenes existentes, agregar items uno por uno usando add_item endpoint
+        // Para órdenes existentes: usar add_item
         for (const item of cart) {
-          const itemData = {
-            recipe: item.recipe.id,
-            quantity: item.quantity,
-            notes: item.notes || '',
-            is_takeaway: item.is_takeaway || false,
-            has_taper: item.is_takeaway || false
-          };
-          await api.post(`/orders/${currentOrder.id}/add_item/`, itemData);
+          await apiService.orders.addItem(currentOrder.id, mapCartItemToOrderData(item));
         }
         showToast('Items agregados al pedido', 'success');
       } else {
+        // Para órdenes nuevas
         const newOrderData = {
           table: selectedTable.id,
           waiter: user?.username || 'Sistema',
-          items: orderData.items_data
+          items: cart.map(mapCartItemToOrderData)
         };
-        const response = await api.post('/orders/', newOrderData);
-        // Agregar nuevo pedido al estado local
-        const newOrder = response.data;
+        const newOrder = await apiService.orders.create(newOrderData);
+        
+        // Actualizar estado local eficientemente
         setOrders([...orders, newOrder]);
         setAllOrders([...allOrders, newOrder]);
         showToast('Pedido creado', 'success');
       }
 
-      await Promise.all([
-        loadTableOrders(selectedTable.id),
-        loadInitialData()
-      ]);
+      // Recarga SOLO lo necesario
+      await loadTableOrders(selectedTable.id);
       
       setCart([]);
       setCurrentOrder(null);
       setStep('orders');
     } catch (error) {
-      // Manejo mejorado de errores del backend
-      if (error.response?.status === 400) {
-        const errorMsg = error.response.data?.error || 
-                        error.response.data?.items?.[0] ||
-                        error.response.data?.detail ||
-                        'Error de validación';
-        showToast(errorMsg, 'error');
-      } else if (error.response?.status === 404) {
-        showToast('Pedido no encontrado', 'error');
-      } else if (error.response?.status === 422) {
-        showToast('Datos inválidos en el pedido', 'error');
-      } else {
-        showToast('Error al guardar pedido', 'error');
-      }
-      console.error('Error saving order:', error);
+      handleSaveOrderError(error);
     } finally {
       setSaving(false);
     }
@@ -253,10 +253,11 @@ const TableOrderEcommerce = () => {
     return filtered;
   }, [recipes, selectedGroup, searchTerm]);
 
-  // Agrupar mesas por zona
+  // Agrupar mesas por zona con manejo robusto
   const tablesByZone = useMemo(() => {
     return tables.reduce((acc, table) => {
-      const zoneName = table.zone_name || table.zone?.name || 'Sin Zona';
+      // Manejo robusto de diferentes estructuras de zona del backend
+      const zoneName = table.zone?.name || table.zone_name || 'Sin Zona';
       if (!acc[zoneName]) acc[zoneName] = [];
       acc[zoneName].push(table);
       return acc;
@@ -415,7 +416,7 @@ const TableOrderEcommerce = () => {
                     <div>
                       <div className="font-semibold">{recipe.name}</div>
                       <div className="text-sm text-gray-600">
-                        S/ {recipe.base_price}
+                        S/ {recipe.price || recipe.base_price || '0.00'}
                       </div>
                     </div>
                     <button
