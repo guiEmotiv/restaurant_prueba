@@ -59,6 +59,7 @@ class RecipeItemSerializer(serializers.ModelSerializer):
 
 class RecipeSerializer(serializers.ModelSerializer):
     group_name = serializers.SerializerMethodField()
+    group = serializers.SerializerMethodField()  # Return full group object for frontend compatibility
     container_name = serializers.SerializerMethodField()
     ingredients_count = serializers.SerializerMethodField()
     ingredients_list = serializers.SerializerMethodField()
@@ -78,6 +79,15 @@ class RecipeSerializer(serializers.ModelSerializer):
             'preparation_time', 'ingredients_count', 'ingredients_list', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_group(self, obj):
+        """Return full group object for frontend compatibility"""
+        if obj.group:
+            return {
+                'id': obj.group.id,
+                'name': obj.group.name
+            }
+        return None
     
     def get_group_name(self, obj):
         return obj.group.name if obj.group else None

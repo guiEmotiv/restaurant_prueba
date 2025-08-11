@@ -119,7 +119,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return RecipeSerializer
     
     def get_queryset(self):
-        queryset = Recipe.objects.all().order_by('name', '-version')
+        queryset = Recipe.objects.select_related('group', 'container').all().order_by('name', '-version')
         is_available = self.request.query_params.get('is_available')
         is_active = self.request.query_params.get('is_active')
         group = self.request.query_params.get('group')

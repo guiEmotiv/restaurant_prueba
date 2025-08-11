@@ -15,7 +15,6 @@ import {
   ChevronRight,
   X,
   Minus,
-  RefreshCw,
   Eye,
   Edit3,
   DollarSign,
@@ -40,7 +39,6 @@ const RestaurantOperationsMobile = () => {
   const [containers, setContainers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [step, setStep] = useState('tables');
 
   // Cart and menu states
@@ -59,10 +57,9 @@ const RestaurantOperationsMobile = () => {
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'available', 'occupied'
 
   // Load all initial data with better error handling
-  const loadInitialData = useCallback(async (showRefreshIndicator = false) => {
+  const loadInitialData = useCallback(async () => {
     try {
-      if (showRefreshIndicator) setRefreshing(true);
-      else setLoading(true);
+      setLoading(true);
 
       console.log('🔄 Loading restaurant data...');
       
@@ -93,14 +90,13 @@ const RestaurantOperationsMobile = () => {
       showToast('Error al cargar datos del restaurante', 'error');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [showToast]);
 
   useEffect(() => {
     loadInitialData();
     // Auto refresh every 30 seconds
-    const interval = setInterval(() => loadInitialData(true), 30000);
+    const interval = setInterval(() => loadInitialData(), 30000);
     return () => clearInterval(interval);
   }, [loadInitialData]);
 
@@ -466,15 +462,6 @@ const RestaurantOperationsMobile = () => {
             
             {/* Action buttons - Compact */}
             <div className="flex items-center space-x-2">
-              {step === 'tables' && (
-                <button
-                  onClick={() => loadInitialData(true)}
-                  disabled={refreshing}
-                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                >
-                  <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
-                </button>
-              )}
               
               {step === 'menu' && (
                 <button
@@ -738,6 +725,48 @@ const RestaurantOperationsMobile = () => {
               </button>
             </div>
 
+            {/* Order Summary Card - Show when there are active orders */}
+            {orders.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-blue-900">Resumen de Mesa</h3>
+                  <div className="flex items-center space-x-2 text-blue-700">
+                    <Users size={16} />
+                    <span className="text-sm font-medium">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-900">
+                      {orders.reduce((sum, order) => sum + (order.items?.length || 0), 0)}
+                    </div>
+                    <div className="text-xs text-blue-700">Items totales</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      S/ {orders.reduce((sum, order) => {
+                        const orderTotal = order.grand_total || order.total_amount || 0;
+                        return sum + parseFloat(orderTotal);
+                      }, 0).toFixed(2)}
+                    </div>
+                    <div className="text-xs text-blue-700">Total acumulado</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-center space-x-2 text-xs text-blue-700">
+                  <Clock size={12} />
+                  <span>
+                    Primer pedido hace {getDurationText(orders.reduce((oldest, order) => {
+                      const orderTime = new Date(order.created_at);
+                      const oldestTime = new Date(oldest.created_at);
+                      return orderTime < oldestTime ? order : oldest;
+                    }).created_at)}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Orders list */}
             {orders.length === 0 ? (
               <div className="text-center py-12">
@@ -895,12 +924,38 @@ const RestaurantOperationsMobile = () => {
             <div className="bg-white rounded-xl shadow-sm border">
               {/* Cart header */}
               <div className="p-4 border-b border-gray-200">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Carrito
-                </h2>
-                <p className="text-gray-600 text-sm">
-                  Mesa {selectedTable?.table_number}
-                </p>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {currentOrder ? `Editando Pedido #${currentOrder.id}` : 'Nuevo Pedido'}
+                    </h2>
+                    <p className="text-gray-600 text-sm">
+                      Mesa {selectedTable?.table_number}
+                    </p>
+                    {currentOrder && (
+                      <div className="flex items-center space-x-2 mt-1">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          currentOrder.status === 'CREATED' 
+                            ? 'bg-orange-100 text-orange-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {currentOrder.status === 'CREATED' ? 'Pendiente' : 'Pagado'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          Creado {new Date(currentOrder.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {currentOrder && (
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-green-600">
+                        S/ {currentOrder.grand_total || currentOrder.total_amount}
+                      </div>
+                      <div className="text-xs text-gray-500">Total actual</div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="p-4">
