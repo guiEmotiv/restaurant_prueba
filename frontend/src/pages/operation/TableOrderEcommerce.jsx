@@ -187,12 +187,18 @@ const TableOrderEcommerce = () => {
       };
       
       if (currentOrder) {
-        const response = await api.put(`/orders/${currentOrder.id}/`, orderData);
-        // Actualizar estado local con la respuesta del backend
-        const updatedOrder = response.data;
-        setOrders(orders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-        setAllOrders(allOrders.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-        showToast('Pedido actualizado', 'success');
+        // Para órdenes existentes, agregar items uno por uno usando add_item endpoint
+        for (const item of cart) {
+          const itemData = {
+            recipe: item.recipe.id,
+            quantity: item.quantity,
+            notes: item.notes || '',
+            is_takeaway: item.is_takeaway || false,
+            has_taper: item.is_takeaway || false
+          };
+          await api.post(`/orders/${currentOrder.id}/add_item/`, itemData);
+        }
+        showToast('Items agregados al pedido', 'success');
       } else {
         const newOrderData = {
           table: selectedTable.id,

@@ -30,7 +30,7 @@ const TableStatus = () => {
 
       const [tablesRes, ordersRes] = await Promise.all([
         api.get('/tables/'),
-        api.get('/operation/orders/?status=CREATED')
+        api.get('/orders/?status=CREATED')
       ]);
       
       setTables(tablesRes.data);
