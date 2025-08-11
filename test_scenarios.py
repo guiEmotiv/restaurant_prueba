@@ -188,10 +188,21 @@ def test_scenario_4_frontend_calculation():
     all_orders = orders_response.json()
     
     def simulate_getTableOrders(table_id):
-        return [order for order in all_orders if 
-                order.get('table', {}).get('id') == table_id or 
-                order.get('table_id') == table_id or 
-                order.get('table') == table_id]
+        orders = []
+        for order in all_orders:
+            table_ref = order.get('table')
+            order_table_id = None
+            
+            if isinstance(table_ref, dict) and 'id' in table_ref:
+                order_table_id = table_ref['id']
+            elif isinstance(table_ref, int):
+                order_table_id = table_ref
+            elif order.get('table_id'):
+                order_table_id = order.get('table_id')
+                
+            if order_table_id == table_id:
+                orders.append(order)
+        return orders
     
     def simulate_getTableStatus(table_id):
         orders = simulate_getTableOrders(table_id)

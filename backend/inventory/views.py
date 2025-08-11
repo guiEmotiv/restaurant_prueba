@@ -108,7 +108,7 @@ class IngredientViewSet(viewsets.ModelViewSet):
 
 class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
-    queryset = Recipe.objects.all().order_by('name')
+    queryset = Recipe.objects.select_related('group', 'container').prefetch_related('recipeitem_set__ingredient').order_by('name')
     pagination_class = None  # Deshabilitar paginación para recetas
     
     def get_serializer_class(self):
