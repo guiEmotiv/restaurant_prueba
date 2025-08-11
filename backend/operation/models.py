@@ -31,14 +31,6 @@ class Order(models.Model):
         db_table = 'order'
         verbose_name = 'Orden'
         verbose_name_plural = 'Órdenes'
-    
-    # def clean(self):
-    #     """Validación a nivel de modelo"""
-    #     from django.core.exceptions import ValidationError
-    #     if self.pk:
-    #         # Si es una orden existente, verificar que tenga items
-    #         if not self.orderitem_set.exists():
-    #             raise ValidationError("La orden debe tener al menos un item")
 
     def __str__(self):
         return f"Orden #{self.id} - Mesa {self.table.table_number}"
@@ -47,10 +39,15 @@ class Order(models.Model):
     def calculate_total(self):
         """Calcula el total de items (NO incluye envases - están en container_sales)"""
         if self.pk:
-            # Método simple y seguro
+            # Forzar refresh de la relación para evitar cache stale
+            self.refresh_from_db()
+            
+            # Total solo de items de comida
             items_total = sum(item.total_price for item in self.orderitem_set.all())
+            
+            # total_amount es solo la comida, los envases están separados
             self.total_amount = items_total
-            self.save(update_fields=['total_amount'])
+            super().save()  # Usar super() para evitar recursión
             return items_total
         return Decimal('0.00')
     

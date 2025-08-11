@@ -506,11 +506,8 @@ class OrderDetailSerializer(serializers.ModelSerializer):
                     except Container.DoesNotExist:
                         pass
         
-        # Recalcular totales usando calculate_total
+        # Recalcular totales
         instance.calculate_total()
-        
-        # Recargar instancia con datos frescos
-        instance.refresh_from_db()
         
         return instance
 
