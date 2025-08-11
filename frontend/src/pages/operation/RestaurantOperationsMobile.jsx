@@ -79,11 +79,19 @@ const RestaurantOperationsMobile = () => {
         orders: allOrdersRes.data?.length || 0
       });
 
-      setTables(Array.isArray(tablesRes.data) ? tablesRes.data : []);
-      setRecipes(Array.isArray(recipesRes.data) ? recipesRes.data : []);
-      setContainers(Array.isArray(containersRes.data) ? containersRes.data : []);
-      setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
-      setAllOrders(Array.isArray(allOrdersRes.data) ? allOrdersRes.data : []);
+      const newTables = Array.isArray(tablesRes.data) ? tablesRes.data : [];
+      const newRecipes = Array.isArray(recipesRes.data) ? recipesRes.data : [];
+      const newContainers = Array.isArray(containersRes.data) ? containersRes.data : [];
+      const newGroups = Array.isArray(groupsRes.data) ? groupsRes.data : [];
+      const newAllOrders = Array.isArray(allOrdersRes.data) ? allOrdersRes.data : [];
+      
+      setTables(newTables);
+      setRecipes(newRecipes);
+      setContainers(newContainers);
+      setGroups(newGroups);
+      setAllOrders(newAllOrders);
+      
+      console.log('📊 Updated allOrders:', newAllOrders.length);
       
     } catch (error) {
       console.error('❌ Error loading data:', error);
@@ -118,7 +126,9 @@ const RestaurantOperationsMobile = () => {
 
   // Table management functions
   const getTableOrders = useCallback((tableId) => {
-    return allOrders.filter(order => order.table?.id === tableId);
+    const orders = allOrders.filter(order => order.table?.id === tableId);
+    console.log(`🔍 Table ${tableId} orders:`, orders.length, orders);
+    return orders;
   }, [allOrders]);
 
   const getTableStatus = useCallback((tableId) => {
@@ -284,6 +294,7 @@ const RestaurantOperationsMobile = () => {
             quantity: item.quantity,
             notes: item.notes || '',
             is_takeaway: item.is_takeaway || false,
+            has_taper: item.is_takeaway || false,
             selected_container: item.is_takeaway && item.recipe.container ? item.recipe.container : null
           })),
           container_sales_data: cart
@@ -323,7 +334,7 @@ const RestaurantOperationsMobile = () => {
       // FIXED: Refresh both table orders and all orders to update table status
       await Promise.all([
         loadTableOrders(selectedTable.id),
-        loadInitialData(true)
+        loadInitialData()
       ]);
       
       setCart([]);

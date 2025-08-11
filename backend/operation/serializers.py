@@ -433,8 +433,14 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         """Actualizar orden con nuevos items y container sales"""
+        print(f"🔄 Updating order {instance.id}")
+        print(f"📋 Validated data keys: {validated_data.keys()}")
+        
         items_data = validated_data.pop('items_data', None)
         container_sales_data = validated_data.pop('container_sales_data', None)
+        
+        print(f"📦 Items data: {items_data}")
+        print(f"🥤 Container sales data: {container_sales_data}")
         
         # Actualizar campos básicos
         for attr, value in validated_data.items():
@@ -448,26 +454,34 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             
             # Crear nuevos items
             for item_data in items_data:
+                print(f"🔧 Processing item: {item_data}")
                 selected_container_id = item_data.pop('selected_container', None)
                 quantity = item_data.get('quantity', 1)
                 
-                # Crear OrderItem
-                order_item = OrderItem.objects.create(order=instance, **item_data)
-                
-                # Crear ContainerSale si es para llevar
-                if order_item.is_takeaway and selected_container_id:
-                    from config.models import Container
-                    try:
-                        container = Container.objects.get(id=selected_container_id, is_active=True)
-                        ContainerSale.objects.create(
-                            order=instance,
-                            container=container,
-                            quantity=quantity,
-                            unit_price=container.price,
-                            total_price=container.price * quantity
-                        )
-                    except Container.DoesNotExist:
-                        pass
+                try:
+                    # Crear OrderItem
+                    order_item = OrderItem.objects.create(order=instance, **item_data)
+                    print(f"✅ Created item: {order_item.id} - {order_item.recipe.name}")
+                    
+                    # Crear ContainerSale si hay contenedor seleccionado (independiente de is_takeaway)
+                    if selected_container_id:
+                        from config.models import Container
+                        try:
+                            container = Container.objects.get(id=selected_container_id, is_active=True)
+                            container_sale = ContainerSale.objects.create(
+                                order=instance,
+                                container=container,
+                                quantity=quantity,
+                                unit_price=container.price,
+                                total_price=container.price * quantity
+                            )
+                            print(f"📦 Created container sale: {container_sale.id}")
+                        except Container.DoesNotExist:
+                            print(f"❌ Container not found: {selected_container_id}")
+                            
+                except Exception as e:
+                    print(f"❌ Error creating item: {e}")
+                    raise
             
             # Crear container sales adicionales si se especifican
             if container_sales_data:

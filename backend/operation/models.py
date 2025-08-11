@@ -133,19 +133,20 @@ class OrderItem(models.Model):
         if not self.unit_price:
             self.unit_price = self.recipe.base_price
         
-        # Always recalculate total_price based on quantity and unit_price
+        # Calculate total_price based on quantity and unit_price
         self.total_price = self.unit_price * self.quantity
+        
+        # Add customizations cost if exists
+        if self.pk:
+            customization_total = sum(
+                item.total_price for item in self.orderitemingredient_set.all()
+            )
+            self.total_price += customization_total
             
         super().save(*args, **kwargs)
-        
-        # After saving, recalculate with customizations if they exist
-        if self.pk:
-            self.calculate_total_price()
-            # Update order total
-            self.order.calculate_total()
 
     def calculate_total_price(self):
-        """Calcula el precio total del item incluyendo customizaciones y cantidad"""
+        """Calcula el precio total del item incluyendo customizaciones y cantidad (sin guardar)"""
         # Precio base: precio unitario * cantidad
         base_total = self.unit_price * self.quantity
         
@@ -157,12 +158,9 @@ class OrderItem(models.Model):
             )
         
         # NO incluir precio de envases aquí - los envases se manejan por separado en ContainerSale
-        # Esto evita la distribución proporcional que causa cambios en precios
         self.total_price = base_total + customization_total
         
-        # Solo guardar si ya existe en la BD para evitar recursión
-        if self.pk:
-            super().save()
+        return self.total_price
 
     def can_be_modified(self):
         """Verifica si el item puede ser modificado"""
