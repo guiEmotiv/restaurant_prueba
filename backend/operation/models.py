@@ -129,19 +129,19 @@ class OrderItem(models.Model):
         return f"{self.order} - {self.recipe.name}"
 
     def save(self, *args, **kwargs):
+        # Set unit price if not set
         if not self.unit_price:
             self.unit_price = self.recipe.base_price
         
-        # Calcular precio total inicial (precio base * cantidad)
-        if not self.total_price:
-            self.total_price = self.unit_price * self.quantity
+        # Always recalculate total_price based on quantity and unit_price
+        self.total_price = self.unit_price * self.quantity
             
         super().save(*args, **kwargs)
         
-        # Después de guardar, recalcular con customizaciones si existen
+        # After saving, recalculate with customizations if they exist
         if self.pk:
             self.calculate_total_price()
-            # Actualizar total de la orden
+            # Update order total
             self.order.calculate_total()
 
     def calculate_total_price(self):

@@ -23,6 +23,7 @@ class ZoneSerializer(serializers.ModelSerializer):
 
 class TableSerializer(serializers.ModelSerializer):
     zone_name = serializers.CharField(source='zone.name', read_only=True)
+    zone = serializers.SerializerMethodField()  # Include zone object for compatibility
     active_orders_count = serializers.SerializerMethodField()
     has_active_orders = serializers.SerializerMethodField()
     name = serializers.CharField(source='table_number', read_only=True)  # Alias para compatibilidad
@@ -32,6 +33,15 @@ class TableSerializer(serializers.ModelSerializer):
         fields = ['id', 'zone', 'zone_name', 'table_number', 'name', 'created_at', 
                   'active_orders_count', 'has_active_orders']
         read_only_fields = ['id', 'created_at']
+    
+    def get_zone(self, obj):
+        """Return zone object for frontend compatibility"""
+        if obj.zone:
+            return {
+                'id': obj.zone.id,
+                'name': obj.zone.name
+            }
+        return None
     
     def get_active_orders_count(self, obj):
         return obj.order_set.filter(status='CREATED').count()

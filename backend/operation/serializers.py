@@ -90,6 +90,7 @@ class OrderSerializer(serializers.ModelSerializer):
     table_number = serializers.CharField(source='table.table_number', read_only=True)
     zone_name = serializers.CharField(source='table.zone.name', read_only=True)
     waiter_name = serializers.CharField(source='waiter', read_only=True)
+    items = OrderItemSerializer(source='orderitem_set', many=True, read_only=True)
     items_count = serializers.SerializerMethodField()
     total_paid = serializers.SerializerMethodField()
     pending_amount = serializers.SerializerMethodField()
@@ -102,7 +103,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'table', 'table_number', 'zone_name', 'waiter', 'waiter_name', 'status',
             'total_amount', 'containers_total', 'grand_total', 'total_paid', 'pending_amount', 'is_fully_paid',
-            'items_count', 'created_at',
+            'items', 'items_count', 'created_at',
             'served_at', 'paid_at'
         ]
         read_only_fields = [

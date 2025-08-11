@@ -134,9 +134,11 @@ const RestaurantOperationsMobile = () => {
     const tableOrders = getTableOrders(tableId);
     if (tableOrders.length === 0) return null;
 
-    const totalAmount = tableOrders.reduce((sum, order) => 
-      sum + parseFloat(order.grand_total || order.total_amount || 0), 0
-    );
+    // FIXED: Use grand_total for complete total (food + containers)
+    const totalAmount = tableOrders.reduce((sum, order) => {
+      const orderTotal = order.grand_total || order.total_amount || 0;
+      return sum + parseFloat(orderTotal);
+    }, 0);
     
     const totalItems = tableOrders.reduce((sum, order) => 
       sum + (order.items?.length || 0), 0
@@ -379,9 +381,9 @@ const RestaurantOperationsMobile = () => {
       });
     }
     
-    // Group by zones
+    // Group by zones - FIXED: Use correct field from serializer
     const grouped = filtered.reduce((acc, table) => {
-      const zoneName = table.zone?.name || 'Sin Zona';
+      const zoneName = table.zone_name || table.zone?.name || 'Sin Zona';
       if (!acc[zoneName]) {
         acc[zoneName] = [];
       }
@@ -553,8 +555,8 @@ const RestaurantOperationsMobile = () => {
                   >
                     Todas las zonas
                   </button>
-                  {Array.from(new Set(tables.map(t => t.zone?.name).filter(Boolean))).map(zoneName => {
-                    const zone = tables.find(t => t.zone?.name === zoneName)?.zone;
+                  {Array.from(new Set(tables.map(t => t.zone_name || t.zone?.name).filter(Boolean))).map(zoneName => {
+                    const zone = tables.find(t => (t.zone_name || t.zone?.name) === zoneName)?.zone;
                     return (
                       <button
                         key={zone?.id}

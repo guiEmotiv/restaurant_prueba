@@ -45,7 +45,10 @@ class ZoneViewSet(viewsets.ModelViewSet):
 
 
 class TableViewSet(viewsets.ModelViewSet):
-    queryset = Table.objects.all().order_by('zone__name', 'table_number')
+    queryset = Table.objects.select_related('zone').prefetch_related(
+        'order_set__orderitem_set',
+        'order_set__container_sales'
+    ).order_by('zone__name', 'table_number')
     permission_classes = []  # Acceso completo para todos los usuarios autenticados
     pagination_class = None  # Deshabilitar paginación para mesas
     
