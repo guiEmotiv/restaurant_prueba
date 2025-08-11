@@ -634,68 +634,39 @@ const RestaurantOperationsMobile = () => {
                       return (
                         <div
                           key={table.id}
-                          className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer haptic-light touch-target ${
+                          className={`relative p-3 rounded-lg border-2 transition-all cursor-pointer ${
                             status === 'available' 
-                              ? 'status-available border-green-200' 
-                              : duration.includes('h') && parseInt(duration.split('h')[0]) >= 2
-                              ? 'status-danger border-red-200'
-                              : duration.includes('h') && parseInt(duration.split('h')[0]) >= 1
-                              ? 'status-warning border-yellow-200'
-                              : 'status-occupied border-blue-200'
+                              ? 'border-green-200 bg-green-50' 
+                              : 'border-blue-200 bg-blue-50'
                           }`}
                           onClick={() => handleTableSelect(table)}
                         >
-                          {/* Table header */}
-                          <div className="text-center mb-3">
-                            <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-white flex items-center justify-center shadow-sm">
+                          {/* Mesa + Estado en una línea */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
                               {status === 'available' ? (
-                                <Check className="text-green-600" size={18} />
-                              ) : duration.includes('h') && parseInt(duration.split('h')[0]) >= 2 ? (
-                                <AlertCircle className="text-red-600" size={18} />
-                              ) : duration.includes('h') && parseInt(duration.split('h')[0]) >= 1 ? (
-                                <Clock className="text-yellow-600" size={18} />
+                                <Check className="text-green-600" size={16} />
                               ) : (
-                                <Users className="text-blue-600" size={18} />
+                                <Users className="text-blue-600" size={16} />
                               )}
+                              <span className="font-bold text-gray-900">
+                                {table.table_number}
+                              </span>
                             </div>
-                            <h4 className="font-bold text-gray-900">
-                              Mesa {table.table_number}
-                            </h4>
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              status === 'available' 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {status === 'available' ? 'Libre' : `${summary.orderCount} pedidos`}
+                            </div>
                           </div>
 
-                          {/* Table status */}
-                          {status === 'available' ? (
-                            <div className="text-center">
-                              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                Disponible
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              {/* Order numbers */}
-                              <div className="text-center">
-                                <div className="text-xs text-blue-600 font-medium mb-1">
-                                  Pedidos: {tableOrders.map(order => `#${order.id}`).join(', ')}
-                                </div>
-                                <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white bg-opacity-80">
-                                  {summary.orderCount} pedido{summary.orderCount > 1 ? 's' : ''}
-                                </div>
-                              </div>
-                              
-                              <div className="text-xs text-gray-700 space-y-1">
-                                <div className="flex justify-between">
-                                  <span>Items:</span>
-                                  <span className="font-medium">{summary.totalItems}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Total:</span>
-                                  <span className="font-medium">S/ {summary.totalAmount.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Tiempo:</span>
-                                  <span className="font-medium">{duration}</span>
-                                </div>
-                              </div>
+                          {/* Solo info crítica si está ocupada */}
+                          {status === 'occupied' && (
+                            <div className="text-xs text-gray-600 flex justify-between">
+                              <span>{summary.totalItems} items</span>
+                              <span className="font-medium">S/ {summary.totalAmount.toFixed(2)}</span>
                             </div>
                           )}
                         </div>
@@ -742,38 +713,23 @@ const RestaurantOperationsMobile = () => {
               </button>
             </div>
 
-            {/* Quick Summary - Minimalist */}
-            {orders.length > 0 && (
-              <div className="bg-blue-50 rounded-lg border border-blue-200 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-sm font-medium text-blue-900">
-                      {orders.length} pedido{orders.length !== 1 ? 's' : ''}
-                    </span>
-                    <span className="text-xs text-blue-600">
-                      {orders.reduce((sum, order) => sum + (order.items?.length || 0), 0)} items
-                    </span>
-                  </div>
-                  <div className="text-lg font-bold text-green-600">
-                    S/ {orders.reduce((sum, order) => {
-                      const orderTotal = order.grand_total || order.total_amount || 0;
-                      return sum + parseFloat(orderTotal);
-                    }, 0).toFixed(2)}
-                  </div>
+            {/* Resumen rápido solo si hay múltiples pedidos */}
+            {orders.length > 1 && (
+              <div className="bg-blue-50 rounded-lg border border-blue-200 p-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-blue-700 font-medium">{orders.length} pedidos activos</span>
+                  <span className="text-blue-900 font-bold">
+                    S/ {orders.reduce((sum, order) => sum + parseFloat(order.grand_total || order.total_amount || 0), 0).toFixed(2)}
+                  </span>
                 </div>
               </div>
             )}
 
-            {/* Orders list */}
+            {/* Lista de pedidos */}
             {orders.length === 0 ? (
-              <div className="text-center py-12">
-                <Coffee className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Sin pedidos
-                </h3>
-                <p className="text-gray-600 mb-6 px-4">
-                  Esta mesa no tiene pedidos pendientes
-                </p>
+              <div className="text-center py-8">
+                <Coffee className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Mesa vacía</h3>
                 <button
                   onClick={handleCreateNewOrder}
                   className="inline-flex items-center space-x-2 text-green-600 hover:text-green-700 font-medium"
@@ -786,8 +742,8 @@ const RestaurantOperationsMobile = () => {
               <div className="space-y-4">
                 {orders.map(order => (
                   <div key={order.id} className="bg-white rounded-lg border p-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center space-x-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
                         <h3 className="font-bold text-gray-900">#{order.id}</h3>
                         <span className={`px-2 py-1 rounded-full text-xs ${
                           order.status === 'CREATED' 
@@ -796,25 +752,21 @@ const RestaurantOperationsMobile = () => {
                         }`}>
                           {order.status === 'CREATED' ? 'Pendiente' : 'Pagado'}
                         </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(order.created_at).toLocaleTimeString()}
-                        </span>
                       </div>
-                      <button
-                        onClick={() => handleEditOrder(order)}
-                        className="text-blue-600 hover:text-blue-700 p-1"
-                      >
-                        <Edit3 size={16} />
-                      </button>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">
-                        {order.items?.length || 0} items
-                      </span>
-                      <span className="font-bold text-gray-900">
-                        S/ {parseFloat(order.grand_total || order.total_amount || 0).toFixed(2)}
-                      </span>
+                      <div className="flex items-center space-x-3">
+                        <div className="text-right">
+                          <div className="text-sm text-gray-600">{order.items?.length || 0} items</div>
+                          <div className="font-bold text-gray-900">
+                            S/ {parseFloat(order.grand_total || order.total_amount || 0).toFixed(2)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleEditOrder(order)}
+                          className="text-blue-600 hover:text-blue-700 p-1"
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
