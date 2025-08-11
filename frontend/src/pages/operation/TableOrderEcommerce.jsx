@@ -358,7 +358,7 @@ const TableOrderEcommerce = () => {
     
     // Para items nuevos: calcular precio base * cantidad
     const quantity = parseInt(item.quantity || 1);
-    const unitPrice = parseFloat(item.recipe?.base_price || 0);
+    const unitPrice = parseFloat(item.recipe_base_price || item.recipe?.base_price || item.unit_price || 0);
     return unitPrice * quantity;
   }, []);
 
@@ -389,12 +389,12 @@ const TableOrderEcommerce = () => {
   }, [getItemFoodPrice, getItemContainerPrice]);
 
   const getCartTotals = useCallback(() => {
-    // Use Cart API totals if available (normalized field names)
+    // Use Cart API totals if available (use correct field names from backend)
     if (currentCart) {
       return {
-        food: parseFloat(currentCart.food_total || currentCart.subtotal || 0),
+        food: parseFloat(currentCart.subtotal || 0),
         containers: parseFloat(currentCart.containers_total || 0),
-        grand: parseFloat(currentCart.total_amount || currentCart.grand_total || 0),
+        grand: parseFloat(currentCart.grand_total || 0),
         newItemsContainers: parseFloat(currentCart.containers_total || 0),
         orderContainers: 0 // Cart API handles all containers
       };
@@ -1165,7 +1165,7 @@ const FloatingCart = memo(({
                       <span className="text-xs bg-gray-200 text-gray-700 rounded-full w-6 h-6 flex items-center justify-center font-bold">
                         {index + 1}
                       </span>
-                      <h4 className="font-medium text-gray-900">{item.recipe.name}</h4>
+                      <h4 className="font-medium text-gray-900">{item.recipe_name || item.recipe?.name}</h4>
                       {item.status === 'SERVED' ? (
                         <div className="flex items-center gap-1 text-green-600 text-xs">
                           <div className="w-2 h-2 bg-green-600 rounded-full"></div>
