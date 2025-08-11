@@ -111,15 +111,9 @@ const TableOrderEcommerce = () => {
   // Editar pedido existente
   const handleEditOrder = (order) => {
     setCurrentOrder(order);
-    const cartItems = order.items?.map(item => ({
-      recipe: item.recipe,
-      quantity: item.quantity,
-      notes: item.notes || '',
-      is_takeaway: item.is_takeaway || false,
-      unit_price: parseFloat(item.unit_price),
-      total_price: parseFloat(item.total_price)
-    })) || [];
-    setCart(cartItems);
+    // CORRECCIÓN: No pre-llenar carrito con items existentes
+    // El carrito debe empezar vacío para agregar NUEVOS items únicamente
+    setCart([]);
     setStep('menu');
   };
 
