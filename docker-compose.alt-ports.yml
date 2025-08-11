@@ -1,0 +1,51 @@
+version: '3.8'
+
+# Alternative port configuration if port 80 is occupied
+# Uses ports 8080 (HTTP) and 8443 (HTTPS) instead
+
+services:
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ec2
+    ports:
+      - "8000:8000"  # Keep backend port for direct access
+    volumes:
+      - ./data:/app/data
+      - ./.env.ec2:/app/.env.ec2
+      - ./frontend/dist:/app/frontend_static
+    environment:
+      - DJANGO_SETTINGS_MODULE=backend.settings_ec2
+    env_file:
+      - .env.ec2
+    restart: unless-stopped
+    networks:
+      - restaurant_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"   # HTTP on alternative port
+      - "8443:443"  # HTTPS on alternative port
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./frontend/dist:/var/www/html:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - restaurant_network
+    environment:
+      - NGINX_PORT=8080
+
+networks:
+  restaurant_network:
+    driver: bridge
