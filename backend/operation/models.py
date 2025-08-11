@@ -144,6 +144,10 @@ class OrderItem(models.Model):
             self.total_price += customization_total
             
         super().save(*args, **kwargs)
+        
+        # Recalcular total de la orden después de guardar el item
+        if self.order_id:
+            self.order.calculate_total()
 
     def calculate_total_price(self):
         """Calcula el precio total del item incluyendo customizaciones y cantidad (sin guardar)"""

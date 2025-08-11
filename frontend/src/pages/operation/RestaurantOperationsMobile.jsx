@@ -115,30 +115,25 @@ const RestaurantOperationsMobile = () => {
   // Table management functions
   const getTableOrders = useCallback((tableId) => {
     const orders = allOrders.filter(order => {
-      // Verificar tanto order.table como order.table_id por compatibilidad
-      const orderTableId = order.table?.id || order.table_id || order.table;
+      // Verificar múltiples formas de referenciar la mesa
+      const orderTableId = 
+        (typeof order.table === 'object' && order.table?.id) ||  // order.table = {id: X}
+        (typeof order.table === 'number' && order.table) ||      // order.table = X
+        order.table_id;                                         // order.table_id = X
+      
       return orderTableId === tableId;
     });
-    console.log(`🔍 Table ${tableId} orders:`, {
-      total: orders.length,
-      tableId,
-      orders: orders.map(o => ({ 
-        id: o.id, 
-        table: o.table, 
-        table_id: o.table_id, 
-        status: o.status,
-        items_count: o.items?.length || 0
-      }))
-    });
+    
+    // Solo debug cuando hay discrepancias
+    if (orders.length > 0) {
+      console.log(`🔍 Table ${tableId} has ${orders.length} orders`);
+    }
+    
     return orders;
   }, [allOrders]);
 
   const getTableStatus = useCallback((tableId) => {
     const tableOrders = getTableOrders(tableId);
-    console.log(`📊 Table ${tableId} status calculation:`, {
-      ordersCount: tableOrders.length,
-      status: tableOrders.length > 0 ? 'occupied' : 'available'
-    });
     return tableOrders.length > 0 ? 'occupied' : 'available';
   }, [getTableOrders]);
 
@@ -747,44 +742,24 @@ const RestaurantOperationsMobile = () => {
               </button>
             </div>
 
-            {/* Order Summary Card - Show when there are active orders */}
+            {/* Quick Summary - Minimalist */}
             {orders.length > 0 && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-blue-900">Resumen de Mesa</h3>
-                  <div className="flex items-center space-x-2 text-blue-700">
-                    <Users size={16} />
-                    <span className="text-sm font-medium">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
+              <div className="bg-blue-50 rounded-lg border border-blue-200 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-sm font-medium text-blue-900">
+                      {orders.length} pedido{orders.length !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-xs text-blue-600">
+                      {orders.reduce((sum, order) => sum + (order.items?.length || 0), 0)} items
+                    </span>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 mb-3">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-900">
-                      {orders.reduce((sum, order) => sum + (order.items?.length || 0), 0)}
-                    </div>
-                    <div className="text-xs text-blue-700">Items totales</div>
+                  <div className="text-lg font-bold text-green-600">
+                    S/ {orders.reduce((sum, order) => {
+                      const orderTotal = order.grand_total || order.total_amount || 0;
+                      return sum + parseFloat(orderTotal);
+                    }, 0).toFixed(2)}
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      S/ {orders.reduce((sum, order) => {
-                        const orderTotal = order.grand_total || order.total_amount || 0;
-                        return sum + parseFloat(orderTotal);
-                      }, 0).toFixed(2)}
-                    </div>
-                    <div className="text-xs text-blue-700">Total acumulado</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-center space-x-2 text-xs text-blue-700">
-                  <Clock size={12} />
-                  <span>
-                    Primer pedido hace {getDurationText(orders.reduce((oldest, order) => {
-                      const orderTime = new Date(order.created_at);
-                      const oldestTime = new Date(oldest.created_at);
-                      return orderTime < oldestTime ? order : oldest;
-                    }).created_at)}
-                  </span>
                 </div>
               </div>
             )}
@@ -810,90 +785,36 @@ const RestaurantOperationsMobile = () => {
             ) : (
               <div className="space-y-4">
                 {orders.map(order => (
-                  <div key={order.id} className="bg-white rounded-xl border shadow-sm p-4">
-                    {/* Order header */}
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <div className="flex items-center space-x-2 mb-1">
-                          <h3 className="text-lg font-bold text-gray-900">
-                            Pedido #{order.id}
-                          </h3>
-                          {/* Estado del pedido */}
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            order.status === 'CREATED' 
-                              ? 'bg-orange-100 text-orange-800' 
-                              : 'bg-green-100 text-green-800'
-                          }`}>
-                            {order.status === 'CREATED' ? '📝 Pendiente' : '💰 Pagado'}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2 text-xs text-gray-600">
-                          <Clock size={14} />
-                          <span>{new Date(order.created_at).toLocaleTimeString()}</span>
-                          {order.waiter && (
-                            <span>• {order.waiter}</span>
-                          )}
-                          {/* Información de pago si está pagado */}
-                          {order.status === 'PAID' && order.paid_at && (
-                            <span>• Pagado {new Date(order.paid_at).toLocaleTimeString()}</span>
-                          )}
-                        </div>
+                  <div key={order.id} className="bg-white rounded-lg border p-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center space-x-2">
+                        <h3 className="font-bold text-gray-900">#{order.id}</h3>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          order.status === 'CREATED' 
+                            ? 'bg-orange-100 text-orange-700' 
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {order.status === 'CREATED' ? 'Pendiente' : 'Pagado'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(order.created_at).toLocaleTimeString()}
+                        </span>
                       </div>
                       <button
                         onClick={() => handleEditOrder(order)}
-                        className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors text-sm"
+                        className="text-blue-600 hover:text-blue-700 p-1"
                       >
-                        <Edit3 size={14} />
-                        <span>Editar</span>
+                        <Edit3 size={16} />
                       </button>
                     </div>
 
-                    {/* Order items - Compact mobile view */}
-                    <div className="space-y-2 mb-3">
-                      {order.items?.slice(0, 3).map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-b-0">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-900 text-sm">{item.recipe?.name}</h4>
-                            {item.notes && (
-                              <p className="text-xs text-gray-600 mt-1 italic truncate">
-                                {item.notes}
-                              </p>
-                            )}
-                            {item.is_takeaway && (
-                              <span className="inline-flex items-center space-x-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full mt-1">
-                                <Package size={10} />
-                                <span>Llevar</span>
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-right ml-2">
-                            <div className="font-bold">×{item.quantity}</div>
-                            <div className="text-xs text-gray-600">S/ {parseFloat(item.total_price || 0).toFixed(2)}</div>
-                          </div>
-                        </div>
-                      ))}
-                      {(order.items?.length || 0) > 3 && (
-                        <div className="text-center text-xs text-gray-500 py-1">
-                          +{(order.items?.length || 0) - 3} items más
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Order total */}
-                    <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                      <div className="text-gray-600 text-sm">
-                        {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-gray-900">
-                          S/ {parseFloat(order.grand_total || order.total_amount || 0).toFixed(2)}
-                        </div>
-                        <div className={`text-xs font-medium ${
-                          order.status === 'CREATED' ? 'text-orange-600' : 'text-green-600'
-                        }`}>
-                          {order.status === 'CREATED' ? 'Pendiente' : 'Pagado'}
-                        </div>
-                      </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">
+                        {order.items?.length || 0} items
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        S/ {parseFloat(order.grand_total || order.total_amount || 0).toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 ))}
