@@ -40,19 +40,23 @@ class Order(models.Model):
         """Calcula el total de items (NO incluye envases - están en container_sales)"""
         if self.pk:
             # Forzar recarga completa desde DB para evitar cache stale
-            from django.db import connection
-            connection.queries_log.clear()  # Clear query cache
+            from django.db import connection, transaction
             
-            # Recalcular directamente desde DB sin usar cache de ORM
-            from django.db import models
-            items_total = self.orderitem_set.aggregate(
-                total=models.Sum('total_price')
-            )['total'] or Decimal('0.00')
+            # Force close and reopen DB connection to avoid cache issues
+            connection.close()
             
-            # Actualizar total_amount
-            self.total_amount = items_total
-            super().save()  # Usar super() para evitar recursión
-            return items_total
+            # Use fresh query with transaction to ensure consistency
+            with transaction.atomic():
+                # Recalcular directamente desde DB sin usar cache de ORM
+                from django.db import models
+                items_total = OrderItem.objects.filter(order_id=self.pk).aggregate(
+                    total=models.Sum('total_price')
+                )['total'] or Decimal('0.00')
+                
+                # Actualizar total_amount
+                self.total_amount = items_total
+                super().save()  # Usar super() para evitar recursión
+                return items_total
         return Decimal('0.00')
     
     def get_containers_total(self):
