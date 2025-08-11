@@ -13,19 +13,8 @@ def update_order_total_on_item_change(sender, instance, **kwargs):
     """
     try:
         if instance.order:
-            # Forzar recálculo directo en DB
-            from django.db import connection
-            with connection.cursor() as cursor:
-                cursor.execute("""
-                    UPDATE operation_order 
-                    SET total_amount = (
-                        SELECT COALESCE(SUM(total_price), 0)
-                        FROM operation_orderitem
-                        WHERE order_id = %s
-                    )
-                    WHERE id = %s
-                """, [instance.order.id, instance.order.id])
-            
+            # Usar el método calculate_total mejorado
+            instance.order.calculate_total()
             logger.info(f"✅ Total recalculado para orden {instance.order.id}")
     except Exception as e:
         logger.error(f"❌ Error recalculando total: {e}")
