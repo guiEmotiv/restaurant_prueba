@@ -22,8 +22,8 @@ import Ingredients from './pages/inventory/Ingredients';
 import Recipes from './pages/inventory/Recipes';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import Kitchen from './pages/operation/Kitchen';
-import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
-import TableStatus from './pages/operation/TableStatus';
+// ELIMINADO: TableOrderEcommerce y TableStatus
+// Sistema simplificado sin tomar pedidos ni estado de mesas
 
 // Debug environment variables with persistent logging
 const logWithTimestamp = (message, data) => {
@@ -127,16 +127,8 @@ const AppContent = () => {
               <Kitchen />
             </RoleProtectedRoute>
           } />
-          <Route path="/table-order" element={
-            <RoleProtectedRoute requiredPermission="canViewKitchen">
-              <TableOrderEcommerce />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/table-status" element={
-            <RoleProtectedRoute requiredPermission="canViewKitchen">
-              <TableStatus />
-            </RoleProtectedRoute>
-          } />
+          {/* ELIMINADO: /table-order y /table-status */}
+          {/* Sistema simplificado - solo vista de cocina disponible */}
 
           {/* Payment routes */}
           <Route path="/payment-history" element={

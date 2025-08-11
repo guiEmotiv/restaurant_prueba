@@ -87,8 +87,7 @@ const Layout = ({ children }) => {
       icon: ShoppingCart,
       permission: 'canViewKitchen',
       children: [
-        { name: 'Tomar Pedido', href: '/table-order', icon: ShoppingCart, permission: 'canViewKitchen' },
-        { name: 'Estado de Mesas', href: '/table-status', icon: Eye, permission: 'canViewKitchen' },
+        // ELIMINADO: Tomar Pedido y Estado de Mesas
         { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
       ]
     },
