@@ -365,7 +365,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     table = TableSerializer(read_only=True)
     items = serializers.SerializerMethodField()
     container_sales = ContainerSaleSerializer(many=True, read_only=True)
-    payments = PaymentSerializer(many=True, read_only=True)
+    payments = serializers.SerializerMethodField()
     
     # Para actualización
     items_data = OrderItemForCreateSerializer(many=True, write_only=True, required=False)
@@ -391,8 +391,20 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'served_at', 'paid_at']
     
     def get_items(self, obj):
-        from .serializers import OrderItemSerializer
         return OrderItemSerializer(obj.orderitem_set.all(), many=True).data
+    
+    def get_payments(self, obj):
+        # Retornar datos básicos de payments sin usar PaymentSerializer
+        return [
+            {
+                'id': payment.id,
+                'payment_method': payment.payment_method,
+                'amount': payment.amount,
+                'created_at': payment.created_at,
+                'payer_name': payment.payer_name
+            }
+            for payment in obj.payments.all()
+        ]
     
     def get_total_paid(self, obj):
         return obj.get_total_paid()
