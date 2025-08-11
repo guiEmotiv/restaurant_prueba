@@ -1,165 +1,134 @@
-# Restaurant Web - Deployment Scripts
+# 🚀 Restaurant Web - Deployment Scripts
 
-Scripts optimizados para el despliegue completo de la aplicación web de restaurante en EC2.
+## 📁 Scripts Esenciales
 
-## 📋 Scripts Disponibles
+| Script | Descripción | Uso |
+|--------|-------------|-----|
+| `setup-initial.sh` | Configuración inicial del proyecto | Una vez al inicio |
+| `build-deploy.sh` | **Script principal de deployment** | Deployment regular |
+| `enable-ssl.sh` | Configuración SSL/HTTPS | Cuando se necesite HTTPS |
+| `maintenance.sh` | Tareas de mantenimiento del sistema | Mantenimiento |
+| `final-fix.sh` | Arreglos finales y validación | Cuando hay problemas |
+| `diagnose-connection.sh` | Diagnóstico completo del sistema | Troubleshooting |
 
-### 1. `setup-initial.sh` (Fases 1-4)
-**Setup inicial del servidor**
-- 🧹 Limpieza ultra del sistema
-- 🔧 Instalación de paquetes esenciales  
-- ⚙️ Configuración de variables de entorno
-- 🌐 Configuración de Nginx
+## 🎯 Comandos Principales
 
+### Configuración Inicial (Solo una vez)
 ```bash
-sudo ./deploy/setup-initial.sh
+sudo ./setup-initial.sh
 ```
 
-### 2. `build-deploy.sh` (Fases 5-7)
-**Build y despliegue de la aplicación**
-- 🏗️ Build del frontend con Vite
-- 🐳 Despliegue de containers Docker
-- 💾 Configuración de base de datos
-- 🔍 Verificación final
-
+### Deployment Principal
 ```bash
-sudo ./deploy/build-deploy.sh
+# Deployment completo
+sudo ./build-deploy.sh
+
+# Solo frontend (más rápido)
+sudo ./build-deploy.sh --frontend-only
+
+# Solo backend
+sudo ./build-deploy.sh --backend-only
+
+# Ver opciones
+sudo ./build-deploy.sh --help
 ```
 
-### 3. `debug-cognito-permissions.sh`
-**Debug de problemas de permisos**
-- 🔍 Verifica configuración de Cognito
-- 🔐 Testa autenticación JWT
-- 📊 Analiza logs de permisos
-- ✅ Valida grupos de usuario
-
+### SSL/HTTPS
 ```bash
-sudo ./deploy/debug-cognito-permissions.sh
+sudo ./enable-ssl.sh
 ```
 
-## 🚀 Uso Recomendado
-
-### Despliegue Completo desde Cero
+### Mantenimiento
 ```bash
-# 1. Setup inicial (solo una vez)
-sudo ./deploy/setup-initial.sh
-
-# 2. Build y deploy (repetible)
-sudo ./deploy/build-deploy.sh
-```
-
-### Debug de Problemas de Permisos
-```bash
-# Si aparece "Usted no tiene permiso para realizar esta acción"
-sudo ./deploy/debug-cognito-permissions.sh
-```
-
-## 🔐 Configuración AWS Cognito
-
-Los scripts están configurados para:
-- **User Pool ID**: `us-west-2_bdCwF60ZI`
-- **App Client ID**: `4i9hrd7srgbqbtun09p43ncfn0`
-- **Región**: `us-west-2`
-
-### Grupos de Usuario Configurados:
-- **administradores**: Acceso completo a todos los módulos
-- **meseros**: Estado mesas + historial + pedidos + pagos
-- **cocineros**: Vista cocina + modificar estado de pedidos
-
-## 📁 Archivos de Entorno Generados
-
-| Archivo | Propósito | Ubicación |
-|---------|-----------|-----------|
-| `.env.ec2` | Configuración principal | `/opt/restaurant-web/` |
-| `backend/.env` | Variables backend | `/opt/restaurant-web/backend/` |
-| `frontend/.env.production` | Variables frontend | `/opt/restaurant-web/frontend/` |
-
-## 🌐 URLs de la Aplicación
-
-- **Frontend**: https://www.xn--elfogndedonsoto-zrb.com
-- **API**: https://www.xn--elfogndedonsoto-zrb.com/api/v1/
-- **Admin**: https://www.xn--elfogndedonsoto-zrb.com/api/v1/admin/
-
-## 🔧 Comandos de Mantenimiento
-
-```bash
-# Ver logs del backend
-docker-compose -f docker-compose.ec2.yml logs web
+# Ver estado del sistema
+./maintenance.sh --status
 
 # Reiniciar servicios
-docker-compose -f docker-compose.ec2.yml restart
+./maintenance.sh --restart
 
-# Ver estado de containers
-docker-compose -f docker-compose.ec2.yml ps
+# Arreglar problemas comunes
+./maintenance.sh --fix-all
 
-# Ver variables de entorno del container
-docker-compose -f docker-compose.ec2.yml exec web env | grep COGNITO
+# Ver todas las opciones
+./maintenance.sh --help
 ```
 
-## 📊 Optimizaciones Implementadas
-
-### Espacio en Disco
-- ✅ Limpieza ultra de paquetes innecesarios
-- ✅ Eliminación de caches y logs antiguos
-- ✅ Optimización de Docker images
-- ✅ Remoción de dependencias de desarrollo post-build
-
-### Rendimiento
-- ✅ Nginx optimizado para aplicación SPA
-- ✅ Configuración CORS eficiente
-- ✅ Build production de Vite optimizado
-- ✅ Static files caching
-
-### Seguridad
-- ✅ Archivos .env con permisos restrictivos (600)
-- ✅ Headers de seguridad en Nginx
-- ✅ Autenticación JWT con AWS Cognito
-- ✅ Permisos granulares por grupo de usuario
-
-## 🚨 Troubleshooting
-
-### Error: "Usted no tiene permiso para realizar esta acción"
-
-**Posibles causas:**
-1. Usuario no está en el grupo correcto en AWS Cognito
-2. JWT token no contiene el claim 'cognito:groups'
-3. Configuración de permisos incorrecta
-
-**Solución:**
+### Diagnóstico y Solución de Problemas
 ```bash
-# 1. Ejecutar debug
-sudo ./deploy/debug-cognito-permissions.sh
+# Diagnóstico completo
+./diagnose-connection.sh
 
-# 2. Verificar grupos en AWS Cognito Console
-# 3. Comprobar JWT token en browser DevTools
+# Arreglos finales si hay problemas
+sudo ./final-fix.sh
 ```
 
-### Error: API devuelve 500 Internal Server Error
+## 🔧 Flujo de Trabajo Típico
 
-**Solución:**
+### 1. Primera Instalación
 ```bash
-# Ver logs detallados
-docker-compose -f docker-compose.ec2.yml logs web --tail=100
-
-# Verificar configuración
-docker-compose -f docker-compose.ec2.yml exec web python manage.py check
+sudo ./setup-initial.sh
+sudo ./build-deploy.sh
+sudo ./enable-ssl.sh
 ```
 
-### Error: Frontend no carga datos
-
-**Solución:**
+### 2. Actualizaciones Regulares
 ```bash
-# Verificar variables de entorno frontend
-cat /opt/restaurant-web/frontend/.env.production
-
-# Rebuild frontend si es necesario
-sudo ./deploy/build-deploy.sh
+git pull
+sudo ./build-deploy.sh --frontend-only  # Si solo cambió frontend
+# o
+sudo ./build-deploy.sh                   # Si cambió backend también
 ```
 
-## 📝 Notas Importantes
+### 3. Solución de Problemas
+```bash
+./diagnose-connection.sh                 # Ver qué está fallando
+sudo ./final-fix.sh                      # Aplicar arreglos
+./maintenance.sh --status                # Verificar estado
+```
 
-- **Requiere Ubuntu 20.04+ con Docker y Docker Compose**
-- **Ejecutar siempre como root (sudo)**
-- **Los scripts son idempotentes (se pueden ejecutar múltiples veces)**
-- **El sistema usa SQLite para simplicidad en producción**
-- **No crea usuarios de prueba - usa AWS Cognito exclusivamente**
+## 🌐 URLs del Sistema
+
+- **Sitio Web**: https://www.xn--elfogndedonsoto-zrb.com/
+- **API**: https://www.xn--elfogndedonsoto-zrb.com/api/v1/
+- **Admin Django**: https://www.xn--elfogndedonsoto-zrb.com/admin/
+
+## 📋 Información de Estado
+
+### Verificar que todo funciona:
+```bash
+# Estado rápido
+./maintenance.sh --status
+
+# Logs en tiempo real
+docker-compose -f docker-compose.ssl.yml logs -f
+
+# Estado de contenedores
+docker-compose -f docker-compose.ssl.yml ps
+```
+
+## 🆘 Troubleshooting
+
+| Problema | Solución |
+|----------|----------|
+| Site no carga | `./diagnose-connection.sh` |
+| API devuelve errores | `./maintenance.sh --fix-all` |
+| SSL no funciona | `sudo ./enable-ssl.sh` |
+| Dashboard vacío | Usuario debe loguearse con AWS Cognito |
+| Cambios no se ven | `sudo ./build-deploy.sh --frontend-only` |
+
+## 📚 Documentación Adicional
+
+- **Guía Completa**: Ver `DEPLOYMENT.md` para guía detallada
+- **Configuración**: Variables en `.env.ec2`
+- **Logs**: `docker-compose logs` para debugging
+- **Backup**: Scripts automáticamente crean backups antes de cambios importantes
+
+## 🎉 Scripts Eliminados
+
+Durante la optimización se eliminaron **48 scripts obsoletos** incluyendo:
+- Scripts de debug específicos
+- Scripts fix duplicados  
+- Scripts experimentales
+- Documentación redundante
+
+**Resultado**: De 55 archivos → 9 archivos esenciales (reducción del 84%)
