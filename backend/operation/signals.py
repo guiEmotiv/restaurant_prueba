@@ -5,8 +5,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@receiver(post_save, sender=OrderItem)
-@receiver(post_delete, sender=OrderItem)
+# TEMPORALMENTE DESACTIVADO PARA DEBUG
+# @receiver(post_save, sender=OrderItem)
+# @receiver(post_delete, sender=OrderItem)
 def update_order_total_on_item_change(sender, instance, **kwargs):
     """
     Recalcular total de orden automáticamente cuando se modifica un OrderItem
