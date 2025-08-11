@@ -39,13 +39,17 @@ class Order(models.Model):
     def calculate_total(self):
         """Calcula el total de items (NO incluye envases - están en container_sales)"""
         if self.pk:
-            # Forzar refresh de la relación para evitar cache stale
-            self.refresh_from_db()
+            # Forzar recarga completa desde DB para evitar cache stale
+            from django.db import connection
+            connection.queries_log.clear()  # Clear query cache
             
-            # Total solo de items de comida
-            items_total = sum(item.total_price for item in self.orderitem_set.all())
+            # Recalcular directamente desde DB sin usar cache de ORM
+            from django.db import models
+            items_total = self.orderitem_set.aggregate(
+                total=models.Sum('total_price')
+            )['total'] or Decimal('0.00')
             
-            # total_amount es solo la comida, los envases están separados
+            # Actualizar total_amount
             self.total_amount = items_total
             super().save()  # Usar super() para evitar recursión
             return items_total
