@@ -28,16 +28,13 @@ import { useAuth } from '../contexts/AuthContext';
 const Layout = ({ children }) => {
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
   const location = useLocation();
 
-  // Hook para detectar tamaño de pantalla
+  // Hook para detectar tamaño de pantalla y cerrar menú en desktop
   useEffect(() => {
     const mediaQuery = window.matchMedia('(min-width: 1024px)');
-    setIsDesktop(mediaQuery.matches);
     
     const handleChange = (e) => {
-      setIsDesktop(e.matches);
       // En desktop, cerrar menú móvil si está abierto
       if (e.matches) {
         setIsMenuOpen(false);
@@ -87,7 +84,8 @@ const Layout = ({ children }) => {
       icon: ShoppingCart,
       permission: 'canViewKitchen',
       children: [
-        // ELIMINADO: Tomar Pedido y Estado de Mesas
+        { name: 'Gestión de Mesas', href: '/table-order', icon: Table, permission: 'canManageOrders' },
+        { name: 'Estado de Mesas', href: '/table-status', icon: Eye, permission: 'canViewOrders' },
         { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
       ]
     },

@@ -31,6 +31,7 @@ export const AuthProvider = ({ children }) => {
       canManageConfig: true,
       canManageInventory: true,
       canManageOrders: true,
+      canViewOrders: true,
       canViewKitchen: true,
       canViewTableStatus: true,
       canManagePayments: true,
@@ -41,6 +42,7 @@ export const AuthProvider = ({ children }) => {
       canManageConfig: false,
       canManageInventory: false,
       canManageOrders: true,      // Necesario para crear/modificar pedidos desde Estado Mesas
+      canViewOrders: true,
       canViewKitchen: false,
       canViewTableStatus: true,
       canManagePayments: false,   // SOLO administradores pueden procesar pagos
@@ -51,6 +53,7 @@ export const AuthProvider = ({ children }) => {
       canManageConfig: false,
       canManageInventory: false,
       canManageOrders: false,
+      canViewOrders: false,
       canViewKitchen: true,
       canViewTableStatus: false,
       canManagePayments: false,
