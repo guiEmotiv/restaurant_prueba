@@ -39,6 +39,9 @@ class Order(models.Model):
     def calculate_total(self):
         """Calcula el total de items (NO incluye envases - están en container_sales)"""
         if self.pk:
+            # Forzar refresh de la relación para evitar cache stale
+            self.refresh_from_db()
+            
             # Total solo de items de comida
             items_total = sum(item.total_price for item in self.orderitem_set.all())
             

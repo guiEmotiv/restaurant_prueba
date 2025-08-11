@@ -292,6 +292,11 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         model = Order
         fields = ['table', 'waiter', 'items']
     
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError("La orden debe tener al menos un item")
+        return value
+    
     @transaction.atomic
     def create(self, validated_data):
         """

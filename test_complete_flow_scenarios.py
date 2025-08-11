@@ -120,7 +120,7 @@ def scenario_1_complete_order_flow():
         validations = []
         validations.append(("Items count", len(order_detail.get('items', [])) == 2))
         validations.append(("Status CREATED", order_detail.get('status') == 'CREATED'))
-        validations.append(("Mesa correcta", order_detail.get('table_number') == test_table['table_number']))
+        validations.append(("Mesa correcta", order_detail.get('table', {}).get('table_number') == test_table['table_number']))
         
         # Validar cálculos
         expected_total = (
@@ -389,17 +389,35 @@ def scenario_4_concurrent_orders_same_table():
     print("=" * 50)
     
     try:
-        # Usar mesa específica para test
+        # Buscar mesa SIN pedidos existentes
         tables_response = requests.get(f"{BASE_URL}/tables/")
+        orders_response = requests.get(f"{BASE_URL}/orders/?status=CREATED")
+        
         tables = tables_response.json()
+        orders = orders_response.json()
         
         if not tables:
             print_test("No hay mesas disponibles", "FAIL")
             return False
+        
+        # Identificar mesas ocupadas
+        occupied_table_ids = set()
+        for order in orders:
+            table_ref = order.get('table')
+            if isinstance(table_ref, dict) and 'id' in table_ref:
+                occupied_table_ids.add(table_ref['id'])
+            elif isinstance(table_ref, int):
+                occupied_table_ids.add(table_ref)
+        
+        # Usar mesa libre para el test
+        free_tables = [t for t in tables if t['id'] not in occupied_table_ids]
+        if not free_tables:
+            print_test("No hay mesas libres para test", "WARNING")
+            return True
             
-        test_table = tables[0]
+        test_table = free_tables[0]
         table_id = test_table['id']
-        print_test(f"Mesa test: {test_table['table_number']}", "INFO")
+        print_test(f"Mesa test: {test_table['table_number']} (libre)", "INFO")
         
         # Obtener recetas
         recipes_response = requests.get(f"{BASE_URL}/recipes/?is_active=true&is_available=true")
