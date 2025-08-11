@@ -32,13 +32,13 @@ class Order(models.Model):
         verbose_name = 'Orden'
         verbose_name_plural = 'Órdenes'
     
-    def clean(self):
-        """Validación a nivel de modelo"""
-        from django.core.exceptions import ValidationError
-        if self.pk:
-            # Si es una orden existente, verificar que tenga items
-            if not self.orderitem_set.exists():
-                raise ValidationError("La orden debe tener al menos un item")
+    # def clean(self):
+    #     """Validación a nivel de modelo"""
+    #     from django.core.exceptions import ValidationError
+    #     if self.pk:
+    #         # Si es una orden existente, verificar que tenga items
+    #         if not self.orderitem_set.exists():
+    #             raise ValidationError("La orden debe tener al menos un item")
 
     def __str__(self):
         return f"Orden #{self.id} - Mesa {self.table.table_number}"
