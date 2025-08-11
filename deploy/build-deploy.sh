@@ -217,8 +217,14 @@ backend_only_deploy() {
     
     cd "$PROJECT_DIR"
     
-    # Always use simple docker compose (has nginx + django)
-    COMPOSE_FILE="docker-compose.simple.yml"
+    # Use SSL compose if certificates exist, otherwise simple
+    if [ -d "/etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com" ]; then
+        COMPOSE_FILE="docker-compose.ssl.yml"
+        echo -e "${GREEN}✅ Using SSL configuration${NC}"
+    else
+        COMPOSE_FILE="docker-compose.simple.yml"
+        echo -e "${YELLOW}⚠️ Using non-SSL configuration (certificates not found)${NC}"
+    fi
     
     # Restart backend container
     echo -e "${BLUE}🔄 Restarting backend...${NC}"
@@ -282,11 +288,17 @@ EOF
     cd "$PROJECT_DIR"
     echo -e "${BLUE}🐳 Starting backend...${NC}"
     
-    # Always use simple docker compose configuration (has nginx + django)
-    COMPOSE_FILE="docker-compose.simple.yml"
-    if [ ! -f "$COMPOSE_FILE" ]; then
-        echo -e "${YELLOW}Creating docker-compose.simple.yml...${NC}"
-        create_simple_compose
+    # Use SSL compose if certificates exist, otherwise simple
+    if [ -d "/etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com" ]; then
+        COMPOSE_FILE="docker-compose.ssl.yml"
+        echo -e "${GREEN}✅ Using SSL configuration${NC}"
+    else
+        COMPOSE_FILE="docker-compose.simple.yml"
+        if [ ! -f "$COMPOSE_FILE" ]; then
+            echo -e "${YELLOW}Creating docker-compose.simple.yml...${NC}"
+            create_simple_compose
+        fi
+        echo -e "${YELLOW}⚠️ Using non-SSL configuration${NC}"
     fi
     
     docker-compose -f "$COMPOSE_FILE" up -d --build &
@@ -377,7 +389,11 @@ else
 fi
 
 # Test Docker nginx status
-COMPOSE_FILE="docker-compose.simple.yml"
+if [ -d "/etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com" ]; then
+    COMPOSE_FILE="docker-compose.ssl.yml"
+else
+    COMPOSE_FILE="docker-compose.simple.yml"
+fi
 
 NGINX_RUNNING=$(docker-compose -f "$COMPOSE_FILE" ps nginx 2>/dev/null | grep -c "Up" || echo "0")
 if [ "$NGINX_RUNNING" -gt 0 ]; then
