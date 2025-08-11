@@ -23,7 +23,8 @@ import {
   Filter,
   ChevronDown,
   Home,
-  List
+  List,
+  MapPin
 } from 'lucide-react';
 
 const RestaurantOperationsMobile = () => {
@@ -52,6 +53,10 @@ const RestaurantOperationsMobile = () => {
   // Modal states
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
   const [showFloatingCart, setShowFloatingCart] = useState(false);
+  
+  // Filter states
+  const [selectedZone, setSelectedZone] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'available', 'occupied'
 
   // Load all initial data with better error handling
   const loadInitialData = useCallback(async (showRefreshIndicator = false) => {
@@ -274,15 +279,16 @@ const RestaurantOperationsMobile = () => {
       console.log(`💾 Saving order...`, { currentOrder: currentOrder?.id, itemCount: cart.length });
       
       if (currentOrder) {
-        // Update existing order - FIXED: Include container sales
+        // Update existing order - FIXED: Use correct field names for backend
         const orderData = {
-          items: cart.map(item => ({
+          items_data: cart.map(item => ({
             recipe: item.recipe.id,
             quantity: item.quantity,
             notes: item.notes || '',
-            is_takeaway: item.is_takeaway || false
+            is_takeaway: item.is_takeaway || false,
+            selected_container: item.is_takeaway && item.recipe.container ? item.recipe.container : null
           })),
-          container_sales: cart
+          container_sales_data: cart
             .filter(item => item.is_takeaway && item.recipe.container)
             .map(item => ({
               container: item.recipe.container,
@@ -355,6 +361,39 @@ const RestaurantOperationsMobile = () => {
     
     return filtered;
   }, [recipes, selectedGroup, searchTerm]);
+
+  // Filtered and grouped tables
+  const { filteredTables, tablesByZone } = useMemo(() => {
+    let filtered = tables;
+    
+    // Filter by zone
+    if (selectedZone) {
+      filtered = filtered.filter(t => t.zone?.id === selectedZone);
+    }
+    
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(t => {
+        const status = getTableStatus(t.id);
+        return statusFilter === status;
+      });
+    }
+    
+    // Group by zones
+    const grouped = filtered.reduce((acc, table) => {
+      const zoneName = table.zone?.name || 'Sin Zona';
+      if (!acc[zoneName]) {
+        acc[zoneName] = [];
+      }
+      acc[zoneName].push(table);
+      return acc;
+    }, {});
+    
+    return { 
+      filteredTables: filtered,
+      tablesByZone: grouped
+    };
+  }, [tables, selectedZone, statusFilter, getTableStatus]);
 
   // Statistics calculations
   const stats = useMemo(() => {
@@ -496,132 +535,183 @@ const RestaurantOperationsMobile = () => {
       </div>
 
       <div className="px-4 py-4">
-        {/* TABLES VIEW - Mobile Grid */}
+        {/* TABLES VIEW - Mobile Grid by Zones */}
         {step === 'tables' && (
           <div className="space-y-4">
-            {/* Quick stats - Mobile 2x2 Grid */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Check className="text-green-600" size={18} />
-                  <span className="text-green-700 font-medium text-sm">Disponibles</span>
-                </div>
-                <div className="text-2xl font-bold text-green-700">
-                  {stats.availableTables}
+            {/* Filters - Zone and Status */}
+            <div className="space-y-3">
+              {/* Zone filter pills */}
+              <div>
+                <div className="flex space-x-2 overflow-x-auto scrollbar-hide pb-2">
+                  <button
+                    onClick={() => setSelectedZone(null)}
+                    className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                      !selectedZone 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-white text-gray-700 border border-gray-300'
+                    }`}
+                  >
+                    Todas las zonas
+                  </button>
+                  {Array.from(new Set(tables.map(t => t.zone?.name).filter(Boolean))).map(zoneName => {
+                    const zone = tables.find(t => t.zone?.name === zoneName)?.zone;
+                    return (
+                      <button
+                        key={zone?.id}
+                        onClick={() => setSelectedZone(zone?.id)}
+                        className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                          selectedZone === zone?.id 
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                            : 'bg-white text-gray-700 border border-gray-300'
+                        }`}
+                      >
+                        {zoneName}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Users className="text-blue-600" size={18} />
-                  <span className="text-blue-700 font-medium text-sm">Ocupadas</span>
-                </div>
-                <div className="text-2xl font-bold text-blue-700">
-                  {stats.occupiedTables}
-                </div>
-              </div>
-              
-              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Coffee className="text-purple-600" size={18} />
-                  <span className="text-purple-700 font-medium text-sm">Pedidos</span>
-                </div>
-                <div className="text-2xl font-bold text-purple-700">
-                  {stats.totalActiveOrders}
-                </div>
-              </div>
-              
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <div className="flex items-center space-x-2 mb-2">
-                  <DollarSign className="text-orange-600" size={18} />
-                  <span className="text-orange-700 font-medium text-sm">Ventas</span>
-                </div>
-                <div className="text-lg font-bold text-orange-700">
-                  S/ {stats.totalPendingSales.toFixed(0)}
-                </div>
+
+              {/* Status filter buttons */}
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setStatusFilter('all')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    statusFilter === 'all'
+                      ? 'bg-gray-100 text-gray-900 border border-gray-300' 
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  Todas ({tables.length})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('available')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    statusFilter === 'available'
+                      ? 'bg-green-100 text-green-700 border border-green-300' 
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  <Check size={16} className="inline mr-1" />
+                  Libres ({tables.filter(t => getTableStatus(t.id) === 'available').length})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('occupied')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    statusFilter === 'occupied'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-300' 
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  <Users size={16} className="inline mr-1" />
+                  Ocupadas ({tables.filter(t => getTableStatus(t.id) === 'occupied').length})
+                </button>
               </div>
             </div>
 
-            {/* Tables grid - Mobile optimized */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">
-                Seleccione una mesa
-              </h2>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {tables.map(table => {
-                  const status = getTableStatus(table.id);
-                  const summary = getTableSummary(table.id);
-                  const duration = summary?.duration || '';
+            {/* Tables grouped by zones */}
+            <div className="space-y-6">
+              {Object.entries(tablesByZone).map(([zoneName, zoneTables]) => (
+                <div key={zoneName}>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                    <MapPin size={18} className="mr-2 text-blue-600" />
+                    {zoneName} ({zoneTables.length})
+                  </h3>
                   
-                  return (
-                    <div
-                      key={table.id}
-                      className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer haptic-light touch-target ${
-                        status === 'available' 
-                          ? 'status-available border-green-200' 
-                          : duration.includes('h') && parseInt(duration.split('h')[0]) >= 2
-                          ? 'status-danger border-red-200'
-                          : duration.includes('h') && parseInt(duration.split('h')[0]) >= 1
-                          ? 'status-warning border-yellow-200'
-                          : 'status-occupied border-blue-200'
-                      }`}
-                      onClick={() => handleTableSelect(table)}
-                    >
-                      {/* Table header */}
-                      <div className="text-center mb-3">
-                        <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-white flex items-center justify-center shadow-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {zoneTables.map(table => {
+                      const status = getTableStatus(table.id);
+                      const summary = getTableSummary(table.id);
+                      const duration = summary?.duration || '';
+                      const tableOrders = getTableOrders(table.id);
+                      
+                      return (
+                        <div
+                          key={table.id}
+                          className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer haptic-light touch-target ${
+                            status === 'available' 
+                              ? 'status-available border-green-200' 
+                              : duration.includes('h') && parseInt(duration.split('h')[0]) >= 2
+                              ? 'status-danger border-red-200'
+                              : duration.includes('h') && parseInt(duration.split('h')[0]) >= 1
+                              ? 'status-warning border-yellow-200'
+                              : 'status-occupied border-blue-200'
+                          }`}
+                          onClick={() => handleTableSelect(table)}
+                        >
+                          {/* Table header */}
+                          <div className="text-center mb-3">
+                            <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-white flex items-center justify-center shadow-sm">
+                              {status === 'available' ? (
+                                <Check className="text-green-600" size={18} />
+                              ) : duration.includes('h') && parseInt(duration.split('h')[0]) >= 2 ? (
+                                <AlertCircle className="text-red-600" size={18} />
+                              ) : duration.includes('h') && parseInt(duration.split('h')[0]) >= 1 ? (
+                                <Clock className="text-yellow-600" size={18} />
+                              ) : (
+                                <Users className="text-blue-600" size={18} />
+                              )}
+                            </div>
+                            <h4 className="font-bold text-gray-900">
+                              Mesa {table.table_number}
+                            </h4>
+                          </div>
+
+                          {/* Table status */}
                           {status === 'available' ? (
-                            <Check className="text-green-600" size={18} />
-                          ) : duration.includes('h') && parseInt(duration.split('h')[0]) >= 2 ? (
-                            <AlertCircle className="text-red-600" size={18} />
-                          ) : duration.includes('h') && parseInt(duration.split('h')[0]) >= 1 ? (
-                            <Clock className="text-yellow-600" size={18} />
+                            <div className="text-center">
+                              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                Disponible
+                              </div>
+                            </div>
                           ) : (
-                            <Users className="text-blue-600" size={18} />
+                            <div className="space-y-2">
+                              {/* Order numbers */}
+                              <div className="text-center">
+                                <div className="text-xs text-blue-600 font-medium mb-1">
+                                  Pedidos: {tableOrders.map(order => `#${order.id}`).join(', ')}
+                                </div>
+                                <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white bg-opacity-80">
+                                  {summary.orderCount} pedido{summary.orderCount > 1 ? 's' : ''}
+                                </div>
+                              </div>
+                              
+                              <div className="text-xs text-gray-700 space-y-1">
+                                <div className="flex justify-between">
+                                  <span>Items:</span>
+                                  <span className="font-medium">{summary.totalItems}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Total:</span>
+                                  <span className="font-medium">S/ {summary.totalAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Tiempo:</span>
+                                  <span className="font-medium">{duration}</span>
+                                </div>
+                              </div>
+                            </div>
                           )}
                         </div>
-                        <h3 className="font-bold text-gray-900">
-                          Mesa {table.table_number}
-                        </h3>
-                        <p className="text-xs text-gray-600">{table.zone?.name}</p>
-                      </div>
-
-                      {/* Table status */}
-                      {status === 'available' ? (
-                        <div className="text-center">
-                          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                            Disponible
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="text-center">
-                            <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white bg-opacity-80 mb-2">
-                              {summary.orderCount} pedido{summary.orderCount > 1 ? 's' : ''}
-                            </div>
-                          </div>
-                          
-                          <div className="text-xs text-gray-700 space-y-1">
-                            <div className="flex justify-between">
-                              <span>Items:</span>
-                              <span className="font-medium">{summary.totalItems}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Total:</span>
-                              <span className="font-medium">S/ {summary.totalAmount.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Tiempo:</span>
-                              <span className="font-medium">{duration}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              
+              {filteredTables.length === 0 && (
+                <div className="text-center py-12">
+                  <Coffee className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No hay mesas
+                  </h3>
+                  <p className="text-gray-600">
+                    {selectedZone || statusFilter !== 'all' 
+                      ? 'No se encontraron mesas con los filtros aplicados' 
+                      : 'No hay mesas configuradas'}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}

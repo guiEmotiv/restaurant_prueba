@@ -360,6 +360,126 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         return order
 
 
+class OrderDetailSerializer(serializers.ModelSerializer):
+    """Serializer detallado para GET y UPDATE de órdenes"""
+    table = TableSerializer(read_only=True)
+    items = serializers.SerializerMethodField()
+    container_sales = ContainerSaleSerializer(many=True, read_only=True)
+    payments = PaymentSerializer(many=True, read_only=True)
+    
+    # Para actualización
+    items_data = OrderItemForCreateSerializer(many=True, write_only=True, required=False)
+    container_sales_data = serializers.ListField(
+        child=serializers.DictField(), write_only=True, required=False
+    )
+    
+    # Campos calculados
+    total_paid = serializers.SerializerMethodField()
+    pending_amount = serializers.SerializerMethodField()
+    is_fully_paid = serializers.SerializerMethodField()
+    containers_total = serializers.SerializerMethodField()
+    grand_total = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'table', 'waiter', 'status', 'total_amount', 'items', 'container_sales', 'payments',
+            'items_data', 'container_sales_data',
+            'total_paid', 'pending_amount', 'is_fully_paid', 'containers_total', 'grand_total',
+            'created_at', 'served_at', 'paid_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'served_at', 'paid_at']
+    
+    def get_items(self, obj):
+        from .serializers import OrderItemSerializer
+        return OrderItemSerializer(obj.orderitem_set.all(), many=True).data
+    
+    def get_total_paid(self, obj):
+        return obj.get_total_paid()
+    
+    def get_pending_amount(self, obj):
+        return obj.get_pending_amount()
+    
+    def get_is_fully_paid(self, obj):
+        return obj.is_fully_paid()
+    
+    def get_containers_total(self, obj):
+        return obj.get_containers_total()
+    
+    def get_grand_total(self, obj):
+        return obj.get_grand_total()
+    
+    @staticmethod
+    def setup_eager_loading(queryset):
+        return queryset.select_related('table__zone').prefetch_related(
+            'orderitem_set__recipe__group',
+            'container_sales__container',
+            'payments__payment_items__order_item__recipe'
+        )
+    
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        """Actualizar orden con nuevos items y container sales"""
+        items_data = validated_data.pop('items_data', None)
+        container_sales_data = validated_data.pop('container_sales_data', None)
+        
+        # Actualizar campos básicos
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        if items_data is not None:
+            # Eliminar items existentes
+            instance.orderitem_set.all().delete()
+            instance.container_sales.all().delete()
+            
+            # Crear nuevos items
+            for item_data in items_data:
+                selected_container_id = item_data.pop('selected_container', None)
+                quantity = item_data.get('quantity', 1)
+                
+                # Crear OrderItem
+                order_item = OrderItem.objects.create(order=instance, **item_data)
+                
+                # Crear ContainerSale si es para llevar
+                if order_item.is_takeaway and selected_container_id:
+                    from config.models import Container
+                    try:
+                        container = Container.objects.get(id=selected_container_id, is_active=True)
+                        ContainerSale.objects.create(
+                            order=instance,
+                            container=container,
+                            quantity=quantity,
+                            unit_price=container.price,
+                            total_price=container.price * quantity
+                        )
+                    except Container.DoesNotExist:
+                        pass
+            
+            # Crear container sales adicionales si se especifican
+            if container_sales_data:
+                for container_sale_data in container_sales_data:
+                    from config.models import Container
+                    try:
+                        container = Container.objects.get(
+                            id=container_sale_data['container'], is_active=True
+                        )
+                        ContainerSale.objects.create(
+                            order=instance,
+                            container=container,
+                            quantity=container_sale_data['quantity'],
+                            unit_price=container.price,
+                            total_price=container.price * container_sale_data['quantity']
+                        )
+                    except Container.DoesNotExist:
+                        pass
+        
+        # Recalcular totales
+        instance.calculate_total()
+        
+        return instance
+
+
 class OrderItemIngredientCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItemIngredient
