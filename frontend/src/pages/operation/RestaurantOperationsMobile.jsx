@@ -61,8 +61,6 @@ const RestaurantOperationsMobile = () => {
     try {
       setLoading(true);
 
-      console.log('🔄 Loading restaurant data...');
-      
       const [tablesRes, recipesRes, containersRes, groupsRes, allOrdersRes] = await Promise.all([
         api.get('/tables/'),
         api.get('/recipes/?is_active=true&is_available=true'),
@@ -70,14 +68,6 @@ const RestaurantOperationsMobile = () => {
         api.get('/groups/'),
         api.get('/orders/?status=CREATED')
       ]);
-      
-      console.log('✅ Data loaded:', {
-        tables: tablesRes.data?.length || 0,
-        recipes: recipesRes.data?.length || 0,
-        containers: containersRes.data?.length || 0,
-        groups: groupsRes.data?.length || 0,
-        orders: allOrdersRes.data?.length || 0
-      });
 
       const newTables = Array.isArray(tablesRes.data) ? tablesRes.data : [];
       const newRecipes = Array.isArray(recipesRes.data) ? recipesRes.data : [];
@@ -90,8 +80,6 @@ const RestaurantOperationsMobile = () => {
       setContainers(newContainers);
       setGroups(newGroups);
       setAllOrders(newAllOrders);
-      
-      console.log('📊 Updated allOrders:', newAllOrders.length);
       
     } catch (error) {
       console.error('❌ Error loading data:', error);
@@ -126,13 +114,31 @@ const RestaurantOperationsMobile = () => {
 
   // Table management functions
   const getTableOrders = useCallback((tableId) => {
-    const orders = allOrders.filter(order => order.table?.id === tableId);
-    console.log(`🔍 Table ${tableId} orders:`, orders.length, orders);
+    const orders = allOrders.filter(order => {
+      // Verificar tanto order.table como order.table_id por compatibilidad
+      const orderTableId = order.table?.id || order.table_id || order.table;
+      return orderTableId === tableId;
+    });
+    console.log(`🔍 Table ${tableId} orders:`, {
+      total: orders.length,
+      tableId,
+      orders: orders.map(o => ({ 
+        id: o.id, 
+        table: o.table, 
+        table_id: o.table_id, 
+        status: o.status,
+        items_count: o.items?.length || 0
+      }))
+    });
     return orders;
   }, [allOrders]);
 
   const getTableStatus = useCallback((tableId) => {
     const tableOrders = getTableOrders(tableId);
+    console.log(`📊 Table ${tableId} status calculation:`, {
+      ordersCount: tableOrders.length,
+      status: tableOrders.length > 0 ? 'occupied' : 'available'
+    });
     return tableOrders.length > 0 ? 'occupied' : 'available';
   }, [getTableOrders]);
 
@@ -196,7 +202,7 @@ const RestaurantOperationsMobile = () => {
   };
 
   const handleEditOrder = (order) => {
-    console.log(`✏️ Editing order ${order.id}`);
+    console.log(`✏️ Editing order ${order.id}`, order);
     setCurrentOrder(order);
     const cartItems = order.items?.map(item => ({
       recipe: item.recipe,
@@ -204,7 +210,12 @@ const RestaurantOperationsMobile = () => {
       notes: item.notes || '',
       is_takeaway: item.is_takeaway || false,
       unit_price: parseFloat(item.unit_price),
-      total_price: parseFloat(item.total_price)
+      total_price: parseFloat(item.total_price),
+      // Incluir datos del item original para mostrar estado
+      status: item.status,
+      created_at: item.created_at,
+      served_at: item.served_at,
+      item_id: item.id
     })) || [];
     setCart(cartItems);
     setStep('menu');
@@ -803,14 +814,28 @@ const RestaurantOperationsMobile = () => {
                     {/* Order header */}
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">
-                          Pedido #{order.id}
-                        </h3>
-                        <div className="flex items-center space-x-2 text-xs text-gray-600 mt-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="text-lg font-bold text-gray-900">
+                            Pedido #{order.id}
+                          </h3>
+                          {/* Estado del pedido */}
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            order.status === 'CREATED' 
+                              ? 'bg-orange-100 text-orange-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {order.status === 'CREATED' ? '📝 Pendiente' : '💰 Pagado'}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2 text-xs text-gray-600">
                           <Clock size={14} />
                           <span>{new Date(order.created_at).toLocaleTimeString()}</span>
                           {order.waiter && (
                             <span>• {order.waiter}</span>
+                          )}
+                          {/* Información de pago si está pagado */}
+                          {order.status === 'PAID' && order.paid_at && (
+                            <span>• Pagado {new Date(order.paid_at).toLocaleTimeString()}</span>
                           )}
                         </div>
                       </div>
@@ -843,7 +868,7 @@ const RestaurantOperationsMobile = () => {
                           </div>
                           <div className="text-right ml-2">
                             <div className="font-bold">×{item.quantity}</div>
-                            <div className="text-xs text-gray-600">S/ {item.total_price}</div>
+                            <div className="text-xs text-gray-600">S/ {parseFloat(item.total_price || 0).toFixed(2)}</div>
                           </div>
                         </div>
                       ))}
@@ -861,10 +886,12 @@ const RestaurantOperationsMobile = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-xl font-bold text-gray-900">
-                          S/ {order.grand_total || order.total_amount}
+                          S/ {parseFloat(order.grand_total || order.total_amount || 0).toFixed(2)}
                         </div>
-                        <div className="text-xs text-orange-600 font-medium">
-                          Pendiente
+                        <div className={`text-xs font-medium ${
+                          order.status === 'CREATED' ? 'text-orange-600' : 'text-green-600'
+                        }`}>
+                          {order.status === 'CREATED' ? 'Pendiente' : 'Pagado'}
                         </div>
                       </div>
                     </div>
@@ -994,7 +1021,26 @@ const RestaurantOperationsMobile = () => {
                       {cart.map((item, index) => (
                         <div key={index} className="border border-gray-200 rounded-lg p-3">
                           <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-bold text-gray-900 flex-1">{item.recipe.name}</h4>
+                            <div className="flex-1">
+                              <h4 className="font-bold text-gray-900">{item.recipe.name}</h4>
+                              {/* Estado del item cuando se está editando un pedido */}
+                              {currentOrder && item.status && (
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    item.status === 'CREATED' 
+                                      ? 'bg-yellow-100 text-yellow-800' 
+                                      : 'bg-green-100 text-green-800'
+                                  }`}>
+                                    {item.status === 'CREATED' ? '🔄 Preparando' : '✅ Entregado'}
+                                  </span>
+                                  {item.created_at && (
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(item.created_at).toLocaleTimeString()}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                             <button
                               onClick={() => removeFromCart(index)}
                               className="ml-2 text-red-600 hover:text-red-700 p-1"
@@ -1054,10 +1100,10 @@ const RestaurantOperationsMobile = () => {
                             </div>
                             <div className="text-right">
                               <div className="text-lg font-bold text-gray-900">
-                                S/ {item.total_price.toFixed(2)}
+                                S/ {parseFloat(item.total_price || 0).toFixed(2)}
                               </div>
                               <div className="text-xs text-gray-600">
-                                S/ {item.unit_price.toFixed(2)} c/u
+                                S/ {parseFloat(item.unit_price || 0).toFixed(2)} c/u
                               </div>
                             </div>
                           </div>
