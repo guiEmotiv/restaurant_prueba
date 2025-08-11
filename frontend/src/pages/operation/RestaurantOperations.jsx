@@ -1,9 +1,9 @@
-// Import the mobile-optimized version
-import RestaurantOperationsMobile from './RestaurantOperationsMobile';
+// Import the minimalist ecommerce version
+import TableOrderEcommerce from './TableOrderEcommerce';
 
 const RestaurantOperations = () => {
-  // Use the mobile-optimized version for all devices
-  return <RestaurantOperationsMobile />;
+  // Use the minimalist ecommerce version for all devices
+  return <TableOrderEcommerce />;
 };
 
 export default RestaurantOperations;
