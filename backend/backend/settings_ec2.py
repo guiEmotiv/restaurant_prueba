@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     
     # Third party
     'rest_framework',
-    # 'corsheaders',  # Disabled - handling CORS in nginx
+    'corsheaders',  # Re-enabled for better CORS handling
     'drf_spectacular',
     
     # Restaurant Apps
@@ -50,7 +50,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    # 'corsheaders.middleware.CorsMiddleware',  # Disabled - handling CORS in nginx
+    'corsheaders.middleware.CorsMiddleware',  # Re-enabled for better CORS handling
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
 ]
@@ -165,8 +165,45 @@ REST_FRAMEWORK = {
 # CORS SETTINGS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# CORS is handled by nginx in production, not Django
-# django-cors-headers is disabled in INSTALLED_APPS and MIDDLEWARE
+# CORS Configuration - Allow all origins in development/production
+CORS_ALLOWED_ORIGINS = [
+    "https://www.xn--elfogndedonsoto-zrb.com",
+    "https://xn--elfogndedonsoto-zrb.com",
+    "http://www.xn--elfogndedonsoto-zrb.com",
+    "http://xn--elfogndedonsoto-zrb.com",
+    "http://localhost:5173",  # Vite dev server
+    "http://127.0.0.1:5173",
+]
+
+# Allow all origins for API testing (can be restricted later)
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all origins in DEBUG mode
+CORS_ALLOW_CREDENTIALS = True
+
+# Allow specific headers
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'expires',
+    'cache-control',
+    'pragma',
+]
+
+# Allow specific methods
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SECURITY SETTINGS

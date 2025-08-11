@@ -120,11 +120,43 @@ Uses Django ORM with three main model groups:
 
 ## Deployment Notes
 
-- Production uses optimized Vite build with memory limits (4GB/2GB)
-- Nginx serves static files and proxies API requests
-- Environment variables configured via `.env.ec2`, `backend/.env`, `frontend/.env.production`
-- SSL certificates handled by Nginx with domain support
-- EC2 deployment scripts in `deploy/` directory provide automated setup
+### Production Architecture
+- **Frontend**: React SPA built with Vite, served by nginx
+- **Backend**: Django REST API in Docker container
+- **Proxy**: Nginx handles routing, CORS, SSL, and static files
+- **Database**: SQLite for production simplicity
+- **Domain**: https://www.xn--elfogndedonsoto-zrb.com
+
+### Key Files
+- `docker-compose.prod.yml`: Complete production setup with nginx + Django
+- `nginx/conf.d/default.conf`: Nginx configuration with API routing
+- `deploy/fix-api-complete.sh`: Complete deployment script
+- Environment variables: `.env.ec2` (root), `backend/.env`, `frontend/.env.production`
+
+### Deployment Commands
+```bash
+# Complete deployment (fixes API 404 errors)
+sudo ./deploy/fix-api-complete.sh
+
+# Manual steps if needed:
+cd /opt/restaurant-web
+sudo docker-compose -f docker-compose.prod.yml down
+cd frontend && npm run build && cd ..
+sudo docker-compose -f docker-compose.prod.yml up -d --build
+```
+
+### API Endpoints
+- Health: `/api/v1/health/`
+- Tables: `/api/v1/config/tables/`
+- Recipes: `/api/v1/inventory/recipes/`
+- Orders: `/api/v1/operation/orders/`
+- Groups: `/api/v1/inventory/groups/`
+- Containers: `/api/v1/config/containers/`
+
+### Troubleshooting
+- Check logs: `docker-compose -f docker-compose.prod.yml logs [web|nginx]`
+- Test API direct: `curl http://localhost:8000/api/v1/health/`
+- Test through nginx: `curl http://localhost/api/v1/health/`
 
 ## Common Patterns
 
