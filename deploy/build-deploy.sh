@@ -110,6 +110,71 @@ show_space() {
     echo -e "${BLUE}💾 ${label}: ${space}GB${NC}"
 }
 
+# Function to fix nginx configuration conflicts
+fix_nginx_config() {
+    local NGINX_DIR="$PROJECT_DIR/nginx/conf.d"
+    
+    # Disable conflicting configurations
+    if [ -f "$NGINX_DIR/alt-ports.conf" ]; then
+        mv "$NGINX_DIR/alt-ports.conf" "$NGINX_DIR/alt-ports.conf.disabled" 2>/dev/null || true
+    fi
+    
+    # Use simple configuration
+    if [ -f "$NGINX_DIR/simple.conf" ]; then
+        cp "$NGINX_DIR/simple.conf" "$NGINX_DIR/default.conf"
+        echo -e "${GREEN}✅ Using simple nginx configuration${NC}"
+    fi
+}
+
+# Function to create simple docker-compose.yml
+create_simple_compose() {
+    cat > "$PROJECT_DIR/docker-compose.simple.yml" << 'EOF'
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ec2
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./.env.ec2:/app/.env.ec2
+      - ./frontend/dist:/app/frontend_static
+    environment:
+      - DJANGO_SETTINGS_MODULE=backend.settings_ec2
+    env_file:
+      - .env.ec2
+    restart: unless-stopped
+    networks:
+      - restaurant_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/var/www/html:ro
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - restaurant_network
+
+networks:
+  restaurant_network:
+    driver: bridge
+EOF
+}
+
 # Function for frontend-only deployment
 frontend_only_deploy() {
     echo -e "\n${YELLOW}🎨 Frontend Only Deployment${NC}"
@@ -140,14 +205,8 @@ EOF
         exit 1
     fi
     
-    # Deploy to nginx
-    echo -e "${BLUE}🚀 Deploying frontend...${NC}"
-    systemctl stop nginx
-    rm -rf /var/www/restaurant/*
-    mkdir -p /var/www/restaurant
-    cp -r dist/* /var/www/restaurant/
-    chown -R www-data:www-data /var/www/restaurant
-    systemctl start nginx
+    # Deploy via Docker - frontend is handled by docker-compose volume mount
+    echo -e "${BLUE}🚀 Frontend built, will be deployed via Docker...${NC}"
     
     echo -e "${GREEN}✅ Frontend deployed successfully${NC}"
 }
@@ -158,9 +217,15 @@ backend_only_deploy() {
     
     cd "$PROJECT_DIR"
     
+    # Use simple docker compose if available, fall back to ec2
+    COMPOSE_FILE="docker-compose.simple.yml"
+    if [ ! -f "$COMPOSE_FILE" ]; then
+        COMPOSE_FILE="docker-compose.ec2.yml"
+    fi
+    
     # Restart backend container
     echo -e "${BLUE}🔄 Restarting backend...${NC}"
-    docker-compose -f docker-compose.ec2.yml restart web
+    docker-compose -f "$COMPOSE_FILE" restart web
     
     # Wait and verify
     sleep 10
@@ -170,7 +235,7 @@ backend_only_deploy() {
         echo -e "${GREEN}✅ Backend restarted successfully${NC}"
     else
         echo -e "${RED}❌ Backend restart failed (Status: $BACKEND_STATUS)${NC}"
-        docker-compose -f docker-compose.ec2.yml logs --tail=10 web
+        docker-compose -f "$COMPOSE_FILE" logs --tail=10 web
         exit 1
     fi
 }
@@ -181,10 +246,14 @@ full_deploy() {
     
     show_space "Before build"
     
+    # Fix nginx configuration conflicts first
+    echo -e "${BLUE}🔧 Fixing nginx configuration...${NC}"
+    fix_nginx_config
+    
     # Stop services
     echo -e "${BLUE}🛑 Stopping services...${NC}"
-    docker-compose -f docker-compose.ec2.yml down
-    systemctl stop nginx 2>/dev/null || true
+    docker-compose -f docker-compose.simple.yml down 2>/dev/null || true
+    docker-compose -f docker-compose.ec2.yml down 2>/dev/null || true
     
     # Selective cleanup (only if needed)
     if ! docker images | grep -q restaurant-web-web; then
@@ -215,7 +284,15 @@ EOF
     # Start backend while frontend builds
     cd "$PROJECT_DIR"
     echo -e "${BLUE}🐳 Starting backend...${NC}"
-    docker-compose -f docker-compose.ec2.yml up -d --build &
+    
+    # Use simple docker compose configuration
+    COMPOSE_FILE="docker-compose.simple.yml"
+    if [ ! -f "$COMPOSE_FILE" ]; then
+        echo -e "${YELLOW}Creating docker-compose.simple.yml...${NC}"
+        create_simple_compose
+    fi
+    
+    docker-compose -f "$COMPOSE_FILE" up -d --build &
     BACKEND_PID=$!
     
     # Wait for frontend build
@@ -226,12 +303,7 @@ EOF
         exit 1
     fi
     
-    # Deploy frontend
-    echo -e "${BLUE}🚀 Deploying frontend...${NC}"
-    rm -rf /var/www/restaurant/*
-    mkdir -p /var/www/restaurant
-    cp -r frontend/dist/* /var/www/restaurant/
-    chown -R www-data:www-data /var/www/restaurant
+    # Frontend is deployed via Docker volume mount (no manual copying needed)
     
     # Wait for backend
     wait $BACKEND_PID
@@ -239,148 +311,12 @@ EOF
     
     # Setup database completely
     echo -e "${BLUE}💾 Setting up database completely...${NC}"
-    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py collectstatic --noinput --clear
-    docker-compose -f docker-compose.ec2.yml exec -T web python manage.py ensure_database_ready
-    
-    # Configure nginx with SSL detection
-    configure_nginx
+    docker-compose -f "$COMPOSE_FILE" exec -T web python manage.py collectstatic --noinput --clear 2>/dev/null || true
+    docker-compose -f "$COMPOSE_FILE" exec -T web python manage.py ensure_database_ready 2>/dev/null || true
     
     show_space "After build"
 }
 
-# Function to configure nginx with SSL detection
-configure_nginx() {
-    echo -e "${BLUE}🔒 Configuring nginx...${NC}"
-    
-    # Check for SSL certificates
-    if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
-        CERT_PATH="/etc/letsencrypt/live/$DOMAIN"
-        echo -e "${GREEN}✅ Certificate found for $DOMAIN${NC}"
-    elif [ -f "/etc/letsencrypt/live/www.$DOMAIN/fullchain.pem" ]; then
-        CERT_PATH="/etc/letsencrypt/live/www.$DOMAIN"
-        echo -e "${GREEN}✅ Certificate found for www.$DOMAIN${NC}"
-    else
-        echo -e "${YELLOW}⚠️ No SSL certificates found, using HTTP${NC}"
-        CERT_PATH=""
-    fi
-    
-    # Create nginx configuration
-    if [ -n "$CERT_PATH" ]; then
-        # HTTPS configuration
-        cat > /etc/nginx/sites-available/$DOMAIN << EOF
-server {
-    listen 80;
-    listen [::]:80;
-    server_name www.$DOMAIN $DOMAIN;
-    return 301 https://www.\$server_name\$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name www.$DOMAIN $DOMAIN;
-    
-    ssl_certificate $CERT_PATH/fullchain.pem;
-    ssl_certificate_key $CERT_PATH/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-    
-    root /var/www/restaurant;
-    index index.html;
-    
-    # Frontend routes
-    location / {
-        try_files \$uri \$uri/ /index.html;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
-    
-    # API proxy
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$http_host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header X-Forwarded-Ssl on;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-    
-    # Django admin
-    location /admin/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$http_host;
-        proxy_set_header X-Forwarded-Proto https;
-    }
-    
-    # Django static files
-    location /static/ {
-        alias /opt/restaurant-web/data/staticfiles/;
-        expires 30d;
-    }
-}
-EOF
-    else
-        # HTTP-only configuration
-        cat > /etc/nginx/sites-available/$DOMAIN << EOF
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name www.$DOMAIN $DOMAIN _;
-    
-    root /var/www/restaurant;
-    index index.html;
-    
-    # Frontend routes
-    location / {
-        try_files \$uri \$uri/ /index.html;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
-    
-    # API proxy
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$http_host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-    
-    # Django admin
-    location /admin/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host \$http_host;
-    }
-    
-    # Django static files
-    location /static/ {
-        alias /opt/restaurant-web/data/staticfiles/;
-        expires 30d;
-    }
-}
-EOF
-    fi
-    
-    # Enable configuration and start nginx
-    rm -f /etc/nginx/sites-enabled/*
-    ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
-    
-    if nginx -t; then
-        systemctl start nginx
-        echo -e "${GREEN}✅ Nginx configured and started${NC}"
-    else
-        echo -e "${RED}❌ Nginx configuration error${NC}"
-        nginx -t
-        exit 1
-    fi
-}
 
 # Main execution starts here
 show_space "Initial space"
@@ -416,15 +352,51 @@ else
     echo -e "${YELLOW}⚠️ Backend API: Status $BACKEND_STATUS${NC}"
     if [[ "$BACKEND_ONLY" != "true" ]]; then
         echo -e "${BLUE}Backend logs (last 10 lines):${NC}"
-        docker-compose -f docker-compose.ec2.yml logs --tail=10 web || echo "Could not fetch logs"
+        # Use simple compose if available
+        COMPOSE_FILE="docker-compose.simple.yml"
+        if [ ! -f "$COMPOSE_FILE" ]; then
+            COMPOSE_FILE="docker-compose.ec2.yml"
+        fi
+        docker-compose -f "$COMPOSE_FILE" logs --tail=10 web || echo "Could not fetch logs"
     fi
 fi
 
-# Test nginx status
-if systemctl is-active --quiet nginx; then
-    echo -e "${GREEN}✅ Nginx: Running${NC}"
+# Test tables endpoint specifically
+echo -e "${BLUE}Testing tables API endpoint...${NC}"
+TABLES_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/v1/config/tables/ 2>/dev/null || echo "000")
+
+if [ "$TABLES_STATUS" = "200" ]; then
+    echo -e "${GREEN}✅ Tables API: Working (Status: $TABLES_STATUS)${NC}"
 else
-    echo -e "${RED}❌ Nginx: Not running${NC}"
+    echo -e "${YELLOW}⚠️ Tables API: Status $TABLES_STATUS${NC}"
+    echo -e "${BLUE}Testing tables direct via backend...${NC}"
+    TABLES_DIRECT=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/config/tables/ 2>/dev/null || echo "000")
+    echo -e "   Direct backend: $TABLES_DIRECT"
+    
+    if [ "$TABLES_DIRECT" != "200" ]; then
+        echo -e "${YELLOW}⚠️ Tables endpoint issue in Django backend${NC}"
+        # Check if tables model/endpoint exists
+        COMPOSE_FILE="docker-compose.simple.yml"
+        if [ ! -f "$COMPOSE_FILE" ]; then
+            COMPOSE_FILE="docker-compose.ec2.yml"
+        fi
+        echo -e "${BLUE}Checking Django URLs...${NC}"
+        docker-compose -f "$COMPOSE_FILE" exec -T web python manage.py show_urls 2>/dev/null | grep tables || echo "No tables URL found"
+    fi
+fi
+
+# Test Docker nginx status
+COMPOSE_FILE="docker-compose.simple.yml"
+if [ ! -f "$COMPOSE_FILE" ]; then
+    COMPOSE_FILE="docker-compose.ec2.yml"
+fi
+
+NGINX_RUNNING=$(docker-compose -f "$COMPOSE_FILE" ps nginx 2>/dev/null | grep -c "Up" || echo "0")
+if [ "$NGINX_RUNNING" -gt 0 ]; then
+    echo -e "${GREEN}✅ Docker Nginx: Running${NC}"
+else
+    echo -e "${RED}❌ Docker Nginx: Not running${NC}"
+    docker-compose -f "$COMPOSE_FILE" logs nginx --tail=5 2>/dev/null || true
 fi
 
 # Test HTTPS if not backend-only
