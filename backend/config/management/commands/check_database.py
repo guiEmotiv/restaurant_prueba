@@ -92,7 +92,7 @@ class Command(BaseCommand):
             # Show first few recipes
             recipes = Recipe.objects.all()[:3]
             for recipe in recipes:
-                self.stdout.write(f"  Recipe '{recipe.name}': ${recipe.price}")
+                self.stdout.write(f"  Recipe '{recipe.name}': ${recipe.base_price}")
                 
         except Exception as e:
             self.stdout.write(f"Error checking sample data: {e}")

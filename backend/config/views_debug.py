@@ -69,7 +69,7 @@ def database_debug(request):
                 {
                     'id': recipe.id,
                     'name': recipe.name,
-                    'price': float(recipe.price) if recipe.price else None,
+                    'price': float(recipe.base_price) if recipe.base_price else None,
                     'group_name': recipe.group.name if recipe.group else None,
                     'is_active': recipe.is_active,
                     'is_available': recipe.is_available

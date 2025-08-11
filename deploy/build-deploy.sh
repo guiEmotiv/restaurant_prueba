@@ -357,14 +357,14 @@ fi
 
 # Test tables endpoint specifically
 echo -e "${BLUE}Testing tables API endpoint...${NC}"
-TABLES_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/v1/config/tables/ 2>/dev/null || echo "000")
+TABLES_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/v1/tables/ 2>/dev/null || echo "000")
 
 if [ "$TABLES_STATUS" = "200" ]; then
     echo -e "${GREEN}✅ Tables API: Working (Status: $TABLES_STATUS)${NC}"
 else
     echo -e "${YELLOW}⚠️ Tables API: Status $TABLES_STATUS${NC}"
     echo -e "${BLUE}Testing tables direct via backend...${NC}"
-    TABLES_DIRECT=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/config/tables/ 2>/dev/null || echo "000")
+    TABLES_DIRECT=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/tables/ 2>/dev/null || echo "000")
     echo -e "   Direct backend: $TABLES_DIRECT"
     
     if [ "$TABLES_DIRECT" != "200" ]; then
