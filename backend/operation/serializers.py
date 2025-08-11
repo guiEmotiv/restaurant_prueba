@@ -506,14 +506,23 @@ class OrderDetailSerializer(serializers.ModelSerializer):
                     except Container.DoesNotExist:
                         pass
         
-        # Recalcular totales
-        print(f"🔧 SERIALIZER: Llamando calculate_total para orden {instance.id}")
-        result = instance.calculate_total()
-        print(f"🔧 SERIALIZER: calculate_total retornó {result}")
+        # Recalcular totales - Método mejorado
+        from django.db import connection
         
-        # Forzar reload para verificar
+        # Forzar recálculo directo en DB
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE "order" 
+                SET total_amount = (
+                    SELECT COALESCE(SUM(total_price), 0)
+                    FROM order_item
+                    WHERE order_id = %s
+                )
+                WHERE id = %s
+            """, [instance.pk, instance.pk])
+        
+        # Recargar instancia con datos frescos
         instance.refresh_from_db()
-        print(f"🔧 SERIALIZER: Total después de refresh: {instance.total_amount}")
         
         return instance
 

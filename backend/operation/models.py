@@ -31,6 +31,14 @@ class Order(models.Model):
         db_table = 'order'
         verbose_name = 'Orden'
         verbose_name_plural = 'Órdenes'
+    
+    def clean(self):
+        """Validación a nivel de modelo"""
+        from django.core.exceptions import ValidationError
+        if self.pk:
+            # Si es una orden existente, verificar que tenga items
+            if not self.orderitem_set.exists():
+                raise ValidationError("La orden debe tener al menos un item")
 
     def __str__(self):
         return f"Orden #{self.id} - Mesa {self.table.table_number}"
@@ -39,44 +47,42 @@ class Order(models.Model):
     def calculate_total(self):
         """Calcula el total de items (NO incluye envases - están en container_sales)"""
         if self.pk:
-            try:
-                # Debug: agregar logging para verificar ejecución
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"🔧 CALCULATE_TOTAL llamado para orden {self.pk}")
+            from django.db import connection, transaction
+            
+            # Método directo con SQL para evitar cualquier cache ORM
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE order 
+                    SET total_amount = (
+                        SELECT COALESCE(SUM(total_price), 0)
+                        FROM order_item
+                        WHERE order_id = %s
+                    )
+                    WHERE id = %s
+                    RETURNING total_amount
+                """, [self.pk, self.pk])
                 
-                # Obtener todos los items de esta orden directamente de DB
-                from django.db import models
-                items_total = self.orderitem_set.all().aggregate(
-                    total=models.Sum('total_price')
-                )['total'] or Decimal('0.00')
-                
-                logger.error(f"🔧 Items total calculado: {items_total}")
-                logger.error(f"🔧 Total actual en orden: {self.total_amount}")
-                
-                # FORZAR actualización siempre, sin condición
-                self.total_amount = items_total
-                
-                # Usar save normal para asegurar actualización
-                super().save(update_fields=['total_amount'])
-                
-                logger.error(f"🔧 Orden actualizada con nuevo total: {items_total}")
-                
-                return items_total
-            except Exception as e:
-                # Fallback con logging
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"🔧 ERROR en calculate_total: {e}")
-                
-                items_total = Decimal('0.00')
-                for item in self.orderitem_set.all():
-                    items_total += item.total_price or Decimal('0.00')
-                
-                self.total_amount = items_total
-                super().save(update_fields=['total_amount'])
-                
-                return items_total
+                result = cursor.fetchone()
+                if result:
+                    self.total_amount = result[0]
+                    return self.total_amount
+                else:
+                    # Fallback si RETURNING no funciona
+                    cursor.execute("""
+                        SELECT COALESCE(SUM(total_price), 0)
+                        FROM order_item
+                        WHERE order_id = %s
+                    """, [self.pk])
+                    
+                    total = cursor.fetchone()[0]
+                    self.total_amount = total
+                    
+                    # Actualizar directamente
+                    cursor.execute("""
+                        UPDATE order SET total_amount = %s WHERE id = %s
+                    """, [total, self.pk])
+                    
+                    return total
         return Decimal('0.00')
     
     def get_containers_total(self):

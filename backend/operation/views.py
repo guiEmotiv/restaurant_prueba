@@ -62,6 +62,14 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Override create to return full order details after creation"""
+        # Validación adicional antes del serializer
+        items = request.data.get('items', [])
+        if not items:
+            return Response(
+                {'error': 'La orden debe tener al menos un item'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         order = serializer.save()
