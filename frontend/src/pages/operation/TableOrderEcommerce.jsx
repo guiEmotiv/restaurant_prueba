@@ -373,8 +373,6 @@ const TableOrderEcommerce = () => {
                         {status === 'occupied' && summary && (
                           <div className="text-xs text-gray-600 mt-1">
                             {summary.orderCount} pedido{summary.orderCount > 1 ? 's' : ''}
-                            <br />
-                            S/ {summary.totalAmount.toFixed(2)}
                           </div>
                         )}
                       </button>
