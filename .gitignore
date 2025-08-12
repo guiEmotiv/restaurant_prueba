@@ -32,6 +32,7 @@ media/
 .env.*
 !.env.example
 !.env.*.example
+!.env.credentials.example
 .env.local
 .env.development.local
 .env.test.local
@@ -102,3 +103,75 @@ db.sqlite3
 # AWS Specific Credentials (in addition to *credentials* pattern above)
 deploy/aws-credentials.env
 deploy/aws-credentials-*.env
+
+# 🔐 CREDENCIALES CRÍTICAS - NUNCA COMMIT
+# SSH Keys
+*.pem
+*.ppk
+*_key.pem
+*_rsa
+*_rsa.pub
+*_key
+*id_rsa*
+*id_ed25519*
+
+# Production Environment Files
+.env.ec2
+.env.production
+.env.prod
+**/production.env
+
+# AWS & Cloud Credentials
+aws-credentials*
+credentials.json
+service-account*.json
+.aws/
+.azure/
+.gcp/
+
+# Database Files
+*.sqlite3
+*.db
+data/
+restaurant_*.sqlite3
+restaurant_*.db
+
+# SSL Certificates
+*.crt
+*.pem
+*.cert
+*.ca-bundle
+ssl/
+certs/
+certificates/
+
+# Terraform & Infrastructure
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+
+# Docker secrets
+docker-compose.override.yml
+docker-compose.prod.yml
+.dockerignore
+
+# Backup and sensitive data
+backups/
+dumps/
+exports/
+data-exports/
+*.sql
+*.dump
+
+# Logs with potential sensitive data
+*.log
+logs/
+*.access.log
+*.error.log
+
+# Temporary files that might contain credentials
+temp/
+tmp/
+.cache/
+.temp/
