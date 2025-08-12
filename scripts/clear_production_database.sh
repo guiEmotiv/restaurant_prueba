@@ -69,7 +69,7 @@ if [ "$ENV_TYPE" = "production" ] || [ "$ENV_TYPE" = "development_docker" ]; the
     echo "📋 Paso 1: Creando script de eliminación completa..."
     
     # Crear el script Python de eliminación en el contenedor
-    docker exec $DOCKER_CONTAINER bash -c 'cat > /app/clear_db.py << '\''PYTHON_SCRIPT'\''
+    docker exec $DOCKER_CONTAINER bash -c 'cat > /app/clear_db.py << "EOF"'
 #!/usr/bin/env python3
 import os
 import sys
@@ -259,7 +259,7 @@ if __name__ == "__main__":
         print("❌ ELIMINACIÓN INCOMPLETA")
         print("⚠️  Revisar manualmente la base de datos")
         exit(1)
-PYTHON_SCRIPT'
+EOF'
 
     echo "🐍 Paso 2: Ejecutando eliminación completa..."
     docker exec $DOCKER_CONTAINER python /app/clear_db.py

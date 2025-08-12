@@ -17,10 +17,30 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-key")
 DEBUG      = os.getenv("DEBUG", "0").lower() in ("1", "true", "yes", "on")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
+# ──────────────────────────────────────────────────────────────
 # AWS Cognito Configuration
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+# ──────────────────────────────────────────────────────────────
+USE_COGNITO_AUTH = os.getenv('USE_COGNITO_AUTH', 'False').lower() == 'true'
+
+# AWS Configuration
+AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+
+# Cognito Configuration
 COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "")
 COGNITO_APP_CLIENT_ID = os.getenv("COGNITO_APP_CLIENT_ID", "")
+
+# Set COGNITO_ENABLED for the middleware
+COGNITO_ENABLED = USE_COGNITO_AUTH
+
+# Validate required Cognito settings only if authentication is enabled
+if USE_COGNITO_AUTH:
+    if not COGNITO_USER_POOL_ID:
+        print("⚠️  COGNITO_USER_POOL_ID not set. Authentication will fail.")
+    if not COGNITO_APP_CLIENT_ID:
+        print("⚠️  COGNITO_APP_CLIENT_ID not set. Authentication will fail.")
+    print(f"✅ AWS Cognito authentication ENABLED - Pool: {COGNITO_USER_POOL_ID}")
+else:
+    print("ℹ️  Running without AWS Cognito authentication (USE_COGNITO_AUTH=False)")
 
 TEMPLATES = [
     {

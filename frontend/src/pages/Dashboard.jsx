@@ -16,6 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import DebugAuthComponent from '../components/DebugAuthComponent';
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -117,6 +118,9 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 -m-4 sm:-m-6 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* DEBUG: Componente temporal para diagnosticar auth y API */}
+        <DebugAuthComponent />
         
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6">

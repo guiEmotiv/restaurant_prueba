@@ -9,9 +9,14 @@ echo "========================================================"
 echo ""
 
 # Detectar entorno
-if [ -f "/.dockerenv" ] || [ -n "${DOCKER_CONTAINER}" ] || [ -d "/opt/restaurant-web" ] || [ "$(whoami)" = "ubuntu" ]; then
+if [ -d "/opt/restaurant-web" ] || [ "$(whoami)" = "ubuntu" ]; then
     echo "🐳 Detectado: Servidor EC2 (Producción)"
     ENV_TYPE="production"
+    DOCKER_CONTAINER="restaurant-web-web-1"
+elif docker ps | grep -q "restaurant-web.*web"; then
+    echo "🐳 Detectado: Desarrollo Docker"
+    ENV_TYPE="development_docker"
+    DOCKER_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "restaurant-web.*web" | head -1)
 else
     echo "💻 Detectado: Desarrollo local"
     ENV_TYPE="development"
@@ -31,6 +36,13 @@ if [ "$ENV_TYPE" = "production" ]; then
         echo "❌ Operación cancelada"
         exit 1
     fi
+elif [ "$ENV_TYPE" = "development_docker" ]; then
+    echo "🐳 Desarrollo Docker - Reiniciando con datos de producción"
+    read -p "¿Proceder con el reset completo? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "❌ Operación cancelada"
+        exit 1
+    fi
 else
     read -p "¿Proceder con el reset completo? (yes/no): " confirm
     if [ "$confirm" != "yes" ]; then
@@ -44,18 +56,18 @@ echo "🚀 Iniciando configuración completa de base de datos..."
 echo ""
 
 # Crear script Python robusto dentro del contenedor
-if [ "$ENV_TYPE" = "production" ]; then
+if [ "$ENV_TYPE" = "production" ] || [ "$ENV_TYPE" = "development_docker" ]; then
     echo "📋 Paso 1: Creando script robusto en contenedor..."
     
     # Crear el script Python directamente en el contenedor
-    docker exec restaurant-web-web-1 bash -c 'cat > /app/setup_db.py << '\''PYTHON_SCRIPT'\''
+    docker exec $DOCKER_CONTAINER bash -c 'cat > /app/setup_db.py << '\''PYTHON_SCRIPT'\''
 #!/usr/bin/env python3
 import os
 import sys
 import django
 from decimal import Decimal
 
-# Configurar entorno Django
+# Configurar entorno Django (usar settings_ec2 para ambos entornos)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings_ec2")
 django.setup()
 
@@ -324,35 +336,33 @@ if __name__ == "__main__":
 PYTHON_SCRIPT'
 
     echo "🐍 Paso 2: Ejecutando configuración de base de datos..."
-    docker exec restaurant-web-web-1 python /app/setup_db.py
+    docker exec $DOCKER_CONTAINER python /app/setup_db.py
     
     echo ""
     echo "🧹 Paso 3: Limpiando archivo temporal..."
-    docker exec restaurant-web-web-1 rm -f /app/setup_db.py
+    docker exec $DOCKER_CONTAINER rm -f /app/setup_db.py
 
 else
-    # Modo desarrollo local
-    echo "🐍 Ejecutando en modo desarrollo..."
+    # Modo desarrollo local (sin Docker)
+    echo "🐍 Ejecutando en modo desarrollo local..."
+    echo "⚠️  NOTA: Para desarrollo se recomienda usar Docker"
+    echo "💡 Ejecuta: docker-compose -f docker-compose.dev.yml up -d"
+    echo "📋 Luego usa este script que detectará Docker automáticamente"
+    
+    read -p "¿Continuar sin Docker? (yes/no): " continue_local
+    if [ "$continue_local" != "yes" ]; then
+        echo "❌ Operación cancelada. Usa Docker para mejores resultados."
+        exit 1
+    fi
+    
     cd backend
-    python << 'EOF'
-# [El mismo script Python pero para desarrollo local]
-import os
-import sys
-import django
-from decimal import Decimal
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
-django.setup()
-
-from django.db import transaction
-from config.models import Unit, Zone, Table, Container
-from inventory.models import Group, Ingredient, Recipe, RecipeItem
-from operation.models import Order, OrderItem, Payment, PaymentItem
-
-print("🌱 Configuración de base de datos en desarrollo...")
-# [Mismo código de limpieza y población]
-print("✅ Configuración completada")
-EOF
+    
+    # Usar el comando Django que ya existe y funciona
+    echo "🐍 Usando comandos Django existentes..."
+    python manage.py clean_database --confirm
+    python manage.py populate_production_data
+    
+    echo "✅ Configuración local completada"
 fi
 
 echo ""
@@ -362,16 +372,21 @@ echo ""
 if [ "$ENV_TYPE" = "production" ]; then
     echo "🌐 Tu restaurante está listo en:"
     echo "   http://xn--elfogndedonsoto-zrb.com"
+elif [ "$ENV_TYPE" = "development_docker" ]; then
+    echo "🌐 Tu restaurante de desarrollo está listo en:"
+    echo "   http://localhost:3000 (Frontend con nginx)"
+    echo "   http://localhost:8000 (Backend directo)"
 else
-    echo "🌐 Tu restaurante está listo en:"
+    echo "🌐 Tu restaurante de desarrollo está listo en:"
     echo "   http://localhost:8000"
 fi
 echo ""
-echo "📊 Datos incluidos:"
-echo "   • 5 zonas del restaurante"
-echo "   • 15 mesas distribuidas"
-echo "   • 16 ingredientes con stock"
-echo "   • 10 recetas de parrillas y bebidas (TODAS con ingredientes y envases)"
-echo "   • Órdenes de ejemplo"
+echo "📊 Datos incluidos (idénticos a producción):"
+echo "   • 4 zonas del restaurante"
+echo "   • 43 mesas distribuidas"
+echo "   • 24 ingredientes con stock"
+echo "   • 7 recetas completas con ingredientes y envases"
+echo "   • 12 grupos de productos"
+echo "   • 3 tipos de envases"
 echo ""
 echo "✨ ¡El Fogón de Don Soto está listo para operar!"

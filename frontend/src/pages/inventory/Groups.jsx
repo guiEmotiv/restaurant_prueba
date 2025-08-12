@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, FileSpreadsheet } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import Button from '../../components/common/Button';
 import GroupModal from '../../components/inventory/GroupModal';
+import GenericExcelImportModal from '../../components/common/GenericExcelImportModal';
+import { EXCEL_IMPORT_CONFIGS } from '../../utils/excelImportConfigs';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -11,6 +13,7 @@ const Groups = () => {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
 
   const columns = [
@@ -60,6 +63,15 @@ const Groups = () => {
     handleOpenModal();
   };
 
+  const handleImportExcel = () => {
+    setShowImportModal(true);
+  };
+
+  const handleImportSuccess = () => {
+    loadGroups();
+    setShowImportModal(false);
+  };
+
   const handleEdit = (group) => {
     handleOpenModal(group);
   };
@@ -89,7 +101,15 @@ const Groups = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <Button 
+          variant="outline"
+          onClick={handleImportExcel}
+          className="flex items-center gap-2"
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Importar Excel
+        </Button>
         <Button 
           onClick={handleAdd}
           className="flex items-center gap-2"
@@ -117,6 +137,16 @@ const Groups = () => {
         onClose={handleCloseModal}
         group={selectedGroup}
         onSave={handleModalSave}
+      />
+
+      <GenericExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportSuccess={handleImportSuccess}
+        title="Importar Grupos desde Excel"
+        apiImportFunction={apiService.groups.importExcel}
+        templateConfig={EXCEL_IMPORT_CONFIGS.groups.templateConfig}
+        formatDescription={EXCEL_IMPORT_CONFIGS.groups.formatDescription}
       />
     </div>
   );

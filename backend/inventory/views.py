@@ -205,6 +205,32 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Ingrediente no encontrado en la receta'}, 
                           status=status.HTTP_404_NOT_FOUND)
 
+    def update(self, request, *args, **kwargs):
+        """Override update para manejar control de versiones automático"""
+        recipe = self.get_object()
+        
+        # Si se está activando esta versión (is_active = True)
+        if request.data.get('is_active') is True and not recipe.is_active:
+            # Desactivar otras versiones del mismo plato automáticamente
+            Recipe.objects.filter(
+                name=recipe.name
+            ).exclude(id=recipe.id).update(is_active=False)
+        
+        return super().update(request, *args, **kwargs)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update para manejar control de versiones automático"""
+        recipe = self.get_object()
+        
+        # Si se está activando esta versión (is_active = True)
+        if request.data.get('is_active') is True and not recipe.is_active:
+            # Desactivar otras versiones del mismo plato automáticamente
+            Recipe.objects.filter(
+                name=recipe.name
+            ).exclude(id=recipe.id).update(is_active=False)
+        
+        return super().partial_update(request, *args, **kwargs)
+
     def destroy(self, request, *args, **kwargs):
         """Override destroy para manejar errores de validación"""
         recipe = self.get_object()

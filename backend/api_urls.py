@@ -1,9 +1,16 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from django.db import transaction
+import pandas as pd
 
 # Import ViewSets
 from config.views import UnitViewSet, ZoneViewSet, TableViewSet, ContainerViewSet, operational_info
+from config.models import Unit
 from config.views_debug import database_debug, api_debug
 from inventory.views import GroupViewSet, IngredientViewSet, RecipeViewSet, RecipeItemViewSet
 from operation.views import (
@@ -37,11 +44,24 @@ router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 # ELIMINADO: Cart routes
 # Sistema Cart eliminado para simplificar operaciones
 
+# Test import function
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def import_units_excel(request):
+    """Test import endpoint"""
+    if request.method == 'GET':
+        return Response({'status': 'Import endpoint is working', 'method': 'GET'})
+    
+    return Response({'status': 'Import endpoint is working', 'method': 'POST', 'files': list(request.FILES.keys())})
+
 urlpatterns = [
-    path('', include(router.urls)),  # Remove api/ prefix from here
+    # Import endpoints FIRST to avoid router conflicts
+    path('import/units/', import_units_excel, name='import-units-excel'),
     path('restaurant-config/operational_info/', operational_info, name='operational-info'),
     path('debug/database/', database_debug, name='database-debug'),
     path('debug/api/', api_debug, name='api-debug'),
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    # Router patterns LAST
+    path('', include(router.urls)),
 ]

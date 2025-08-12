@@ -11,11 +11,13 @@ const Modal = ({ isOpen, onClose, onSubmit, title, initialData = null, columns }
     } else {
       // Initialize form with empty values based on columns
       const emptyData = {};
-      columns.forEach(column => {
-        if (column.key !== 'id' && column.key !== 'created_at' && column.key !== 'updated_at') {
-          emptyData[column.key] = '';
-        }
-      });
+      if (columns && Array.isArray(columns)) {
+        columns.forEach(column => {
+          if (column.key !== 'id' && column.key !== 'created_at' && column.key !== 'updated_at') {
+            emptyData[column.key] = '';
+          }
+        });
+      }
       setFormData(emptyData);
     }
   }, [initialData, columns]);
@@ -48,7 +50,7 @@ const Modal = ({ isOpen, onClose, onSubmit, title, initialData = null, columns }
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-          {columns.map((column) => {
+          {columns && Array.isArray(columns) ? columns.map((column) => {
             // Skip non-editable fields
             if (column.key === 'id' || column.key === 'created_at' || column.key === 'updated_at') {
               return null;
@@ -109,7 +111,7 @@ const Modal = ({ isOpen, onClose, onSubmit, title, initialData = null, columns }
                 )}
               </div>
             );
-          })}
+          }) : <div className="text-center text-gray-500">No hay columnas definidas</div>}
 
         </form>
         

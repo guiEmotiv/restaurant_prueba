@@ -1,0 +1,313 @@
+name: Deploy to EC2
+
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types:
+      - completed
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      skip_tests:
+        description: 'Skip running tests'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  pre-deploy-checks:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    outputs:
+      deploy_env: ${{ steps.set_env.outputs.environment }}
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set environment
+      id: set_env
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+        else
+          echo "environment=production" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Pre-deployment checks
+      id: check
+      run: |
+        echo "Running pre-deployment checks..."
+        
+        # Check if this is a valid deployment commit
+        if git log --oneline -1 | grep -E "\[skip deploy\]|\[no deploy\]"; then
+          echo "Deployment skipped due to commit message"
+          echo "should_deploy=false" >> $GITHUB_OUTPUT
+        else
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+        fi
+        
+        # Check for required files
+        if [ ! -f "docker-compose.prod.yml" ]; then
+          echo "Warning: docker-compose.prod.yml not found"
+        fi
+        
+        if [ ! -f "deploy/fix-api-complete.sh" ]; then
+          echo "Warning: deployment script not found"
+        fi
+
+  deploy:
+    name: Deploy to ${{ needs.pre-deploy-checks.outputs.deploy_env }}
+    runs-on: ubuntu-latest
+    needs: pre-deploy-checks
+    if: needs.pre-deploy-checks.outputs.should_deploy == 'true'
+    
+    environment:
+      name: ${{ needs.pre-deploy-checks.outputs.deploy_env }}
+      url: ${{ needs.pre-deploy-checks.outputs.deploy_env == 'production' && 'https://www.xn--elfogndedonsoto-zrb.com' || 'https://staging.restaurant-app.com' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install frontend dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Build frontend for production
+      working-directory: ./frontend
+      run: |
+        if [ "${{ needs.pre-deploy-checks.outputs.deploy_env }}" == "production" ]; then
+          npm run build:prod
+        else
+          npm run build
+        fi
+    
+    - name: Prepare deployment package
+      run: |
+        # Create deployment package
+        mkdir -p deployment-package
+        
+        # Copy necessary files
+        cp -r backend/ deployment-package/
+        cp -r frontend/dist/ deployment-package/frontend-build/
+        cp docker-compose.prod.yml deployment-package/
+        cp -r deploy/ deployment-package/ 2>/dev/null || echo "No deploy directory"
+        cp -r nginx/ deployment-package/ 2>/dev/null || echo "No nginx directory"
+        
+        # Create deployment info
+        echo "DEPLOY_TIMESTAMP=$(date -u +%Y%m%d_%H%M%S)" > deployment-package/deploy.env
+        echo "DEPLOY_COMMIT=${GITHUB_SHA}" >> deployment-package/deploy.env
+        echo "DEPLOY_BRANCH=${GITHUB_REF_NAME}" >> deployment-package/deploy.env
+        echo "DEPLOY_ENVIRONMENT=${{ needs.pre-deploy-checks.outputs.deploy_env }}" >> deployment-package/deploy.env
+    
+    - name: Deploy to EC2
+      env:
+        EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USER: ${{ secrets.EC2_USER }}
+        DEPLOY_PATH: /opt/restaurant-web
+      run: |
+        # Set up SSH
+        echo "$EC2_SSH_KEY" > ec2_key.pem
+        chmod 600 ec2_key.pem
+        
+        # Create deployment script
+        cat << 'EOF' > deploy_script.sh
+        #!/bin/bash
+        set -e
+        
+        DEPLOY_PATH="/opt/restaurant-web"
+        BACKUP_PATH="/opt/restaurant-web-backup-$(date +%Y%m%d_%H%M%S)"
+        
+        echo "Starting deployment process..."
+        
+        # Create backup
+        if [ -d "$DEPLOY_PATH" ]; then
+          echo "Creating backup at $BACKUP_PATH"
+          sudo cp -r "$DEPLOY_PATH" "$BACKUP_PATH"
+        fi
+        
+        # Stop services
+        echo "Stopping services..."
+        cd "$DEPLOY_PATH" || exit 1
+        sudo docker-compose -f docker-compose.prod.yml down || true
+        
+        # Update code
+        echo "Updating application code..."
+        sudo git fetch origin
+        sudo git reset --hard origin/main
+        
+        # Update frontend build
+        if [ -d "/tmp/frontend-build" ]; then
+          echo "Updating frontend build..."
+          sudo rm -rf frontend/dist/*
+          sudo cp -r /tmp/frontend-build/* frontend/dist/
+        fi
+        
+        # Restart services
+        echo "Starting services..."
+        sudo docker-compose -f docker-compose.prod.yml up -d --build
+        
+        # Wait for services to be ready
+        echo "Waiting for services to start..."
+        sleep 30
+        
+        # Run migrations
+        echo "Running database migrations..."
+        sudo docker-compose -f docker-compose.prod.yml exec -T web python manage.py migrate || true
+        
+        # Collect static files
+        echo "Collecting static files..."
+        sudo docker-compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput || true
+        
+        echo "Deployment completed successfully!"
+        EOF
+        
+        # Copy deployment package to EC2
+        echo "Uploading deployment package..."
+        scp -i ec2_key.pem -o StrictHostKeyChecking=no -r deployment-package/ $EC2_USER@$EC2_HOST:/tmp/
+        
+        # Copy frontend build separately
+        scp -i ec2_key.pem -o StrictHostKeyChecking=no -r deployment-package/frontend-build/ $EC2_USER@$EC2_HOST:/tmp/
+        
+        # Execute deployment
+        echo "Executing deployment script..."
+        scp -i ec2_key.pem -o StrictHostKeyChecking=no deploy_script.sh $EC2_USER@$EC2_HOST:/tmp/
+        ssh -i ec2_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "chmod +x /tmp/deploy_script.sh && /tmp/deploy_script.sh"
+    
+    - name: Health check
+      env:
+        HEALTH_URL: ${{ needs.pre-deploy-checks.outputs.deploy_env == 'production' && 'https://www.xn--elfogndedonsoto-zrb.com/api/v1/health/' || 'https://staging.restaurant-app.com/api/v1/health/' }}
+      run: |
+        echo "Running health checks..."
+        
+        # Wait for application to be ready
+        for i in {1..10}; do
+          echo "Health check attempt $i/10..."
+          if curl -f -s "$HEALTH_URL"; then
+            echo "✅ Health check passed!"
+            break
+          else
+            echo "❌ Health check failed, retrying in 30s..."
+            sleep 30
+          fi
+          
+          if [ $i -eq 10 ]; then
+            echo "❌ Health checks failed after 10 attempts"
+            exit 1
+          fi
+        done
+    
+    - name: Post-deployment tests
+      if: ${{ !github.event.inputs.skip_tests }}
+      env:
+        BASE_URL: ${{ needs.pre-deploy-checks.outputs.deploy_env == 'production' && 'https://www.xn--elfogndedonsoto-zrb.com' || 'https://staging.restaurant-app.com' }}
+      run: |
+        echo "Running post-deployment tests..."
+        
+        # Test critical endpoints
+        curl -f "$BASE_URL/api/v1/health/" || exit 1
+        curl -f "$BASE_URL/" || exit 1
+        
+        # Test API endpoints that should be publicly accessible
+        curl -f "$BASE_URL/api/v1/config/tables/" -H "Accept: application/json" || echo "Tables endpoint may require auth"
+        
+        echo "✅ Post-deployment tests completed"
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        # Clean up temporary files
+        rm -f ec2_key.pem
+        rm -f deploy_script.sh
+        rm -rf deployment-package/
+    
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "🚀 Deployment to ${{ needs.pre-deploy-checks.outputs.deploy_env }} completed successfully!"
+          echo "URL: ${{ steps.deploy.outputs.environment_url }}"
+        else
+          echo "❌ Deployment to ${{ needs.pre-deploy-checks.outputs.deploy_env }} failed!"
+        fi
+
+  rollback:
+    name: Rollback (Manual)
+    runs-on: ubuntu-latest
+    needs: [pre-deploy-checks, deploy]
+    if: failure() && needs.pre-deploy-checks.outputs.should_deploy == 'true'
+    environment:
+      name: rollback-${{ needs.pre-deploy-checks.outputs.deploy_env }}
+    
+    steps:
+    - name: Rollback deployment
+      env:
+        EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USER: ${{ secrets.EC2_USER }}
+      run: |
+        echo "🔄 Initiating rollback procedure..."
+        
+        # Set up SSH
+        echo "$EC2_SSH_KEY" > ec2_key.pem
+        chmod 600 ec2_key.pem
+        
+        # Rollback script
+        cat << 'EOF' > rollback_script.sh
+        #!/bin/bash
+        set -e
+        
+        DEPLOY_PATH="/opt/restaurant-web"
+        LATEST_BACKUP=$(ls -t /opt/restaurant-web-backup-* 2>/dev/null | head -1)
+        
+        if [ -z "$LATEST_BACKUP" ]; then
+          echo "❌ No backup found for rollback!"
+          exit 1
+        fi
+        
+        echo "🔄 Rolling back to: $LATEST_BACKUP"
+        
+        # Stop current services
+        cd "$DEPLOY_PATH"
+        sudo docker-compose -f docker-compose.prod.yml down || true
+        
+        # Restore from backup
+        sudo rm -rf "$DEPLOY_PATH"
+        sudo cp -r "$LATEST_BACKUP" "$DEPLOY_PATH"
+        
+        # Start services
+        cd "$DEPLOY_PATH"
+        sudo docker-compose -f docker-compose.prod.yml up -d
+        
+        echo "✅ Rollback completed successfully!"
+        EOF
+        
+        # Execute rollback
+        scp -i ec2_key.pem -o StrictHostKeyChecking=no rollback_script.sh $EC2_USER@$EC2_HOST:/tmp/
+        ssh -i ec2_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "chmod +x /tmp/rollback_script.sh && /tmp/rollback_script.sh"
+        
+        # Clean up
+        rm -f ec2_key.pem rollback_script.sh

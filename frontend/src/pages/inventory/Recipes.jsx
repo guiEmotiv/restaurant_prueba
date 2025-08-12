@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, ChefHat, Package, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, ChefHat, Package, Search, FileSpreadsheet } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import RecipeModal from '../../components/recipe/RecipeModalFixed';
+import GenericExcelImportModal from '../../components/common/GenericExcelImportModal';
+import { EXCEL_IMPORT_CONFIGS } from '../../utils/excelImportConfigs';
 import { useToast } from '../../contexts/ToastContext';
 
 const Recipes = () => {
@@ -16,6 +18,7 @@ const Recipes = () => {
   const [nameFilter, setNameFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [availableFilter, setAvailableFilter] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     loadGroups();
@@ -89,24 +92,29 @@ const Recipes = () => {
     loadRecipes();
   };
 
-  const handleToggleAvailability = async (recipe) => {
-    try {
-      const updatedRecipe = {
-        ...recipe,
-        is_available: !recipe.is_available
-      };
-      await apiService.recipes.update(recipe.id, updatedRecipe);
-      await loadRecipes();
-      showSuccess(`Receta ${updatedRecipe.is_available ? 'habilitada' : 'deshabilitada'} exitosamente`);
-    } catch (error) {
-      console.error('Error updating recipe availability:', error);
-      showError('Error al actualizar la disponibilidad de la receta');
-    }
+  const handleImportExcel = () => {
+    setShowImportModal(true);
   };
+
+  const handleImportSuccess = () => {
+    loadRecipes();
+    setShowImportModal(false);
+  };
+
+  // ❌ REMOVED: Manual availability toggle - now purely informational based on stock
 
   const handleToggleActive = async (recipe) => {
     try {
-      // Solo enviar los campos necesarios para evitar efectos secundarios
+      const newActiveStatus = !recipe.is_active;
+      
+      // ⚠️ WARNING: Activating this version will deactivate other versions of the same recipe
+      if (newActiveStatus) {
+        const confirmMessage = `¿Activar "${recipe.name} v${recipe.version}"?\n\nEsto desactivará automáticamente otras versiones activas del mismo plato.`;
+        if (!window.confirm(confirmMessage)) {
+          return;
+        }
+      }
+      
       const updatedData = {
         name: recipe.name,
         version: recipe.version,
@@ -114,15 +122,21 @@ const Recipes = () => {
         base_price: recipe.base_price,
         profit_percentage: recipe.profit_percentage,
         preparation_time: recipe.preparation_time,
-        is_available: recipe.is_available, // Mantener el valor actual
-        is_active: !recipe.is_active // Solo cambiar este campo
+        is_available: recipe.is_available,
+        is_active: newActiveStatus
       };
+      
       await apiService.recipes.update(recipe.id, updatedData);
       await loadRecipes();
-      showSuccess(`Receta ${updatedData.is_active ? 'activada' : 'desactivada'} exitosamente`);
+      
+      showSuccess(
+        newActiveStatus 
+          ? `✅ Versión ${recipe.version} de "${recipe.name}" activada. Otras versiones desactivadas automáticamente.`
+          : `❌ Versión ${recipe.version} de "${recipe.name}" desactivada`
+      );
     } catch (error) {
       console.error('Error updating recipe active status:', error);
-      showError('Error al actualizar el estado activo de la receta');
+      showError('Error al actualizar el estado de la versión');
     }
   };
 
@@ -169,7 +183,15 @@ const Recipes = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <Button 
+          variant="outline"
+          onClick={handleImportExcel}
+          className="flex items-center gap-2"
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Importar Excel
+        </Button>
         <Button onClick={handleAdd} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           Nueva Receta
@@ -276,10 +298,10 @@ const Recipes = () => {
                   Ingredientes
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Estado
+                  Stock Disponible
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Activa
+                  Versión Activa
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
@@ -349,26 +371,38 @@ const Recipes = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {recipe.is_available_calculated ? (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                          Disponible
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                          <span className="w-2 h-2 bg-green-600 rounded-full mr-1"></span>
+                          Stock OK
                         </span>
                       ) : (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                          Falta de stock
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                          <span className="w-2 h-2 bg-red-600 rounded-full mr-1"></span>
+                          Sin Stock
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <button
                         onClick={() => handleToggleActive(recipe)}
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
                           recipe.is_active 
-                            ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                            ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
                             : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                         } transition-colors cursor-pointer`}
-                        title={`Click para ${recipe.is_active ? 'desactivar' : 'activar'}`}
+                        title={`${recipe.is_active ? 'Versión activa - Click para desactivar' : 'Versión inactiva - Click para activar (desactiva otras versiones)'}`}
                       >
-                        {recipe.is_active ? 'Activa' : 'Inactiva'}
+                        {recipe.is_active ? (
+                          <>
+                            <span className="w-2 h-2 bg-blue-600 rounded-full mr-1"></span>
+                            v{recipe.version} ✓
+                          </>
+                        ) : (
+                          <>
+                            <span className="w-2 h-2 bg-gray-400 rounded-full mr-1"></span>
+                            v{recipe.version}
+                          </>
+                        )}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
@@ -425,7 +459,10 @@ const Recipes = () => {
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {recipe.is_available_calculated ? 'Disponible' : 'Falta de stock'}
+                        <span className={`w-2 h-2 rounded-full mr-1 ${
+                          recipe.is_available_calculated ? 'bg-green-600' : 'bg-red-600'
+                        }`}></span>
+                        {recipe.is_available_calculated ? 'Stock OK' : 'Sin Stock'}
                       </span>
                     </div>
                     
@@ -520,6 +557,16 @@ const Recipes = () => {
         onClose={() => setIsModalOpen(false)}
         recipe={selectedRecipe}
         onSave={handleModalSave}
+      />
+
+      <GenericExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportSuccess={handleImportSuccess}
+        title="Importar Recetas desde Excel"
+        apiImportFunction={apiService.recipes.importExcel}
+        templateConfig={EXCEL_IMPORT_CONFIGS.recipes.templateConfig}
+        formatDescription={EXCEL_IMPORT_CONFIGS.recipes.formatDescription}
       />
     </div>
   );

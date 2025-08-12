@@ -189,7 +189,13 @@ class CognitoAuthenticationMiddleware:
             email = payload.get('email', '')
             groups = payload.get('cognito:groups', [])
             
+            # Log complete payload for debugging
+            logger.info(f"🔍 Complete token payload: {json.dumps(payload, indent=2)}")
             logger.info(f"✅ User extracted: username={username}, email={email}, groups={groups}")
+            
+            # If no groups found and this is an access token, log warning
+            if not groups and payload.get('token_use') == 'access':
+                logger.warning(f"⚠️ Access token does not contain groups. Consider using ID token for authorization.")
             
             return CognitoUser(username=username, email=email, groups=groups)
             

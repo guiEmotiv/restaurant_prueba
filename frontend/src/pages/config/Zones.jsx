@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, FileSpreadsheet } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import Button from '../../components/common/Button';
 import ZoneModal from '../../components/config/ZoneModal';
+import GenericExcelImportModal from '../../components/common/GenericExcelImportModal';
+import { EXCEL_IMPORT_CONFIGS } from '../../utils/excelImportConfigs';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -11,6 +13,7 @@ const Zones = () => {
   const [loading, setLoading] = useState(true);
   const { showSuccess, showError } = useToast();
   const [showZoneModal, setShowZoneModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedZone, setSelectedZone] = useState(null);
 
   const columns = [
@@ -59,6 +62,15 @@ const Zones = () => {
     handleOpenModal();
   };
 
+  const handleImportExcel = () => {
+    setShowImportModal(true);
+  };
+
+  const handleImportSuccess = () => {
+    loadZones();
+    setShowImportModal(false);
+  };
+
   const handleEdit = (zone) => {
     handleOpenModal(zone);
   };
@@ -80,7 +92,15 @@ const Zones = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <Button 
+          variant="outline"
+          onClick={handleImportExcel}
+          className="flex items-center gap-2"
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Importar Excel
+        </Button>
         <Button 
           onClick={handleAdd}
           className="flex items-center gap-2"
@@ -107,6 +127,16 @@ const Zones = () => {
         onClose={handleCloseModal}
         zone={selectedZone}
         onSave={handleModalSave}
+      />
+
+      <GenericExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportSuccess={handleImportSuccess}
+        title="Importar Zonas desde Excel"
+        apiImportFunction={apiService.zones.importExcel}
+        templateConfig={EXCEL_IMPORT_CONFIGS.zones.templateConfig}
+        formatDescription={EXCEL_IMPORT_CONFIGS.zones.formatDescription}
       />
     </div>
   );

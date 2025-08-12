@@ -82,6 +82,12 @@ const LoginForm = ({ children }) => {
           console.log('  Full user object:', user);
           console.log('  SignInDetails:', user.signInDetails);
           console.log('  Rendering children...');
+          
+          // ✅ Notificar al AuthContext que el usuario se autenticó
+          console.log('🎯 Dispatching cognitoAuthSuccess event...');
+          window.dispatchEvent(new CustomEvent('cognitoAuthSuccess', { 
+            detail: { user, timestamp: Date.now() } 
+          }));
         } else {
           console.log('❌ Authenticator: No user found - showing login');
         }

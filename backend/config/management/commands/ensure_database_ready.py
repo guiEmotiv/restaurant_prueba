@@ -16,19 +16,17 @@ class Command(BaseCommand):
         self.stdout.write("🔍 Checking data state...")
         call_command('check_database')
         
-        # Clean and populate if needed
-        from config.models import Zone, Table
+        # Only populate if database is COMPLETELY empty (no auto-cleaning)
+        from config.models import Zone, Table, Unit
         
-        total_records = Zone.objects.count() + Table.objects.count()
+        total_records = Zone.objects.count() + Table.objects.count() + Unit.objects.count()
         
-        if total_records < 10:
-            self.stdout.write("🗑️ Cleaning old data...")
-            call_command('clean_database', confirm=True)
-            
-            self.stdout.write("📊 Populating fresh data...")
+        if total_records == 0:
+            self.stdout.write("📊 Database is empty - populating initial data...")
             call_command('populate_production_data')
         else:
-            self.stdout.write("✅ Database already has sufficient data")
+            self.stdout.write(f"✅ Database has data ({total_records} records) - skipping population")
+            self.stdout.write("ℹ️  To manually reset database, run: python manage.py clean_database")
             
         self.stdout.write(
             self.style.SUCCESS("✅ Database is ready!")

@@ -46,8 +46,11 @@ make createsuperuser
 python manage.py createsuperuser
 
 # Run tests
-make test
-pytest -q
+make test                  # Run all tests
+pytest -q                 # Quick test run
+pytest --cov=. --cov-report=term-missing  # With coverage
+pytest -m "unit"          # Unit tests only
+pytest -m "integration"   # Integration tests only
 
 # Shell access
 make shell
@@ -65,6 +68,12 @@ npm run dev                # Starts on port 5173
 # Production build
 npm run build             # Standard build
 npm run build:prod        # Memory-optimized build
+
+# Testing
+npm test                  # Run tests once
+npm run test:watch        # Watch mode
+npm run test:coverage     # With coverage report
+npm run test:ci           # CI mode (no watch)
 
 # Linting
 npm run lint              # ESLint check
@@ -174,3 +183,96 @@ sudo docker-compose -f docker-compose.prod.yml up -d --build
 - React Context for authentication and global state
 - Local component state for forms and UI interactions
 - API data fetched on component mount with loading states
+
+## Testing Framework
+
+### Backend Tests (pytest)
+```bash
+# Run all tests with coverage
+pytest --cov=. --cov-report=term-missing
+
+# Test categories
+pytest -m "unit"           # Unit tests only
+pytest -m "integration"    # Integration tests only
+pytest -m "slow"           # Long-running tests
+
+# Test fixtures available
+# - admin_user, waiter_user, cook_user
+# - sample_table, sample_recipe, sample_order
+```
+
+### Frontend Tests (Jest + React Testing Library)
+```bash
+# Run tests
+npm test                   # Interactive mode
+npm run test:ci           # CI mode with coverage
+npm run test:watch        # Watch for changes
+
+# Test structure
+# - src/__tests__/setup.js: Global test configuration
+# - src/__tests__/components/: Component tests
+# - src/__tests__/contexts/: Context tests
+# - src/__tests__/services/: Service tests
+```
+
+### Coverage Requirements
+- Backend: 70% minimum coverage (lines, functions, branches)
+- Frontend: 70% minimum coverage
+- Critical components require 90%+ coverage
+
+## CI/CD Pipeline
+
+### GitHub Actions Workflows
+
+#### 1. CI/CD Pipeline (`.github/workflows/ci-cd.yml`)
+- Triggers: Push to main/develop, PRs to main
+- Backend testing with PostgreSQL
+- Frontend testing and build
+- Security scanning (Bandit, Safety, npm audit)
+- Automated deployment to dev/prod
+
+#### 2. PR Checks (`.github/workflows/pr-checks.yml`)
+- Fast feedback for pull requests
+- Quick unit tests and linting
+- Code quality checks
+- Performance analysis
+
+#### 3. Quality Gate (`.github/workflows/quality-gate.yml`)
+- Comprehensive testing suite
+- Integration tests
+- Performance benchmarks
+- Security audits
+- Nightly quality checks
+
+#### 4. Deployment (`.github/workflows/deploy.yml`)
+- Production deployment to EC2
+- Health checks and rollback capability
+- Blue-green deployment strategy
+- Database migrations
+
+### Deployment Process
+1. Code push triggers CI pipeline
+2. Tests run in parallel (backend + frontend)
+3. Security scans validate dependencies
+4. Build artifacts created and tested
+5. Deployment to staging/production
+6. Health checks verify deployment
+7. Rollback available if issues detected
+
+### Environment Configuration
+- **Development**: Local Docker with hot reload
+- **Staging**: Automated deployment from develop branch
+- **Production**: Manual/automated deployment from main branch
+- **Monitoring**: Health checks, logging, error tracking
+
+### Required Secrets (GitHub)
+- `EC2_SSH_KEY`: SSH private key for EC2 access
+- `EC2_HOST`: Production server hostname
+- `EC2_USER`: SSH username (typically ubuntu)
+
+### Quality Gates
+- All tests must pass (70%+ coverage)
+- No high-severity security vulnerabilities
+- Linting and code style checks pass
+- Build size within acceptable limits
+- API health checks successful

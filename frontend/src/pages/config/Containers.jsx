@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, FileSpreadsheet } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import Button from '../../components/common/Button';
 import ContainerModal from '../../components/config/ContainerModal';
+import GenericExcelImportModal from '../../components/common/GenericExcelImportModal';
+import { EXCEL_IMPORT_CONFIGS } from '../../utils/excelImportConfigs';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -11,6 +13,7 @@ const Containers = () => {
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showContainerModal, setShowContainerModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
 
   const columns = [
@@ -66,6 +69,15 @@ const Containers = () => {
     handleOpenModal();
   };
 
+  const handleImportExcel = () => {
+    setShowImportModal(true);
+  };
+
+  const handleImportSuccess = () => {
+    loadContainers();
+    setShowImportModal(false);
+  };
+
   const handleEdit = (container) => {
     handleOpenModal(container);
   };
@@ -87,7 +99,15 @@ const Containers = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <Button 
+          variant="outline"
+          onClick={handleImportExcel}
+          className="flex items-center gap-2"
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Importar Excel
+        </Button>
         <Button 
           onClick={handleAdd}
           className="flex items-center gap-2"
@@ -114,6 +134,16 @@ const Containers = () => {
         onClose={handleCloseModal}
         container={selectedContainer}
         onSave={handleModalSave}
+      />
+
+      <GenericExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportSuccess={handleImportSuccess}
+        title="Importar Envases desde Excel"
+        apiImportFunction={apiService.containers.importExcel}
+        templateConfig={EXCEL_IMPORT_CONFIGS.containers.templateConfig}
+        formatDescription={EXCEL_IMPORT_CONFIGS.containers.formatDescription}
       />
     </div>
   );

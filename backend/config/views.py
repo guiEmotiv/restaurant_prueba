@@ -2,11 +2,18 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny
+from django.db import transaction
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from backend.cognito_permissions import (
     CognitoAdminOnlyPermission, 
     CognitoWaiterAndAdminPermission, 
     CognitoReadOnlyForNonAdmins
 )
+import pandas as pd
+import io
+import json
 from .models import Unit, Zone, Table, Container
 from .serializers import (
     UnitSerializer, ZoneSerializer, 
@@ -27,6 +34,7 @@ class UnitViewSet(viewsets.ModelViewSet):
         from inventory.serializers import IngredientSerializer
         serializer = IngredientSerializer(ingredients, many=True)
         return Response(serializer.data)
+    
 
 
 class ZoneViewSet(viewsets.ModelViewSet):
@@ -118,3 +126,4 @@ def operational_info(request):
         'business_hours': '24/7',   # Siempre disponible
         'message': 'Restaurante operativo'
     })
+

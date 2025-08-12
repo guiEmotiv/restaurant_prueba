@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Amplify } from 'aws-amplify';
 import { ToastProvider } from './contexts/ToastContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, MockAuthProvider } from './contexts/AuthContext';
 import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
@@ -54,7 +54,7 @@ Amplify.configure(amplifyConfig);
 const isCognitoConfigured = !!(
   import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID && 
   import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID
-);
+) && !import.meta.env.VITE_DISABLE_AUTH; // ✅ Allow disabling auth for development
 
 console.log('🔐 AWS Cognito authentication status:', isCognitoConfigured ? 'ENABLED' : 'DISABLED');
 if (isCognitoConfigured) {
@@ -199,12 +199,12 @@ function App() {
               </AuthProvider>
             </LoginForm>
           ) : (
-            <AuthProvider>
-              {console.log('🚀 Inside AuthProvider (no auth)...')}
+            <MockAuthProvider>
+              {console.log('🚀 Inside MockAuthProvider (no auth)...')}
               <RoleValidator>
                 <AppContent />
               </RoleValidator>
-            </AuthProvider>
+            </MockAuthProvider>
           )}
         </Router>
       </ToastProvider>

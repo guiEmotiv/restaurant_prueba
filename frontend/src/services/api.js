@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { logger } from '../utils/logger';
+import { API_CONFIG } from '../utils/constants';
 
 // Determine API URL based on environment
 let API_BASE_URL;
@@ -13,13 +15,13 @@ if (import.meta.env.VITE_API_URL) {
   API_BASE_URL = 'http://localhost:8000/api/v1';
 }
 
-// Debug log to see what URL is being used
-console.log('🔍 API Configuration Debug:');
-console.log('  VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('  API_BASE_URL:', API_BASE_URL);
-console.log('  MODE:', import.meta.env.MODE);
-console.log('  PROD:', import.meta.env.PROD);
-console.log('  Timestamp:', new Date().toISOString());
+// Log API configuration (solo en desarrollo)
+logger.info('API Configuration:', {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  API_BASE_URL,
+  MODE: import.meta.env.MODE,
+  PROD: import.meta.env.PROD
+});
 
 // Create axios instance with default configuration
 const api = axios.create({
@@ -27,26 +29,17 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 second timeout
+  timeout: API_CONFIG.TIMEOUT
 });
 
+// Export API_BASE_URL for use in other components
+export { API_BASE_URL };
 
-// Add request interceptor for authentication and debugging
+
+// Add request interceptor for authentication
 api.interceptors.request.use(
   async (config) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[⚖️ ${timestamp}] 📡 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    
-    // Store API request logs
-    const apiLogs = JSON.parse(sessionStorage.getItem('api-debug-logs') || '[]');
-    apiLogs.push({
-      timestamp,
-      type: 'request',
-      method: config.method?.toUpperCase(),
-      url: `${config.baseURL}${config.url}`,
-      headers: config.headers
-    });
-    sessionStorage.setItem('api-debug-logs', JSON.stringify(apiLogs.slice(-50)));
+    logger.api(config.method?.toUpperCase(), config.url, config.data);
     
     // Add JWT token for authentication
     try {
@@ -54,11 +47,17 @@ api.interceptors.request.use(
       const { fetchAuthSession } = await import('aws-amplify/auth');
       const session = await fetchAuthSession();
       
-      if (session.tokens?.accessToken) {
+      // IMPORTANTE: Usar ID Token en lugar de Access Token para obtener grupos
+      // El ID Token incluye los grupos del usuario (cognito:groups)
+      if (session.tokens?.idToken) {
+        config.headers.Authorization = `Bearer ${session.tokens.idToken}`;
+        console.log('🔐 Added ID Token to request (includes user groups)');
+      } else if (session.tokens?.accessToken) {
+        // Fallback to access token if ID token not available
         config.headers.Authorization = `Bearer ${session.tokens.accessToken}`;
-        console.log('🔐 Added JWT token to request');
+        console.log('⚠️ Using Access Token (may not include groups)');
       } else {
-        console.log('ℹ️ No access token available in session');
+        console.log('ℹ️ No tokens available in session');
       }
     } catch (error) {
       // If not authenticated or error getting token, continue without auth
@@ -178,6 +177,14 @@ export const apiService = {
       const response = await api.get(`/units/${id}/ingredients/`);
       return response.data;
     },
+    importExcel: async (formData) => {
+      const response = await axios.post('http://localhost:8000/import-units/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    },
   },
 
   zones: {
@@ -188,6 +195,14 @@ export const apiService = {
     delete: (id) => apiService.delete('zones', id),
     getTables: async (id) => {
       const response = await api.get(`/zones/${id}/tables/`);
+      return response.data;
+    },
+    importExcel: async (formData) => {
+      const response = await axios.post('http://localhost:8000/import-zones/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       return response.data;
     },
   },
@@ -210,6 +225,14 @@ export const apiService = {
       const response = await api.get(`/tables/${id}/active_orders/`);
       return response.data;
     },
+    importExcel: async (formData) => {
+      const response = await axios.post('http://localhost:8000/import-tables/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    },
   },
 
 
@@ -222,6 +245,14 @@ export const apiService = {
     delete: (id) => apiService.delete('groups', id),
     getRecipes: async (id) => {
       const response = await api.get(`/groups/${id}/recipes/`);
+      return response.data;
+    },
+    importExcel: async (formData) => {
+      const response = await axios.post('http://localhost:8000/import-groups/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       return response.data;
     },
   },
@@ -239,6 +270,14 @@ export const apiService = {
     delete: (id) => apiService.delete('ingredients', id),
     updateStock: async (id, quantity, operation) => {
       const response = await api.post(`/ingredients/${id}/update_stock/`, { quantity, operation });
+      return response.data;
+    },
+    importExcel: async (formData) => {
+      const response = await axios.post('http://localhost:8000/import-ingredients/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       return response.data;
     },
   },
@@ -268,6 +307,14 @@ export const apiService = {
     },
     removeIngredient: async (id, ingredientId) => {
       const response = await api.delete(`/recipes/${id}/remove_ingredient/`, { data: { ingredient_id: ingredientId } });
+      return response.data;
+    },
+    importExcel: async (formData) => {
+      const response = await axios.post('http://localhost:8000/import-recipes/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       return response.data;
     },
   },
@@ -403,6 +450,14 @@ export const apiService = {
     }
   },
 
+  // Debug endpoint
+  debug: {
+    checkAuth: async () => {
+      const response = await api.get('/debug/auth/');
+      return response.data;
+    }
+  },
+
   // Restaurant config endpoints
   restaurantConfig: {
     getAll: () => apiService.getAll('restaurant-config'),
@@ -437,6 +492,14 @@ export const apiService = {
     create: (data) => apiService.create('containers', data),
     update: (id, data) => apiService.update('containers', id, data),
     delete: (id) => apiService.delete('containers', id),
+    importExcel: async (formData) => {
+      const response = await axios.post('http://localhost:8000/import-containers/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    },
   },
 
   containerSales: {

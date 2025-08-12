@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, FileSpreadsheet } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import IngredientModal from '../../components/inventory/IngredientModal';
+import GenericExcelImportModal from '../../components/common/GenericExcelImportModal';
+import { EXCEL_IMPORT_CONFIGS } from '../../utils/excelImportConfigs';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -13,6 +15,7 @@ const Ingredients = () => {
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showIngredientModal, setShowIngredientModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
   const [nameFilter, setNameFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
@@ -126,6 +129,15 @@ const Ingredients = () => {
     loadIngredients();
   };
 
+  const handleImportExcel = () => {
+    setShowImportModal(true);
+  };
+
+  const handleImportSuccess = () => {
+    loadIngredients();
+    setShowImportModal(false);
+  };
+
   const handleAdd = () => {
     handleOpenIngredientModal();
   };
@@ -163,7 +175,15 @@ const Ingredients = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <Button 
+          variant="outline"
+          onClick={handleImportExcel}
+          className="flex items-center gap-2"
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Importar Excel
+        </Button>
         <Button 
           onClick={handleAdd} 
           className="flex items-center gap-2"
@@ -234,6 +254,17 @@ const Ingredients = () => {
         onClose={handleCloseIngredientModal}
         ingredient={selectedIngredient}
         onSave={handleIngredientModalSave}
+      />
+
+      {/* Excel Import Modal */}
+      <GenericExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportSuccess={handleImportSuccess}
+        title="Importar Ingredientes desde Excel"
+        apiImportFunction={apiService.ingredients.importExcel}
+        templateConfig={EXCEL_IMPORT_CONFIGS.ingredients.templateConfig}
+        formatDescription={EXCEL_IMPORT_CONFIGS.ingredients.formatDescription}
       />
 
     </div>
