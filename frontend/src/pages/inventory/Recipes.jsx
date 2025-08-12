@@ -60,20 +60,32 @@ const Recipes = () => {
     }
   };
 
-  const loadRecipes = async () => {
+  const loadRecipes = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
+      
       const params = { show_all: true };
       
       const data = await apiService.recipes.getAll(params);
-      // Ordenar por ID descendente
+      // Ordenar por ID descendente para mostrar las más recientes primero
       const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
-      setRecipes(sortedData);
+      
+      // Optimización: solo actualizar si hay cambios reales
+      if (JSON.stringify(sortedData) !== JSON.stringify(recipes)) {
+        setRecipes(sortedData);
+      }
+      
     } catch (error) {
       console.error('Error loading recipes:', error);
-      showError('Error al cargar las recetas');
+      if (!silent) {
+        showError('Error al cargar las recetas');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -97,7 +109,8 @@ const Recipes = () => {
   };
 
   const handleImportSuccess = () => {
-    loadRecipes();
+    // Use silent reload to avoid showing loading state unnecessarily
+    loadRecipes(false); // Force full reload after import
     setShowImportModal(false);
   };
 

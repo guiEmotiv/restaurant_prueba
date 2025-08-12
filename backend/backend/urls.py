@@ -3,13 +3,16 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
-from django.http import HttpResponse, FileResponse, Http404
+from django.http import HttpResponse, FileResponse, Http404, JsonResponse
 from pathlib import Path
 import mimetypes
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
+from django.db import connection
+from django.views.decorators.csrf import csrf_exempt
+import pandas as pd
 
 def index_view(request):
     """Serve React index.html for production"""
@@ -293,6 +296,7 @@ import_ingredients_excel_main = create_import_excel_function(Ingredient, 'ingred
 # Recipes import (with group, container references and ingredients)
 def process_recipes_row(row, row_num, errors):
     try:
+        from decimal import Decimal
         name = str(row['name']).strip()
         version = str(row.get('version', '1.0')).strip()
         profit_percentage = float(row.get('profit_percentage', 0))
@@ -338,7 +342,7 @@ def process_recipes_row(row, row_num, errors):
             try:
                 ingredient = Ingredient.objects.get(name__iexact=ingredient_name)
                 recipe_ingredients.append({'ingredient': ingredient, 'quantity': quantity})
-                calculated_price += ingredient.unit_price * quantity
+                calculated_price += float(ingredient.unit_price) * quantity
             except Ingredient.DoesNotExist:
                 errors.append(f'Fila {row_num}: Ingrediente "{ingredient_name}" no existe')
                 return None
@@ -378,8 +382,8 @@ def process_recipes_row(row, row_num, errors):
             'container': container,
             'name': name,
             'version': version,
-            'base_price': base_price,
-            'profit_percentage': profit_percentage,
+            'base_price': Decimal(str(base_price)),
+            'profit_percentage': Decimal(str(profit_percentage)),
             'preparation_time': preparation_time,
             'is_available': True,
             'is_active': True,
@@ -399,7 +403,14 @@ def import_recipes_excel_main(request):
         return JsonResponse({'error': 'No se encontró el archivo'}, status=400)
     
     try:
+        # Add debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("DEBUG: Starting recipe import")
+        
         # Clear existing data and reset counter
+        deleted_recipes = Recipe.objects.count()
+        deleted_recipe_items = RecipeItem.objects.count()
         Recipe.objects.all().delete()
         RecipeItem.objects.all().delete()
         
@@ -408,9 +419,13 @@ def import_recipes_excel_main(request):
             cursor.execute("DELETE FROM sqlite_sequence WHERE name='recipe'")
             cursor.execute("DELETE FROM sqlite_sequence WHERE name='recipe_item'")
         
-        # Read Excel file
+        # Read Excel/CSV file
         file = request.FILES['file']
-        df = pd.read_excel(file)
+        file_ext = file.name.lower().split('.')[-1]
+        if file_ext == 'csv':
+            df = pd.read_csv(file)
+        else:
+            df = pd.read_excel(file)
         
         if df.empty:
             return JsonResponse({'error': 'El archivo está vacío'}, status=400)
@@ -465,10 +480,11 @@ def import_recipes_excel_main(request):
             
             # Create recipe ingredients
             for ingredient_data in recipe_ingredients:
+                from decimal import Decimal
                 RecipeItem.objects.create(
                     recipe=recipe,
                     ingredient=ingredient_data['ingredient'],
-                    quantity=ingredient_data['quantity']
+                    quantity=Decimal(str(ingredient_data['quantity']))
                 )
             
             # Update calculated price if ingredients were provided
@@ -480,11 +496,24 @@ def import_recipes_excel_main(request):
         return JsonResponse({
             'success': True,
             'message': f'Se importaron exitosamente {len(created_recipes)} recetas con sus ingredientes',
-            'count': len(created_recipes)
+            'created': len(created_recipes),
+            'deleted': deleted_recipes,
+            'errors': 0,
+            'error_details': [],
+            'created_items': [r.name for r in created_recipes]
         })
         
     except Exception as e:
-        return JsonResponse({'error': f'Error procesando archivo: {str(e)}'}, status=400)
+        # Log the full error with traceback
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"ERROR in import_recipes_excel_main: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({
+            'error': f'Error procesando archivo: {str(e)}',
+            'traceback': traceback.format_exc()  # Include in response for debugging
+        }, status=500)
 
 # Add CSRF exemption to all functions (except recipes which is already exempt)
 import_zones_excel_main = csrf_exempt(import_zones_excel_main)

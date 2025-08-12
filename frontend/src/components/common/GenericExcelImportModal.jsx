@@ -12,7 +12,7 @@ const GenericExcelImportModal = ({
   templateConfig = {},
   formatDescription = []
 }) => {
-  const { showSuccess, showError, showInfo } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -69,23 +69,66 @@ const GenericExcelImportModal = ({
       const response = await apiImportFunction(formData);
       setResults(response);
 
-      if (response.errors === 0) {
+      // Determine success based on multiple criteria for better reliability
+      const isFullSuccess = response.success && 
+        (response.errors === 0 || response.errors === undefined) &&
+        (response.created > 0 || response.count > 0);
+      
+      const hasPartialSuccess = response.success && 
+        (response.created > 0 || response.count > 0) &&
+        response.errors > 0;
+
+      if (isFullSuccess) {
         showSuccess(`✅ ${response.message}`);
-        if (onImportSuccess) {
-          onImportSuccess();
-        }
-      } else {
-        showInfo(`⚠️ ${response.message}`);
+      } else if (hasPartialSuccess) {
+        showWarning(`⚠️ ${response.message}`);
+      }
+
+      // Call success callback if any items were created, regardless of errors
+      // This ensures UI refresh happens when data is actually imported
+      if ((response.created > 0 || response.count > 0) && onImportSuccess) {
+        onImportSuccess();
       }
 
     } catch (error) {
       console.error('Error importing Excel:', error);
       
-      const errorMessage = error.response?.data?.error || 
-                          (error.response?.status === 400 ? `Error en el formato del archivo. ${formatDescription.length > 0 ? 'Verifique las columnas requeridas.' : ''}` :
-                           error.response?.status === 401 ? 'Error de autenticación. Recargue la página e intente nuevamente.' :
-                           !error.response ? 'Error de conexión. Verifique que el servidor esté funcionando.' :
-                           'Error al importar el archivo Excel');
+      let errorMessage = 'Error al importar el archivo Excel';
+      
+      if (error.response?.data) {
+        const data = error.response.data;
+        
+        // Si hay errores de validación detallados
+        if (data.error && data.details) {
+          errorMessage = data.error;
+          // Mostrar los detalles como resultados para que el usuario los vea
+          setResults({
+            errors: data.details.length,
+            error_details: data.details,
+            created: 0,
+            deleted: 0
+          });
+          showError(`❌ ${errorMessage}`);
+          return; // No limpiar results para que se muestren los errores
+        } 
+        // Si hay un mensaje de error simple
+        else if (data.error) {
+          errorMessage = data.error;
+        }
+        // Si hay errores de validación específicos
+        else if (data.details) {
+          errorMessage = `Errores encontrados: ${data.details.join(', ')}`;
+        }
+      } else {
+        // Errores de conexión o estado HTTP
+        if (error.response?.status === 400) {
+          errorMessage = `Error en el formato del archivo. ${formatDescription.length > 0 ? 'Verifique las columnas requeridas.' : ''}`;
+        } else if (error.response?.status === 401) {
+          errorMessage = 'Error de autenticación. Recargue la página e intente nuevamente.';
+        } else if (!error.response) {
+          errorMessage = 'Error de conexión. Verifique que el servidor esté funcionando.';
+        }
+      }
       
       showError(errorMessage);
       setResults(null);
@@ -263,43 +306,64 @@ const GenericExcelImportModal = ({
         {/* Resultados de importación */}
         {results && (
           <div className={`border rounded-lg p-4 ${
-            results.errors === 0 ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+            (results.errors === 0 || results.errors === undefined) && (results.created > 0 || results.count > 0) ? 'bg-green-50 border-green-200' : 
+            results.errors > 0 && (results.created > 0 || results.count > 0) ? 'bg-yellow-50 border-yellow-200' :
+            'bg-red-50 border-red-200'
           }`}>
             <div className="flex items-start gap-3">
-              {results.errors === 0 ? (
+              {(results.errors === 0 || results.errors === undefined) && (results.created > 0 || results.count > 0) ? (
                 <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-              ) : (
+              ) : results.errors > 0 && (results.created > 0 || results.count > 0) ? (
                 <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
               )}
               <div className="flex-1">
                 <h4 className={`font-medium ${
-                  results.errors === 0 ? 'text-green-900' : 'text-yellow-900'
+                  (results.errors === 0 || results.errors === undefined) && (results.created > 0 || results.count > 0) ? 'text-green-900' : 
+                  results.errors > 0 && (results.created > 0 || results.count > 0) ? 'text-yellow-900' :
+                  'text-red-900'
                 }`}>
-                  Resultados de la importación
+                  {(results.errors === 0 || results.errors === undefined) && (results.created > 0 || results.count > 0) ? 'Importación exitosa' :
+                   results.errors > 0 && (results.created > 0 || results.count > 0) ? 'Importación con errores' :
+                   'Error en la importación'}
                 </h4>
                 <div className={`text-sm mt-2 ${
-                  results.errors === 0 ? 'text-green-700' : 'text-yellow-700'
+                  (results.errors === 0 || results.errors === undefined) && (results.created > 0 || results.count > 0) ? 'text-green-700' : 
+                  results.errors > 0 && (results.created > 0 || results.count > 0) ? 'text-yellow-700' :
+                  'text-red-700'
                 }`}>
-                  {results.deleted !== undefined && (
+                  {results.deleted !== undefined && results.deleted > 0 && (
                     <p>• {results.deleted} elementos eliminados</p>
                   )}
-                  <p>• {results.created} elementos creados</p>
-                  {results.updated !== undefined && (
-                    <p>• {results.updated} elementos ya existían</p>
+                  {/* Support both 'created' and 'count' fields for backward compatibility */}
+                  {((results.created !== undefined && results.created > 0) || (results.count !== undefined && results.count > 0)) && (
+                    <p>• {results.created || results.count} elementos creados</p>
                   )}
-                  {results.errors > 0 && (
+                  {results.updated !== undefined && results.updated > 0 && (
+                    <p>• {results.updated} elementos actualizados</p>
+                  )}
+                  {results.errors !== undefined && results.errors > 0 && (
                     <p>• {results.errors} errores encontrados</p>
                   )}
                 </div>
                 
                 {results.error_details && results.error_details.length > 0 && (
                   <div className="mt-3">
-                    <p className="font-medium text-yellow-900 mb-1">Errores:</p>
-                    <ul className="text-sm text-yellow-700 list-disc list-inside">
+                    <p className={`font-medium mb-1 ${
+                      results.created > 0 ? 'text-yellow-900' : 'text-red-900'
+                    }`}>
+                      Errores detallados:
+                    </p>
+                    <div className={`text-sm max-h-32 overflow-y-auto ${
+                      results.created > 0 ? 'text-yellow-700' : 'text-red-700'
+                    }`}>
                       {results.error_details.map((error, index) => (
-                        <li key={index}>{error}</li>
+                        <div key={index} className="mb-1 p-2 bg-white bg-opacity-50 rounded">
+                          • {error}
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
               </div>

@@ -178,10 +178,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const response = await axios.post('http://localhost:8000/import-units/', formData, {
+      const baseUrl = API_BASE_URL.replace('/api/v1', '');
+      const response = await axios.post(`${baseUrl}/import-units/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000,
       });
       return response.data;
     },
@@ -198,10 +200,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const response = await axios.post('http://localhost:8000/import-zones/', formData, {
+      const baseUrl = API_BASE_URL.replace('/api/v1', '');
+      const response = await axios.post(`${baseUrl}/import-zones/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000,
       });
       return response.data;
     },
@@ -226,10 +230,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const response = await axios.post('http://localhost:8000/import-tables/', formData, {
+      const baseUrl = API_BASE_URL.replace('/api/v1', '');
+      const response = await axios.post(`${baseUrl}/import-tables/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000,
       });
       return response.data;
     },
@@ -248,10 +254,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const response = await axios.post('http://localhost:8000/import-groups/', formData, {
+      const baseUrl = API_BASE_URL.replace('/api/v1', '');
+      const response = await axios.post(`${baseUrl}/import-groups/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000,
       });
       return response.data;
     },
@@ -273,10 +281,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const response = await axios.post('http://localhost:8000/import-ingredients/', formData, {
+      const baseUrl = API_BASE_URL.replace('/api/v1', '');
+      const response = await axios.post(`${baseUrl}/import-ingredients/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000,
       });
       return response.data;
     },
@@ -310,10 +320,13 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const response = await axios.post('http://localhost:8000/import-recipes/', formData, {
+      // Use direct axios to bypass API base path since import endpoints are at root level
+      const baseUrl = API_BASE_URL.replace('/api/v1', ''); // Remove /api/v1 from base URL
+      const response = await axios.post(`${baseUrl}/import-recipes/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000, // 30 seconds for file upload
       });
       return response.data;
     },
@@ -493,10 +506,12 @@ export const apiService = {
     update: (id, data) => apiService.update('containers', id, data),
     delete: (id) => apiService.delete('containers', id),
     importExcel: async (formData) => {
-      const response = await axios.post('http://localhost:8000/import-containers/', formData, {
+      const baseUrl = API_BASE_URL.replace('/api/v1', '');
+      const response = await axios.post(`${baseUrl}/import-containers/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000,
       });
       return response.data;
     },
