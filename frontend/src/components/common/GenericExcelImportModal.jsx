@@ -145,26 +145,24 @@ const GenericExcelImportModal = ({
   };
 
   const downloadTemplate = () => {
-    if (!templateConfig.columns || templateConfig.columns.length === 0) {
+    if (!templateConfig.filename) {
       showError('No hay plantilla disponible para este tipo de import');
       return;
     }
     
-    // Crear CSV con las columnas requeridas y ejemplos
-    const csvContent = [
-      templateConfig.columns,
-      ...(templateConfig.examples || [])
-    ].map(row => row.join(',')).join('\n');
+    // Descargar archivo Excel pre-generado desde el servidor
+    const templatePath = `/templates/${templateConfig.filename}`;
+    const link = document.createElement('a');
+    link.href = templatePath;
+    link.download = templateConfig.filename;
+    link.style.display = 'none';
     
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = templateConfig.filename || 'plantilla.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Nota: Si el archivo no existe, el navegador mostrará un error 404
+    // En producción, estos archivos deben estar en la carpeta public/templates
   };
 
   if (!isOpen) return null;

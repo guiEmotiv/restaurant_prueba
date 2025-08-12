@@ -51,23 +51,17 @@ api.interceptors.request.use(
       // El ID Token incluye los grupos del usuario (cognito:groups)
       if (session.tokens?.idToken) {
         config.headers.Authorization = `Bearer ${session.tokens.idToken}`;
-        console.log('🔐 Added ID Token to request (includes user groups)');
       } else if (session.tokens?.accessToken) {
         // Fallback to access token if ID token not available
         config.headers.Authorization = `Bearer ${session.tokens.accessToken}`;
-        console.log('⚠️ Using Access Token (may not include groups)');
-      } else {
-        console.log('ℹ️ No tokens available in session');
       }
     } catch (error) {
       // If not authenticated or error getting token, continue without auth
-      console.log('ℹ️ No auth token available:', error.message);
     }
     
     return config;
   },
   (error) => {
-    console.error('🚨 Request Error:', error);
     return Promise.reject(error);
   }
 );
@@ -75,60 +69,27 @@ api.interceptors.request.use(
 // Add response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
-    console.log(`✅ API Response: ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
-    console.log('  Response data type:', typeof response.data);
-    console.log('  Has results field:', response.data?.results !== undefined);
     // DON'T modify the response here - let handlePaginatedResponse handle it
     return response;
   },
   (error) => {
-    console.error('🚨 API Error Details:');
-    console.error('  URL:', error.config?.url);
-    console.error('  Method:', error.config?.method?.toUpperCase());
-    console.error('  Full URL:', error.config?.baseURL + error.config?.url);
-    console.error('  Status:', error.response?.status);
-    console.error('  Error:', error.message);
-    console.error('  Response:', error.response?.data);
-    
-    // Handle authentication errors - DON'T auto-reload
-    if (error.response?.status === 401) {
-      console.log('🚨 Authentication failed - user needs to login again');
-      console.log('⚠️ Token may be expired or invalid');
-      // Just log the error, let the auth context handle the flow
-    }
-    
-    // Handle CORS or network errors
-    if (!error.response) {
-      console.error('🚨 Network error - server may be unreachable');
-    }
-    
     return Promise.reject(error);
   }
 );
 
 // Helper function to handle paginated responses
 const handlePaginatedResponse = (response) => {
-  console.log('🔍 Raw API Response:', response.data);
-  console.log('  Response type:', typeof response.data);
-  console.log('  Is Array:', Array.isArray(response.data));
-  
   // Handle paginated response
   if (response.data && typeof response.data === 'object' && response.data.results !== undefined) {
-    console.log('📋 Paginated response detected');
-    console.log('  Results:', response.data.results);
-    console.log('  Count:', response.data.count);
-    console.log('  Next:', response.data.next);
     return response.data.results;
   }
   
   // Direct array response
   if (Array.isArray(response.data)) {
-    console.log('📋 Direct array response:', response.data.length, 'items');
     return response.data;
   }
   
   // Fallback
-  console.warn('⚠️ Unexpected response format, returning empty array');
   return [];
 };
 
@@ -497,7 +458,6 @@ export const apiService = {
       const queryParams = new URLSearchParams(params).toString();
       const url = queryParams ? `/containers/?${queryParams}` : '/containers/';
       const response = await api.get(url);
-      console.log('🔍 CONTAINERS Raw response:', response.data);
       // Return data directly since pagination is disabled
       return Array.isArray(response.data) ? response.data : [];
     },

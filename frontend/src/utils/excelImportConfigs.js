@@ -10,7 +10,7 @@ export const EXCEL_IMPORT_CONFIGS = {
         ['metros'],
         ['piezas']
       ],
-      filename: 'plantilla_unidades.csv'
+      filename: 'plantilla_unidades.xlsx'
     },
     formatDescription: [
       'El archivo debe tener una columna llamada "name"',
@@ -29,7 +29,7 @@ export const EXCEL_IMPORT_CONFIGS = {
         ['Área VIP'],
         ['Jardín']
       ],
-      filename: 'plantilla_zonas.csv'
+      filename: 'plantilla_zonas.xlsx'
     },
     formatDescription: [
       'El archivo debe tener una columna llamada "name"',
@@ -48,7 +48,7 @@ export const EXCEL_IMPORT_CONFIGS = {
         ['Bar', 'B01'],
         ['Área VIP', 'V01']
       ],
-      filename: 'plantilla_mesas.csv'
+      filename: 'plantilla_mesas.xlsx'
     },
     formatDescription: [
       'El archivo debe tener las columnas "zone" y "table_number"',
@@ -67,7 +67,7 @@ export const EXCEL_IMPORT_CONFIGS = {
         ['Envase Grande', '4.50', 'Envase para pedidos grandes', '50'],
         ['Bolsa Ecológica', '1.00', 'Bolsa biodegradable', '200']
       ],
-      filename: 'plantilla_envases.csv'
+      filename: 'plantilla_envases.xlsx'
     },
     formatDescription: [
       'Columnas requeridas: "name" y "price"',
@@ -88,7 +88,7 @@ export const EXCEL_IMPORT_CONFIGS = {
         ['Bebidas'],
         ['Especialidades']
       ],
-      filename: 'plantilla_grupos.csv'
+      filename: 'plantilla_grupos.xlsx'
     },
     formatDescription: [
       'El archivo debe tener una columna llamada "name"',
@@ -107,7 +107,7 @@ export const EXCEL_IMPORT_CONFIGS = {
         ['kg', 'Arroz', '3.20', '50.0'],
         ['litros', 'Leche', '4.50', '10.0']
       ],
-      filename: 'plantilla_ingredientes.csv'
+      filename: 'plantilla_ingredientes.xlsx'
     },
     formatDescription: [
       'Columnas requeridas: "unit", "name" y "unit_price"',
@@ -147,7 +147,7 @@ export const EXCEL_IMPORT_CONFIGS = {
           '18.0', '20', 'Pollo', '0.3', 'Arroz', '0.15', 'Aceite de Oliva', '0.04', 'Cebolla', '0.1', '', '', '', '', '', ''
         ]
       ],
-      filename: 'plantilla_recetas.csv'
+      filename: 'plantilla_recetas.xlsx'
     },
     formatDescription: [
       'Columnas requeridas: "name" y al menos un ingrediente',

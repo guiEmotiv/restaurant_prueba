@@ -23,29 +23,8 @@ import Recipes from './pages/inventory/Recipes';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import Kitchen from './pages/operation/Kitchen';
 import RestaurantOperations from './pages/operation/RestaurantOperations';
+import TableStatus from './pages/operation/TableStatus';
 
-// Debug environment variables with persistent logging
-const logWithTimestamp = (message, data) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${message}`, data);
-  // Store in sessionStorage for persistent debugging
-  const logs = JSON.parse(sessionStorage.getItem('app-debug-logs') || '[]');
-  logs.push({ timestamp, message, data });
-  sessionStorage.setItem('app-debug-logs', JSON.stringify(logs.slice(-50))); // Keep last 50 logs
-};
-
-logWithTimestamp('API Configuration Debug:', {
-  VITE_API_URL: import.meta.env.VITE_API_URL,
-  API_BASE_URL: import.meta.env.VITE_API_URL || 'http://44.248.47.186/api/v1',
-  MODE: import.meta.env.MODE,
-  PROD: import.meta.env.PROD
-});
-
-logWithTimestamp('Cognito Configuration Debug:', {
-  VITE_AWS_REGION: import.meta.env.VITE_AWS_REGION,
-  VITE_AWS_COGNITO_USER_POOL_ID: import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID,
-  VITE_AWS_COGNITO_APP_CLIENT_ID: import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID
-});
 
 // Configure AWS Amplify
 Amplify.configure(amplifyConfig);
@@ -56,12 +35,6 @@ const isCognitoConfigured = !!(
   import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID
 ) && !import.meta.env.VITE_DISABLE_AUTH; // ✅ Allow disabling auth for development
 
-console.log('🔐 AWS Cognito authentication status:', isCognitoConfigured ? 'ENABLED' : 'DISABLED');
-if (isCognitoConfigured) {
-  console.log('✅ Cognito configuration found - authentication enabled');
-} else {
-  console.log('⚠️ Cognito environment variables missing - authentication disabled');
-}
 
 const AppContent = () => {
   try {
@@ -138,7 +111,7 @@ const AppContent = () => {
           } />
           <Route path="/table-status" element={
             <RoleProtectedRoute requiredPermission="canViewOrders">
-              <RestaurantOperations />
+              <TableStatus />
             </RoleProtectedRoute>
           } />
 
@@ -159,11 +132,8 @@ const AppContent = () => {
     </Layout>
   );
   
-  console.log('🔍 Content created successfully');
   return content;
   } catch (error) {
-    console.error('❌ Error in AppContent:', error);
-    console.error('Stack trace:', error.stack);
     return (
       <div style={{ padding: '20px', color: 'red' }}>
         <h2>Error rendering app</h2>
@@ -175,24 +145,13 @@ const AppContent = () => {
 };
 
 function App() {
-  logWithTimestamp('🚀 App component rendering...', {
-    cognitoConfigured: isCognitoConfigured,
-    location: window.location.href,
-    readyState: document.readyState,
-    userAgent: navigator.userAgent
-  });
-  
   try {
     return (
       <ToastProvider>
-        {console.log('🚀 Inside ToastProvider...')}
         <Router>
-          {console.log('🚀 Inside Router...')}
           {isCognitoConfigured ? (
             <LoginForm>
-              {console.log('🚀 Inside LoginForm (authenticated)...')}
               <AuthProvider>
-                {console.log('🚀 Inside AuthProvider...')}
                 <RoleValidator>
                   <AppContent />
                 </RoleValidator>
@@ -200,7 +159,6 @@ function App() {
             </LoginForm>
           ) : (
             <MockAuthProvider>
-              {console.log('🚀 Inside MockAuthProvider (no auth)...')}
               <RoleValidator>
                 <AppContent />
               </RoleValidator>
@@ -210,8 +168,6 @@ function App() {
       </ToastProvider>
     );
   } catch (error) {
-    console.error('❌ Error in App component:', error);
-    console.error('Stack trace:', error.stack);
     return (
       <div style={{ padding: '20px', color: 'red' }}>
         <h2>Critical error</h2>
