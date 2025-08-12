@@ -10,7 +10,6 @@ const TableOrderEcommerce = () => {
   // Estados principales
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
-  const [orders, setOrders] = useState([]);
   const [allOrders, setAllOrders] = useState([]); 
   const [recipes, setRecipes] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -54,11 +53,45 @@ const TableOrderEcommerce = () => {
     return () => clearInterval(interval);
   }, [loadInitialData]);
 
-  // Cargar órdenes de mesa específica
+  // Computed property para órdenes de la mesa actual
+  const currentTableOrders = useMemo(() => {
+    if (!selectedTable) return [];
+    return allOrders.filter(order => {
+      const orderTableId = order.table?.id || order.table || order.table_id;
+      return orderTableId === selectedTable.id;
+    });
+  }, [allOrders, selectedTable]);
+
+  // Cargar órdenes de mesa específica con items detallados
   const loadTableOrders = async (tableId) => {
     try {
       const orders = await apiService.tables.getActiveOrders(tableId);
-      setOrders(orders || []);
+      
+      // Asegurar que cada order tiene items cargados con detalles
+      const ordersWithItems = await Promise.all(
+        (orders || []).map(async (order) => {
+          if (!order.items || order.items.length === 0) {
+            try {
+              const detailedOrder = await apiService.orders.getById(order.id);
+              return detailedOrder;
+            } catch (error) {
+              console.warn(`No se pudieron cargar items para orden ${order.id}:`, error);
+              return order;
+            }
+          }
+          return order;
+        })
+      );
+      
+      // Actualizar allOrders con las órdenes detalladas de esta mesa
+      setAllOrders(prevOrders => {
+        const otherOrders = prevOrders.filter(order => {
+          const orderTableId = order.table?.id || order.table || order.table_id;
+          return orderTableId !== tableId;
+        });
+        return [...otherOrders, ...ordersWithItems];
+      });
+      
     } catch (error) {
       console.error('Error loading table orders:', error);
       showToast(`Error al cargar pedidos de mesa: ${error.message}`, 'error');
@@ -218,7 +251,6 @@ const TableOrderEcommerce = () => {
         const newOrder = await apiService.orders.create(newOrderData);
         
         // Actualizar estado local eficientemente
-        setOrders([...orders, newOrder]);
         setAllOrders([...allOrders, newOrder]);
         showToast('Pedido creado', 'success');
       }
@@ -270,23 +302,48 @@ const TableOrderEcommerce = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header simple */}
+      {/* Header mejorado con breadcrumbs */}
       <div className="bg-white shadow-sm">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold">
-            {step === 'tables' && 'Mesas'}
-            {step === 'orders' && `Mesa ${selectedTable?.table_number}`}
-            {step === 'menu' && 'Menú'}
-          </h1>
+        <div className="px-4 py-3">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+            <span className={step === 'tables' ? 'text-blue-600 font-medium' : ''}>
+              Mesas
+            </span>
+            {step !== 'tables' && (
+              <>
+                <span>→</span>
+                <span className={step === 'orders' ? 'text-blue-600 font-medium' : ''}>
+                  Mesa {selectedTable?.table_number}
+                </span>
+              </>
+            )}
+            {step === 'menu' && (
+              <>
+                <span>→</span>
+                <span className="text-blue-600 font-medium">
+                  {currentOrder ? 'Agregar items' : 'Nuevo pedido'}
+                </span>
+              </>
+            )}
+          </div>
           
-          {step !== 'tables' && (
-            <button
-              onClick={() => setStep(step === 'menu' ? 'orders' : 'tables')}
-              className="text-blue-600 hover:text-blue-700"
-            >
-              Atrás
-            </button>
-          )}
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-bold">
+              {step === 'tables' && 'Seleccionar Mesa'}
+              {step === 'orders' && `Pedidos - Mesa ${selectedTable?.table_number}`}
+              {step === 'menu' && (currentOrder ? `Editar Pedido #${currentOrder.id}` : 'Crear Nuevo Pedido')}
+            </h1>
+            
+            {step !== 'tables' && (
+              <button
+                onClick={() => setStep(step === 'menu' ? 'orders' : 'tables')}
+                className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                ← Atrás
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -339,19 +396,28 @@ const TableOrderEcommerce = () => {
               Nuevo Pedido
             </button>
 
-            {orders.length === 0 ? (
+            {currentTableOrders.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No hay pedidos activos
               </div>
             ) : (
               <div className="space-y-2">
-                {orders.map(order => (
+                {currentTableOrders.map(order => (
                   <div key={order.id} className="bg-white border rounded p-3">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-2">
                       <div>
                         <span className="font-bold">#{order.id}</span>
                         <span className="ml-2 text-sm text-gray-600">
                           {order.items?.length || 0} items
+                        </span>
+                        {/* Indicador de estado */}
+                        <span className={`ml-2 px-2 py-0.5 text-xs rounded ${
+                          order.status === 'CREATED' ? 'bg-yellow-100 text-yellow-800' :
+                          order.status === 'PAID' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {order.status === 'CREATED' ? 'Pendiente' :
+                           order.status === 'PAID' ? 'Pagado' : order.status}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
@@ -366,6 +432,27 @@ const TableOrderEcommerce = () => {
                         </button>
                       </div>
                     </div>
+                    
+                    {/* MOSTRAR ITEMS DEL PEDIDO */}
+                    {order.items && order.items.length > 0 && (
+                      <div className="border-t pt-2 mt-2">
+                        <div className="space-y-1">
+                          {order.items.map((item, index) => (
+                            <div key={item.id || index} className="flex justify-between text-sm">
+                              <span className="text-gray-700">
+                                {item.recipe_name || item.recipe?.name} x{item.quantity}
+                                {item.notes && (
+                                  <span className="text-gray-500 italic ml-1">({item.notes})</span>
+                                )}
+                              </span>
+                              <span className="text-gray-600">
+                                S/ {parseFloat(item.total_price || 0).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -430,9 +517,25 @@ const TableOrderEcommerce = () => {
               ))}
             </div>
 
-            {/* Carrito flotante */}
+            {/* Carrito flotante con contexto del pedido */}
             {cart.length > 0 && (
               <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4">
+                {/* Información del pedido actual si estamos editando */}
+                {currentOrder && (
+                  <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                    <div className="text-sm font-medium text-blue-800">
+                      Editando Pedido #{currentOrder.id}
+                    </div>
+                    <div className="text-xs text-blue-600">
+                      Items existentes: {currentOrder.items?.length || 0} • 
+                      Total actual: S/ {parseFloat(currentOrder.grand_total || currentOrder.total_amount || 0).toFixed(2)}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="text-sm font-medium mb-2 text-gray-700">
+                  {currentOrder ? 'Nuevos items a agregar:' : 'Items en carrito:'}
+                </div>
                 <div className="max-h-40 overflow-y-auto mb-3">
                   {cart.map((item, index) => (
                     <div key={index} className="flex justify-between items-center py-1">
@@ -477,7 +580,7 @@ const TableOrderEcommerce = () => {
                     disabled={saving || cart.length === 0}
                     className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {saving ? 'Guardando...' : (currentOrder ? 'Actualizar Pedido' : 'Crear Pedido')}
+                    {saving ? 'Guardando...' : (currentOrder ? 'Agregar Items al Pedido' : 'Crear Nuevo Pedido')}
                   </button>
                 </div>
               </div>
