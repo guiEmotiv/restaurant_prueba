@@ -400,13 +400,15 @@ const DashboardFinanciero = () => {
               {item_status_breakdown && item_status_breakdown.map((status, index) => {
                 const statusNames = {
                   'CREATED': 'Creados',
+                  'PREPARING': 'En Preparación',
                   'SERVED': 'Entregados',
                   'PAID': 'Pagados'
                 };
                 
                 const statusColors = {
                   'CREATED': 'bg-yellow-500',
-                  'SERVED': 'bg-blue-500', 
+                  'PREPARING': 'bg-blue-500',
+                  'SERVED': 'bg-indigo-500', 
                   'PAID': 'bg-green-500'
                 };
                 

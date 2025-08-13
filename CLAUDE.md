@@ -2,9 +2,35 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **🎯 ÚLTIMA ACTUALIZACIÓN**: Sistema completamente optimizado (Agosto 2025) - Dashboard financiero con estados, colas secuenciales en cocina, UI responsive, scripts de limpieza de BD, y procedimientos de deploy actualizados.
+> **🎯 ÚLTIMA ACTUALIZACIÓN**: Sistema completamente optimizado (Enero 2025) - Estado PREPARING implementado, colores de UI actualizados, sistema de importación Excel validado, y workflow de cocina optimizado.
 
-## ⚠️ **CAMBIOS CRÍTICOS RECIENTES** - Agosto 2025
+## ⚠️ **CAMBIOS CRÍTICOS RECIENTES** - Enero 2025
+
+### **🔄 Nuevas Funcionalidades Implementadas (Enero 2025)**
+
+#### **🔧 Estado PREPARING en OrderItems - Workflow Optimizado**
+- ✅ **Nuevo flujo de estados**: CREATED → PREPARING → SERVED → PAID
+- ✅ **Vista de cocina mejorada**: Muestra items CREATED y PREPARING (oculta SERVED)
+- ✅ **Colores diferenciados**: Verde (CREATED), Amarillo (PREPARING), Azul (SERVED), Gris (PAID)
+- ✅ **Restricciones de eliminación**: Items con estado PREPARING no pueden eliminarse
+- ✅ **Campo timestamp**: `preparing_at` para seguimiento temporal
+- ✅ **Transiciones validadas**: Solo permite transiciones válidas entre estados
+
+#### **🎨 Actualización de Colores en Gestión de Mesas**
+- ✅ **Indicadores de estado actualizados**: 
+  - CREATED: Verde (`bg-green-500`)
+  - PREPARING: Amarillo (`bg-yellow-500`)
+  - SERVED: Azul (`bg-blue-500`)
+  - PAID: Gris (`bg-gray-500`)
+- ✅ **Consistencia visual**: Aplicado tanto en lista de pedidos como panel lateral
+- ✅ **Tooltips informativos**: Estados claros para los usuarios
+
+#### **📊 Sistema de Importación Excel Validado**
+- ✅ **Patrón delete-before-import**: Confirmado en todas las funciones de importación
+- ✅ **Transacciones atómicas**: Rollback automático en caso de error
+- ✅ **Validación robusta**: Archivos, tamaños, formatos y datos
+- ✅ **Reset de secuencias**: SQLite sequences optimizadas
+- ✅ **Bulk operations**: Performance optimizada para grandes volúmenes
 
 ### **🔧 Optimizaciones Recientes Implementadas**
 
@@ -505,12 +531,14 @@ Recipe → Menu items with:
 ```python
 # Restaurant operations workflow
 Order → Table relationship with status tracking:
-  - created → pending → served → paid
+  - created → served → paid
   
 OrderItem → Recipe selections with:
-  - Individual status tracking
+  - Individual status tracking: CREATED → PREPARING → SERVED → PAID
+  - Preparing timestamp: tracking for kitchen workflow
   - Container selection for takeaway
   - Total price calculation (recipe + container)
+  - Modification restrictions: Cannot delete items in PREPARING+ states
   
 Payment → Multiple payment methods:
   - efectivo, yape, transferencia
@@ -534,10 +562,12 @@ Table Selection → Menu Browser → Recipe Selection → Cart Management → Or
 - **Takeaway Option**: Container selection with additional pricing
 
 #### **3. Kitchen Operations** (`/kitchen`)
-- **Cook Role**: Views orders by preparation status
-- **Status Updates**: created → pending → served
+- **Cook Role**: Views orders by preparation status  
+- **Status Updates**: CREATED → PREPARING → SERVED
 - **Real-time Updates**: 5-second polling for immediate status sync
 - **Individual Items**: Each OrderItem appears separately (not grouped by recipe)
+- **Color Coding**: Green (CREATED), Yellow (PREPARING) for visual workflow
+- **Filtering**: Shows only CREATED and PREPARING items (hides SERVED items)
 
 #### **4. Payment Processing** (Admin Only)
 - **Payment Methods**: Cash, Yape, Bank transfer
@@ -911,13 +941,21 @@ queryset = Order.objects.select_related('table__zone').prefetch_related(
 
 ##### **Status Workflow Pattern**
 ```python
-# Order/OrderItem status progression
+# OrderItem status progression (Updated January 2025)
 STATUS_CHOICES = [
-    ('created', 'Created'),    # Initial state
-    ('pending', 'Pending'),    # Kitchen preparing
-    ('served', 'Served'),      # Ready for payment
-    ('paid', 'Paid')           # Complete
+    ('CREATED', 'Creado'),        # Initial state - can be deleted
+    ('PREPARING', 'En Preparación'), # Kitchen preparing - cannot be deleted
+    ('SERVED', 'Entregado'),      # Ready for payment
+    ('PAID', 'Pagado')            # Complete
 ]
+
+# Valid status transitions
+VALID_TRANSITIONS = {
+    'CREATED': ['PREPARING'],
+    'PREPARING': ['SERVED'], 
+    'SERVED': ['PAID'],
+    'PAID': []  # Final state
+}
 ```
 
 ### **Performance Optimization Patterns**

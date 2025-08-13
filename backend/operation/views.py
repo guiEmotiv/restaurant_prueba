@@ -169,10 +169,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         """Vista de tablero de cocina - cada OrderItem individual como entrada separada"""
         from django.db.models import Q
         
-        # Obtener todos los order items que están pendientes (CREATED)
+        # Obtener todos los order items que están pendientes (CREATED y PREPARING)
         # No filtrar por el estado de la orden, solo por el estado del item
         order_items = OrderItem.objects.filter(
-            status='CREATED'
+            status__in=['CREATED', 'PREPARING']
         ).exclude(
             order__status='PAID'  # Excluir solo órdenes ya pagadas
         ).select_related('recipe', 'recipe__group', 'order', 'order__table', 'order__table__zone').order_by('created_at')
@@ -431,6 +431,20 @@ class OrderItemViewSet(viewsets.ModelViewSet):
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+    
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy to check if item can be deleted"""
+        order_item = self.get_object()
+        
+        # Solo permitir eliminación si el item está en estado CREATED
+        if not order_item.can_be_modified():
+            return Response(
+                {'error': 'No se puede eliminar un item que ya está en preparación o servido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Si es válido, proceder con la eliminación normal
+        return super().destroy(request, *args, **kwargs)
     
     @action(detail=True, methods=['post'])
     def add_ingredient(self, request, pk=None):

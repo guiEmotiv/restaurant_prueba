@@ -348,7 +348,7 @@ class DashboardViewSet(viewsets.ViewSet):
         total_amount = sum(status_amounts.values())
         
         breakdown = []
-        for status in ['CREATED', 'SERVED', 'PAID']:
+        for status in ['CREATED', 'PREPARING', 'SERVED', 'PAID']:
             count = status_counts.get(status, 0)
             amount = status_amounts.get(status, 0)
             

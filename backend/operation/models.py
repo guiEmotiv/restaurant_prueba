@@ -120,6 +120,7 @@ class Order(models.Model):
 class OrderItem(models.Model):
     STATUS_CHOICES = [
         ('CREATED', 'Creado'),
+        ('PREPARING', 'En Preparación'),
         ('SERVED', 'Entregado'),
         ('PAID', 'Pagado'),
     ]
@@ -158,6 +159,7 @@ class OrderItem(models.Model):
         help_text="Precio del envase al momento de la venta"
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    preparing_at = models.DateTimeField(null=True, blank=True)
     served_at = models.DateTimeField(null=True, blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
 
@@ -216,7 +218,8 @@ class OrderItem(models.Model):
         """Actualiza el estado del item"""
         # Validar transiciones válidas
         valid_transitions = {
-            'CREATED': ['SERVED'],
+            'CREATED': ['PREPARING'],
+            'PREPARING': ['SERVED'],
             'SERVED': ['PAID'],
             'PAID': []
         }
@@ -227,7 +230,9 @@ class OrderItem(models.Model):
         self.status = new_status
         now = timezone.now()
         
-        if new_status == 'SERVED':
+        if new_status == 'PREPARING':
+            self.preparing_at = now
+        elif new_status == 'SERVED':
             self.served_at = now
         elif new_status == 'PAID':
             self.paid_at = now

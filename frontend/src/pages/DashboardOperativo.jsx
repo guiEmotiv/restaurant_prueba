@@ -31,6 +31,7 @@ const DashboardOperativo = () => {
       setLoading(true);
       setError(null);
       
+      // Los datos ya vienen filtrados por fecha y solo órdenes PAID desde el backend
       const data = await apiService.dashboard.getReport(selectedDate);
       setDashboardData(data);
 
@@ -197,7 +198,7 @@ const DashboardOperativo = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Productividad:</span>
                     <span className="font-medium">
-                      {((waiter.orders / summary.total_orders) * 100).toFixed(1)}%
+                      {summary.total_orders > 0 ? Math.round((waiter.orders / summary.total_orders) * 100) : 0}%
                     </span>
                   </div>
                 </div>
@@ -253,7 +254,7 @@ const DashboardOperativo = () => {
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-gray-600">Rotación promedio</span>
                       <span className="font-medium">
-                        {zone.tables_used > 0 ? (zone.orders / zone.tables_used).toFixed(1) : 0}x
+                        {zone.tables_used > 0 ? Math.round(zone.orders / zone.tables_used * 10) / 10 : 0}x
                       </span>
                     </div>
                   </div>
@@ -262,12 +263,12 @@ const DashboardOperativo = () => {
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-500">Eficiencia</span>
                       <span className={`text-xs font-medium ${
-                        zone.orders / zone.tables_used >= 3 ? 'text-green-600' :
-                        zone.orders / zone.tables_used >= 2 ? 'text-yellow-600' :
+                        zone.tables_used > 0 && (zone.orders / zone.tables_used) >= 3 ? 'text-green-600' :
+                        zone.tables_used > 0 && (zone.orders / zone.tables_used) >= 2 ? 'text-yellow-600' :
                         'text-red-600'
                       }`}>
-                        {zone.orders / zone.tables_used >= 3 ? 'Alta' :
-                         zone.orders / zone.tables_used >= 2 ? 'Media' : 'Baja'}
+                        {zone.tables_used > 0 && (zone.orders / zone.tables_used) >= 3 ? 'Alta' :
+                         zone.tables_used > 0 && (zone.orders / zone.tables_used) >= 2 ? 'Media' : 'Baja'}
                       </span>
                     </div>
                   </div>

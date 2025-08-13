@@ -31,9 +31,28 @@ const Kitchen = () => {
   };
 
 
+  // Función para obtener el siguiente estado según el flujo
+  const getNextStatus = (currentStatus) => {
+    const statusFlow = {
+      'CREATED': 'PREPARING',
+      'PREPARING': 'SERVED'
+    };
+    return statusFlow[currentStatus];
+  };
+
   const updateItemStatus = async (itemId, newStatus) => {
-    // Mostrar confirmación antes de cambiar estado
-    const confirmed = window.confirm('¿Estás seguro de que deseas marcar este item como entregado?');
+    const statusMessages = {
+      'PREPARING': '¿Estás seguro de que deseas iniciar la preparación de este item?',
+      'SERVED': '¿Estás seguro de que deseas marcar este item como entregado?'
+    };
+    
+    const successMessages = {
+      'PREPARING': 'Item en preparación',
+      'SERVED': 'Item marcado como entregado'
+    };
+
+    // Mostrar confirmación apropiada
+    const confirmed = window.confirm(statusMessages[newStatus] || '¿Confirmar cambio de estado?');
     if (!confirmed) {
       return;
     }
@@ -41,7 +60,7 @@ const Kitchen = () => {
     try {
       await apiService.orderItems.updateStatus(itemId, newStatus);
       await loadKitchenBoard();
-      showSuccess('Item marcado como entregado');
+      showSuccess(successMessages[newStatus] || 'Estado actualizado');
     } catch (error) {
       console.error('Error updating item status:', error);
       const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
@@ -111,62 +130,77 @@ const Kitchen = () => {
     const createdAt = new Date(item.created_at);
     const elapsedSinceCreation = (now - createdAt) / (1000 * 60); // minutos desde creación
 
-    // Si el item aún no ha empezado en su estación (está en cola)
-    if (elapsedSinceCreation < item.queueStartTime) {
-      return { 
-        color: 'bg-gray-400', 
-        textColor: 'text-gray-600', 
-        status: 'waiting',
-        bgColor: 'bg-gray-50', 
-        borderColor: 'border-gray-200',
-        progress: 0,
-        displayTime: `Cola pos. ${item.queuePosition}`
-      };
+    // Determinar el tiempo base según el estado
+    let baseTime, statusText;
+    
+    if (item.status === 'CREATED') {
+      baseTime = elapsedSinceCreation;
+      statusText = 'Pendiente';
+    } else if (item.status === 'PREPARING') {
+      const preparingAt = item.preparing_at ? new Date(item.preparing_at) : createdAt;
+      baseTime = (now - preparingAt) / (1000 * 60);
+      statusText = 'Preparando';
     }
-
-    // Tiempo que lleva siendo procesado en la estación
-    const timeInStation = elapsedSinceCreation - item.queueStartTime;
-    const percentage = (timeInStation / item.preparation_time) * 100;
-
-    // Mostrar tiempo de proceso en la estación
-    const displayMinutes = Math.max(0, Math.ceil(timeInStation));
-    const displayTime = displayMinutes < 60 ? `${displayMinutes}m` : 
-                       `${Math.floor(displayMinutes/60)}h ${displayMinutes%60}m`;
-
+    
+    // Calcular porcentaje basado en tiempo de preparación
+    const percentage = (baseTime / item.preparation_time) * 100;
+    
+    // Determinar color basado en el estado del item
+    let color, textColor, bgColor, borderColor;
+    
+    if (item.status === 'CREATED') {
+      // Estado CREATED - Verde
+      color = 'bg-green-500';
+      textColor = 'text-green-600';
+      bgColor = 'bg-green-50';
+      borderColor = 'border-green-200';
+    } else if (item.status === 'PREPARING') {
+      // Estado PREPARING - Amarillo
+      color = 'bg-yellow-400';
+      textColor = 'text-yellow-600';
+      bgColor = 'bg-yellow-50';
+      borderColor = 'border-yellow-200';
+    }
+    
+    // Determinar el tiempo a mostrar y estado de urgencia
+    let displayTime, urgencyStatus;
     if (percentage > 100) {
-      const overdueMinutes = Math.ceil(timeInStation - item.preparation_time);
-      return { 
-        color: 'bg-red-500', 
-        textColor: 'text-red-600', 
-        status: 'overdue',
-        bgColor: 'bg-red-50', 
-        borderColor: 'border-red-200',
-        progress: 100,
-        displayTime: `+${overdueMinutes}m`
-      };
+      const overdueMinutes = Math.ceil(baseTime - item.preparation_time);
+      displayTime = `+${overdueMinutes}m`;
+      urgencyStatus = 'overdue';
+    } else if (percentage > 80) {
+      displayTime = `${Math.ceil(baseTime)}m`;
+      urgencyStatus = 'urgent';
+    } else {
+      displayTime = `${Math.ceil(baseTime)}m`;
+      urgencyStatus = 'normal';
     }
     
-    if (percentage > 80) {
-      return { 
-        color: 'bg-orange-500', 
-        textColor: 'text-orange-600', 
-        status: 'warning',
-        bgColor: 'bg-orange-50', 
-        borderColor: 'border-orange-200',
-        progress: percentage,
-        displayTime
-      };
-    }
-    
-    return { 
-      color: 'bg-green-500', 
-      textColor: 'text-green-600', 
-      status: 'normal',
-      bgColor: 'bg-green-50', 
-      borderColor: 'border-green-200',
+    return {
+      color,
+      textColor,
+      status: urgencyStatus, // Para el icono de alerta
+      bgColor,
+      borderColor,
       progress: percentage,
-      displayTime
+      displayTime,
+      statusText: statusText,
+      itemStatus: item.status
     };
+  };
+
+  // Función para obtener el icono del estado
+  const getStatusIcon = (itemStatus) => {
+    if (itemStatus === 'CREATED') {
+      return (
+        <Clock className="h-4 w-4" title="Pendiente" />
+      );
+    } else if (itemStatus === 'PREPARING') {
+      return (
+        <ChefHat className="h-4 w-4" title="En Preparación" />
+      );
+    }
+    return null;
   };
 
   // Organizar items por grupos para Kanban
@@ -425,7 +459,7 @@ const Kitchen = () => {
                     return (
                       <div
                         key={item.id}
-                        onClick={() => updateItemStatus(item.id, 'SERVED')}
+                        onClick={() => updateItemStatus(item.id, getNextStatus(item.status))}
                         className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor}`}
                       >
                         {/* Barra de progreso de tiempo */}
@@ -538,7 +572,7 @@ const Kitchen = () => {
                       return (
                         <div
                           key={item.id}
-                          onClick={() => updateItemStatus(item.id, 'SERVED')}
+                          onClick={() => updateItemStatus(item.id, getNextStatus(item.status))}
                           className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} relative`}
                         >
                           {/* Barra de progreso de tiempo */}
@@ -565,6 +599,7 @@ const Kitchen = () => {
                                 </div>
                               </div>
                             </div>
+
 
                             {/* Receta */}
                             <div className="font-medium text-gray-900 text-center py-2 bg-gray-50 rounded">

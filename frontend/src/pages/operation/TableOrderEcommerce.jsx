@@ -1065,8 +1065,8 @@ const TableOrderEcommerce = () => {
                       // Determinar color basado en estado de items de los pedidos
                       const getTableButtonStyle = () => {
                         if (status === 'available' || !summary || summary.orderCount === 0) {
-                          // Sin pedidos - Verde suave
-                          return 'bg-green-50 border-green-300 hover:bg-green-100';
+                          // Sin pedidos - Neutro
+                          return 'bg-white border-gray-300 hover:bg-gray-50';
                         } 
                         
                         // Verificar el estado de todos los items de todos los pedidos de esta mesa
@@ -1082,8 +1082,8 @@ const TableOrderEcommerce = () => {
                         });
                         
                         if (totalItems === 0) {
-                          // No hay items - Verde (mesa disponible)
-                          return 'bg-green-50 border-green-300 hover:bg-green-100';
+                          // No hay items - Neutro (mesa disponible)
+                          return 'bg-white border-gray-300 hover:bg-gray-50';
                         } else if (servedItems === totalItems) {
                           // Todos los items están SERVED - Azul suave
                           return 'bg-blue-50 border-blue-300 hover:bg-blue-100';
@@ -1141,7 +1141,7 @@ const TableOrderEcommerce = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleEditOrder(order)}
-                          className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 border border-blue-600 rounded hover:bg-blue-50"
+                          className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50"
                         >
                           Editar
                         </button>
@@ -1150,7 +1150,7 @@ const TableOrderEcommerce = () => {
                           <button
                             onClick={() => handleDeleteOrder(order)}
                             disabled={saving}
-                            className="px-3 py-1 text-sm text-red-600 hover:text-red-700 border border-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50 disabled:opacity-50"
                           >
                             Eliminar
                           </button>
@@ -1159,7 +1159,7 @@ const TableOrderEcommerce = () => {
                         {canProcessPayment(order) && hasPermission('canManagePayments') && (
                           <button
                             onClick={() => handleProcessPayment(order)}
-                            className="px-3 py-1 text-sm text-green-600 hover:text-green-700 border border-green-600 rounded hover:bg-green-50"
+                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50"
                           >
                             Procesar Pago
                           </button>
@@ -1177,11 +1177,14 @@ const TableOrderEcommerce = () => {
                                 <div 
                                   className={`w-2 h-2 rounded-full flex-shrink-0 ${
                                     item.status === 'PAID' ? 'bg-gray-500' :
-                                    item.status === 'SERVED' ? 'bg-green-500' : 'bg-yellow-500'
+                                    item.status === 'SERVED' ? 'bg-blue-500' :
+                                    item.status === 'PREPARING' ? 'bg-yellow-500' : 'bg-green-500'
                                   }`} 
                                   title={
                                     item.status === 'PAID' ? 'Pagado' :
-                                    item.status === 'SERVED' ? 'Entregado' : 'Creado'
+                                    item.status === 'SERVED' ? 'Entregado' : 
+                                    item.status === 'PREPARING' ? 'En Preparación' :
+                                    item.status === 'CREATED' ? 'Pendiente' : 'Desconocido'
                                   }
                                 />
                                 <div className="flex items-center space-x-2 flex-1">
@@ -1217,7 +1220,7 @@ const TableOrderEcommerce = () => {
             <div className="fixed bottom-4 right-4 z-40">
               <button
                 onClick={handleCreateNewOrder}
-                className="w-14 h-14 rounded-full shadow-lg bg-green-600 hover:bg-green-700 text-white transform hover:scale-110 transition-all duration-300 flex items-center justify-center"
+                className="w-14 h-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-110 transition-all duration-300 flex items-center justify-center"
                 title="Nuevo Pedido"
               >
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1367,12 +1370,14 @@ const TableOrderEcommerce = () => {
                               <div 
                                 className={`w-3 h-3 rounded-full flex-shrink-0 ${
                                   item.status === 'PAID' ? 'bg-gray-500' :
-                                  item.status === 'SERVED' ? 'bg-green-500' : 
-                                  item.status === 'CREATED' ? 'bg-yellow-500' : 'bg-gray-400'
+                                  item.status === 'SERVED' ? 'bg-blue-500' :
+                                  item.status === 'PREPARING' ? 'bg-yellow-500' : 'bg-green-500'
                                 }`} 
                                 title={
                                   item.status === 'PAID' ? 'Pagado' :
-                                  item.status === 'SERVED' ? 'Entregado' : 'En proceso'
+                                  item.status === 'SERVED' ? 'Entregado' : 
+                                  item.status === 'PREPARING' ? 'En Preparación' :
+                                  item.status === 'CREATED' ? 'Pendiente' : 'Desconocido'
                                 }
                               />
                               
@@ -1566,7 +1571,7 @@ const TableOrderEcommerce = () => {
                           className="h-3 w-3 text-blue-600 border-gray-300 rounded"
                         />
                         <div 
-                          className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" 
+                          className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" 
                           title="Entregado"
                         />
                         <div className="flex-1 min-w-0 flex justify-between items-center">
@@ -1627,6 +1632,43 @@ const TableOrderEcommerce = () => {
                   ))
                 }
 
+                {/* Items PREPARING (no disponibles) */}
+                {selectedOrderForPayment.items
+                  .filter(item => item.status === 'PREPARING')
+                  .map(item => (
+                    <div key={item.id} className="p-2 bg-gray-50 opacity-60">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          disabled
+                          checked={false}
+                          className="h-3 w-3 text-gray-400 border-gray-300 rounded opacity-50 cursor-not-allowed"
+                        />
+                        <div 
+                          className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" 
+                          title="En Preparación"
+                        />
+                        <div className="flex-1 min-w-0 flex justify-between items-center">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm text-gray-600 truncate">
+                              {item.quantity}x {item.recipe_name}
+                              {item.is_takeaway && (
+                                <span className="text-xs text-blue-600 ml-1">(para llevar)</span>
+                              )}
+                            </div>
+                            {item.notes && (
+                              <div className="text-xs text-gray-500 italic truncate">{item.notes}</div>
+                            )}
+                          </div>
+                          <div className="text-sm font-medium text-gray-600 ml-2">
+                            S/ {parseFloat(item.total_with_container || item.total_price || 0).toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+
                 {/* Items CREATED (no disponibles) */}
                 {selectedOrderForPayment.items
                   .filter(item => item.status === 'CREATED')
@@ -1640,7 +1682,7 @@ const TableOrderEcommerce = () => {
                           className="h-3 w-3 text-gray-400 border-gray-300 rounded opacity-50 cursor-not-allowed"
                         />
                         <div 
-                          className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" 
+                          className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" 
                           title="Pendiente"
                         />
                         <div className="flex-1 min-w-0 flex justify-between items-center">
@@ -1783,100 +1825,125 @@ const TableOrderEcommerce = () => {
         )}
       </div>
 
-      {/* Modal minimalista y responsive para notas */}
+      {/* Panel deslizante para notas - Optimizado para móviles */}
       {isNoteModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white w-full sm:w-96 sm:mx-4 sm:rounded-lg max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-200 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-medium text-gray-900 truncate">
-                  {selectedRecipe?.name}
-                </h3>
-                <button
-                  onClick={closeNoteModal}
-                  className="text-gray-400 hover:text-gray-600 p-1"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+        <>
+          {/* Overlay */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
+            onClick={closeNoteModal}
+          />
+          
+          {/* Panel deslizante desde abajo */}
+          <div className="fixed inset-x-0 bottom-0 z-50 transform transition-transform duration-300 ease-in-out">
+            <div className="bg-white rounded-t-2xl shadow-xl max-h-[85vh] flex flex-col">
+              {/* Handle bar para indicar que es deslizable */}
+              <div className="flex justify-center py-2">
+                <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
               </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 flex-1 overflow-y-auto">
-              <div className="space-y-4">
-                {/* Campo de notas */}
-                <div>
-                  <textarea
-                    value={noteText}
-                    onChange={(e) => setNoteText(e.target.value)}
-                    placeholder="Comentarios especiales..."
-                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    rows="3"
-                  />
-                </div>
-
-                {/* Para llevar */}
+              
+              {/* Header */}
+              <div className="px-4 pb-4 border-b border-gray-200 flex-shrink-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Para llevar</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isTakeaway}
-                      onChange={(e) => setIsTakeaway(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
+                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    {selectedRecipe?.name}
+                  </h3>
+                  <button
+                    onClick={closeNoteModal}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
+              </div>
 
-                {/* Precio total */}
-                <div className="bg-gray-50 p-3 rounded-md">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Precio</span>
-                    <span>S/ {selectedRecipe?.price || selectedRecipe?.base_price || 0}</span>
+              {/* Content - Scrollable */}
+              <div className="px-4 py-4 flex-1 overflow-y-auto">
+                <div className="space-y-6">
+                  {/* Campo de notas mejorado para móviles */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Comentarios especiales
+                    </label>
+                    <textarea
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      placeholder="Ej: Sin cebolla, extra salsa, etc..."
+                      className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base resize-none"
+                      rows="4"
+                      style={{ minHeight: '100px' }}
+                    />
                   </div>
-                  {isTakeaway && containers.length > 0 && (
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-600">Envase</span>
-                      <span>S/ {containers[0].price || 0}</span>
+
+                  {/* Para llevar con mejor diseño */}
+                  <div className="bg-gray-50 p-4 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-base font-medium text-gray-900">Para llevar</span>
+                        <p className="text-sm text-gray-500">Incluye envase adicional</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isTakeaway}
+                          onChange={(e) => setIsTakeaway(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-12 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
                     </div>
-                  )}
-                  <hr className="my-2" />
-                  <div className="flex justify-between items-center font-medium">
-                    <span>Total</span>
-                    <span>
-                      S/ {(
-                        parseFloat(selectedRecipe?.price || selectedRecipe?.base_price || 0) +
-                        (isTakeaway && containers.length > 0 ? parseFloat(containers[0].price || 0) : 0)
-                      ).toFixed(2)}
-                    </span>
+                  </div>
+
+                  {/* Precio total con mejor visual */}
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-700">Precio del plato</span>
+                        <span className="font-medium">S/ {selectedRecipe?.price || selectedRecipe?.base_price || 0}</span>
+                      </div>
+                      {isTakeaway && containers.length > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700">Envase</span>
+                          <span className="font-medium">S/ {containers[0].price || 0}</span>
+                        </div>
+                      )}
+                      <hr className="border-blue-200" />
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-gray-900">Total</span>
+                        <span className="text-lg font-bold text-blue-600">
+                          S/ {(
+                            parseFloat(selectedRecipe?.price || selectedRecipe?.base_price || 0) +
+                            (isTakeaway && containers.length > 0 ? parseFloat(containers[0].price || 0) : 0)
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-200 flex-shrink-0">
-              <div className="flex gap-3">
-                <button
-                  onClick={closeNoteModal}
-                  className="flex-1 py-2 px-4 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleAddWithNotes}
-                  className="flex-1 py-2 px-4 text-sm text-white bg-black rounded-md hover:bg-gray-800"
-                >
-                  Agregar
-                </button>
+              {/* Footer con botones grandes para móviles */}
+              <div className="px-4 py-4 border-t border-gray-200 flex-shrink-0 bg-white">
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeNoteModal}
+                    className="flex-1 py-3 px-4 text-base font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleAddWithNotes}
+                    className="flex-1 py-3 px-4 text-base font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+                  >
+                    Agregar al pedido
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
     </div>
