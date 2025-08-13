@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Receipt, Search, Calendar, Eye } from 'lucide-react';
+import { Receipt, Search, Calendar, Eye, X, Printer } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import bluetoothPrinter from '../../services/bluetoothPrinter';
 
 const PaymentHistory = () => {
   const navigate = useNavigate();
@@ -12,6 +13,9 @@ const PaymentHistory = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     loadPaidOrders();
@@ -47,7 +51,68 @@ const PaymentHistory = () => {
   };
 
   const handleViewDetails = async (orderId) => {
-    navigate(`/orders/${orderId}/receipt`);
+    try {
+      setDetailLoading(true);
+      const orderDetail = await apiService.orders.getById(orderId);
+      setSelectedOrderDetail(orderDetail);
+    } catch (error) {
+      console.error('Error loading order details:', error);
+      showError('Error al cargar el detalle del pedido');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedOrderDetail(null);
+  };
+
+  const handlePrintReceipt = async () => {
+    if (!selectedOrderDetail) return;
+    
+    try {
+      setPrinting(true);
+      
+      if (!bluetoothPrinter.isBluetoothSupported()) {
+        showError(bluetoothPrinter.getBluetoothErrorMessage());
+        return;
+      }
+
+      // Conectar si no está conectado
+      if (!bluetoothPrinter.isConnected) {
+        await bluetoothPrinter.connect();
+      }
+
+      const receiptData = {
+        order: {
+          id: selectedOrderDetail.id,
+          table_number: selectedOrderDetail.table_number,
+          waiter: selectedOrderDetail.waiter || 'Usuario',
+          created_at: selectedOrderDetail.created_at,
+          total_amount: selectedOrderDetail.total_amount,
+          items: selectedOrderDetail.items?.map(item => ({
+            recipe_name: item.recipe_name,
+            quantity: item.quantity,
+            total_price: item.total_with_container || item.total_price,
+            is_takeaway: item.is_takeaway
+          })) || []
+        },
+        payment: {
+          created_at: selectedOrderDetail.paid_at || selectedOrderDetail.created_at
+        },
+        amount: selectedOrderDetail.items?.reduce((sum, item) => 
+          sum + parseFloat(item.total_with_container || item.total_price || 0), 0
+        ) || parseFloat(selectedOrderDetail.total_amount)
+      };
+
+      await bluetoothPrinter.printPaymentReceipt(receiptData);
+      showSuccess('Comprobante impreso exitosamente');
+    } catch (error) {
+      console.error('Error printing receipt:', error);
+      showError(`Error al imprimir: ${error.message}`);
+    } finally {
+      setPrinting(false);
+    }
   };
 
 
@@ -265,6 +330,110 @@ const PaymentHistory = () => {
           )}
         </div>
       </div>
+
+      {/* Modal de Detalle del Pedido */}
+      {selectedOrderDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            {/* Header del Modal */}
+            <div className="flex justify-between items-center p-6 border-b">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800">
+                  Detalle Pedido #{selectedOrderDetail.id}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Mesa {selectedOrderDetail.table_number} • {formatDate(selectedOrderDetail.paid_at || selectedOrderDetail.created_at)}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseDetail}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {detailLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Items del Pedido */}
+                  <div>
+                    <h4 className="font-medium text-gray-800 mb-3">Items del Pedido</h4>
+                    <div className="space-y-2">
+                      {selectedOrderDetail.items?.map((item, index) => (
+                        <div key={item.id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" 
+                              title="Pagado"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {item.quantity}x {item.recipe_name}
+                              </div>
+                              {item.notes && (
+                                <div className="text-xs text-gray-500 italic">{item.notes}</div>
+                              )}
+                              {item.is_takeaway && (
+                                <div className="text-xs text-blue-600">Para llevar</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900">
+                            S/ {item.total_price}
+                          </div>
+                        </div>
+                      )) || []}
+                    </div>
+                  </div>
+
+                  {/* Resumen del Total */}
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between items-center text-lg font-bold">
+                      <span>Total:</span>
+                      <span>{formatCurrency(selectedOrderDetail.total_amount)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="p-6 border-t bg-gray-50">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCloseDetail}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cerrar
+                </button>
+                <button
+                  onClick={handlePrintReceipt}
+                  disabled={printing}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {printing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Imprimiendo...
+                    </>
+                  ) : (
+                    <>
+                      <Printer className="h-4 w-4" />
+                      Imprimir Comprobante
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

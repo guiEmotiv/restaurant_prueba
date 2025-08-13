@@ -7,7 +7,7 @@ const Kitchen = () => {
   const [kitchenBoard, setKitchenBoard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedGroupTab, setSelectedGroupTab] = useState('all');
-  const [timeFilter, setTimeFilter] = useState('all'); // all, normal, warning, overdue
+  const [selectedTableFilter, setSelectedTableFilter] = useState('all'); // all, or specific table
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
@@ -72,11 +72,101 @@ const Kitchen = () => {
     }
   };
 
-  const getTimeStatus = (elapsedMinutes, preparationTime) => {
-    const percentage = (elapsedMinutes / preparationTime) * 100;
-    if (percentage > 100) return { color: 'bg-red-500', textColor: 'text-red-600', status: 'overdue', bgColor: 'bg-red-50', borderColor: 'border-red-200' };
-    if (percentage > 80) return { color: 'bg-orange-500', textColor: 'text-orange-600', status: 'warning', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' };
-    return { color: 'bg-green-500', textColor: 'text-green-600', status: 'normal', bgColor: 'bg-green-50', borderColor: 'border-green-200' };
+  // Calcular tiempo secuencial por estación
+  const calculateStationQueue = (items) => {
+    // Agrupar items por estación (grupo) y ordenar por tiempo de creación
+    const stations = {};
+    items.forEach(item => {
+      const stationKey = item.recipe_group_id || 'sin-grupo';
+      if (!stations[stationKey]) stations[stationKey] = [];
+      stations[stationKey].push(item);
+    });
+
+    // Para cada estación, calcular tiempo acumulado
+    Object.keys(stations).forEach(stationKey => {
+      // Ordenar por tiempo de creación (FIFO - First In, First Out)
+      stations[stationKey].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      
+      let accumulatedTime = 0;
+      stations[stationKey] = stations[stationKey].map((item, index) => {
+        const queueStartTime = accumulatedTime; // Cuando empieza este item en minutos
+        const queueEndTime = accumulatedTime + item.preparation_time;
+        accumulatedTime = queueEndTime;
+
+        return {
+          ...item,
+          queueStartTime,
+          queueEndTime,
+          queuePosition: index + 1
+        };
+      });
+    });
+
+    // Retornar array plano con los datos de cola calculados
+    return Object.values(stations).flat();
+  };
+
+  const getTimeStatus = (item) => {
+    const now = new Date();
+    const createdAt = new Date(item.created_at);
+    const elapsedSinceCreation = (now - createdAt) / (1000 * 60); // minutos desde creación
+
+    // Si el item aún no ha empezado en su estación (está en cola)
+    if (elapsedSinceCreation < item.queueStartTime) {
+      return { 
+        color: 'bg-gray-400', 
+        textColor: 'text-gray-600', 
+        status: 'waiting',
+        bgColor: 'bg-gray-50', 
+        borderColor: 'border-gray-200',
+        progress: 0,
+        displayTime: `Cola pos. ${item.queuePosition}`
+      };
+    }
+
+    // Tiempo que lleva siendo procesado en la estación
+    const timeInStation = elapsedSinceCreation - item.queueStartTime;
+    const percentage = (timeInStation / item.preparation_time) * 100;
+
+    // Mostrar tiempo de proceso en la estación
+    const displayMinutes = Math.max(0, Math.ceil(timeInStation));
+    const displayTime = displayMinutes < 60 ? `${displayMinutes}m` : 
+                       `${Math.floor(displayMinutes/60)}h ${displayMinutes%60}m`;
+
+    if (percentage > 100) {
+      const overdueMinutes = Math.ceil(timeInStation - item.preparation_time);
+      return { 
+        color: 'bg-red-500', 
+        textColor: 'text-red-600', 
+        status: 'overdue',
+        bgColor: 'bg-red-50', 
+        borderColor: 'border-red-200',
+        progress: 100,
+        displayTime: `+${overdueMinutes}m`
+      };
+    }
+    
+    if (percentage > 80) {
+      return { 
+        color: 'bg-orange-500', 
+        textColor: 'text-orange-600', 
+        status: 'warning',
+        bgColor: 'bg-orange-50', 
+        borderColor: 'border-orange-200',
+        progress: percentage,
+        displayTime
+      };
+    }
+    
+    return { 
+      color: 'bg-green-500', 
+      textColor: 'text-green-600', 
+      status: 'normal',
+      bgColor: 'bg-green-50', 
+      borderColor: 'border-green-200',
+      progress: percentage,
+      displayTime
+    };
   };
 
   // Organizar items por grupos para Kanban
@@ -91,18 +181,20 @@ const Kitchen = () => {
       }))
     );
 
-    // Filtrar por tiempo si está seleccionado
-    const timeFilteredItems = allItems.filter(item => {
-      if (timeFilter === 'all') return true;
-      const timeStatus = getTimeStatus(item.elapsed_time_minutes, item.preparation_time);
-      return timeStatus.status === timeFilter;
+    // Calcular cola secuencial para todos los items
+    const itemsWithQueue = calculateStationQueue(allItems);
+
+    // Filtrar por mesa si está seleccionada
+    const tableFilteredItems = itemsWithQueue.filter(item => {
+      if (selectedTableFilter === 'all') return true;
+      return `${item.order_zone}-${item.order_table}` === selectedTableFilter;
     });
 
     // Crear grupos dinámicamente basado en los items que realmente existen
     const dynamicGroups = {};
     
     // Agrupar items por grupo y crear columnas dinámicamente
-    timeFilteredItems.forEach(item => {
+    tableFilteredItems.forEach(item => {
       const groupKey = item.recipe_group_id || 'sin-grupo';
       const groupName = item.recipe_group_name || 'Sin Grupo';
       
@@ -142,9 +234,39 @@ const Kitchen = () => {
 
   const kanbanColumns = getKanbanColumns();
   const totalItems = Object.values(kanbanColumns).reduce((sum, col) => sum + col.items.length, 0);
-  const overdueItems = Object.values(kanbanColumns).reduce((sum, col) => 
-    sum + col.items.filter(item => getTimeStatus(item.elapsed_time_minutes, item.preparation_time).status === 'overdue').length, 0
-  );
+
+  // Obtener todas las mesas únicas con items pendientes
+  const getTablesWithItems = () => {
+    const allItems = kitchenBoard.flatMap(recipe => 
+      recipe.items.map(item => ({
+        zone: item.order_zone,
+        table: item.order_table,
+        key: `${item.order_zone}-${item.order_table}`
+      }))
+    );
+
+    // Agrupar por mesa y contar items
+    const tableGroups = {};
+    allItems.forEach(item => {
+      if (!tableGroups[item.key]) {
+        tableGroups[item.key] = {
+          zone: item.zone,
+          table: item.table,
+          key: item.key,
+          count: 0
+        };
+      }
+      tableGroups[item.key].count++;
+    });
+
+    return Object.values(tableGroups).sort((a, b) => {
+      // Ordenar por zona y luego por número de mesa
+      if (a.zone !== b.zone) return a.zone.localeCompare(b.zone);
+      return parseInt(a.table) - parseInt(b.table);
+    });
+  };
+
+  const tablesWithItems = getTablesWithItems();
   
   // Obtener grupos dinámicos para las pestañas (siempre todos los grupos que tienen items)
   const getDynamicGroupsForTabs = () => {
@@ -193,42 +315,35 @@ const Kitchen = () => {
       {/* Header */}
       <div className="bg-white shadow-sm px-4 py-3 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-xs text-gray-600">En vivo</span>
+          {/* Filtros por Mesa */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setSelectedTableFilter('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                selectedTableFilter === 'all'
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              Todas ({totalItems})
+            </button>
+            {tablesWithItems.map(table => (
+              <button
+                key={table.key}
+                onClick={() => setSelectedTableFilter(table.key)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  selectedTableFilter === table.key
+                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                {table.table} ({table.count})
+              </button>
+            ))}
           </div>
 
-          {/* Filtros */}
-          <div className="flex items-center gap-4">
-            {/* Filtro de tiempo */}
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-gray-600" />
-              <select
-                value={timeFilter}
-                onChange={(e) => setTimeFilter(e.target.value)}
-                className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">Todos los tiempos</option>
-                <option value="normal">Normal (verde)</option>
-                <option value="warning">Advertencia (naranja)</option>
-                <option value="overdue">Retrasado (rojo)</option>
-              </select>
-            </div>
-            
-            {/* Estadísticas */}
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <span className="font-semibold text-blue-700">{totalItems}</span>
-                <span className="text-gray-600">pendientes</span>
-              </div>
-              {overdueItems > 0 && (
-                <div className="flex items-center gap-1">
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <span className="font-semibold text-red-700">{overdueItems}</span>
-                  <span className="text-gray-600">retrasados</span>
-                </div>
-              )}
-            </div>
+          <div className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
           </div>
         </div>
 
@@ -247,8 +362,11 @@ const Kitchen = () => {
                 Todos ({totalItems})
               </button>
               {dynamicGroupsForTabs.map(group => {
-                // Calcular items del grupo para la pestaña (todos los items, no filtrados por tiempo)
-                const groupItems = group.items.length;
+                // Calcular items del grupo filtrados por mesa seleccionada
+                const groupItemsCount = selectedTableFilter === 'all' 
+                  ? group.items.length
+                  : group.items.filter(item => `${item.order_zone}-${item.order_table}` === selectedTableFilter).length;
+                
                 return (
                   <button
                     key={group.id}
@@ -259,7 +377,7 @@ const Kitchen = () => {
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                     }`}
                   >
-                    {group.name} ({groupItems})
+                    {group.name} ({groupItemsCount})
                   </button>
                 );
               })}
@@ -302,7 +420,7 @@ const Kitchen = () => {
                 {/* Items de la columna */}
                 <div className="bg-gray-100 rounded-b-lg p-3 min-h-[400px] max-h-[calc(100vh-300px)] overflow-y-auto space-y-3">
                   {column.items.map(item => {
-                    const timeStatus = getTimeStatus(item.elapsed_time_minutes, item.preparation_time);
+                    const timeStatus = getTimeStatus(item);
                     
                     return (
                       <div
@@ -315,7 +433,7 @@ const Kitchen = () => {
                           <div className="w-full bg-gray-200 rounded-full h-1.5">
                             <div 
                               className={`h-1.5 rounded-full transition-all duration-300 ${timeStatus.color}`}
-                              style={{ width: `${Math.min((item.elapsed_time_minutes / item.preparation_time) * 100, 100)}%` }}
+                              style={{ width: `${Math.min(timeStatus.progress, 100)}%` }}
                             />
                           </div>
                         </div>
@@ -327,7 +445,7 @@ const Kitchen = () => {
                             <span className="text-lg font-bold text-gray-900">#{item.order_id}</span>
                             <div className="text-right">
                               <div className={`text-sm font-medium ${timeStatus.textColor}`}>
-                                {formatTime(item.elapsed_time_minutes)}
+                                {timeStatus.displayTime}
                               </div>
                               <div className="text-xs text-gray-500">
                                 {formatCreationTime(item.created_at)}
@@ -343,7 +461,7 @@ const Kitchen = () => {
                           {/* Ubicación */}
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <MapPin className="h-4 w-4" />
-                            <span>{item.order_zone} - Mesa {item.order_table}</span>
+                            <span>{item.order_zone} - {item.order_table}</span>
                           </div>
 
                           {/* Mesero */}
@@ -415,7 +533,7 @@ const Kitchen = () => {
                   {/* Grid de items */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
                     {column.items.map(item => {
-                      const timeStatus = getTimeStatus(item.elapsed_time_minutes, item.preparation_time);
+                      const timeStatus = getTimeStatus(item);
                       
                       return (
                         <div
@@ -428,7 +546,7 @@ const Kitchen = () => {
                             <div className="w-full bg-gray-200 rounded-full h-1.5">
                               <div 
                                 className={`h-1.5 rounded-full transition-all duration-300 ${timeStatus.color}`}
-                                style={{ width: `${Math.min((item.elapsed_time_minutes / item.preparation_time) * 100, 100)}%` }}
+                                style={{ width: `${Math.min(timeStatus.progress, 100)}%` }}
                               />
                             </div>
                           </div>
@@ -440,7 +558,7 @@ const Kitchen = () => {
                               <span className="text-lg font-bold text-gray-900">#{item.order_id}</span>
                               <div className="text-right">
                                 <div className={`text-sm font-medium ${timeStatus.textColor}`}>
-                                  {formatTime(item.elapsed_time_minutes)}
+                                  {timeStatus.displayTime}
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   {formatCreationTime(item.created_at)}
@@ -456,7 +574,7 @@ const Kitchen = () => {
                             {/* Ubicación */}
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <MapPin className="h-4 w-4" />
-                              <span>{item.order_zone} - Mesa {item.order_table}</span>
+                              <span>{item.order_zone} - {item.order_table}</span>
                             </div>
 
                             {/* Mesero */}

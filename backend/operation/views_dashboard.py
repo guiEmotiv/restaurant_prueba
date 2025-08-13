@@ -33,11 +33,17 @@ class DashboardViewSet(viewsets.ViewSet):
             else:
                 selected_date = timezone.now().date()
             
-            # Obtener datos detallados completos
+            # Obtener datos detallados completos (solo items PAID para dashboard)
             detailed_data = self._get_detailed_order_data(selected_date)
+            
+            # Obtener TODOS los datos para la gráfica de estados
+            all_detailed_data = self._get_all_detailed_order_data(selected_date)
             
             # Generar dashboard desde los datos detallados
             dashboard_data = self._generate_dashboard_from_details(detailed_data, selected_date)
+            
+            # Agregar distribución de estados de items
+            dashboard_data['item_status_breakdown'] = self._calculate_item_status_breakdown(all_detailed_data)
             
             return Response(dashboard_data)
         
@@ -56,14 +62,16 @@ class DashboardViewSet(viewsets.ViewSet):
         Obtiene datos completamente detallados por fila
         Cada fila representa un OrderItem con TODA su información relacionada
         """
-        # Obtener órdenes PAID con todas las relaciones
+        # Obtener órdenes PAID con todas las relaciones - FILTRAR SOLO ITEMS PAID
         paid_orders = Order.objects.filter(
             status='PAID',
             paid_at__date=selected_date
         ).select_related(
             'table__zone'
         ).prefetch_related(
-            Prefetch('orderitem_set', queryset=OrderItem.objects.select_related(
+            Prefetch('orderitem_set', queryset=OrderItem.objects.filter(
+                status='PAID'  # ✅ SOLO ITEMS PAGADOS
+            ).select_related(
                 'recipe__group'
             ).prefetch_related(
                 'orderitemingredient_set__ingredient__unit',
@@ -120,8 +128,9 @@ class DashboardViewSet(viewsets.ViewSet):
                     'container_total_price': float(container_sale.total_price)
                 })
             
-            # Procesar cada item de la orden
-            for order_item in order.orderitem_set.all():
+            # Procesar cada item PAGADO de la orden
+            paid_items = [item for item in order.orderitem_set.all() if item.status == 'PAID']
+            for order_item in paid_items:
                 
                 # Información del item
                 item_info = {
@@ -189,6 +198,173 @@ class DashboardViewSet(viewsets.ViewSet):
         
         return detailed_rows
     
+    def _get_all_detailed_order_data(self, selected_date):
+        """
+        Obtiene TODOS los datos detallados (incluyendo items no PAID) para Excel
+        """
+        # Obtener órdenes PAID con TODOS los items (sin filtrar por status)
+        paid_orders = Order.objects.filter(
+            status='PAID',
+            paid_at__date=selected_date
+        ).select_related(
+            'table__zone'
+        ).prefetch_related(
+            Prefetch('orderitem_set', queryset=OrderItem.objects.select_related(
+                'recipe__group'
+            ).prefetch_related(
+                'orderitemingredient_set__ingredient__unit',
+                'recipe__recipeitem_set__ingredient__unit'
+            )),
+            'payments',
+            'container_sales__container'
+        ).order_by('paid_at')
+        
+        detailed_rows = []
+        
+        for order in paid_orders:
+            
+            # Información básica de la orden (igual que antes)
+            order_info = {
+                'order_id': order.id,
+                'table_number': order.table.table_number if order.table else 'N/A',
+                'zone_name': order.table.zone.name if order.table and order.table.zone else 'N/A',
+                'waiter': order.waiter or 'Sin asignar',
+                'order_status': order.status,
+                'order_total': float(order.total_amount),
+                'created_at': order.created_at.isoformat() if order.created_at else None,
+                'served_at': order.served_at.isoformat() if order.served_at else None,
+                'paid_at': order.paid_at.isoformat() if order.paid_at else None,
+                'service_time_minutes': None
+            }
+            
+            # Calcular tiempo de servicio
+            if order.created_at and order.paid_at:
+                service_time_seconds = (order.paid_at - order.created_at).total_seconds()
+                service_time_minutes = max(1, int(service_time_seconds / 60))
+                order_info['service_time_minutes'] = service_time_minutes
+            
+            # Información de pagos y envases (igual que antes)
+            payments_info = []
+            for payment in order.payments.all():
+                payments_info.append({
+                    'payment_method': payment.payment_method,
+                    'payment_amount': float(payment.amount),
+                    'payment_date': payment.created_at.isoformat(),
+                    'tax_amount': float(payment.tax_amount),
+                    'payer_name': payment.payer_name or ''
+                })
+            
+            containers_info = []
+            for container_sale in order.container_sales.all():
+                containers_info.append({
+                    'container_name': container_sale.container.name,
+                    'container_quantity': container_sale.quantity,
+                    'container_unit_price': float(container_sale.unit_price),
+                    'container_total_price': float(container_sale.total_price)
+                })
+            
+            # Procesar TODOS los items de la orden (sin filtrar por status)
+            for order_item in order.orderitem_set.all():
+                
+                # Información del item (igual que antes)
+                item_info = {
+                    'item_id': order_item.id,
+                    'recipe_name': order_item.recipe.name if order_item.recipe else 'Sin receta',
+                    'recipe_version': order_item.recipe.version if order_item.recipe else 'N/A',
+                    'category': order_item.recipe.group.name if order_item.recipe and order_item.recipe.group else 'Sin categoría',
+                    'item_quantity': order_item.quantity,
+                    'item_unit_price': float(order_item.unit_price),
+                    'item_total_price': float(order_item.total_price),
+                    'item_status': order_item.status,  # ✅ INCLUYE TODOS LOS ESTADOS
+                    'item_notes': order_item.notes or '',
+                    'is_takeaway': order_item.is_takeaway,
+                    'has_taper': order_item.has_taper,
+                    'preparation_time': order_item.recipe.preparation_time if order_item.recipe else 0
+                }
+                
+                # Resto del procesamiento igual (ingredientes, costos, etc.)
+                recipe_ingredients = []
+                if order_item.recipe:
+                    for recipe_item in order_item.recipe.recipeitem_set.all():
+                        ingredient_cost = float(recipe_item.ingredient.unit_price * recipe_item.quantity)
+                        recipe_ingredients.append({
+                            'ingredient_name': recipe_item.ingredient.name,
+                            'ingredient_unit': recipe_item.ingredient.unit.name,
+                            'ingredient_quantity': float(recipe_item.quantity),
+                            'ingredient_unit_price': float(recipe_item.ingredient.unit_price),
+                            'ingredient_total_cost': ingredient_cost,
+                            'ingredient_type': 'base'
+                        })
+                
+                custom_ingredients = []
+                for custom_ingredient in order_item.orderitemingredient_set.all():
+                    custom_cost = float(custom_ingredient.total_price)
+                    custom_ingredients.append({
+                        'ingredient_name': custom_ingredient.ingredient.name,
+                        'ingredient_unit': custom_ingredient.ingredient.unit.name,
+                        'ingredient_quantity': float(custom_ingredient.quantity),
+                        'ingredient_unit_price': float(custom_ingredient.unit_price),
+                        'ingredient_total_cost': custom_cost,
+                        'ingredient_type': 'custom'
+                    })
+                
+                total_ingredient_cost = sum(ing['ingredient_total_cost'] for ing in recipe_ingredients + custom_ingredients)
+                profit_amount = float(order_item.total_price) - total_ingredient_cost
+                profit_percentage = (profit_amount / total_ingredient_cost * 100) if total_ingredient_cost > 0 else 0
+                
+                # Crear fila detallada completa
+                detailed_row = {
+                    **order_info,
+                    **item_info,
+                    'total_ingredient_cost': total_ingredient_cost,
+                    'profit_amount': profit_amount,
+                    'profit_percentage': profit_percentage,
+                    'recipe_ingredients': recipe_ingredients,
+                    'custom_ingredients': custom_ingredients,
+                    'all_ingredients': recipe_ingredients + custom_ingredients,
+                    'payments': payments_info,
+                    'containers': containers_info
+                }
+                
+                detailed_rows.append(detailed_row)
+        
+        return detailed_rows
+    
+    def _calculate_item_status_breakdown(self, detailed_data):
+        """
+        Calcula la distribución de estados de items para la gráfica
+        """
+        status_counts = {}
+        status_amounts = {}
+        
+        for row in detailed_data:
+            status = row['item_status']
+            amount = row['item_total_price']
+            
+            status_counts[status] = status_counts.get(status, 0) + 1
+            status_amounts[status] = status_amounts.get(status, 0) + amount
+        
+        total_items = sum(status_counts.values())
+        total_amount = sum(status_amounts.values())
+        
+        breakdown = []
+        for status in ['CREATED', 'SERVED', 'PAID']:
+            count = status_counts.get(status, 0)
+            amount = status_amounts.get(status, 0)
+            
+            count_percentage = (count / total_items * 100) if total_items > 0 else 0
+            amount_percentage = (amount / total_amount * 100) if total_amount > 0 else 0
+            
+            breakdown.append({
+                'status': status,
+                'count': count,
+                'amount': amount,
+                'count_percentage': count_percentage,
+                'amount_percentage': amount_percentage
+            })
+        
+        return breakdown
+    
     def _generate_dashboard_from_details(self, detailed_data, selected_date):
         """
         Genera el dashboard completo desde los datos detallados
@@ -212,6 +388,7 @@ class DashboardViewSet(viewsets.ViewSet):
         zone_stats = {}
         table_stats = {}
         payment_method_stats = {}
+        payment_method_counts = {}
         
         for row in detailed_data:
             order_id = row['order_id']
@@ -256,11 +433,12 @@ class DashboardViewSet(viewsets.ViewSet):
                 if row['service_time_minutes']:
                     service_times.append(row['service_time_minutes'])
                 
-                # Stats de pagos (solo para la primera fila de cada orden)
+                # Stats de pagos (solo para la primera fila de cada orden) - OPTIMIZADO
                 for payment in row['payments']:
                     method = payment['payment_method']
                     amount = Decimal(str(payment['payment_amount']))
                     payment_method_stats[method] = payment_method_stats.get(method, Decimal('0')) + amount
+                    payment_method_counts[method] = payment_method_counts.get(method, 0) + 1
                 
                 # Stats por zona (solo una vez por orden)
                 zone = row['zone_name']
@@ -341,14 +519,14 @@ class DashboardViewSet(viewsets.ViewSet):
             })
         
         # Métodos de pago
-        total_payments = sum(payment_method_stats.values())
         payment_methods = []
         for method, amount in payment_method_stats.items():
-            percentage = (amount / total_payments * 100) if total_payments > 0 else 0
+            percentage = (amount / total_revenue * 100) if total_revenue > 0 else 0
             payment_methods.append({
                 'method': method,
                 'amount': float(amount),
-                'percentage': float(percentage)
+                'percentage': float(percentage),
+                'transaction_count': payment_method_counts.get(method, 0)
             })
         
         
@@ -372,23 +550,42 @@ class DashboardViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def export_excel(self, request):
         """
-        Exporta datos detallados completos a Excel/CSV
+        Exporta datos detallados completos a Excel/CSV - TODOS LOS ITEMS (no solo PAID)
         """
         try:
-            # Obtener datos detallados
-            report_response = self.report(request)
-            if report_response.status_code != 200:
-                return report_response
+            # Obtener fecha del parámetro
+            date_param = request.query_params.get('date')
+            if date_param:
+                try:
+                    selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+                except ValueError:
+                    selected_date = timezone.now().date()
+            else:
+                selected_date = timezone.now().date()
             
-            response_data = report_response.data
-            detailed_data = response_data.get('detailed_data', [])
+            # Obtener TODOS los datos detallados (no solo PAID) para Excel
+            all_detailed_data = self._get_all_detailed_order_data(selected_date)
+            
+            # Generar dashboard solo con items PAID
+            dashboard_data = self._generate_dashboard_from_details(
+                [row for row in all_detailed_data if row['item_status'] == 'PAID'], 
+                selected_date
+            )
+            
+            # Preparar respuesta con todos los datos para Excel
+            excel_response_data = {
+                'date': selected_date.isoformat(),
+                'detailed_data': all_detailed_data,  # TODOS los items
+                'summary': dashboard_data['summary'],
+                'item_status_breakdown': self._calculate_item_status_breakdown(all_detailed_data)
+            }
             
             # Intentar Excel, fallback a CSV
             try:
                 import openpyxl
-                return self._generate_detailed_excel(response_data)
+                return self._generate_detailed_excel(excel_response_data)
             except ImportError:
-                return self._generate_detailed_csv(response_data)
+                return self._generate_detailed_csv(excel_response_data)
                 
         except Exception as e:
             return Response({
@@ -449,14 +646,17 @@ class DashboardViewSet(viewsets.ViewSet):
                 ]
                 writer.writerow(base_row)
             else:
-                # Una fila por cada ingrediente
-                for ingredient in all_ingredients:
+                # Una fila por cada ingrediente - CORREGIDO: item_total_price solo en primera fila
+                for idx, ingredient in enumerate(all_ingredients):
+                    # Solo incluir item_total_price en la primera fila del item para evitar duplicación
+                    item_total_display = row['item_total_price'] if idx == 0 else 0
+                    
                     ingredient_row = [
                         response_data['date'], row['order_id'], row['table_number'], row['zone_name'],
                         row['waiter'], row['order_status'], row['order_total'],
                         row['created_at'], row['served_at'], row['paid_at'], row['service_time_minutes'],
                         row['item_id'], row['recipe_name'], row['recipe_version'], row['category'],
-                        row['item_quantity'], row['item_unit_price'], row['item_total_price'],
+                        row['item_quantity'], row['item_unit_price'], item_total_display,
                         row['item_status'], row['item_notes'], row['is_takeaway'], row['has_taper'],
                         row['preparation_time'], row['total_ingredient_cost'], row['profit_amount'],
                         row['profit_percentage'],
@@ -533,14 +733,17 @@ class DashboardViewSet(viewsets.ViewSet):
                     ws_details.cell(row=row_num, column=col, value=value)
                 row_num += 1
             else:
-                # Una fila por ingrediente
-                for ingredient in all_ingredients:
+                # Una fila por ingrediente - CORREGIDO: item_total_price solo en primera fila
+                for idx, ingredient in enumerate(all_ingredients):
+                    # Solo incluir item_total_price en la primera fila del item para evitar duplicación
+                    item_total_display = row['item_total_price'] if idx == 0 else 0
+                    
                     data_row = [
                         response_data['date'], row['order_id'], row['table_number'], row['zone_name'],
                         row['waiter'], row['order_status'], row['order_total'],
                         row['created_at'], row['served_at'], row['paid_at'], row['service_time_minutes'],
                         row['item_id'], row['recipe_name'], row['recipe_version'], row['category'],
-                        row['item_quantity'], row['item_unit_price'], row['item_total_price'],
+                        row['item_quantity'], row['item_unit_price'], item_total_display,
                         row['item_status'], row['item_notes'], row['is_takeaway'], row['has_taper'],
                         row['preparation_time'], row['total_ingredient_cost'], row['profit_amount'],
                         row['profit_percentage'],

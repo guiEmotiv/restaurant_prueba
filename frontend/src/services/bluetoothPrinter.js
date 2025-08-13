@@ -224,23 +224,58 @@ class BluetoothPrinterService {
       await this.printText(`Fecha:               ${fecha}\n`);
       await this.printText(`Hora:                ${hora}\n`);
 
-      // Separador (igual que web)
-      await this.printText('-------------------------------------\n');
+      // Separador (48 caracteres para usar todo el ancho)
+      await this.printText('------------------------------------------------\n');
 
-      // Items con cálculo correcto del total
+      // Items con formato de columnas perfectamente alineado
       let itemsTotal = 0;
+      console.log('=== DEBUG IMPRESIÓN ===');
+      console.log('paymentData:', paymentData);
       if (paymentData.order.items && paymentData.order.items.length > 0) {
         for (const item of paymentData.order.items) {
           const itemName = item.recipe_name || 'Item';
           const quantity = item.quantity || 1;
           const itemPrice = parseFloat(item.total_price || 0);
+          console.log(`Item: ${itemName}, Quantity: ${quantity}, Price: ${itemPrice}`);
           itemsTotal += itemPrice;
           const price = this.formatPrice(itemPrice); // Sin símbolo S/
           
-          // Formato: "2x Nombre del Plato              15.00" (sin S/)
-          const itemLine = `${quantity}x ${itemName}`;
-          const spaces = Math.max(1, 37 - itemLine.length - price.length);
-          await this.printText(`${itemLine}${' '.repeat(spaces)}${price}\n`);
+          // Usar todo el ancho disponible de impresora 58mm (48 caracteres)
+          const totalWidth = 48;
+          const priceWidth = 10; // Ancho fijo para precios
+          const itemWidth = totalWidth - priceWidth;
+          
+          // Crear la línea del item y normalizar caracteres especiales
+          const itemLine = `${quantity}x ${itemName}`
+            .replace(/ñ/g, 'n')
+            .replace(/á/g, 'a')
+            .replace(/é/g, 'e')
+            .replace(/í/g, 'i')
+            .replace(/ó/g, 'o')
+            .replace(/ú/g, 'u')
+            .replace(/Ñ/g, 'N')
+            .replace(/Á/g, 'A')
+            .replace(/É/g, 'E')
+            .replace(/Í/g, 'I')
+            .replace(/Ó/g, 'O')
+            .replace(/Ú/g, 'U');
+          
+          // Truncar si excede el ancho
+          let finalItemLine = itemLine.length > itemWidth 
+            ? itemLine.substring(0, itemWidth - 3) + '...' 
+            : itemLine;
+          
+          // Calcular espacios necesarios para alineación exacta
+          const spacesNeeded = itemWidth - finalItemLine.length;
+          const spaces = ' '.repeat(Math.max(0, spacesNeeded));
+          
+          // Formatear precio con ancho fijo
+          const formattedPrice = price.padStart(priceWidth, ' ');
+          
+          // Construir línea completa con alineación precisa
+          const fullLine = finalItemLine + spaces + formattedPrice;
+          
+          await this.printText(`${fullLine}\n`);
           
           if (item.is_takeaway) {
             await this.printText(`  Para llevar\n`);
@@ -249,18 +284,32 @@ class BluetoothPrinterService {
       }
 
       // Separador antes del total
-      await this.printText('-------------------------------------\n');
+      await this.printText('------------------------------------------------\n');
 
-      // Total alineado con los precios (derecha como los items)
+      // Total alineado perfectamente con las columnas
+      console.log(`Items Total: ${itemsTotal}`);
+      console.log(`Payment Amount: ${paymentData.amount}`);
+      console.log(`Order Total: ${paymentData.order.total_amount}`);
       const displayTotal = this.formatCurrency(itemsTotal || paymentData.amount || paymentData.order.total_amount || 0);
+      console.log(`Display Total: ${displayTotal}`);
       const totalLine = 'TOTAL:';
-      const totalSpaces = Math.max(1, 37 - totalLine.length - displayTotal.length);
+      const totalWidth = 48;
+      const priceWidth = 10; // Mismo ancho que para items
+      const labelWidth = totalWidth - priceWidth;
+      
+      // Calcular espacios exactos para el total
+      const spacesNeededTotal = labelWidth - totalLine.length;
+      const spacesTotal = ' '.repeat(Math.max(0, spacesNeededTotal));
+      const formattedTotal = displayTotal.padStart(priceWidth, ' ');
+      
+      const fullTotalLine = totalLine + spacesTotal + formattedTotal;
+      
       await this.sendCommand(this.commands.BOLD_ON);
-      await this.printText(`${totalLine}${' '.repeat(totalSpaces)}${displayTotal}\n`);
+      await this.printText(`${fullTotalLine}\n`);
       await this.sendCommand(this.commands.BOLD_OFF);
 
       // Separador final
-      await this.printText('-------------------------------------\n');
+      await this.printText('------------------------------------------------\n');
 
       // Footer centrado (solo ASCII)
       await this.sendCommand(this.commands.ALIGN_CENTER);
@@ -330,7 +379,7 @@ class BluetoothPrinterService {
       await this.sendCommand(this.commands.BOLD_ON);
       await this.printText('PRUEBA DE IMPRESION\n');
       await this.sendCommand(this.commands.BOLD_OFF);
-      await this.printText('===================\n');
+      await this.printText('================================\n');
       await this.printText('EL FOGON DE DON SOTO\n');
       
       const now = new Date();
@@ -338,7 +387,7 @@ class BluetoothPrinterService {
       const hora = now.toLocaleTimeString('es-PE');
       await this.printText(`${fecha} ${hora}\n`);
       
-      await this.printText('===================\n');
+      await this.printText('================================\n');
       await this.printText('Impresora conectada\n');
       await this.printText('correctamente\n\n\n');
       

@@ -33,6 +33,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
     paid_amount = serializers.SerializerMethodField()
     pending_amount = serializers.SerializerMethodField()
     is_fully_paid = serializers.SerializerMethodField()
+    container_info = serializers.SerializerMethodField()
+    total_with_container = serializers.SerializerMethodField()
     
     class Meta:
         model = OrderItem
@@ -42,7 +44,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'customizations', 'customizations_count',
             'elapsed_time_minutes', 'is_overdue',
             'paid_amount', 'pending_amount', 'is_fully_paid',
-            'created_at', 'served_at'
+            'container_info', 'total_with_container', 'created_at', 'served_at'
         ]
         read_only_fields = [
             'id', 'unit_price', 'total_price', 'created_at', 'served_at'
@@ -84,6 +86,42 @@ class OrderItemSerializer(serializers.ModelSerializer):
     
     def get_is_fully_paid(self, obj):
         return obj.is_fully_paid()
+    
+    def get_container_info(self, obj):
+        """
+        Obtiene información del contenedor asociado a este item
+        """
+        # Primero verificar si tiene container directo (nueva arquitectura)
+        if obj.container:
+            return {
+                'container_id': obj.container.id,
+                'container_name': obj.container.name,
+                'unit_price': float(obj.container_price or obj.container.price),
+                'total_price': float((obj.container_price or obj.container.price) * obj.quantity)
+            }
+        
+        # Fallback: buscar en ContainerSale (arquitectura antigua)
+        if obj.has_taper and obj.order:
+            container_sale = obj.order.container_sales.filter(
+                quantity=obj.quantity,
+                created_at__gte=obj.created_at
+            ).order_by('created_at').first()
+            
+            if container_sale:
+                return {
+                    'container_id': container_sale.container.id,
+                    'container_name': container_sale.container.name,
+                    'unit_price': float(container_sale.unit_price),
+                    'total_price': float(container_sale.total_price)
+                }
+        
+        return None
+    
+    def get_total_with_container(self, obj):
+        """
+        Obtiene el precio total del item incluyendo el envase
+        """
+        return float(obj.get_total_with_container())
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -215,10 +253,12 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         """
-        Crear OrderItem con transacción atómica para garantizar consistencia.
+        Crear OrderItems individuales para cada cantidad solicitada.
+        Si quantity=5, crea 5 OrderItems separados con quantity=1 cada uno.
+        Esto permite que la vista de cocina muestre cada item individualmente.
         """
         selected_container_id = validated_data.pop('selected_container', None)
-        quantity = validated_data.get('quantity', 1)
+        quantity = validated_data.pop('quantity', 1)  # Remover quantity del validated_data
         
         # Obtener order del contexto
         order = self.context.get('order')
@@ -227,6 +267,7 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         
         # Pre-validar stock de container si aplica
         container = None
+        container_price = None
         if validated_data.get('has_taper', False) and selected_container_id:
             from config.models import Container
             try:
@@ -238,21 +279,34 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
                         f"Stock insuficiente de {container.name}. "
                         f"Disponible: {container.stock}, Requerido: {quantity}"
                     )
+                container_price = container.price
             except Container.DoesNotExist:
                 raise serializers.ValidationError(
                     "El envase seleccionado no existe o no está disponible"
                 )
         
-        # Crear OrderItem
-        order_item = OrderItem.objects.create(order=order, **validated_data)
+        # Crear OrderItems individuales (uno por cada cantidad)
+        created_items = []
+        for i in range(quantity):
+            order_item = OrderItem.objects.create(
+                order=order,
+                container=container,
+                container_price=container_price,
+                quantity=1,  # Cada OrderItem tiene quantity=1
+                **validated_data
+            )
+            created_items.append(order_item)
         
-        # Crear ContainerSale si aplica
+        # Retornar el primer item (para compatibilidad con la API)
+        order_item = created_items[0] if created_items else None
+        
+        # Crear ContainerSale para mantener compatibilidad y control de stock
         if container:
             # Reducir stock del envase
             container.stock -= quantity
             container.save()
             
-            # Crear ContainerSale
+            # Crear ContainerSale para tracking
             ContainerSale.objects.create(
                 order=order,
                 container=container,
@@ -261,8 +315,9 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
                 total_price=container.price * quantity
             )
         
-        # Calcular el precio total después de crear el item
-        order_item.calculate_total_price()
+        # Calcular el precio total para todos los items creados
+        for item in created_items:
+            item.calculate_total_price()
         
         return order_item
 
@@ -335,13 +390,21 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         # Crear items y containers (ya validado el stock)
         for item_data in items_data:
             selected_container_id = item_data.pop('selected_container', None)
-            quantity = item_data.get('quantity', 1)
+            quantity = item_data.pop('quantity', 1)  # Remover quantity del item_data
             
-            # Crear OrderItem
-            order_item = OrderItem.objects.create(order=order, **item_data)
+            # Crear OrderItems individuales (uno por cada cantidad)
+            created_items = []
+            for i in range(quantity):
+                order_item = OrderItem.objects.create(
+                    order=order, 
+                    quantity=1,  # Cada OrderItem tiene quantity=1
+                    **item_data
+                )
+                created_items.append(order_item)
             
-            # Crear ContainerSale si aplica
-            if order_item.has_taper and selected_container_id:
+            # Crear ContainerSale si aplica (usar el primer item como referencia)
+            first_item = created_items[0] if created_items else None
+            if first_item and first_item.has_taper and selected_container_id:
                 container = next(
                     (c for c, q in containers_to_reduce if c.id == selected_container_id), 
                     None

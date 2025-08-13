@@ -82,7 +82,8 @@ const Layout = ({ children }) => {
     { 
       name: 'Operaciones', 
       icon: ShoppingCart,
-      permission: 'canViewKitchen',
+      // Mostrar si tiene cualquier permiso de operaciones (meseros o cocineros)
+      permission: null, // Se filtrará por sus hijos
       children: [
         { name: 'Gestión de Mesas', href: '/operations', icon: Table, permission: 'canManageOrders' },
         { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },

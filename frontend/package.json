@@ -4,15 +4,20 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 5173 --host",
+    "dev": "vite --port 5173 --host --open",
+    "dev:debug": "DEBUG=vite:* vite --port 5173 --host",
+    "dev:force": "vite --port 5173 --host --force",
     "build": "NODE_OPTIONS='--max-old-space-size=4096' vite build",
     "build:prod": "NODE_OPTIONS='--max-old-space-size=2048' vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview --port 5173",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --watchAll=false"
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "clean": "rm -rf node_modules/.vite dist",
+    "reset": "npm run clean && npm install && npm run dev"
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.11.2",

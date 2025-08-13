@@ -51,10 +51,31 @@ const DashboardFinanciero = () => {
   const handleDownloadExcel = async () => {
     try {
       setDownloading(true);
+      
+      // Verificar que hay datos para exportar
+      if (!dashboardData || dashboardData.summary?.total_orders === 0) {
+        alert('No hay datos para exportar en la fecha seleccionada');
+        return;
+      }
+      
       await apiService.dashboard.downloadExcel(selectedDate);
+      
+      // Feedback positivo (opcional - el archivo se descarga automáticamente)
+      // setTimeout(() => alert('✅ Excel descargado exitosamente'), 500);
+      
     } catch (error) {
       console.error('Error downloading Excel:', error);
-      alert('Error al descargar el archivo Excel');
+      
+      // Mensaje de error más específico
+      if (error.response?.status === 404) {
+        alert('❌ No se encontraron datos para exportar en esta fecha');
+      } else if (error.response?.status === 500) {
+        alert('❌ Error interno del servidor al generar Excel');
+      } else if (error.code === 'NETWORK_ERROR') {
+        alert('❌ Error de conexión. Verifica tu internet.');
+      } else {
+        alert('❌ Error al descargar Excel. Inténtalo de nuevo.');
+      }
     } finally {
       setDownloading(false);
     }
@@ -106,7 +127,7 @@ const DashboardFinanciero = () => {
     );
   }
 
-  const { summary, category_breakdown, top_dishes, waiter_performance, zone_performance, payment_methods } = dashboardData;
+  const { summary, category_breakdown, top_dishes, waiter_performance, zone_performance, payment_methods, item_status_breakdown } = dashboardData;
 
   return (
     <div className="min-h-screen bg-gray-50 -m-4 sm:-m-6 p-4 sm:p-6">
@@ -210,7 +231,7 @@ const DashboardFinanciero = () => {
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-gray-900">{formatCurrency(category.revenue)}</p>
-                        <p className="text-sm text-gray-500">{category.percentage.toFixed(1)}%</p>
+                        <p className="text-sm text-gray-500">{Math.round(category.percentage)}%</p>
                       </div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
@@ -301,7 +322,7 @@ const DashboardFinanciero = () => {
                     </div>
                     <div className="text-center">
                       <p className="text-gray-500">% del Total</p>
-                      <p className="font-medium">{((waiter.revenue / summary.total_revenue) * 100).toFixed(1)}%</p>
+                      <p className="font-medium">{Math.round((waiter.revenue / summary.total_revenue) * 100)}%</p>
                     </div>
                   </div>
                   
@@ -325,65 +346,111 @@ const DashboardFinanciero = () => {
             </div>
           </div>
 
-          {/* Ingresos por zona */}
+          {/* Productos menos vendidos */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-500" />
-              Ingresos por Zona
+              <TrendingUp className="h-5 w-5 text-red-500" />
+              Productos Menos Vendidos
             </h3>
             
-            <div className="space-y-3">
-              {zone_performance.map((zone, index) => (
-                <div key={index} className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-gray-900">{zone.zone}</h4>
-                    <span className="text-lg font-bold text-gray-900">{formatCurrency(zone.revenue)}</span>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div className="text-center">
-                      <p className="text-gray-500">Ventas</p>
-                      <p className="font-medium">{zone.orders}</p>
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {top_dishes
+                .slice()
+                .sort((a, b) => a.quantity - b.quantity)
+                .slice(0, 5)
+                .map((dish, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm bg-red-400">
+                      {index + 1}
                     </div>
-                    <div className="text-center">
-                      <p className="text-gray-500">Por Mesa</p>
-                      <p className="font-medium">{formatCurrency(zone.average_per_table)}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-gray-500">% del Total</p>
-                      <p className="font-medium">{((zone.revenue / summary.total_revenue) * 100).toFixed(1)}%</p>
+                    <div>
+                      <p className="font-medium text-gray-900">{dish.name}</p>
+                      <p className="text-sm text-gray-500">{dish.category} • Solo {dish.quantity} vendidos</p>
                     </div>
                   </div>
-                  
-                  <div className="mt-3">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${(zone.revenue / summary.total_revenue) * 100}%` }}
-                      />
-                    </div>
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900">{formatCurrency(dish.revenue)}</p>
+                    <p className="text-xs text-red-600">Bajo rendimiento</p>
                   </div>
                 </div>
               ))}
               
-              {zone_performance.length === 0 && (
+              {top_dishes.length === 0 && (
                 <div className="text-center text-gray-500 py-4">
-                  <DollarSign className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm">Sin datos de ingresos por zona</p>
+                  <TrendingUp className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm">Sin datos de productos para esta fecha</p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Métodos de pago */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <CreditCard className="h-5 w-5 text-green-500" />
-            Distribución de Métodos de Pago
-          </h3>
+        {/* Estado de Items y Métodos de pago */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Estado de Items */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <PieChart className="h-5 w-5 text-blue-500" />
+              Estado de Items
+            </h3>
+            
+            <div className="space-y-4">
+              {item_status_breakdown && item_status_breakdown.map((status, index) => {
+                const statusNames = {
+                  'CREATED': 'Creados',
+                  'SERVED': 'Entregados',
+                  'PAID': 'Pagados'
+                };
+                
+                const statusColors = {
+                  'CREATED': 'bg-yellow-500',
+                  'SERVED': 'bg-blue-500', 
+                  'PAID': 'bg-green-500'
+                };
+                
+                const bgColor = statusColors[status.status] || 'bg-gray-500';
+                
+                return (
+                  <div key={index}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded ${bgColor}`}></div>
+                        <span className="font-medium text-gray-900">{statusNames[status.status] || status.status}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-900">{status.count} items</p>
+                        <p className="text-sm text-gray-500">{formatCurrency(status.amount)}</p>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div 
+                        className={`${bgColor} h-3 rounded-full transition-all duration-500`}
+                        style={{ width: `${status.count_percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {(!item_status_breakdown || item_status_breakdown.length === 0) && (
+                <div className="text-center text-gray-500 py-8">
+                  <PieChart className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                  <p>Sin datos de estados para esta fecha</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Métodos de pago */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-green-500" />
+              Distribución de Métodos de Pago
+            </h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {payment_methods.map((method, index) => {
               const methodNames = {
                 'CASH': 'Efectivo',
@@ -404,8 +471,8 @@ const DashboardFinanciero = () => {
                   <h4 className="font-medium mb-2">{methodNames[method.method] || method.method}</h4>
                   <p className="text-2xl font-bold mb-1">{formatCurrency(method.amount)}</p>
                   <div className="flex items-center justify-between text-sm">
-                    <span>{method.percentage.toFixed(1)}%</span>
-                    <span className="opacity-75">{summary.total_orders > 0 ? Math.round(method.amount / summary.average_ticket) : 0} trans.</span>
+                    <span>{Math.round(method.percentage)}%</span>
+                    <span className="opacity-75">{method.transaction_count || 0} trans.</span>
                   </div>
                 </div>
               );
@@ -417,6 +484,7 @@ const DashboardFinanciero = () => {
                 <p>Sin datos de métodos de pago para esta fecha</p>
               </div>
             )}
+            </div>
           </div>
         </div>
 

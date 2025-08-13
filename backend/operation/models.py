@@ -34,6 +34,26 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Orden #{self.id} - Mesa {self.table.table_number}"
+    
+    @property
+    def total_payments(self):
+        """Calcula total de pagos realizados para esta orden"""
+        return self.payments.aggregate(
+            total=models.Sum('amount')
+        )['total'] or Decimal('0.00')
+    
+    @property
+    def is_fully_paid(self):
+        """Verifica si la orden está completamente pagada"""
+        return self.total_payments >= self.total_amount
+    
+    @property 
+    def payment_summary(self):
+        """Resumen de pagos por método - Optimizado para dashboard"""
+        payments = self.payments.values('payment_method').annotate(
+            total=models.Sum('amount')
+        )
+        return {p['payment_method']: p['total'] for p in payments}
 
 
     def calculate_total(self):
@@ -101,6 +121,7 @@ class OrderItem(models.Model):
     STATUS_CHOICES = [
         ('CREATED', 'Creado'),
         ('SERVED', 'Entregado'),
+        ('PAID', 'Pagado'),
     ]
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE)
@@ -120,8 +141,25 @@ class OrderItem(models.Model):
     notes = models.TextField(blank=True)
     is_takeaway = models.BooleanField(default=False, verbose_name='Para llevar')
     has_taper = models.BooleanField(default=False, verbose_name='Con envoltorio')
+    container = models.ForeignKey(
+        'config.Container', 
+        on_delete=models.PROTECT, 
+        null=True, 
+        blank=True,
+        related_name='order_items',
+        help_text="Envase utilizado para este item"
+    )
+    container_price = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Precio del envase al momento de la venta"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     served_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'order_item'
@@ -164,7 +202,8 @@ class OrderItem(models.Model):
                 item.total_price for item in self.orderitemingredient_set.all()
             )
         
-        # NO incluir precio de envases aquí - los envases se manejan por separado en ContainerSale
+        # El precio del envase ya NO se incluye aquí
+        # Se maneja por separado para mantener claridad en reportes
         self.total_price = base_total + customization_total
         
         return self.total_price
@@ -178,7 +217,8 @@ class OrderItem(models.Model):
         # Validar transiciones válidas
         valid_transitions = {
             'CREATED': ['SERVED'],
-            'SERVED': []
+            'SERVED': ['PAID'],
+            'PAID': []
         }
         
         if new_status not in valid_transitions.get(self.status, []):
@@ -189,6 +229,8 @@ class OrderItem(models.Model):
         
         if new_status == 'SERVED':
             self.served_at = now
+        elif new_status == 'PAID':
+            self.paid_at = now
         
         self.save()
         
@@ -222,6 +264,28 @@ class OrderItem(models.Model):
     def is_fully_paid(self):
         """Verifica si el item está completamente pagado"""
         return self.get_pending_amount() <= Decimal('0.00')
+    
+    def get_total_with_container(self):
+        """Obtiene el precio total incluyendo el envase"""
+        item_total = self.total_price
+        
+        # Primero verificar si tiene container directo (nueva arquitectura)
+        if self.container and self.container_price:
+            container_total = self.container_price * self.quantity
+            return item_total + container_total
+        
+        # Fallback: buscar en ContainerSale (arquitectura antigua)
+        if self.has_taper and self.order:
+            # Buscar ContainerSale asociado temporal por timestamp
+            container_sale = self.order.container_sales.filter(
+                quantity=self.quantity,
+                created_at__gte=self.created_at
+            ).order_by('created_at').first()
+            
+            if container_sale:
+                return item_total + container_sale.total_price
+        
+        return item_total
 
 
 class OrderItemIngredient(models.Model):

@@ -23,17 +23,36 @@ import Recipes from './pages/inventory/Recipes';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import Kitchen from './pages/operation/Kitchen';
 import RestaurantOperations from './pages/operation/RestaurantOperations';
-import TableStatus from './pages/operation/TableStatus';
 
 
 // Configure AWS Amplify
 Amplify.configure(amplifyConfig);
 
-// Enable Cognito authentication - Check if Cognito is properly configured
-const isCognitoConfigured = !!(
-  import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID && 
-  import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID
-) && !import.meta.env.VITE_DISABLE_AUTH; // ✅ Allow disabling auth for development
+// 🔐 AWS Cognito Configuration - OPTIMIZADO
+const isCognitoConfigured = (() => {
+  const hasCredentials = !!(
+    import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID && 
+    import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID
+  );
+  
+  const isAuthEnabled = (
+    import.meta.env.VITE_DISABLE_AUTH === 'false' || 
+    import.meta.env.VITE_FORCE_COGNITO === 'true'
+  );
+  
+  const cognitoEnabled = hasCredentials && isAuthEnabled;
+  
+  console.log('🔐 Cognito Configuration Check:', {
+    hasCredentials,
+    isAuthEnabled,
+    cognitoEnabled,
+    userPoolId: import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID,
+    disableAuth: import.meta.env.VITE_DISABLE_AUTH,
+    forceCognito: import.meta.env.VITE_FORCE_COGNITO
+  });
+  
+  return cognitoEnabled;
+})();
 
 
 const AppContent = () => {
@@ -107,11 +126,6 @@ const AppContent = () => {
           <Route path="/table-order" element={
             <RoleProtectedRoute requiredPermission="canManageOrders">
               <RestaurantOperations />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/table-status" element={
-            <RoleProtectedRoute requiredPermission="canViewOrders">
-              <TableStatus />
             </RoleProtectedRoute>
           } />
 

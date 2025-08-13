@@ -3,7 +3,7 @@ import { X, CreditCard, DollarSign, Users, Split, Check, Smartphone } from 'luci
 import Button from '../common/Button';
 import { useToast } from '../../contexts/ToastContext';
 
-const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = false }) => {
+const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = false, onFullPayment }) => {
   const { showError } = useToast();
   const [paymentMode, setPaymentMode] = useState('full'); // 'full' or 'split'
   const [splits, setSplits] = useState([]);
@@ -532,7 +532,7 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
           {paymentMode === 'full' ? (
             <Button 
               variant="success" 
-              onClick={handleFullPayment}
+              onClick={onFullPayment}
               disabled={processing}
               className="flex items-center gap-2"
             >

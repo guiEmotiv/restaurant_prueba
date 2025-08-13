@@ -166,9 +166,8 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def kitchen_board(self, request):
-        """Vista de tablero de cocina - items organizados por receta"""
+        """Vista de tablero de cocina - cada OrderItem individual como entrada separada"""
         from django.db.models import Q
-        from collections import defaultdict
         
         # Obtener todos los order items que están pendientes (CREATED)
         # No filtrar por el estado de la orden, solo por el estado del item
@@ -178,11 +177,9 @@ class OrderViewSet(viewsets.ModelViewSet):
             order__status='PAID'  # Excluir solo órdenes ya pagadas
         ).select_related('recipe', 'recipe__group', 'order', 'order__table', 'order__table__zone').order_by('created_at')
         
-        # Organizar items por receta
-        kitchen_board = defaultdict(list)
+        # Crear entrada separada para cada OrderItem individual
+        result = []
         for item in order_items:
-            recipe_key = item.recipe.name
-            
             # Calcular tiempo transcurrido desde la creación
             from django.utils import timezone
             elapsed_minutes = int((timezone.now() - item.created_at).total_seconds() / 60)
@@ -205,28 +202,132 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'recipe_group_name': item.recipe.group.name if item.recipe.group else 'Sin Grupo',
                 'recipe_group_id': item.recipe.group.id if item.recipe.group else None
             }
-            kitchen_board[recipe_key].append(item_data)
-        
-        # Convertir a formato final
-        result = []
-        for recipe_name, items in kitchen_board.items():
-            # Usar el grupo del primer item (todos los items de la misma receta tienen el mismo grupo)
-            first_item = items[0] if items else {}
+            
+            # Cada OrderItem se convierte en una entrada separada con un solo item
             result.append({
-                'recipe_name': recipe_name,
-                'recipe_group_name': first_item.get('recipe_group_name', 'Sin Grupo'),
-                'recipe_group_id': first_item.get('recipe_group_id'),
-                'total_items': len(items),
-                'pending_items': len([i for i in items if i['status'] == 'CREATED']),
-                'served_items': len([i for i in items if i['status'] == 'SERVED']),
-                'overdue_items': len([i for i in items if i['is_overdue']]),
-                'items': items
+                'recipe_name': item.recipe.name,
+                'recipe_group_name': item.recipe.group.name if item.recipe.group else 'Sin Grupo',
+                'recipe_group_id': item.recipe.group.id if item.recipe.group else None,
+                'total_items': 1,  # Siempre 1 porque cada entrada es un item individual
+                'pending_items': 1 if item.status == 'CREATED' else 0,
+                'served_items': 1 if item.status == 'SERVED' else 0,
+                'overdue_items': 1 if is_overdue else 0,
+                'items': [item_data]  # Array con un solo item
             })
         
-        # Ordenar por número de items pendientes (más urgent primero)
-        result.sort(key=lambda x: (x['overdue_items'], x['pending_items']), reverse=True)
+        # Ordenar por urgencia: primero los retrasados, luego por tiempo de creación
+        result.sort(key=lambda x: (
+            -x['overdue_items'],  # Retrasados primero (orden descendente)
+            x['items'][0]['created_at']  # Luego por tiempo de creación (más antiguos primero)
+        ))
         
         return Response(result)
+    
+    @action(detail=True, methods=['post'])
+    def process_payment(self, request, pk=None):
+        """Procesar pago completo de una orden"""
+        from django.db import transaction
+        
+        order = self.get_object()
+        
+        # Verificar que la orden puede ser pagada
+        if order.status == 'PAID':
+            return Response({'error': 'La orden ya está pagada'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar que todos los items estén servidos
+        if not order.orderitem_set.filter(status='CREATED').count() == 0:
+            return Response(
+                {'error': 'No se puede procesar pago: hay items pendientes de entrega'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        payment_data = request.data
+        required_fields = ['payment_method', 'amount']
+        
+        for field in required_fields:
+            if field not in payment_data:
+                return Response({'error': f'Campo requerido: {field}'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            with transaction.atomic():
+                # Crear el pago
+                from .models import Payment
+                payment = Payment.objects.create(
+                    order=order,
+                    payment_method=payment_data['payment_method'],
+                    amount=float(payment_data['amount']),
+                    tax_amount=float(payment_data.get('tax_amount', 0)),
+                    payer_name=payment_data.get('payer_name', ''),
+                    notes=payment_data.get('notes', '')
+                )
+                
+                # Actualizar estado de la orden
+                order.status = 'PAID'
+                order.save()
+                
+                # Serializar respuesta
+                response_serializer = OrderDetailSerializer(order)
+                return Response({
+                    'message': 'Pago procesado exitosamente',
+                    'payment_id': payment.id,
+                    'order': response_serializer.data
+                }, status=status.HTTP_201_CREATED)
+        
+        except Exception as e:
+            return Response({'error': f'Error procesando pago: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['post'])
+    def process_split_payment(self, request, pk=None):
+        """Procesar pago dividido de una orden"""
+        from django.db import transaction
+        
+        order = self.get_object()
+        split_data = request.data
+        
+        # Verificar que la orden puede ser pagada
+        if order.status == 'PAID':
+            return Response({'error': 'La orden ya está pagada'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            with transaction.atomic():
+                from .models import Payment, PaymentItem
+                
+                # Crear el pago principal
+                payment = Payment.objects.create(
+                    order=order,
+                    payment_method=split_data['payment_method'],
+                    amount=float(split_data['total_amount']),
+                    payer_name=split_data.get('payer_name', ''),
+                    split_group=split_data.get('split_group', ''),
+                    notes=split_data.get('notes', ''),
+                    is_split=True
+                )
+                
+                # Crear PaymentItems para los items seleccionados
+                total_paid = 0
+                for item_data in split_data.get('items', []):
+                    order_item = order.orderitem_set.get(id=item_data['item_id'])
+                    PaymentItem.objects.create(
+                        payment=payment,
+                        order_item=order_item,
+                        amount_paid=float(item_data['amount'])
+                    )
+                    total_paid += float(item_data['amount'])
+                
+                # Verificar si la orden está completamente pagada - OPTIMIZADO
+                if order.is_fully_paid:
+                    order.status = 'PAID'
+                    order.save()
+                
+                response_serializer = OrderDetailSerializer(order)
+                return Response({
+                    'message': 'Pago dividido procesado exitosamente',
+                    'payment_id': payment.id,
+                    'order': response_serializer.data
+                }, status=status.HTTP_201_CREATED)
+        
+        except Exception as e:
+            return Response({'error': f'Error procesando pago dividido: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=False, methods=['get'])
     def served(self, request):
@@ -347,6 +448,80 @@ class OrderItemViewSet(viewsets.ModelViewSet):
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def process_payment(self, request, pk=None):
+        """Procesar pago individual de un OrderItem"""
+        order_item = self.get_object()
+        
+        # Verificar que el item está en estado SERVED
+        if order_item.status != 'SERVED':
+            return Response(
+                {'error': 'Solo se pueden pagar items que han sido entregados'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar que el item no esté ya pagado
+        if order_item.is_fully_paid():
+            return Response(
+                {'error': 'Este item ya está completamente pagado'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        payment_data = request.data
+        required_fields = ['payment_method']
+        
+        for field in required_fields:
+            if field not in payment_data:
+                return Response(
+                    {'error': f'Campo requerido: {field}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        try:
+            with transaction.atomic():
+                # Crear el pago para este item específico
+                payment_amount = order_item.get_pending_amount()
+                
+                payment = Payment.objects.create(
+                    order=order_item.order,
+                    payment_method=payment_data['payment_method'],
+                    amount=payment_amount,
+                    payer_name=payment_data.get('payer_name', ''),
+                    notes=payment_data.get('notes', '')
+                )
+                
+                # Crear PaymentItem para asociar el pago con este item específico
+                PaymentItem.objects.create(
+                    payment=payment,
+                    order_item=order_item,
+                    amount=payment_amount
+                )
+                
+                # Actualizar estado del item a PAID
+                order_item.update_status('PAID')
+                
+                # Verificar si todos los items de la orden están pagados
+                order = order_item.order
+                all_items_paid = not order.orderitem_set.exclude(status='PAID').exists()
+                
+                if all_items_paid:
+                    order.update_status('PAID')
+                
+                # Serializar respuesta
+                response_serializer = OrderItemSerializer(order_item)
+                return Response({
+                    'message': 'Pago procesado exitosamente',
+                    'payment_id': payment.id,
+                    'order_item': response_serializer.data,
+                    'order_fully_paid': all_items_paid
+                }, status=status.HTTP_201_CREATED)
+        
+        except Exception as e:
+            return Response(
+                {'error': f'Error procesando pago: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class OrderItemIngredientViewSet(viewsets.ModelViewSet):

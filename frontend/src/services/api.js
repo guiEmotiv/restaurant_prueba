@@ -4,9 +4,9 @@ import { API_CONFIG } from '../utils/constants';
 
 // Determine API URL based on environment
 let API_BASE_URL;
-if (import.meta.env.VITE_API_URL) {
+if (import.meta.env.VITE_API_BASE_URL) {
   // Use explicit environment variable if set
-  API_BASE_URL = `${import.meta.env.VITE_API_URL}/api/v1`;
+  API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 } else if (import.meta.env.MODE === 'production') {
   // In production, assume API is on same host
   API_BASE_URL = `${window.location.origin}/api/v1`;
@@ -17,7 +17,7 @@ if (import.meta.env.VITE_API_URL) {
 
 // Log API configuration (solo en desarrollo)
 logger.info('API Configuration:', {
-  VITE_API_URL: import.meta.env.VITE_API_URL,
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
   API_BASE_URL,
   MODE: import.meta.env.MODE,
   PROD: import.meta.env.PROD
@@ -341,6 +341,14 @@ export const apiService = {
       const response = await api.post(`/orders/${id}/split_payment/`, data);
       return response.data;
     },
+    processPayment: async (id, paymentData) => {
+      const response = await api.post(`/orders/${id}/process_payment/`, paymentData);
+      return response.data;
+    },
+    processSplitPayment: async (id, splitData) => {
+      const response = await api.post(`/orders/${id}/process_split_payment/`, splitData);
+      return response.data;
+    },
   },
 
   orderItems: {
@@ -352,6 +360,10 @@ export const apiService = {
     delete: (id) => apiService.delete('order-items', id),
     updateStatus: async (id, status) => {
       const response = await api.post(`/order-items/${id}/update_status/`, { status });
+      return response.data;
+    },
+    processPayment: async (id, paymentData) => {
+      const response = await api.post(`/order-items/${id}/process_payment/`, paymentData);
       return response.data;
     },
     updateNotes: async (id, notes) => {
@@ -403,22 +415,41 @@ export const apiService = {
     },
     downloadExcel: async (date = null) => {
       const url = date ? `/dashboard/export_excel/?date=${date}` : '/dashboard/export_excel/';
+      
       const response = await api.get(url, {
-        responseType: 'blob'
+        responseType: 'blob',
+        timeout: 30000 // 30 segundos para Excel pesado
       });
       
-      // Crear enlace de descarga
+      // Verificar que la respuesta es un blob válido
+      if (response.data.size === 0) {
+        throw new Error('Archivo Excel vacío recibido del servidor');
+      }
+      
+      // Crear enlace de descarga con mejor naming
       const blob = new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
+      
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `dashboard_ventas_${date || new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // Nombre más descriptivo con fecha legible
+      const dateStr = date || new Date().toISOString().split('T')[0];
+      const [year, month, day] = dateStr.split('-');
+      link.download = `Dashboard_Ventas_${day}-${month}-${year}.xlsx`;
+      
+      // Asegurar que el link se descarga incluso en navegadores restrictivos
+      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
-      link.remove();
-      window.URL.revokeObjectURL(downloadUrl);
+      
+      // Cleanup más robusto
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+      }, 100);
       
       return response;
     }
