@@ -56,7 +56,6 @@ const Recipes = () => {
       const data = await apiService.groups.getAll();
       setGroups(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading groups:', error);
     }
   };
 
@@ -78,7 +77,6 @@ const Recipes = () => {
       }
       
     } catch (error) {
-      console.error('Error loading recipes:', error);
       if (!silent) {
         showError('Error al cargar las recetas');
       }
@@ -148,7 +146,6 @@ const Recipes = () => {
           : `❌ Versión ${recipe.version} de "${recipe.name}" desactivada`
       );
     } catch (error) {
-      console.error('Error updating recipe active status:', error);
       showError('Error al actualizar el estado de la versión');
     }
   };
@@ -160,7 +157,6 @@ const Recipes = () => {
         await loadRecipes();
         showSuccess('Receta eliminada exitosamente');
       } catch (error) {
-        console.error('Error deleting recipe:', error);
         if (error.response?.status === 400) {
           showError('No se puede eliminar esta receta porque está siendo usada en órdenes');
         } else {

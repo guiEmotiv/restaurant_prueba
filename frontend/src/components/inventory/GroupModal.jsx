@@ -78,7 +78,6 @@ const GroupModal = ({ isOpen, onClose, group = null, onSave }) => {
       onSave();
       onClose();
     } catch (error) {
-      console.error('Error saving group:', error);
       let errorMessage = 'Error desconocido';
       
       if (error.response?.data) {

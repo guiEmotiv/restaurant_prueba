@@ -36,7 +36,6 @@ const DashboardOperativo = () => {
       setDashboardData(data);
 
     } catch (error) {
-      console.error('Error loading dashboard:', error);
       setError('Error al cargar los datos del dashboard');
     } finally {
       setLoading(false);

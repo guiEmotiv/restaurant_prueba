@@ -155,17 +155,17 @@ jobs:
       run: |
         npm run build
         
-        # Analyze bundle size
-        npx bundlesize || true
+        # Basic bundle size check
+        du -sh dist/
         
-        # Check for unused dependencies
-        npx depcheck --json > depcheck-report.json || true
+        # List largest files
+        find dist -name "*.js" -exec ls -lh {} \; | sort -k5 -hr | head -5
     
     - name: Security audit
       run: |
         npm audit --json > npm-audit.json || true
-        # Also check with audit-ci for CI-friendly output
-        npx audit-ci --low || true
+        # Show npm audit results
+        npm audit || true
     
     - name: Upload build analysis
       uses: actions/upload-artifact@v4
@@ -174,7 +174,6 @@ jobs:
         name: frontend-analysis
         path: |
           frontend/dist/
-          frontend/depcheck-report.json
           frontend/npm-audit.json
 
   # Integration Tests
@@ -300,8 +299,9 @@ jobs:
     - name: Bundle analyzer
       working-directory: ./frontend
       run: |
-        # Analyze bundle composition
-        npx webpack-bundle-analyzer dist --analyze-mode static --report bundle-report.html --mode production || true
+        # Simple bundle analysis with Vite
+        echo "Bundle composition:"
+        ls -lh dist/assets/ | grep -E '\.(js|css)$' || true
     
     - name: Upload performance reports
       uses: actions/upload-artifact@v4
@@ -309,7 +309,7 @@ jobs:
       with:
         name: performance-reports
         path: |
-          frontend/bundle-report.html
+          frontend/dist/
 
   # Quality Summary
   quality-summary:

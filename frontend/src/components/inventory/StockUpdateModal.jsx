@@ -32,7 +32,6 @@ const StockUpdateModal = ({ isOpen, onClose, ingredient, onSuccess }) => {
       onSuccess();
       handleClose();
     } catch (error) {
-      console.error('Error updating stock:', error);
       const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
       showError('Error al actualizar el stock: ' + errorMessage);
     } finally {

@@ -1,11 +1,6 @@
 from django.contrib import admin
-from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem, ContainerSale
+from .models import Order, OrderItem, Payment, PaymentItem, ContainerSale
 
-
-class OrderItemIngredientInline(admin.TabularInline):
-    model = OrderItemIngredient
-    extra = 0
-    readonly_fields = ['unit_price', 'total_price']
 
 
 class OrderItemInline(admin.TabularInline):
@@ -35,15 +30,8 @@ class OrderItemAdmin(admin.ModelAdmin):
     list_filter = ['status', 'recipe']
     search_fields = ['order__id', 'recipe__name']
     readonly_fields = ['unit_price', 'total_price', 'created_at', 'served_at']
-    inlines = [OrderItemIngredientInline]
+    # Removed OrderItemIngredientInline - functionality removed
 
-
-@admin.register(OrderItemIngredient)
-class OrderItemIngredientAdmin(admin.ModelAdmin):
-    list_display = ['order_item', 'ingredient', 'quantity', 'unit_price', 'total_price']
-    list_filter = []
-    search_fields = ['order_item__order__id', 'ingredient__name']
-    readonly_fields = ['unit_price', 'total_price', 'created_at']
 
 
 class PaymentItemInline(admin.TabularInline):

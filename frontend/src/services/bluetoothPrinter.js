@@ -87,7 +87,6 @@ class BluetoothPrinterService {
     }
 
     try {
-      console.log('Buscando impresora Bluetooth...');
       
       // Solicitar dispositivo Bluetooth con todos los UUIDs posibles
       this.device = await navigator.bluetooth.requestDevice({
@@ -95,22 +94,18 @@ class BluetoothPrinterService {
         optionalServices: this.config.serviceUUIDs
       });
 
-      console.log('Dispositivo encontrado:', this.device.name);
 
       // Conectar al servidor GATT
       this.server = await this.device.gatt.connect();
-      console.log('Conectado al servidor GATT');
 
       // Intentar conectar con diferentes UUIDs de servicio
       let serviceFound = false;
       for (const serviceUUID of this.config.serviceUUIDs) {
         try {
           this.service = await this.server.getPrimaryService(serviceUUID);
-          console.log('Servicio obtenido con UUID:', serviceUUID);
           serviceFound = true;
           break;
         } catch (error) {
-          console.log('UUID de servicio no disponible:', serviceUUID);
           continue;
         }
       }
@@ -124,11 +119,9 @@ class BluetoothPrinterService {
       for (const charUUID of this.config.characteristicUUIDs) {
         try {
           this.characteristic = await this.service.getCharacteristic(charUUID);
-          console.log('Característica obtenida con UUID:', charUUID);
           characteristicFound = true;
           break;
         } catch (error) {
-          console.log('UUID de característica no disponible:', charUUID);
           continue;
         }
       }
@@ -138,11 +131,9 @@ class BluetoothPrinterService {
       }
 
       this.isConnected = true;
-      console.log('Impresora conectada exitosamente');
 
       return true;
     } catch (error) {
-      console.error('Error conectando a la impresora:', error);
       this.isConnected = false;
       throw new Error(`Error de conexión: ${error.message}`);
     }
@@ -160,7 +151,6 @@ class BluetoothPrinterService {
     this.server = null;
     this.service = null;
     this.characteristic = null;
-    console.log('Impresora desconectada');
   }
 
   /**
@@ -175,7 +165,6 @@ class BluetoothPrinterService {
       const data = new Uint8Array(command);
       await this.characteristic.writeValue(data);
     } catch (error) {
-      console.error('Error enviando comando:', error);
       throw new Error(`Error de impresión: ${error.message}`);
     }
   }
@@ -229,14 +218,11 @@ class BluetoothPrinterService {
 
       // Items con formato de columnas perfectamente alineado
       let itemsTotal = 0;
-      console.log('=== DEBUG IMPRESIÓN ===');
-      console.log('paymentData:', paymentData);
       if (paymentData.order.items && paymentData.order.items.length > 0) {
         for (const item of paymentData.order.items) {
           const itemName = item.recipe_name || 'Item';
           const quantity = item.quantity || 1;
           const itemPrice = parseFloat(item.total_price || 0);
-          console.log(`Item: ${itemName}, Quantity: ${quantity}, Price: ${itemPrice}`);
           itemsTotal += itemPrice;
           const price = this.formatPrice(itemPrice); // Sin símbolo S/
           
@@ -287,11 +273,7 @@ class BluetoothPrinterService {
       await this.printText('------------------------------------------------\n');
 
       // Total alineado perfectamente con las columnas
-      console.log(`Items Total: ${itemsTotal}`);
-      console.log(`Payment Amount: ${paymentData.amount}`);
-      console.log(`Order Total: ${paymentData.order.total_amount}`);
       const displayTotal = this.formatCurrency(itemsTotal || paymentData.amount || paymentData.order.total_amount || 0);
-      console.log(`Display Total: ${displayTotal}`);
       const totalLine = 'TOTAL:';
       const totalWidth = 48;
       const priceWidth = 10; // Mismo ancho que para items
@@ -319,11 +301,9 @@ class BluetoothPrinterService {
       await this.printText('\n\n\n\n');
       await this.sendCommand(this.commands.CUT_PAPER);
 
-      console.log('Comprobante impreso exitosamente');
       return true;
 
     } catch (error) {
-      console.error('Error imprimiendo comprobante:', error);
       throw error;
     }
   }
@@ -393,10 +373,8 @@ class BluetoothPrinterService {
       
       await this.sendCommand(this.commands.CUT_PAPER);
       
-      console.log('Prueba de impresión completada');
       return true;
     } catch (error) {
-      console.error('Error en prueba de impresión:', error);
       throw error;
     }
   }
@@ -414,32 +392,22 @@ if (typeof window !== 'undefined') {
         optionalServices: bluetoothPrinter.config.serviceUUIDs
       });
 
-      console.log('Dispositivo:', device.name || 'Sin nombre');
       
       const server = await device.gatt.connect();
       const services = await server.getPrimaryServices();
       
-      console.log('Servicios encontrados:');
       for (const service of services) {
-        console.log(`  ${service.uuid}`);
         try {
           const characteristics = await service.getCharacteristics();
           for (const char of characteristics) {
-            console.log(`    • ${char.uuid} - Propiedades:`, {
-              read: char.properties.read,
-              write: char.properties.write,
-              writeWithoutResponse: char.properties.writeWithoutResponse
-            });
           }
         } catch (error) {
-          console.log(`    Error obteniendo características`);
         }
       }
       
       device.gatt.disconnect();
       return { device: device.name, services: services.map(s => s.uuid) };
     } catch (error) {
-      console.error('Error:', error);
     }
   };
 }

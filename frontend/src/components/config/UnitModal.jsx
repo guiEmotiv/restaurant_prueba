@@ -78,7 +78,6 @@ const UnitModal = ({ isOpen, onClose, unit = null, onSave }) => {
       onSave();
       onClose();
     } catch (error) {
-      console.error('Error saving unit:', error);
       let errorMessage = 'Error desconocido';
       
       if (error.response?.data) {

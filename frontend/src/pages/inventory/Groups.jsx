@@ -34,11 +34,9 @@ const Groups = () => {
     try {
       setLoading(true);
       const data = await apiService.groups.getAll();
-      console.log('Groups data received:', data);
       const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
       setGroups(sortedData);
     } catch (error) {
-      console.error('Error loading groups:', error);
       showError('Error al cargar los grupos');
     } finally {
       setLoading(false);
@@ -82,7 +80,6 @@ const Groups = () => {
       await loadGroups();
       showSuccess('Grupo eliminado exitosamente');
     } catch (error) {
-      console.error('Error deleting group:', error);
       if (error.response?.status === 400) {
         showError('No se puede eliminar un grupo que tiene recetas asociadas');
       } else {

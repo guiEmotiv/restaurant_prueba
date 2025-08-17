@@ -14,7 +14,8 @@ from config.models import Unit
 from config.views_debug import database_debug, api_debug
 from inventory.views import GroupViewSet, IngredientViewSet, RecipeViewSet, RecipeItemViewSet
 from operation.views import (
-    OrderViewSet, OrderItemViewSet, OrderItemIngredientViewSet, PaymentViewSet, ContainerSaleViewSet
+    OrderViewSet, OrderItemViewSet, PaymentViewSet, ContainerSaleViewSet
+    # OrderItemIngredientViewSet removed - functionality deprecated
 )
 from operation.views_dashboard import DashboardViewSet
 
@@ -36,7 +37,7 @@ router.register(r'recipe-items', RecipeItemViewSet, basename='recipeitem')
 # Operation app routes
 router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'order-items', OrderItemViewSet, basename='orderitem')
-router.register(r'order-item-ingredients', OrderItemIngredientViewSet, basename='orderitemingredient')
+# router.register(r'order-item-ingredients', OrderItemIngredientViewSet, basename='orderitemingredient')  # Removed - functionality deprecated
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'container-sales', ContainerSaleViewSet, basename='containersale')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')

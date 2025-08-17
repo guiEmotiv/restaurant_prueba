@@ -25,7 +25,6 @@ const Kitchen = () => {
       setKitchenBoard(Array.isArray(data) ? data : []);
       setLoading(false);
     } catch (error) {
-      console.error('Error loading kitchen board:', error);
       setLoading(false);
     }
   };
@@ -62,7 +61,6 @@ const Kitchen = () => {
       await loadKitchenBoard();
       showSuccess(successMessages[newStatus] || 'Estado actualizado');
     } catch (error) {
-      console.error('Error updating item status:', error);
       const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
       showError('Error al actualizar el estado: ' + errorMessage);
     }

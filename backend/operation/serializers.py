@@ -1,24 +1,13 @@
 from rest_framework import serializers
 from django.db import transaction
-from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem, ContainerSale
+from .models import Order, OrderItem, Payment, PaymentItem, ContainerSale
 from config.serializers import TableSerializer, ContainerSerializer
 from inventory.serializers import RecipeSerializer, IngredientSerializer
 from decimal import Decimal
 import uuid
 
 
-class OrderItemIngredientSerializer(serializers.ModelSerializer):
-    ingredient_name = serializers.CharField(source='ingredient.name', read_only=True)
-    ingredient_unit = serializers.CharField(source='ingredient.unit.name', read_only=True)
-    
-    class Meta:
-        model = OrderItemIngredient
-        fields = [
-            'id', 'ingredient', 'ingredient_name', 'ingredient_unit',
-            'quantity', 'unit_price', 'total_price', 'created_at'
-        ]
-        read_only_fields = ['id', 'unit_price', 'total_price', 'created_at']
-
+# OrderItemIngredientSerializer removed - functionality deprecated
 
 class OrderItemSerializer(serializers.ModelSerializer):
     recipe_name = serializers.CharField(source='recipe.name', read_only=True)
@@ -26,8 +15,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     order_zone = serializers.CharField(source='order.table.zone.name', read_only=True)
     order_table = serializers.CharField(source='order.table.table_number', read_only=True)
     order_id = serializers.IntegerField(source='order.id', read_only=True)
-    customizations = OrderItemIngredientSerializer(source='orderitemingredient_set', many=True, read_only=True)
-    customizations_count = serializers.SerializerMethodField()
+    # customizations removed - OrderItemIngredient functionality deprecated
     elapsed_time_minutes = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
     paid_amount = serializers.SerializerMethodField()
@@ -41,7 +29,6 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'recipe', 'recipe_name', 'recipe_preparation_time', 'unit_price', 'total_price',
             'status', 'notes', 'quantity', 'is_takeaway', 'has_taper', 'order_zone', 'order_table', 'order_id',
-            'customizations', 'customizations_count',
             'elapsed_time_minutes', 'is_overdue',
             'paid_amount', 'pending_amount', 'is_fully_paid',
             'container_info', 'total_with_container', 'created_at', 'served_at'
@@ -50,8 +37,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'id', 'unit_price', 'total_price', 'created_at', 'served_at'
         ]
     
-    def get_customizations_count(self, obj):
-        return obj.orderitemingredient_set.count()
+    # get_customizations_count removed - OrderItemIngredient functionality deprecated
     
     def get_elapsed_time_minutes(self, obj):
         from django.utils import timezone
@@ -575,28 +561,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         return instance
 
 
-class OrderItemIngredientCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OrderItemIngredient
-        fields = ['ingredient', 'quantity']
-    
-    def validate(self, data):
-        order_item = self.context['order_item']
-        ingredient = data['ingredient']
-        
-        # Verificar que el OrderItem se puede modificar
-        if not order_item.can_be_modified():
-            raise serializers.ValidationError(
-                "Solo se pueden agregar ingredientes a items con status CREATED"
-            )
-        
-        # Verificar que no exista ya este ingrediente en el item
-        if OrderItemIngredient.objects.filter(order_item=order_item, ingredient=ingredient).exists():
-            raise serializers.ValidationError(
-                f"El ingrediente {ingredient.name} ya está agregado a este item"
-            )
-        
-        return data
+# OrderItemIngredientCreateSerializer removed - functionality deprecated
 
 
 class PaymentItemSerializer(serializers.ModelSerializer):

@@ -4,7 +4,6 @@ import '@aws-amplify/ui-react/styles.css';
 import { ChefHat } from 'lucide-react';
 
 const LoginForm = ({ children }) => {
-  console.log('🔐 LoginForm rendering with children:', typeof children);
   
   // Configurar traducciones en español
   translations.es = {
@@ -74,29 +73,15 @@ const LoginForm = ({ children }) => {
       hideSignUp={true}
     >
       {({ user }) => {
-        // Log authentication state for debugging
         if (user) {
-          console.log('✅ Authenticator: User authenticated:');
-          console.log('  Username:', user.username);
-          console.log('  UserId:', user.userId);
-          console.log('  Full user object:', user);
-          console.log('  SignInDetails:', user.signInDetails);
-          console.log('  Rendering children...');
-          
           // ✅ Notificar al AuthContext que el usuario se autenticó
-          console.log('🎯 Dispatching cognitoAuthSuccess event...');
           window.dispatchEvent(new CustomEvent('cognitoAuthSuccess', { 
             detail: { user, timestamp: Date.now() } 
           }));
-        } else {
-          console.log('❌ Authenticator: No user found - showing login');
         }
-        
-        console.log('🔐 LoginForm about to render children inside authenticated wrapper...');
         
         return (
           <div className="min-h-screen bg-gray-50">
-            {console.log('🔐 LoginForm rendering children...')}
             {children}
           </div>
         );

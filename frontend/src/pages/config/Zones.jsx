@@ -37,7 +37,6 @@ const Zones = () => {
       const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
       setZones(sortedData);
     } catch (error) {
-      console.error('Error loading zones:', error);
       showError('Error al cargar las zonas');
     } finally {
       setLoading(false);
@@ -81,7 +80,6 @@ const Zones = () => {
       await loadZones();
       showSuccess('Zona eliminada exitosamente');
     } catch (error) {
-      console.error('Error deleting zone:', error);
       if (error.response?.status === 400) {
         showError('No se puede eliminar esta zona porque tiene mesas asociadas');
       } else {

@@ -37,7 +37,6 @@ const Units = () => {
       const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
       setUnits(sortedData);
     } catch (error) {
-      console.error('Error loading units:', error);
       showError('Error al cargar las unidades');
     } finally {
       setLoading(false);
@@ -81,7 +80,6 @@ const Units = () => {
       await loadUnits();
       showSuccess('Unidad eliminada exitosamente');
     } catch (error) {
-      console.error('Error deleting unit:', error);
       if (error.response?.status === 400) {
         showError('No se puede eliminar esta unidad porque tiene ingredientes asociados');
       } else {

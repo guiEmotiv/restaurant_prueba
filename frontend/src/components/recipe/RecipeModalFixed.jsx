@@ -90,7 +90,6 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       const data = await apiService.ingredients.getAll({ show_all: true });
       setAvailableIngredients(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading ingredients:', error);
     }
   };
 
@@ -99,7 +98,6 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       const data = await apiService.groups.getAll();
       setAvailableGroups(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading groups:', error);
     }
   };
 
@@ -108,7 +106,6 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       const data = await apiService.containers.getAll();
       setAvailableContainers(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading containers:', error);
     }
   };
 
@@ -118,7 +115,6 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     try {
       // Si la receta ya tiene ingredients_list del backend, usarla
       if (recipe.ingredients_list && Array.isArray(recipe.ingredients_list)) {
-        console.log('Using ingredients_list from recipe:', recipe.ingredients_list);
         setRecipeItems(recipe.ingredients_list.map(item => ({
           id: null, // Los items del backend no tienen id local
           ingredient: item.id,
@@ -134,7 +130,6 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       // Si no, hacer la llamada al API
       const response = await apiService.recipeItems.getByRecipe(recipe.id);
       const items = Array.isArray(response) ? response : [];
-      console.log('Loading recipe items from API:', items);
       
       setRecipeItems(items.map(item => {
         // Buscar el stock actual del ingrediente
@@ -150,7 +145,6 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
         };
       }));
     } catch (error) {
-      console.error('Error loading recipe items:', error);
       setRecipeItems([]);
     }
   };
@@ -320,11 +314,6 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
         }))
       };
       
-      console.log('Costo ingredientes:', ingredientsCost);
-      console.log('Porcentaje ganancia:', profitPercentage);
-      console.log('Precio final:', finalPrice);
-      console.log('Ingredientes válidos:', validItems);
-      console.log('Guardando receta:', recipeData);
       
       let savedRecipe;
       if (recipe?.id) {
@@ -339,8 +328,6 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       onClose();
       showSuccess(recipe ? 'Receta actualizada exitosamente' : 'Receta creada exitosamente');
     } catch (error) {
-      console.error('Error saving recipe:', error);
-      console.error('Error response:', error.response?.data);
       const errorMessage = error.response?.data?.detail || 
                           error.response?.data?.error || 
                           (error.response?.data && typeof error.response.data === 'object' ? 

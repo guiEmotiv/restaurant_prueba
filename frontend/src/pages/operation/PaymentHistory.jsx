@@ -43,7 +43,6 @@ const PaymentHistory = () => {
       
       setOrders(paidOrders);
     } catch (error) {
-      console.error('Error loading paid orders:', error);
       showError('Error al cargar el historial de pagos');
     } finally {
       setLoading(false);
@@ -56,7 +55,6 @@ const PaymentHistory = () => {
       const orderDetail = await apiService.orders.getById(orderId);
       setSelectedOrderDetail(orderDetail);
     } catch (error) {
-      console.error('Error loading order details:', error);
       showError('Error al cargar el detalle del pedido');
     } finally {
       setDetailLoading(false);
@@ -108,7 +106,6 @@ const PaymentHistory = () => {
       await bluetoothPrinter.printPaymentReceipt(receiptData);
       showSuccess('Comprobante impreso exitosamente');
     } catch (error) {
-      console.error('Error printing receipt:', error);
       showError(`Error al imprimir: ${error.message}`);
     } finally {
       setPrinting(false);

@@ -110,6 +110,81 @@ show_space() {
     echo -e "${BLUE}💾 ${label}: ${space}GB${NC}"
 }
 
+# Function to validate environment variables
+validate_env_vars() {
+    local env_file="$1"
+    local missing_vars=()
+    
+    # Required variables for production
+    local required_vars=(
+        "VITE_API_BASE_URL"
+        "VITE_AWS_REGION" 
+        "VITE_AWS_COGNITO_USER_POOL_ID"
+        "VITE_AWS_COGNITO_APP_CLIENT_ID"
+        "VITE_DISABLE_AUTH"
+        "VITE_FORCE_COGNITO"
+    )
+    
+    echo -e "${BLUE}🔍 Validating environment variables in $env_file...${NC}"
+    
+    for var in "${required_vars[@]}"; do
+        if ! grep -q "^$var=" "$env_file" 2>/dev/null; then
+            missing_vars+=("$var")
+        fi
+    done
+    
+    if [ ${#missing_vars[@]} -eq 0 ]; then
+        echo -e "${GREEN}✅ All required environment variables present${NC}"
+        
+        # Show critical values (masked for security)
+        echo -e "${BLUE}📋 Critical configuration:${NC}"
+        echo "   API URL: $(grep VITE_API_BASE_URL "$env_file" | cut -d'=' -f2)"
+        echo "   Cognito Pool: $(grep VITE_AWS_COGNITO_USER_POOL_ID "$env_file" | cut -d'=' -f2)"
+        echo "   Auth Enabled: $(grep VITE_DISABLE_AUTH "$env_file" | cut -d'=' -f2)"
+        return 0
+    else
+        echo -e "${RED}❌ Missing required environment variables:${NC}"
+        for var in "${missing_vars[@]}"; do
+            echo "   - $var"
+        done
+        return 1
+    fi
+}
+
+# Function to verify frontend build integrity
+verify_frontend_build() {
+    local dist_dir="$1"
+    
+    echo -e "${BLUE}🔍 Verifying frontend build integrity...${NC}"
+    
+    # Check if dist directory exists and has files
+    if [ ! -d "$dist_dir" ]; then
+        echo -e "${RED}❌ Build directory not found: $dist_dir${NC}"
+        return 1
+    fi
+    
+    # Check for critical files
+    local critical_files=("index.html" "assets")
+    for file in "${critical_files[@]}"; do
+        if [ ! -e "$dist_dir/$file" ]; then
+            echo -e "${RED}❌ Critical file missing: $file${NC}"
+            return 1
+        fi
+    done
+    
+    # Check if index.html contains environment variables (basic check)
+    if ! grep -q "VITE_" "$dist_dir/index.html" 2>/dev/null; then
+        echo -e "${YELLOW}⚠️ Warning: No VITE_ variables found in index.html${NC}"
+        echo -e "${YELLOW}   This might indicate build process didn't inject env vars${NC}"
+    fi
+    
+    # Get build size
+    local build_size=$(du -sh "$dist_dir" 2>/dev/null | cut -f1)
+    echo -e "${GREEN}✅ Frontend build verified (Size: $build_size)${NC}"
+    
+    return 0
+}
+
 # Function to fix nginx configuration conflicts
 fix_nginx_config() {
     local NGINX_DIR="$PROJECT_DIR/nginx/conf.d"
@@ -183,10 +258,12 @@ frontend_only_deploy() {
     
     # Create environment file
     cat > .env.production << EOF
-VITE_API_URL=https://www.$DOMAIN
+VITE_API_BASE_URL=https://www.$DOMAIN/api/v1
 VITE_AWS_REGION=$AWS_REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
+VITE_DISABLE_AUTH=false
+VITE_FORCE_COGNITO=true
 EOF
     
     # Install dependencies and build frontend
@@ -202,6 +279,17 @@ EOF
     
     if [ ! -d "dist" ]; then
         echo -e "${RED}❌ Frontend build failed${NC}"
+        exit 1
+    fi
+    
+    # Validate environment variables and build integrity
+    if ! validate_env_vars ".env.production"; then
+        echo -e "${RED}❌ Environment validation failed${NC}"
+        exit 1
+    fi
+    
+    if ! verify_frontend_build "dist"; then
+        echo -e "${RED}❌ Frontend build verification failed${NC}"
         exit 1
     fi
     
@@ -268,10 +356,12 @@ full_deploy() {
     cd "$FRONTEND_DIR"
     
     cat > .env.production << EOF
-VITE_API_URL=https://www.$DOMAIN
+VITE_API_BASE_URL=https://www.$DOMAIN/api/v1
 VITE_AWS_REGION=$AWS_REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
+VITE_DISABLE_AUTH=false
+VITE_FORCE_COGNITO=true
 EOF
     
     echo -e "${BLUE}📦 Installing dependencies...${NC}"
@@ -311,6 +401,20 @@ EOF
         echo -e "${RED}❌ Frontend build failed${NC}"
         exit 1
     fi
+    
+    # Validate environment variables and build integrity for full deploy
+    cd "$FRONTEND_DIR"
+    if ! validate_env_vars ".env.production"; then
+        echo -e "${RED}❌ Environment validation failed${NC}"
+        exit 1
+    fi
+    
+    if ! verify_frontend_build "dist"; then
+        echo -e "${RED}❌ Frontend build verification failed${NC}"
+        exit 1
+    fi
+    
+    cd "$PROJECT_DIR"
     
     # Frontend is deployed via Docker volume mount (no manual copying needed)
     

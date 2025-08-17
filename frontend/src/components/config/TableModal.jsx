@@ -43,7 +43,6 @@ const TableModal = ({ isOpen, onClose, table = null, onSave }) => {
       const zonesData = await apiService.zones.getAll();
       setAvailableZones(Array.isArray(zonesData) ? zonesData : []);
     } catch (error) {
-      console.error('Error loading available data:', error);
     }
   };
 
@@ -102,7 +101,6 @@ const TableModal = ({ isOpen, onClose, table = null, onSave }) => {
       onSave();
       onClose();
     } catch (error) {
-      console.error('Error saving table:', error);
       let errorMessage = 'Error desconocido';
       
       if (error.response?.data) {

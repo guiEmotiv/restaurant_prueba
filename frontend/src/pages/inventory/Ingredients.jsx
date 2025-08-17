@@ -98,7 +98,6 @@ const Ingredients = () => {
       const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
       setIngredients(sortedData);
     } catch (error) {
-      console.error('Error loading ingredients:', error);
       showError('Error al cargar los ingredientes');
     } finally {
       setLoading(false);
@@ -111,7 +110,6 @@ const Ingredients = () => {
       const data = await apiService.units.getAll();
       setUnits(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading units:', error);
     }
   };
 
@@ -153,7 +151,6 @@ const Ingredients = () => {
       await loadIngredients();
       showSuccess('Ingrediente eliminado exitosamente');
     } catch (error) {
-      console.error('Error deleting ingredient:', error);
       if (error.response?.status === 400) {
         showError('No se puede eliminar este ingrediente porque está siendo usado en recetas');
       } else {

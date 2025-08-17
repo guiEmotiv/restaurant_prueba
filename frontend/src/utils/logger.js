@@ -1,103 +1,43 @@
 /**
  * Logger centralizado para la aplicación
- * Controla el logging basado en el entorno y configuración
+ * PRODUCTION SAFE: All console statements removed for security
  */
 
-const isDev = import.meta.env.DEV;
-const logLevel = import.meta.env.VITE_LOG_LEVEL || 'info';
-
-// Niveles de logging (menor número = mayor prioridad)
-const levels = {
-  error: 0,
-  warn: 1, 
-  info: 2,
-  debug: 3
-};
-
-const currentLevel = levels[logLevel] || 2;
-
-// Colores para consola (solo en desarrollo)
-const colors = {
-  error: '\x1b[31m',   // Rojo
-  warn: '\x1b[33m',    // Amarillo
-  info: '\x1b[36m',    // Cian
-  debug: '\x1b[90m',   // Gris
-  reset: '\x1b[0m'
-};
-
-const formatMessage = (level, message, ...args) => {
-  const timestamp = new Date().toISOString().substr(11, 8);
-  const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
-  
-  if (isDev) {
-    return [`${colors[level]}${prefix}${colors.reset}`, message, ...args];
-  }
-  return [prefix, message, ...args];
-};
+// No-op function to maintain API compatibility while preventing console output
+const noop = () => {};
 
 export const logger = {
   /**
-   * Errores críticos - siempre se muestran
+   * Errores críticos - disabled for production security
    */
-  error: (message, ...args) => {
-    if (currentLevel >= 0) {
-      console.error(...formatMessage('error', message, ...args));
-    }
-  },
+  error: noop,
 
   /**
-   * Advertencias - importantes pero no críticas
+   * Advertencias - disabled for production security  
    */
-  warn: (message, ...args) => {
-    if (currentLevel >= 1) {
-      console.warn(...formatMessage('warn', message, ...args));
-    }
-  },
+  warn: noop,
 
   /**
-   * Información general - solo en desarrollo por defecto
+   * Información general - disabled for production security
    */
-  info: (message, ...args) => {
-    if (currentLevel >= 2 && (isDev || import.meta.env.VITE_LOG_INFO === 'true')) {
-      console.info(...formatMessage('info', message, ...args));
-    }
-  },
+  info: noop,
 
   /**
-   * Debug detallado - solo en desarrollo
+   * Debug detallado - disabled for production security
    */
-  debug: (message, ...args) => {
-    if (currentLevel >= 3 && isDev) {
-      console.log(...formatMessage('debug', message, ...args));
-    }
-  },
+  debug: noop,
 
   /**
-   * Para APIs y requests - con información estructurada
+   * Para APIs y requests - disabled for production security
    */
-  api: (method, url, data, response) => {
-    if (isDev && currentLevel >= 2) {
-      console.group(`🌐 API ${method} ${url}`);
-      if (data) console.log('Request:', data);
-      if (response) console.log('Response:', response);
-      console.groupEnd();
-    }
-  },
+  api: noop,
 
   /**
-   * Para timing de performance
+   * Para timing de performance - disabled for production security
    */
-  time: (label) => {
-    if (isDev && currentLevel >= 3) {
-      console.time(label);
-    }
-  },
+  time: noop,
 
-  timeEnd: (label) => {
-    if (isDev && currentLevel >= 3) {
-      console.timeEnd(label);
-    }
-  }
+  timeEnd: noop
 };
 
 // Export default para compatibilidad

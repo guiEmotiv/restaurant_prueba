@@ -91,8 +91,6 @@ const GenericExcelImportModal = ({
       }
 
     } catch (error) {
-      console.error('Error importing Excel:', error);
-      
       let errorMessage = 'Error al importar el archivo Excel';
       
       if (error.response?.data) {

@@ -52,7 +52,6 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
       const unitsData = await apiService.units.getAll();
       setAvailableUnits(Array.isArray(unitsData) ? unitsData : []);
     } catch (error) {
-      console.error('Error loading available data:', error);
     }
   };
 
@@ -133,7 +132,6 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
       onSave();
       onClose();
     } catch (error) {
-      console.error('Error saving ingredient:', error);
       let errorMessage = 'Error desconocido';
       
       if (error.response?.data) {

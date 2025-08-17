@@ -9,11 +9,11 @@ from backend.cognito_permissions import (
     CognitoOrderStatusPermission,
     CognitoPaymentPermission
 )
-from .models import Order, OrderItem, OrderItemIngredient, Payment, PaymentItem, ContainerSale
+from .models import Order, OrderItem, Payment, PaymentItem, ContainerSale
 from .serializers import (
     OrderSerializer, OrderDetailSerializer, OrderCreateSerializer,
     OrderItemSerializer, OrderItemCreateSerializer,
-    OrderItemIngredientSerializer, OrderItemIngredientCreateSerializer,
+    # OrderItemIngredient serializers removed - functionality deprecated
     PaymentSerializer, OrderStatusUpdateSerializer, SplitPaymentSerializer,
     ContainerSaleSerializer
 )
@@ -446,22 +446,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
         # Si es válido, proceder con la eliminación normal
         return super().destroy(request, *args, **kwargs)
     
-    @action(detail=True, methods=['post'])
-    def add_ingredient(self, request, pk=None):
-        """Agregar ingrediente personalizado a un item"""
-        order_item = self.get_object()
-        serializer = OrderItemIngredientCreateSerializer(
-            data=request.data,
-            context={'order_item': order_item}
-        )
-        
-        if serializer.is_valid():
-            ingredient_item = serializer.save(order_item=order_item)
-            
-            response_serializer = OrderItemIngredientSerializer(ingredient_item)
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # add_ingredient method removed - OrderItemIngredient functionality deprecated
     
     @action(detail=True, methods=['post'])
     def process_payment(self, request, pk=None):
@@ -538,22 +523,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
             )
 
 
-class OrderItemIngredientViewSet(viewsets.ModelViewSet):
-    queryset = OrderItemIngredient.objects.all().order_by('-created_at')
-    serializer_class = OrderItemIngredientSerializer
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
-    
-    def get_queryset(self):
-        queryset = OrderItemIngredient.objects.all().order_by('-created_at')
-        order_item = self.request.query_params.get('order_item')
-        ingredient = self.request.query_params.get('ingredient')
-        
-        if order_item:
-            queryset = queryset.filter(order_item_id=order_item)
-        if ingredient:
-            queryset = queryset.filter(ingredient_id=ingredient)
-            
-        return queryset
+# OrderItemIngredientViewSet removed - functionality deprecated
 
 
 class PaymentViewSet(viewsets.ModelViewSet):

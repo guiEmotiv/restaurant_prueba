@@ -30,7 +30,6 @@ const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
       try {
         await printPaymentReceipt(paymentData);
       } catch (printError) {
-        console.error('Error imprimiendo:', printError);
         // No bloqueamos el flujo si falla la impresión
       }
     }
@@ -67,8 +66,6 @@ const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
       await bluetoothPrinter.printPaymentReceipt(receiptData);
       showSuccess('Comprobante impreso exitosamente');
     } catch (error) {
-      console.error('Error printing receipt:', error);
-      
       if (error.message.includes('Web Bluetooth no está soportado')) {
         showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
       } else if (error.message.includes('conexión')) {
@@ -87,8 +84,6 @@ const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
       await bluetoothPrinter.printTest();
       showSuccess('Prueba de impresión completada');
     } catch (error) {
-      console.error('Error in test print:', error);
-      
       if (error.message.includes('Web Bluetooth no está soportado')) {
         showError('Tu navegador no soporta Bluetooth. Usa Chrome o Edge.');
       } else if (error.message.includes('conexión')) {

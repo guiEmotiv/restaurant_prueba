@@ -42,14 +42,6 @@ const isCognitoConfigured = (() => {
   
   const cognitoEnabled = hasCredentials && isAuthEnabled;
   
-  console.log('🔐 Cognito Configuration Check:', {
-    hasCredentials,
-    isAuthEnabled,
-    cognitoEnabled,
-    userPoolId: import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID,
-    disableAuth: import.meta.env.VITE_DISABLE_AUTH,
-    forceCognito: import.meta.env.VITE_FORCE_COGNITO
-  });
   
   return cognitoEnabled;
 })();

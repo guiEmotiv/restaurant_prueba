@@ -6,7 +6,7 @@ from django.db.models import Sum, Count, Q, F, Avg, Prefetch
 from django.http import JsonResponse
 from datetime import datetime, date
 from decimal import Decimal
-from .models import Order, OrderItem, Payment, OrderItemIngredient, ContainerSale
+from .models import Order, OrderItem, Payment, ContainerSale
 from inventory.models import Recipe, RecipeItem, Ingredient
 
 class DashboardViewSet(viewsets.ViewSet):

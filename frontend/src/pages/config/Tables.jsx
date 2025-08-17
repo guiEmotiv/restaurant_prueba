@@ -47,7 +47,6 @@ const Tables = () => {
       const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
       setTables(sortedData);
     } catch (error) {
-      console.error('Error loading tables:', error);
       showError('Error al cargar las mesas');
     } finally {
       setLoading(false);
@@ -59,7 +58,6 @@ const Tables = () => {
       const data = await apiService.zones.getAll();
       setZones(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading zones:', error);
     }
   };
 
@@ -100,7 +98,6 @@ const Tables = () => {
       await loadTables();
       showSuccess('Mesa eliminada exitosamente');
     } catch (error) {
-      console.error('Error deleting table:', error);
       if (error.response?.status === 400) {
         showError('No se puede eliminar esta mesa porque tiene órdenes asociadas');
       } else {

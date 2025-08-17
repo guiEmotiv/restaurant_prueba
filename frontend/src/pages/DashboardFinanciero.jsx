@@ -37,7 +37,6 @@ const DashboardFinanciero = () => {
       setDashboardData(data);
 
     } catch (error) {
-      console.error('Error loading dashboard:', error);
       setError('Error al cargar los datos del dashboard');
     } finally {
       setLoading(false);
@@ -64,8 +63,6 @@ const DashboardFinanciero = () => {
       // setTimeout(() => alert('✅ Excel descargado exitosamente'), 500);
       
     } catch (error) {
-      console.error('Error downloading Excel:', error);
-      
       // Mensaje de error más específico
       if (error.response?.status === 404) {
         alert('❌ No se encontraron datos para exportar en esta fecha');

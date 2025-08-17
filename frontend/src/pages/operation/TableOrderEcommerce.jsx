@@ -92,7 +92,6 @@ const TableOrderEcommerce = () => {
       // Filtrar órdenes activas en frontend para mayor control
       setAllOrders(allOrders?.filter(o => o.status === 'CREATED') || []);
     } catch (error) {
-      console.error('Error loading data:', error);
       showToast(`Error al cargar datos: ${error.message}`, 'error');
     } finally {
       setLoading(false);
@@ -124,7 +123,6 @@ const TableOrderEcommerce = () => {
               return activeOrders;
             });
           } catch (error) {
-            console.error('Error updating orders data:', error);
           }
         }
       }, 15000); // Aumentamos a 15s para reducir carga
@@ -190,7 +188,6 @@ const TableOrderEcommerce = () => {
       // Cargar órdenes detalladas en lote (reduce N+1 queries)
       const detailedOrdersPromises = orderIdsNeedingItems.map(orderId => 
         apiService.orders.getById(orderId).catch(error => {
-          console.warn(`No se pudieron cargar items para orden ${orderId}:`, error);
           return orders.find(o => o.id === orderId); // Fallback a la orden original
         })
       );
@@ -215,7 +212,6 @@ const TableOrderEcommerce = () => {
       });
       
     } catch (error) {
-      console.error('Error loading table orders:', error);
       showToast(`Error al cargar pedidos de mesa: ${error.message}`, 'error');
     }
   };
@@ -425,7 +421,6 @@ const TableOrderEcommerce = () => {
       showToast('Pedido eliminado correctamente', 'success');
       loadTableOrders(selectedTable.id);
     } catch (error) {
-      console.error('Error deleting order:', error);
       showToast('Error al eliminar pedido', 'error');
     } finally {
       setSaving(false);
@@ -502,7 +497,6 @@ const TableOrderEcommerce = () => {
         setBluetoothConnected(true);
         showToast('Impresora Bluetooth conectada exitosamente', 'success');
       } catch (error) {
-        console.error('Error conectando Bluetooth:', error);
         setBluetoothConnected(false);
         setWithPrinting(false);
         showToast(`Error conectando impresora: ${error.message}`, 'error');
@@ -551,7 +545,6 @@ const TableOrderEcommerce = () => {
       await bluetoothPrinter.printPaymentReceipt(receiptData);
       showToast('Comprobante impreso exitosamente', 'success');
     } catch (error) {
-      console.error('Error imprimiendo comprobante:', error);
       showToast(`Error al imprimir: ${error.message}`, 'error');
     }
   };
@@ -593,7 +586,6 @@ const TableOrderEcommerce = () => {
       await bluetoothPrinter.printPaymentReceipt(receiptData);
       showToast('Comprobante completo impreso exitosamente', 'success');
     } catch (error) {
-      console.error('Error imprimiendo comprobante completo:', error);
       showToast(`Error al imprimir comprobante completo: ${error.message}`, 'error');
     }
   };
@@ -631,7 +623,6 @@ const TableOrderEcommerce = () => {
           const result = await apiService.orderItems.processPayment(itemId, paymentData);
           results.push(result);
         } catch (itemError) {
-          console.error(`Error procesando item ${itemId}:`, itemError);
           throw new Error(`Error en item ${itemId}: ${itemError.response?.data?.error || itemError.message}`);
         }
       }
@@ -662,7 +653,6 @@ const TableOrderEcommerce = () => {
           );
           await printSelectedItemsReceipt(paidItems);
         } catch (printError) {
-          console.error('Error en impresión:', printError);
           showToast(`Error al imprimir: ${printError.message}`, 'error');
         }
       }
@@ -702,7 +692,6 @@ const TableOrderEcommerce = () => {
       
       return true;
     } catch (error) {
-      console.error('Error procesando pago:', error);
       
       // Manejo detallado de errores
       let errorMessage = 'Error desconocido al procesar pago';
@@ -759,7 +748,6 @@ const TableOrderEcommerce = () => {
 
   // Manejo especializado de errores
   const handleSaveOrderError = (error) => {
-    console.error('Error saving order:', error);
     
     if (error.response?.status === 400) {
       const errorDetails = error.response.data;
@@ -925,7 +913,6 @@ const TableOrderEcommerce = () => {
       
       showToast('Item eliminado del pedido', 'success');
     } catch (error) {
-      console.error('Error deleting order item:', error);
       showToast('Error al eliminar item', 'error');
     } finally {
       setSaving(false);

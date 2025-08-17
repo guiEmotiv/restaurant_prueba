@@ -104,7 +104,6 @@ const ContainerModal = ({ isOpen, onClose, container = null, onSave }) => {
       onSave();
       onClose();
     } catch (error) {
-      console.error('Error saving container:', error);
       let errorMessage = 'Error desconocido';
       
       if (error.response?.data) {

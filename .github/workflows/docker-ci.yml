@@ -80,18 +80,18 @@ jobs:
             npm run build
           "
     
-    # Build production images
-    - name: Build and push production images
-      if: github.event_name != 'pull_request'
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile.prod
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    # Build production images - DISABLED until Dockerfile.prod exists
+    # - name: Build and push production images
+    #   if: github.event_name != 'pull_request'
+    #   uses: docker/build-push-action@v5
+    #   with:
+    #     context: .
+    #     file: ./Dockerfile.prod
+    #     push: true
+    #     tags: ${{ steps.meta.outputs.tags }}
+    #     labels: ${{ steps.meta.outputs.labels }}
+    #     cache-from: type=gha
+    #     cache-to: type=gha,mode=max
 
   # Deploy to staging
   deploy-staging:

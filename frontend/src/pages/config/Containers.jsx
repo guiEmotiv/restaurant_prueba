@@ -44,7 +44,6 @@ const Containers = () => {
       const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
       setContainers(sortedData);
     } catch (error) {
-      console.error('Error loading containers:', error);
       showError('Error al cargar los envases');
     } finally {
       setLoading(false);
@@ -88,7 +87,6 @@ const Containers = () => {
       await loadContainers();
       showSuccess('Envase eliminado exitosamente');
     } catch (error) {
-      console.error('Error deleting container:', error);
       if (error.response?.status === 400) {
         showError('No se puede eliminar este envase porque está siendo usado');
       } else {

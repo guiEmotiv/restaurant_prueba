@@ -179,12 +179,7 @@ class OrderItem(models.Model):
         # Calculate total_price based on quantity and unit_price
         self.total_price = self.unit_price * self.quantity
         
-        # Add customizations cost if exists
-        if self.pk:
-            customization_total = sum(
-                item.total_price for item in self.orderitemingredient_set.all()
-            )
-            self.total_price += customization_total
+        # Remove customizations cost calculation (OrderItemIngredient removed)
             
         super().save(*args, **kwargs)
         
@@ -193,20 +188,13 @@ class OrderItem(models.Model):
             self.order.calculate_total()
 
     def calculate_total_price(self):
-        """Calcula el precio total del item incluyendo customizaciones y cantidad (sin guardar)"""
+        """Calcula el precio total del item basado en cantidad (sin guardar)"""
         # Precio base: precio unitario * cantidad
         base_total = self.unit_price * self.quantity
         
-        # Agregar customizaciones si existen
-        customization_total = Decimal('0.00')
-        if self.pk:
-            customization_total = sum(
-                item.total_price for item in self.orderitemingredient_set.all()
-            )
-        
         # El precio del envase ya NO se incluye aquí
         # Se maneja por separado para mantener claridad en reportes
-        self.total_price = base_total + customization_total
+        self.total_price = base_total
         
         return self.total_price
 
@@ -292,45 +280,6 @@ class OrderItem(models.Model):
         
         return item_total
 
-
-class OrderItemIngredient(models.Model):
-    """Ingredientes personalizados en un item de orden"""
-    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE)
-    ingredient = models.ForeignKey(Ingredient, on_delete=models.PROTECT)
-    quantity = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0.01'))]
-    )
-    unit_price = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0.01'))]
-    )
-    total_price = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0.01'))]
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'order_item_ingredient'
-        verbose_name = 'Ingrediente Personalizado'
-        verbose_name_plural = 'Ingredientes Personalizados'
-        unique_together = ['order_item', 'ingredient']
-
-    def __str__(self):
-        return f"{self.order_item} - {self.ingredient.name}"
-
-    def save(self, *args, **kwargs):
-        # El precio unitario se toma del ingrediente y no es modificable
-        self.unit_price = self.ingredient.unit_price
-        self.total_price = self.unit_price * self.quantity
-        super().save(*args, **kwargs)
-        # Actualizar precio total del order_item
-        self.order_item.calculate_total_price()
-        self.order_item.save()
 
 
 class Payment(models.Model):

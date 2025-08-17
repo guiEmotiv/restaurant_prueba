@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from config.models import Unit, Zone, Table, Container
 from inventory.models import Group, Ingredient, Recipe, RecipeItem
-from operation.models import Order, OrderItem, OrderItemIngredient, Payment
+from operation.models import Order, OrderItem, Payment
 
 class Command(BaseCommand):
     help = 'Clean all data from database'
@@ -29,7 +29,7 @@ class Command(BaseCommand):
         # Check current counts
         self.stdout.write("Current data counts:")
         models_to_clean = [
-            ('OrderItemIngredient', OrderItemIngredient),
+            # ('OrderItemIngredient', OrderItemIngredient),  # Removed - functionality deprecated
             ('OrderItem', OrderItem),
             ('Order', Order),
             ('Payment', Payment),

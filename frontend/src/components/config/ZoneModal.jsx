@@ -78,7 +78,6 @@ const ZoneModal = ({ isOpen, onClose, zone = null, onSave }) => {
       onSave();
       onClose();
     } catch (error) {
-      console.error('Error saving zone:', error);
       let errorMessage = 'Error desconocido';
       
       if (error.response?.data) {
