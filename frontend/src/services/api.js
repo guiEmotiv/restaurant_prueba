@@ -77,11 +77,18 @@ api.interceptors.response.use(
   }
 );
 
-// Helper function to handle paginated responses
+// Helper function to handle paginated responses - OPTIMIZADO para navegación
 const handlePaginatedResponse = (response) => {
-  // Handle paginated response
+  // Validar que tenemos una respuesta válida
+  if (!response || !response.data) {
+    logger.warn('API response missing data field');
+    return [];
+  }
+  
+  // Handle paginated response (DRF pagination)
   if (response.data && typeof response.data === 'object' && response.data.results !== undefined) {
-    return response.data.results;
+    const results = response.data.results;
+    return Array.isArray(results) ? results : [];
   }
   
   // Direct array response
@@ -89,16 +96,39 @@ const handlePaginatedResponse = (response) => {
     return response.data;
   }
   
-  // Fallback
+  // Handle null/undefined data
+  if (response.data === null || response.data === undefined) {
+    logger.warn('API returned null/undefined data');
+    return [];
+  }
+  
+  // Single object returned - wrap in array for consistency
+  if (typeof response.data === 'object') {
+    logger.info('API returned single object, wrapping in array');
+    return [response.data];
+  }
+  
+  // Fallback for any other case
+  logger.warn('Unexpected API response format', response.data);
   return [];
 };
 
 // API service functions
 export const apiService = {
-  // Generic CRUD operations
-  async getAll(endpoint) {
-    const response = await api.get(`/${endpoint}/`);
-    return handlePaginatedResponse(response);
+  // Generic CRUD operations - OPTIMIZADO con retry para navegación
+  async getAll(endpoint, retries = 2) {
+    try {
+      const response = await api.get(`/${endpoint}/`);
+      return handlePaginatedResponse(response);
+    } catch (error) {
+      // Retry en caso de error de red durante navegación
+      if (retries > 0 && (error.code === 'NETWORK_ERROR' || error.response?.status >= 500)) {
+        logger.warn(`Retrying ${endpoint} API call. Retries left: ${retries}`);
+        await new Promise(resolve => setTimeout(resolve, 300)); // 300ms delay
+        return this.getAll(endpoint, retries - 1);
+      }
+      throw error;
+    }
   },
 
   async getById(endpoint, id) {
@@ -227,11 +257,21 @@ export const apiService = {
   },
 
   ingredients: {
-    getAll: async (params = {}) => {
-      const queryParams = new URLSearchParams(params).toString();
-      const url = queryParams ? `/ingredients/?${queryParams}` : '/ingredients/';
-      const response = await api.get(url);
-      return handlePaginatedResponse(response);
+    getAll: async (params = {}, retries = 2) => {
+      try {
+        const queryParams = new URLSearchParams(params).toString();
+        const url = queryParams ? `/ingredients/?${queryParams}` : '/ingredients/';
+        const response = await api.get(url);
+        return handlePaginatedResponse(response);
+      } catch (error) {
+        // Retry logic para navegación robusta
+        if (retries > 0 && (error.code === 'NETWORK_ERROR' || error.response?.status >= 500)) {
+          logger.warn(`Retrying ingredients API call. Retries left: ${retries}`);
+          await new Promise(resolve => setTimeout(resolve, 300));
+          return apiService.ingredients.getAll(params, retries - 1);
+        }
+        throw error;
+      }
     },
     getById: (id) => apiService.getById('ingredients', id),
     create: (data) => apiService.create('ingredients', data),
@@ -254,11 +294,21 @@ export const apiService = {
   },
 
   recipes: {
-    getAll: async (params = {}) => {
-      const queryParams = new URLSearchParams(params).toString();
-      const url = queryParams ? `/recipes/?${queryParams}` : '/recipes/';
-      const response = await api.get(url);
-      return response.data;
+    getAll: async (params = {}, retries = 2) => {
+      try {
+        const queryParams = new URLSearchParams(params).toString();
+        const url = queryParams ? `/recipes/?${queryParams}` : '/recipes/';
+        const response = await api.get(url);
+        return handlePaginatedResponse(response);
+      } catch (error) {
+        // Retry logic para navegación robusta
+        if (retries > 0 && (error.code === 'NETWORK_ERROR' || error.response?.status >= 500)) {
+          logger.warn(`Retrying recipes API call. Retries left: ${retries}`);
+          await new Promise(resolve => setTimeout(resolve, 300));
+          return apiService.recipes.getAll(params, retries - 1);
+        }
+        throw error;
+      }
     },
     getById: (id) => apiService.getById('recipes', id),
     create: (data) => apiService.create('recipes', data),
@@ -485,12 +535,21 @@ export const apiService = {
   },
 
   containers: {
-    getAll: async (params = {}) => {
-      const queryParams = new URLSearchParams(params).toString();
-      const url = queryParams ? `/containers/?${queryParams}` : '/containers/';
-      const response = await api.get(url);
-      // Return data directly since pagination is disabled
-      return Array.isArray(response.data) ? response.data : [];
+    getAll: async (params = {}, retries = 2) => {
+      try {
+        const queryParams = new URLSearchParams(params).toString();
+        const url = queryParams ? `/containers/?${queryParams}` : '/containers/';
+        const response = await api.get(url);
+        return handlePaginatedResponse(response);
+      } catch (error) {
+        // Retry logic para navegación robusta
+        if (retries > 0 && (error.code === 'NETWORK_ERROR' || error.response?.status >= 500)) {
+          logger.warn(`Retrying containers API call. Retries left: ${retries}`);
+          await new Promise(resolve => setTimeout(resolve, 300));
+          return apiService.containers.getAll(params, retries - 1);
+        }
+        throw error;
+      }
     },
     getById: (id) => apiService.getById('containers', id),
     create: (data) => apiService.create('containers', data),
