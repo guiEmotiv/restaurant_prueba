@@ -378,11 +378,29 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             selected_container_id = item_data.pop('selected_container', None)
             quantity = item_data.pop('quantity', 1)  # Remover quantity del item_data
             
+            # Obtener información del container para este item
+            container_id = None
+            container_price = None
+            print(f"🔍 DEBUG: selected_container_id = {selected_container_id}")
+            if selected_container_id:
+                # Buscar container directamente usando SQL crudo para evitar foreign key issues
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT id, price FROM container WHERE id = ? AND is_active = 1", [selected_container_id])
+                    result = cursor.fetchone()
+                    print(f"🔍 DEBUG: SQL result = {result}")
+                    if result:
+                        container_id = result[0]
+                        container_price = result[1]
+                        print(f"✅ DEBUG: Found container {container_id} with price {container_price}")
+            
             # Crear OrderItems individuales (uno por cada cantidad)
             created_items = []
             for i in range(quantity):
                 order_item = OrderItem.objects.create(
                     order=order, 
+                    container_id=container_id,
+                    container_price=container_price,
                     quantity=1,  # Cada OrderItem tiene quantity=1
                     **item_data
                 )
