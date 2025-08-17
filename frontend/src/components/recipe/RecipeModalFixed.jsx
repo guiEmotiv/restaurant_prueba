@@ -55,8 +55,8 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       setFormData({
         name: recipe.name || '',
         version: recipe.version || '1.0',
-        group: recipe.group || '',
-        container: recipe.container || '',
+        group: recipe.group ? recipe.group.toString() : '',
+        container: recipe.container ? recipe.container.toString() : '',
         preparation_time: recipe.preparation_time || '',
         profit_percentage: recipe.profit_percentage || '0.00',
         is_active: recipe.is_active !== undefined ? recipe.is_active : true
@@ -301,8 +301,8 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       const recipeData = {
         name: formData.name.trim(),
         version: formData.version || '1.0',
-        group: formData.group || null,
-        container: formData.container || null,
+        group: formData.group ? parseInt(formData.group) : null,
+        container: formData.container ? parseInt(formData.container) : null,
         base_price: finalPrice > 0 ? finalPrice.toFixed(2) : "0.01", // Backend requiere precio mínimo como string
         profit_percentage: parseFloat(formData.profit_percentage) || 0,
         preparation_time: parseInt(formData.preparation_time),
