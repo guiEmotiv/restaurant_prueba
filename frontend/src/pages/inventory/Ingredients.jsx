@@ -58,8 +58,8 @@ const Ingredients = () => {
       title: 'Activo', 
       type: 'checkbox',
       render: (value, item) => {
-        // Basado en stock: si stock > 0 = Sí, si stock = 0 = No
-        return parseFloat(item.current_stock) > 0 ? 'Sí' : 'No';
+        // Mostrar el valor real de is_active, no basado en stock
+        return item.is_active ? 'Sí' : 'No';
       }
     }
   ];
@@ -82,7 +82,7 @@ const Ingredients = () => {
     if (activeFilter !== '') {
       const isActive = activeFilter === 'true';
       filtered = filtered.filter(ingredient => 
-        isActive ? parseFloat(ingredient.current_stock) > 0 : parseFloat(ingredient.current_stock) === 0
+        isActive ? ingredient.is_active : !ingredient.is_active
       );
     }
     
@@ -215,8 +215,8 @@ const Ingredients = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Todos ({ingredients.length})</option>
-              <option value="true">Activos ({ingredients.filter(i => parseFloat(i.current_stock) > 0).length})</option>
-              <option value="false">Inactivos ({ingredients.filter(i => parseFloat(i.current_stock) === 0).length})</option>
+              <option value="true">Activos ({ingredients.filter(i => i.is_active).length})</option>
+              <option value="false">Inactivos ({ingredients.filter(i => !i.is_active).length})</option>
             </select>
           </div>
           <div className="flex items-end">
