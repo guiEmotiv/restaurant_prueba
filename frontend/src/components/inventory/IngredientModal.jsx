@@ -10,8 +10,7 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
     name: '',
     unit: '',
     unit_price: '',
-    current_stock: '',
-    is_active: true
+    current_stock: ''
   });
   const [availableUnits, setAvailableUnits] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -26,8 +25,7 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
           name: ingredient.name || '',
           unit: ingredient.unit?.id || ingredient.unit || '',
           unit_price: ingredient.unit_price || '',
-          current_stock: ingredient.current_stock || '',
-          is_active: ingredient.is_active !== undefined ? ingredient.is_active : true
+          current_stock: ingredient.current_stock || ''
         });
       } else {
         // Modo creación
@@ -41,8 +39,7 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
       name: '',
       unit: '',
       unit_price: '',
-      current_stock: '',
-      is_active: true
+      current_stock: ''
     });
     setErrors({});
   };
@@ -117,8 +114,8 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
         name: formData.name.trim(),
         unit: parseInt(formData.unit),
         unit_price: parseFloat(formData.unit_price),
-        current_stock: parseFloat(formData.current_stock),
-        is_active: formData.is_active
+        current_stock: parseFloat(formData.current_stock)
+        // is_active se calcula automáticamente en el backend basado en el stock
       };
       
       if (ingredient?.id) {
@@ -287,20 +284,6 @@ const IngredientModal = ({ isOpen, onClose, ingredient = null, onSave }) => {
               </div>
             </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                name="is_active"
-                id="is_active"
-                checked={formData.is_active}
-                onChange={handleInputChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                disabled={loading}
-              />
-              <label htmlFor="is_active" className="ml-2 block text-sm text-gray-700">
-                Ingrediente activo
-              </label>
-            </div>
           </div>
         </div>
 

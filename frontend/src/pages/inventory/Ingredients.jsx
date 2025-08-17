@@ -55,11 +55,14 @@ const Ingredients = () => {
     },
     { 
       key: 'is_active', 
-      title: 'Activo', 
+      title: 'Estado', 
       type: 'checkbox',
       render: (value, item) => {
-        // Mostrar el valor real de is_active, no basado en stock
-        return item.is_active ? 'Sí' : 'No';
+        // Estado automático basado en stock
+        const hasStock = parseFloat(item.current_stock) > 0;
+        return hasStock ? 
+          <span className="text-green-600 font-medium">Activo</span> : 
+          <span className="text-red-600 font-medium">Sin Stock</span>;
       }
     }
   ];
@@ -82,7 +85,7 @@ const Ingredients = () => {
     if (activeFilter !== '') {
       const isActive = activeFilter === 'true';
       filtered = filtered.filter(ingredient => 
-        isActive ? ingredient.is_active : !ingredient.is_active
+        isActive ? parseFloat(ingredient.current_stock) > 0 : parseFloat(ingredient.current_stock) === 0
       );
     }
     
@@ -215,8 +218,8 @@ const Ingredients = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Todos ({ingredients.length})</option>
-              <option value="true">Activos ({ingredients.filter(i => i.is_active).length})</option>
-              <option value="false">Inactivos ({ingredients.filter(i => !i.is_active).length})</option>
+              <option value="true">Con Stock ({ingredients.filter(i => parseFloat(i.current_stock) > 0).length})</option>
+              <option value="false">Sin Stock ({ingredients.filter(i => parseFloat(i.current_stock) === 0).length})</option>
             </select>
           </div>
           <div className="flex items-end">
