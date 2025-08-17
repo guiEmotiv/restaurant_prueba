@@ -140,18 +140,20 @@ class Recipe(models.Model):
         self.save()
 
     def check_availability(self):
-        """Verifica si la receta está disponible según el stock (independiente de is_active)"""
+        """Verifica si la receta está disponible según el stock (automático basado en stock)"""
         if not self.is_available:
             return False
         for recipe_item in self.recipeitem_set.all():
-            if not recipe_item.ingredient.is_active or recipe_item.ingredient.current_stock < recipe_item.quantity:
+            # Solo verificar stock, ya que is_active es automático (stock > 0)
+            if recipe_item.ingredient.current_stock < recipe_item.quantity:
                 return False
         return True
     
     def has_sufficient_stock(self):
         """Verifica si hay stock suficiente para preparar la receta (solo chequeo de stock)"""
         for recipe_item in self.recipeitem_set.all():
-            if not recipe_item.ingredient.is_active or recipe_item.ingredient.current_stock < recipe_item.quantity:
+            # Solo verificar stock, is_active es automático basado en current_stock > 0
+            if recipe_item.ingredient.current_stock < recipe_item.quantity:
                 return False
         return True
     
