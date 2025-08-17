@@ -52,11 +52,17 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     
     if (recipe) {
       // Modo edición
+      console.log('🔍 DEBUG loadData - recipe object:', recipe);
+      console.log('🔍 DEBUG loadData - recipe.container type:', typeof recipe.container, 'value:', recipe.container);
+      
+      const containerValue = recipe.container ? recipe.container.toString() : '';
+      console.log('🔍 DEBUG loadData - containerValue:', containerValue, 'type:', typeof containerValue);
+      
       setFormData({
         name: recipe.name || '',
         version: recipe.version || '1.0',
-        group: recipe.group ? recipe.group.toString() : '',
-        container: recipe.container ? recipe.container.toString() : '',
+        group: recipe.group ? (typeof recipe.group === 'object' ? recipe.group.id.toString() : recipe.group.toString()) : '',
+        container: containerValue,
         preparation_time: recipe.preparation_time || '',
         profit_percentage: recipe.profit_percentage || '0.00',
         is_active: recipe.is_active !== undefined ? recipe.is_active : true
@@ -208,6 +214,10 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
 
   const validateForm = () => {
     const newErrors = {};
+    
+    // Debug: log formData structure
+    console.log('🔍 DEBUG validateForm - formData:', formData);
+    console.log('🔍 DEBUG validateForm - container type:', typeof formData.container, 'value:', formData.container);
     
     if (!formData.name.trim()) {
       newErrors.name = 'El nombre es requerido';
