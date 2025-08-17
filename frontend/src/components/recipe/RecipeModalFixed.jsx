@@ -217,7 +217,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       newErrors.version = 'La versión es obligatoria';
     }
     
-    if (!formData.container.trim()) {
+    if (!formData.container || formData.container === '') {
       newErrors.container = 'Debe seleccionar un envase';
     }
     
