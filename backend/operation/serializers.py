@@ -191,8 +191,6 @@ class OrderDetailSerializer(OrderSerializer):
         ).prefetch_related(
             'orderitem_set__recipe',
             'orderitem_set__recipe__group',
-            'orderitem_set__orderitemingredient_set__ingredient',
-            'orderitem_set__orderitemingredient_set__ingredient__unit',
             'container_sales__container',
             'payments__payment_items__order_item'
         )

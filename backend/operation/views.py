@@ -198,7 +198,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'elapsed_time_minutes': elapsed_minutes,
                 'preparation_time': item.recipe.preparation_time,
                 'is_overdue': is_overdue,
-                'customizations_count': item.orderitemingredient_set.count(),
+                'customizations_count': 0,  # OrderItemIngredient fue eliminado
                 'recipe_group_name': item.recipe.group.name if item.recipe.group else 'Sin Grupo',
                 'recipe_group_id': item.recipe.group.id if item.recipe.group else None
             }

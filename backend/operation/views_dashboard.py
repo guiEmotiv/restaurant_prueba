@@ -74,7 +74,6 @@ class DashboardViewSet(viewsets.ViewSet):
             ).select_related(
                 'recipe__group'
             ).prefetch_related(
-                'orderitemingredient_set__ingredient__unit',
                 'recipe__recipeitem_set__ingredient__unit'
             )),
             'payments',
@@ -162,18 +161,8 @@ class DashboardViewSet(viewsets.ViewSet):
                             'ingredient_type': 'base'  # Ingrediente base de la receta
                         })
                 
-                # Ingredientes personalizados/extras
+                # Ingredientes personalizados/extras - funcionalidad removida
                 custom_ingredients = []
-                for custom_ingredient in order_item.orderitemingredient_set.all():
-                    custom_cost = float(custom_ingredient.total_price)
-                    custom_ingredients.append({
-                        'ingredient_name': custom_ingredient.ingredient.name,
-                        'ingredient_unit': custom_ingredient.ingredient.unit.name,
-                        'ingredient_quantity': float(custom_ingredient.quantity),
-                        'ingredient_unit_price': float(custom_ingredient.unit_price),
-                        'ingredient_total_cost': custom_cost,
-                        'ingredient_type': 'custom'  # Ingrediente personalizado/extra
-                    })
                 
                 # Calcular costos totales de ingredientes
                 total_ingredient_cost = sum(ing['ingredient_total_cost'] for ing in recipe_ingredients + custom_ingredients)
@@ -212,7 +201,6 @@ class DashboardViewSet(viewsets.ViewSet):
             Prefetch('orderitem_set', queryset=OrderItem.objects.select_related(
                 'recipe__group'
             ).prefetch_related(
-                'orderitemingredient_set__ingredient__unit',
                 'recipe__recipeitem_set__ingredient__unit'
             )),
             'payments',
@@ -296,17 +284,8 @@ class DashboardViewSet(viewsets.ViewSet):
                             'ingredient_type': 'base'
                         })
                 
+                # Ingredientes personalizados/extras - funcionalidad removida
                 custom_ingredients = []
-                for custom_ingredient in order_item.orderitemingredient_set.all():
-                    custom_cost = float(custom_ingredient.total_price)
-                    custom_ingredients.append({
-                        'ingredient_name': custom_ingredient.ingredient.name,
-                        'ingredient_unit': custom_ingredient.ingredient.unit.name,
-                        'ingredient_quantity': float(custom_ingredient.quantity),
-                        'ingredient_unit_price': float(custom_ingredient.unit_price),
-                        'ingredient_total_cost': custom_cost,
-                        'ingredient_type': 'custom'
-                    })
                 
                 total_ingredient_cost = sum(ing['ingredient_total_cost'] for ing in recipe_ingredients + custom_ingredients)
                 profit_amount = float(order_item.total_price) - total_ingredient_cost
