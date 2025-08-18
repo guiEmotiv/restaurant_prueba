@@ -59,10 +59,20 @@ export const debugAuth = async () => {
   }
 };
 
-// Make debug function available globally in development
-if (import.meta.env.MODE === 'development') {
-  window.debugAuth = debugAuth;
-}
+// Make debug function available globally in development and production
+window.debugAuth = debugAuth;
+
+// Add global debugging function to test API with current auth
+window.testApiAuth = async () => {
+  try {
+    const response = await api.get('/auth-debug/');
+    console.log('🔐 API Auth Test Result:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ API Auth Test Error:', error);
+    return { error: error.message };
+  }
+};
 
 
 // Get CSRF token function

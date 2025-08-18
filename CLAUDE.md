@@ -272,3 +272,18 @@ DATABASE_NAME=restaurant_prod.sqlite3
 3. Check browser console for authentication errors
 4. Clear browser cache and cookies, then login again
 5. Verify frontend is using ID Token (not Access Token) for API calls
+
+**Debug Steps** (in browser console):
+```javascript
+// Check authentication status
+await debugAuth()
+
+// Test API authentication
+await testApiAuth()
+```
+
+Expected results:
+- `debugAuth()` should show `hasIdToken: true` or `hasAccessToken: true`
+- `testApiAuth()` should show `token_valid_format: true` and `token_segments: 3`
+
+If tokens are missing or malformed, user needs to login again via AWS Cognito.
