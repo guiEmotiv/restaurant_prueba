@@ -24,7 +24,7 @@ from .serializers import (
 class UnitViewSet(viewsets.ModelViewSet):
     queryset = Unit.objects.all().order_by('name')
     serializer_class = UnitSerializer
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    permission_classes = [AllowAny]  # Acceso completo en desarrollo
     
     @action(detail=True, methods=['get'])
     def ingredients(self, request, pk=None):
@@ -40,7 +40,7 @@ class UnitViewSet(viewsets.ModelViewSet):
 class ZoneViewSet(viewsets.ModelViewSet):
     queryset = Zone.objects.all().order_by('name')
     serializer_class = ZoneSerializer
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    permission_classes = [AllowAny]  # Acceso completo en desarrollo
     pagination_class = None  # Deshabilitar paginación para zonas
     
     @action(detail=True, methods=['get'])
@@ -57,7 +57,7 @@ class TableViewSet(viewsets.ModelViewSet):
         'order_set__orderitem_set__recipe',
         'order_set__container_sales__container'
     ).order_by('zone__name', 'table_number')
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    permission_classes = [AllowAny]  # Acceso completo en desarrollo
     pagination_class = None  # Deshabilitar paginación para mesas
     
     def get_serializer_class(self):
@@ -101,7 +101,7 @@ class TableViewSet(viewsets.ModelViewSet):
 class ContainerViewSet(viewsets.ModelViewSet):
     serializer_class = ContainerSerializer
     pagination_class = None  # Disable pagination
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    permission_classes = [AllowAny]  # Acceso completo en desarrollo
     
     def get_queryset(self):
         queryset = Container.objects.all().order_by('name')

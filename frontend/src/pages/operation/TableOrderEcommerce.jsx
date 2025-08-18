@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { apiService } from '../../services/api';
@@ -1127,40 +1127,52 @@ const TableOrderEcommerce = () => {
                   <div key={order.id} className="bg-white border rounded p-3">
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center space-x-3">
-                        <span className="font-bold text-base">#{order.id}</span>
-                        <span className="text-gray-500 text-base">-</span>
-                        <span className="text-gray-900 text-base">
+                        <span className="font-bold text-sm">#{order.id}</span>
+                        <span className="text-gray-500 text-sm">-</span>
+                        <span className="text-gray-900 text-sm">
                           S/ {parseFloat(order.grand_total || order.total_amount || 0).toFixed(2)}
                         </span>
-                        <span className="text-gray-500 text-base">-</span>
-                        <span className="text-gray-700 text-base">
+                        <span className="text-gray-500 text-sm">-</span>
+                        <span className="text-gray-700 text-sm">
                           {order.waiter || 'Sin mesero'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleEditOrder(order)}
-                          className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50"
+                          className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                          title="Editar pedido"
                         >
-                          Editar
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
                         </button>
                         
                         {canDeleteOrder(order) && (
                           <button
                             onClick={() => handleDeleteOrder(order)}
                             disabled={saving}
-                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50 disabled:opacity-50"
+                            className="w-8 h-8 flex items-center justify-center text-red-500 hover:text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                            title="Eliminar pedido"
                           >
-                            Eliminar
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           </button>
                         )}
                         
                         {canProcessPayment(order) && hasPermission('canManagePayments') && (
                           <button
                             onClick={() => handleProcessPayment(order)}
-                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50"
+                            className="w-8 h-8 flex items-center justify-center text-green-600 hover:text-green-700 border border-green-300 rounded-lg hover:bg-green-50 transition-colors"
+                            title="Procesar pago"
                           >
-                            Procesar Pago
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
                           </button>
                         )}
                       </div>
@@ -1275,7 +1287,7 @@ const TableOrderEcommerce = () => {
                         className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </button>
                       <button
@@ -1338,16 +1350,16 @@ const TableOrderEcommerce = () => {
                 {/* Panel lateral deslizante */}
                 <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col">
                   {/* Header del panel lateral */}
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-4 py-4 border-b flex-shrink-0">
+                  <div className="bg-gray-50 px-4 py-4 border-b flex-shrink-0">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="flex-1 flex items-center justify-center">
                         <h2 className="text-lg font-semibold text-gray-800">
                           {currentOrder ? `Pedido #${currentOrder.id}` : 'Nuevo Pedido'}
                         </h2>
                       </div>
                       <button
                         onClick={toggleCart}
-                        className="text-gray-400 hover:text-gray-600 p-2 hover:bg-white rounded-full transition-colors"
+                        className="text-gray-600 hover:text-gray-800 p-2 hover:bg-gray-100 rounded-full transition-colors"
                         title="Cerrar panel"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1478,26 +1490,27 @@ const TableOrderEcommerce = () => {
                     )}
                   </div>
 
-                  {/* Footer con total y botón de acción - SIEMPRE VISIBLE */}
-                  <div className="p-4 bg-gray-50 border-t flex-shrink-0">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-lg font-semibold text-gray-800">
-                        Total:
-                      </span>
-                      <span className="text-xl font-bold text-green-600">
-                        S/ {getCompleteTotal().toFixed(2)}
-                      </span>
+                  {/* Footer con total y botón de acción - Estilo negro minimalista */}
+                  <div className="p-4 bg-gray-50 flex-shrink-0">
+                    {/* Total con estilo minimalista */}
+                    <div className="bg-gray-50 rounded-xl p-3 mb-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Total</span>
+                        <span className="text-lg font-semibold text-gray-900">
+                          S/ {getCompleteTotal().toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                     
-                    {/* Botón de acción - Solo mostrar cuando hay items en el carrito */}
+                    {/* Botón de acción estilo negro */}
                     {cart.length > 0 && (
                       <button
                         onClick={saveOrder}
                         disabled={saving}
-                        className={`w-full font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+                        className={`w-full py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm ${
                           !saving
-                            ? 'bg-green-500 hover:bg-green-600 text-white shadow-sm hover:shadow-md'
-                            : 'bg-gray-300 text-gray-500'
+                            ? 'bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-700'
+                            : 'bg-gray-700 text-gray-400'
                         } disabled:opacity-50`}
                       >
                         {saving ? (
@@ -1824,121 +1837,108 @@ const TableOrderEcommerce = () => {
         )}
       </div>
 
-      {/* Panel deslizante para notas - Optimizado para móviles */}
+      {/* Modal ultra-minimalista para móviles */}
       {isNoteModalOpen && (
         <>
-          {/* Overlay */}
+          {/* Overlay optimizado */}
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
+            className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm"
             onClick={closeNoteModal}
           />
           
-          {/* Panel deslizante desde abajo */}
-          <div className="fixed inset-x-0 bottom-0 z-50 transform transition-transform duration-300 ease-in-out">
-            <div className="bg-white rounded-t-2xl shadow-xl max-h-[85vh] flex flex-col">
-              {/* Handle bar para indicar que es deslizable */}
-              <div className="flex justify-center py-2">
-                <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
+          {/* Modal responsive */}
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="bg-white w-full max-w-sm mx-auto rounded-t-3xl sm:rounded-2xl shadow-2xl transform transition-all duration-300 ease-out">
+              {/* Header ultra-compacto */}
+              <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
+                  {selectedRecipe?.name}
+                </h3>
+                <button
+                  onClick={closeNoteModal}
+                  className="p-2 -m-2 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              
-              {/* Header */}
-              <div className="px-4 pb-4 border-b border-gray-200 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">
-                    {selectedRecipe?.name}
-                  </h3>
+
+              {/* Content compacto */}
+              <div className="px-4 py-4 space-y-4">
+                {/* Campo de notas optimizado para móvil */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">
+                    Comentario
+                  </label>
+                  <textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder="Ej: Sin cebolla, extra salsa..."
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition-all"
+                    rows="2"
+                    style={{
+                      fontSize: '16px', // Prevent zoom on iOS
+                      WebkitAppearance: 'none',
+                      minHeight: '60px'
+                    }}
+                  />
+                </div>
+
+                {/* Para llevar compacto */}
+                <div className="flex items-center justify-between py-2">
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-800">Para llevar</span>
+                    {containers.length > 0 && isTakeaway && (
+                      <span className="text-xs text-gray-500 ml-2">+S/{containers[0].price || 0}</span>
+                    )}
+                  </div>
                   <button
-                    onClick={closeNoteModal}
-                    className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                    onClick={() => setIsTakeaway(!isTakeaway)}
+                    className={`relative w-10 h-6 rounded-full transition-all duration-200 ${
+                      isTakeaway ? 'bg-gray-800' : 'bg-gray-200'
+                    }`}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <div
+                      className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
+                        isTakeaway ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
                   </button>
                 </div>
-              </div>
 
-              {/* Content - Scrollable */}
-              <div className="px-4 py-4 flex-1 overflow-y-auto">
-                <div className="space-y-6">
-                  {/* Campo de notas mejorado para móviles */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Comentarios especiales
-                    </label>
-                    <textarea
-                      value={noteText}
-                      onChange={(e) => setNoteText(e.target.value)}
-                      placeholder="Ej: Sin cebolla, extra salsa, etc..."
-                      className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base resize-none"
-                      rows="4"
-                      style={{ minHeight: '100px' }}
-                    />
-                  </div>
-
-                  {/* Para llevar con mejor diseño */}
-                  <div className="bg-gray-50 p-4 rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-base font-medium text-gray-900">Para llevar</span>
-                        <p className="text-sm text-gray-500">Incluye envase adicional</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isTakeaway}
-                          onChange={(e) => setIsTakeaway(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-12 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Precio total con mejor visual */}
-                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-700">Precio del plato</span>
-                        <span className="font-medium">S/ {selectedRecipe?.price || selectedRecipe?.base_price || 0}</span>
-                      </div>
-                      {isTakeaway && containers.length > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-700">Envase</span>
-                          <span className="font-medium">S/ {containers[0].price || 0}</span>
-                        </div>
-                      )}
-                      <hr className="border-blue-200" />
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold text-gray-900">Total</span>
-                        <span className="text-lg font-bold text-blue-600">
-                          S/ {(
-                            parseFloat(selectedRecipe?.price || selectedRecipe?.base_price || 0) +
-                            (isTakeaway && containers.length > 0 ? parseFloat(containers[0].price || 0) : 0)
-                          ).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
+                {/* Precio minimalista */}
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Total</span>
+                    <span className="text-lg font-semibold text-gray-900">
+                      S/ {(
+                        parseFloat(selectedRecipe?.price || selectedRecipe?.base_price || 0) +
+                        (isTakeaway && containers.length > 0 ? parseFloat(containers[0].price || 0) : 0)
+                      ).toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Footer con botones grandes para móviles */}
-              <div className="px-4 py-4 border-t border-gray-200 flex-shrink-0 bg-white">
-                <div className="flex gap-3">
+              {/* Botones optimizados para móvil */}
+              <div className="px-4 pb-4 pt-2">
+                <div className="flex gap-2">
                   <button
                     onClick={closeNoteModal}
-                    className="flex-1 py-3 px-4 text-base font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                    className="flex-1 py-3 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleAddWithNotes}
-                    className="flex-1 py-3 px-4 text-base font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+                    className="flex-1 py-3 text-sm font-medium text-white bg-gray-900 rounded-xl hover:bg-gray-800 active:bg-gray-700 transition-colors"
                   >
-                    Agregar al pedido
+                    Agregar
                   </button>
                 </div>
+                {/* Safe area para móviles */}
+                <div className="h-2 sm:hidden" />
               </div>
             </div>
           </div>

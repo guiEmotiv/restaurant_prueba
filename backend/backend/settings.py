@@ -17,6 +17,10 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-key")
 DEBUG      = os.getenv("DEBUG", "0").lower() in ("1", "true", "yes", "on")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
+# In development, allow all hosts for easier testing
+if DEBUG:
+    ALLOWED_HOSTS = ['*']
+
 # ──────────────────────────────────────────────────────────────
 # AWS Cognito Configuration
 # ──────────────────────────────────────────────────────────────
@@ -86,10 +90,18 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "backend.cognito_auth.CognitoAuthenticationMiddleware",  # AWS Cognito authentication
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# Add Cognito middleware only if USE_COGNITO_AUTH is True
+if USE_COGNITO_AUTH:
+    # Insert after AuthenticationMiddleware
+    auth_index = MIDDLEWARE.index("django.contrib.auth.middleware.AuthenticationMiddleware")
+    MIDDLEWARE.insert(auth_index + 1, "backend.cognito_auth.CognitoAuthenticationMiddleware")
+else:
+    # In development, add bypass middleware
+    MIDDLEWARE.insert(-1, "backend.dev_middleware.DevAuthBypassMiddleware")
 
 ROOT_URLCONF  = "backend.urls"
 WSGI_APPLICATION = "backend.wsgi.application"
@@ -137,10 +149,20 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.AllowAny",
     ),
+    "DEFAULT_AUTHENTICATION_CLASSES": [],  # No authentication in development
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
+
+# Override authentication/permissions based on Cognito setting
+if USE_COGNITO_AUTH:
+    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] = [
+        "backend.cognito_drf_auth.CognitoAuthentication",
+    ]
+    REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"] = [
+        "rest_framework.permissions.IsAuthenticated",
+    ]
 
 # ──────────────────────────────────────────────────────────────
 # CORS Configuration
@@ -148,7 +170,12 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite development server
     "http://127.0.0.1:5173",
+    "http://192.168.1.35:5173",  # Local network IP
 ]
+
+# Allow all origins in development for easier testing
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
 
 # Add EC2 IP to CORS if configured
 EC2_IP = os.getenv('EC2_PUBLIC_IP', '')
@@ -171,6 +198,7 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",  # Vite development server
     "http://127.0.0.1:5173",
+    "http://192.168.1.35:5173",  # Local network IP
 ]
 
 # Add domain to CSRF if configured

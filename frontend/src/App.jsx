@@ -34,7 +34,7 @@ const isCognitoConfigured = (() => {
   );
   
   if (!hasCredentials) {
-    console.error('AWS Cognito credentials not configured. Please set VITE_AWS_COGNITO_USER_POOL_ID and VITE_AWS_COGNITO_APP_CLIENT_ID');
+    // AWS Cognito credentials not configured
   }
   
   return hasCredentials;

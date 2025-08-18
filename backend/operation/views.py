@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from django.utils import timezone
 from django.db import transaction
 from backend.cognito_permissions import (
@@ -25,7 +26,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         'container_sales__container',
         'payments'
     ).order_by('-created_at')
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    permission_classes = [AllowAny]  # Acceso completo en desarrollo
     pagination_class = None  # Deshabilitar paginación para órdenes
     
     def get_serializer_class(self):
@@ -388,7 +389,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
     queryset = OrderItem.objects.all().order_by('-created_at')
     pagination_class = None  # Deshabilitar paginación para order items
     serializer_class = OrderItemSerializer
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    permission_classes = [AllowAny]  # Acceso completo en desarrollo
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -784,7 +785,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 class ContainerSaleViewSet(viewsets.ModelViewSet):
     queryset = ContainerSale.objects.all().order_by('-created_at')
     serializer_class = ContainerSaleSerializer
-    permission_classes = []  # Acceso completo para todos los usuarios autenticados
+    permission_classes = [AllowAny]  # Acceso completo en desarrollo
     pagination_class = None  # Deshabilitar paginación
 
 

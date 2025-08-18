@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from django.utils import timezone
 from django.db.models import Sum, Count, Q, F, Avg, Prefetch
 from django.http import JsonResponse
@@ -14,7 +15,7 @@ class DashboardViewSet(viewsets.ViewSet):
     ViewSet para el dashboard consolidado con datos detallados completos
     Cada fila representa un item de orden con TODOS sus detalles e ingredientes
     """
-    permission_classes = []  # Acceso completo para usuarios autenticados
+    permission_classes = [AllowAny]  # Acceso completo en desarrollo
     
     @action(detail=False, methods=['get'])
     def report(self, request):

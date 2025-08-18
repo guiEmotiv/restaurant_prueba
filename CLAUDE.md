@@ -1,23 +1,30 @@
 # CLAUDE.md
 
-## 🏗️ Restaurant Management System - OPTIMIZED & EFFICIENT
+## 🏗️ Restaurant Management System - OPTIMIZED & EFFICIENT v2.0
 
 **Stack**: Django 5.2 + React 19.1 + Vite + Docker + AWS Cognito  
 **Deploy**: EC2 + Nginx + SSL | **Database**: SQLite
 
 ---
 
-## ⚡ **STREAMLINED USAGE**
+## ⚡ **ENHANCED DEPLOYMENT COMMANDS**
 
 ```bash
 # Development
-./deploy.sh --dev    # OR just: ./deploy.sh
+./deploy.sh --dev      # Start dev environment (handles migrations automatically)
+./deploy.sh --check    # Health check
+./deploy.sh --migrate  # Run migrations with auto-fixes
 
-# Production Deploy  
-./deploy.sh --prod
+# Production Deploy
+./deploy.sh --prod     # Deploy to production
+./deploy.sh --sync     # Sync dev DB to prod (with backup)
 
-# Build Only
-./deploy.sh --build
+# Remote Deployment (NEW!)
+./deploy-remote.sh deploy       # Standard deployment
+./deploy-remote.sh deploy-sync  # Deploy with DB sync
+./deploy-remote.sh status      # Check remote status
+./deploy-remote.sh backup      # Backup production DB
+./deploy-remote.sh logs        # View remote logs
 ```
 
 **URLs**:
@@ -26,15 +33,32 @@
 
 ---
 
-## 🚀 **SINGLE-COMMAND PRODUCTION DEPLOYMENT**
+## 🚀 **AUTOMATED DEPLOYMENT FEATURES**
 
+### **Local Development** (`./deploy.sh --dev`)
+- ✅ Auto-installs npm dependencies if missing
+- ✅ Kills existing processes on port 5173
+- ✅ Handles problematic migrations automatically
+- ✅ Waits for containers to be ready
+- ✅ Color-coded output for better visibility
+
+### **Production Deployment** (`./deploy.sh --prod`)
+- ✅ Checks for uncommitted changes
+- ✅ Auto-backups database before deployment
+- ✅ Smart migration handling with fallbacks
+- ✅ Health checks after deployment
+- ✅ Validates nginx configuration
+
+### **Remote Deployment** (`./deploy-remote.sh`)
 ```bash
-# From local machine - deploys to EC2
-ssh -i "ubuntu_fds_key.pem" ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com "
-cd /opt/restaurant-web && 
-git pull origin main && 
-./deploy.sh --prod
-"
+# Quick deploy from local to production
+./deploy-remote.sh deploy
+
+# Deploy with database sync (replaces prod with dev data)
+./deploy-remote.sh deploy-sync
+
+# Check production status
+./deploy-remote.sh status
 ```
 
 **What it does automatically**:
@@ -75,9 +99,27 @@ location /api/ {
 
 ## 🔧 **OPTIMIZED CONFIGURATION FILES**
 
-### **Environment Variables** (`.env.ec2`)
+### **Environment Variables**
+
+**Backend Development:**
 ```bash
-# Production - No duplicates, minimal config
+# Development settings in container
+DEBUG=True
+USE_COGNITO_AUTH=False
+DATABASE_NAME=restaurant_dev.sqlite3
+DJANGO_SETTINGS_MODULE=backend.settings
+```
+
+**Frontend Development** (`.env.development`):
+```bash
+# Required for Cognito to initialize properly
+VITE_AWS_COGNITO_USER_POOL_ID=us-west-2_bdCwF60ZI
+VITE_AWS_COGNITO_APP_CLIENT_ID=4i9hrd7srgbqbtun09p43ncfn0
+VITE_AWS_REGION=us-west-2
+```
+
+**Production** (`.env.ec2`):
+```bash
 DEBUG=False
 USE_COGNITO_AUTH=True
 DOMAIN_NAME=xn--elfogndedonsoto-zrb.com
@@ -110,47 +152,80 @@ services:
 
 | Issue | Command | Expected Result |
 |-------|---------|-----------------|
-| **500 on orders** | `docker exec restaurant-backend python /app/backend/manage.py migrate` | "OK" for each migration |
+| **500 on orders** | `./deploy.sh --migrate` | Auto-fixes migration issues |
 | **403 Forbidden** | Logout/login (JWT expired) | New valid token |
 | **502 Bad Gateway** | `docker-compose restart nginx` | nginx starts without errors |
-| **Container issues** | `docker ps \| grep restaurant` | Both containers running |
+| **Container issues** | `./deploy.sh --check` | Health status report |
+| **Migration errors** | `bash scripts/migration-helper.sh` | Handles problematic migrations |
 | **Settings check** | `docker exec restaurant-backend printenv DJANGO_SETTINGS_MODULE` | `backend.settings_ec2` |
 
----
-
-## ✅ **DEPLOYMENT CHECKLIST**
-
-### Pre-Deploy (30 seconds)
-- [ ] `git status` clean
-- [ ] `./deploy.sh --build` works locally
-
-### Deploy (90 seconds)
-- [ ] `git pull origin main` successful
-- [ ] `./deploy.sh --prod` completes without errors
-- [ ] Both containers running: `docker ps`
-
-### Verification (30 seconds)
-- [ ] Website loads: https://www.xn--elfogndedonsoto-zrb.com/
-- [ ] API responds: `curl -s "https://www.xn--elfogndedonsoto-zrb.com/api/v1/orders/kitchen_board/"`
-- [ ] Kitchen view: No 500 errors, polling active, audio button visible
+### **Known Migration Fixes (Automated)**
+- ✅ `config.0013`: RestaurantOperationalConfig table missing → Auto-faked
+- ✅ `operation.0021`: CartItem table missing → Auto-faked
+- ✅ `operation.0018-0020`: Container fields → Applied in sequence
 
 ---
 
-## 🗂️ **STREAMLINED FILE STRUCTURE**
+## ✅ **SIMPLIFIED DEPLOYMENT WORKFLOW**
+
+### **Option 1: Quick Deploy (Recommended)**
+```bash
+# From your local machine - one command!
+./deploy-remote.sh deploy
+```
+- Automatically commits changes if needed
+- Pushes to git
+- Deploys to EC2
+- Handles migrations
+- Shows deployment status
+
+### **Option 2: Deploy with Database Sync**
+```bash
+# When you want production to match development exactly
+./deploy-remote.sh deploy-sync
+```
+- Backs up production database
+- Deploys code changes
+- Replaces production DB with dev DB
+- Restarts services
+
+### **Option 3: Manual Deploy Steps**
+```bash
+# If you prefer step-by-step control
+git add -A && git commit -m "Update" && git push
+ssh -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com
+cd /opt/restaurant-web
+git pull origin main
+./deploy.sh --prod
+```
+
+---
+
+## 🗂️ **ENHANCED FILE STRUCTURE**
 
 ```
 restaurant-web/
-├── deploy.sh              # SINGLE deployment script
-├── docker-compose.yml     # Simplified container config
-├── .env.ec2               # Clean production env (17 lines)
+├── deploy.sh              # Enhanced deployment script v2.0
+├── deploy-remote.sh       # NEW: Remote deployment automation
+├── docker-compose.yml     # Container configuration
+├── .env.ec2               # Production environment
+├── scripts/
+│   └── migration-helper.sh # NEW: Automatic migration fixes
 ├── nginx/
-│   ├── conf.d/ssl.conf    # Optimized nginx (50 lines vs 131)
-│   └── proxy_params       # Reusable proxy config
-├── backend/backend/
-│   └── settings_ec2.py    # Production Django settings
-└── frontend/
-    └── src/pages/operation/
-        └── Kitchen.jsx    # Production-ready polling
+│   ├── conf.d/ssl.conf    # SSL configuration
+│   └── proxy_params       # Proxy configuration
+├── backend/
+│   ├── manage.py
+│   └── backend/
+│       ├── settings.py    # Development settings
+│       └── settings_ec2.py # Production settings
+├── frontend/
+│   └── src/
+│       └── pages/operation/
+│           └── Kitchen.jsx # Real-time polling enabled
+└── data/
+    ├── restaurant_dev.sqlite3  # Development database
+    └── restaurant_prod.sqlite3 # Production database
 ```
 
 ---
@@ -202,4 +277,28 @@ Kitchen View ← Real-time Polling ← Order Updates ← Database
 
 ---
 
-**🎯 RESULT: 2-minute deployment, zero configuration errors, maximum efficiency.**
+**🎯 RESULT: 1-click deployment, automatic error handling, zero manual intervention.**
+
+---
+
+## 🆕 **WHAT'S NEW IN v2.0**
+
+### **Deployment Improvements**
+1. **One-Command Remote Deploy**: `./deploy-remote.sh deploy`
+2. **Automatic Migration Fixes**: Handles all known problematic migrations
+3. **Database Sync Option**: Easy dev→prod database sync with backups
+4. **Color-Coded Output**: Better visibility of deployment progress
+5. **Health Checks**: Automatic verification after deployment
+6. **NPM Cache Fix**: Handles npm permission issues automatically
+7. **Port Conflict Resolution**: Auto-kills processes on port 5173
+
+### **Error Prevention**
+- ✅ Waits for containers to be ready before migrations
+- ✅ Checks for uncommitted changes before deploy
+- ✅ Auto-backups production database
+- ✅ Validates nginx configuration
+- ✅ Retries failed migrations with fixes
+
+### **New Scripts**
+- `deploy-remote.sh`: Complete remote deployment automation
+- `scripts/migration-helper.sh`: Intelligent migration problem solver

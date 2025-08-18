@@ -12,9 +12,8 @@ class NotificationService {
   initAudioContext() {
     try {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      console.log('🔊 AudioContext creado');
     } catch (error) {
-      console.warn('❌ AudioContext no disponible:', error);
+      // Audio no disponible - continuar sin audio
     }
   }
 
@@ -27,10 +26,8 @@ class NotificationService {
         await this.audioContext.resume();
       }
       this.createSoundGenerators();
-      console.log('✅ Audio activado');
       return true;
     } catch (error) {
-      console.error('❌ Error activando audio:', error);
       return false;
     }
   }
@@ -38,6 +35,13 @@ class NotificationService {
   // Verificar si el audio está listo
   isAudioReady() {
     return this.audioContext?.state === 'running' && this.soundGenerators.size > 0;
+  }
+
+  // Desactivar audio
+  disableAudio() {
+    if (this.audioContext && this.audioContext.state === 'running') {
+      this.audioContext.suspend();
+    }
   }
 
   // Crear generadores de sonido optimizados
@@ -91,7 +95,6 @@ class NotificationService {
   // Configurar rol del usuario
   setCurrentUserRole(userRole) {
     this.currentUserRole = userRole;
-    console.log('👤 Rol configurado:', userRole);
   }
 
   // Verificar si puede escuchar notificaciones
@@ -101,8 +104,14 @@ class NotificationService {
 
   // Reproducir sonido
   playNotification(type = 'itemCreated') {
+    // Verificar si el audio está habilitado por el usuario
+    const audioEnabled = localStorage.getItem('kitchenAudioEnabled') === 'true';
+    
+    if (!audioEnabled) {
+      return;
+    }
+
     if (!this.isAudioReady()) {
-      console.warn('⚠️ Audio no activado');
       return;
     }
 
@@ -110,9 +119,8 @@ class NotificationService {
     if (generator) {
       try {
         generator();
-        console.log(`🔊 ${type}`);
       } catch (error) {
-        console.error('❌ Error reproduciendo sonido:', error);
+        // Error reproduciendo sonido - continuar silenciosamente
       }
     }
   }

@@ -11,11 +11,12 @@ if (import.meta.env.VITE_API_BASE_URL) {
   // In production, assume API is on same host
   API_BASE_URL = `${window.location.origin}/api/v1`;
 } else {
-  // Development mode - use localhost
-  API_BASE_URL = 'http://localhost:8000/api/v1';
+  // Development mode - use same host as frontend but port 8000
+  const hostname = window.location.hostname;
+  API_BASE_URL = `http://${hostname}:8000/api/v1`;
 }
 
-// Log API configuration (solo en desarrollo)
+// API configurado silenciosamente
 logger.info('API Configuration:', {
   VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
   API_BASE_URL,
@@ -44,17 +45,8 @@ export const debugAuth = async () => {
     const { fetchAuthSession } = await import('aws-amplify/auth');
     const session = await fetchAuthSession();
     
-    console.log('🔐 Auth Debug Report:', {
-      hasTokens: !!session.tokens,
-      hasIdToken: !!session.tokens?.idToken,
-      hasAccessToken: !!session.tokens?.accessToken,
-      idTokenPrefix: session.tokens?.idToken?.toString().substring(0, 50) + '...',
-      accessTokenPrefix: session.tokens?.accessToken?.toString().substring(0, 50) + '...',
-    });
-    
     return session;
   } catch (error) {
-    console.error('❌ Auth Debug Error:', error);
     return null;
   }
 };
@@ -66,10 +58,8 @@ window.debugAuth = debugAuth;
 window.testApiAuth = async () => {
   try {
     const response = await api.get('/auth-debug/');
-    console.log('🔐 API Auth Test Result:', response.data);
     return response.data;
   } catch (error) {
-    console.error('❌ API Auth Test Error:', error);
     return { error: error.message };
   }
 };
@@ -156,6 +146,7 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Handle errors silently in production
     return Promise.reject(error);
   }
 );

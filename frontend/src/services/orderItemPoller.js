@@ -33,9 +33,8 @@ class OrderItemPoller {
         });
       });
       
-      console.log('📋 Items inicializados:', this.knownItems.size);
     } catch (error) {
-      console.error('❌ Error inicializando:', error);
+      // Error inicializando - continuar silenciosamente
     }
   }
 
@@ -68,17 +67,15 @@ class OrderItemPoller {
       
       // Reproducir sonidos
       if (newItems.length > 0) {
-        console.log('🆕 Nuevos items:', newItems.length);
         notificationService.playNotification('itemCreated');
       }
 
       if (deletedCount > 0) {
-        console.log('🗑️ Items eliminados:', deletedCount);
         notificationService.playNotification('itemDeleted');
       }
       
     } catch (error) {
-      console.error('❌ Error en polling:', error);
+      // Error en polling - continuar silenciosamente
     }
   }
 
@@ -92,8 +89,6 @@ class OrderItemPoller {
     this.pollInterval = setInterval(() => {
       this.checkForNewOrderItems();
     }, this.intervalMs);
-    
-    console.log('🔄 Polling iniciado');
   }
 
   // Detener polling
@@ -103,7 +98,6 @@ class OrderItemPoller {
     this.isPolling = false;
     clearInterval(this.pollInterval);
     this.pollInterval = null;
-    console.log('⏹️ Polling detenido');
   }
 }
 

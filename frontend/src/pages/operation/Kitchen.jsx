@@ -11,7 +11,11 @@ const Kitchen = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGroupTab, setSelectedGroupTab] = useState('all');
   const [selectedTableFilter, setSelectedTableFilter] = useState('all'); // all, or specific table
-  const [audioReady, setAudioReady] = useState(false);
+  const [audioReady, setAudioReady] = useState(() => {
+    // Cargar estado desde localStorage
+    const saved = localStorage.getItem('kitchenAudioEnabled');
+    return saved === 'true';
+  });
   const { showSuccess, showError } = useToast();
   const { userRole } = useAuth();
 
@@ -43,22 +47,32 @@ const Kitchen = () => {
     }
   };
 
-  // Activar audio con gesto del usuario
-  const handleActivateAudio = async () => {
-    const success = await notificationService.initAudioWithUserGesture();
-    setAudioReady(success);
-    
-    if (success) {
-      showSuccess('🔊 Audio activado para notificaciones');
-      // Reproducir sonidos de prueba
-      notificationService.playNotification('itemCreated');
-      
-      // Reproducir sonido de eliminación después de 1 segundo
-      setTimeout(() => {
-        notificationService.playNotification('itemDeleted');
-      }, 1000);
+  // Toggle audio con gesto del usuario
+  const handleToggleAudio = async () => {
+    if (audioReady) {
+      // Desactivar audio
+      notificationService.disableAudio();
+      setAudioReady(false);
+      localStorage.setItem('kitchenAudioEnabled', 'false');
+      showSuccess('Audio desactivado');
     } else {
-      showError('❌ Error activando audio');
+      // Activar audio
+      const success = await notificationService.initAudioWithUserGesture();
+      setAudioReady(success);
+      localStorage.setItem('kitchenAudioEnabled', success.toString());
+      
+      if (success) {
+        showSuccess('Audio activado para notificaciones');
+        // Reproducir sonidos de prueba
+        notificationService.playNotification('itemCreated');
+        
+        // Reproducir sonido de eliminación después de 1 segundo
+        setTimeout(() => {
+          notificationService.playNotification('itemDeleted');
+        }, 1000);
+      } else {
+        showError('Error activando audio');
+      }
     }
   };
 
@@ -408,17 +422,17 @@ const Kitchen = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Botón Activar Audio */}
+            {/* Botón Toggle Audio */}
             {['cocineros', 'administradores'].includes(userRole?.toLowerCase()) && (
               <button
-                onClick={handleActivateAudio}
+                onClick={handleToggleAudio}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   audioReady
                     ? 'bg-green-100 text-green-700 border border-green-200'
                     : 'bg-yellow-100 text-yellow-700 border border-yellow-200 hover:bg-yellow-200'
                 }`}
               >
-                {audioReady ? '🔊 Audio OK' : '🔇 Activar Audio'}
+                {audioReady ? 'Audio ON' : 'Audio OFF'}
               </button>
             )}
             
