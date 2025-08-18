@@ -7,8 +7,13 @@
 
 echo "🏗️ PRODUCTION DEPLOYMENT"
 
-# Build frontend
-echo "📦 Building frontend..."
+# Build frontend with production environment
+echo "📦 Building frontend for production..."
+if [ -f frontend/.env.production ]; then
+    echo "✅ Using .env.production"
+else
+    echo "⚠️ Warning: frontend/.env.production not found"
+fi
 cd frontend && npm run build && cd ..
 
 # Deploy with production profile

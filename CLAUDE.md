@@ -68,6 +68,7 @@
 - `frontend/src/services/api.js` - API client
 - `frontend/src/pages/` - App pages
 - `frontend/src/components/` - Reusable components
+- `frontend/.env.production` - Production environment variables (create before deploy)
 
 ---
 
@@ -79,10 +80,22 @@
 # 1. Test locally
 ./dev.sh
 
-# 2. SSH to EC2
+# 2. Create production environment file (IMPORTANT!)
+cat > frontend/.env.production << EOF
+VITE_API_BASE_URL=https://www.xn--elfogndedonsoto-zrb.com/api/v1
+VITE_AWS_COGNITO_USER_POOL_ID=us-west-2_bdCwF60ZI
+VITE_AWS_COGNITO_APP_CLIENT_ID=4i9hrd7srgbqbtun09p43ncfn0
+VITE_AWS_REGION=us-west-2
+VITE_FORCE_COGNITO=true
+EOF
+
+# 3. Commit and push changes
+git add -A && git commit -m "Deploy: Update for production" && git push
+
+# 4. SSH to EC2
 ssh -i "ubuntu_fds_key.pem" ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com
 
-# 3. Deploy
+# 5. Deploy on EC2
 cd /opt/restaurant-web
 git pull origin main
 ./prod.sh
@@ -222,3 +235,24 @@ DATABASE_NAME=restaurant_prod.sqlite3
 - **CSRF**: Automatically handled for development environment
 - **Authentication**: AWS Cognito required for all API endpoints
 - **Deployment**: Single command deployment with `./prod.sh`
+
+---
+
+## 🐛 Common Issues & Solutions
+
+### XMLHttpRequest cannot load http://localhost:8000
+
+**Problem**: Frontend is trying to connect to localhost instead of production API.
+
+**Solution**: 
+1. Ensure `frontend/.env.production` exists with correct `VITE_API_BASE_URL`
+2. Rebuild frontend: `cd frontend && npm run build`
+3. Redeploy: `./prod.sh`
+
+### CORS Errors
+
+**Problem**: API requests blocked by CORS policy.
+
+**Solution**: 
+- Backend automatically configures CORS based on `DOMAIN_NAME` in `.env.ec2`
+- Ensure nginx is passing correct headers (already configured)
