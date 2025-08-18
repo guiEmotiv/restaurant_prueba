@@ -19,11 +19,11 @@ services:
       - ./data:/app/data
       - ./backend:/app/backend  # Hot-reload for development
     environment:
-      - DJANGO_SETTINGS_MODULE=backend.settings${PROD:+_ec2}
+      - DJANGO_SETTINGS_MODULE=backend.settings_ec2
       - DATABASE_PATH=/app/data
-      - DATABASE_NAME=restaurant_${PROD:+prod}${PROD:-dev}.sqlite3
+      - DATABASE_NAME=restaurant_prod.sqlite3
     env_file:
-      - .env.${PROD:+ec2}${PROD:-dev}
+      - .env.ec2
     restart: unless-stopped
 
   # ────────────────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/conf.d/ssl.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/conf.d/simple.conf:/etc/nginx/conf.d/default.conf
       - ./frontend/dist:/var/www/html
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:

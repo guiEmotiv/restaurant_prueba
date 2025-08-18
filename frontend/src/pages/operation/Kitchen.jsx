@@ -18,12 +18,10 @@ const Kitchen = () => {
   useEffect(() => {
     loadKitchenBoard();
     
-    // Configurar notificaciones de audio (solo en desarrollo)
-    if (import.meta.env.MODE === 'development') {
-      notificationService.setCurrentUserRole(userRole);
-      orderItemPoller.setKitchenView(true);
-      orderItemPoller.startPolling();
-    }
+    // Configurar notificaciones de audio y polling
+    notificationService.setCurrentUserRole(userRole);
+    orderItemPoller.setKitchenView(true);
+    orderItemPoller.startPolling();
     
     // Auto-refresh en tiempo real cada 5 segundos
     const interval = setInterval(loadKitchenBoard, 5000);
@@ -31,9 +29,7 @@ const Kitchen = () => {
     return () => {
       clearInterval(interval);
       // Detener polling al salir de la vista
-      if (import.meta.env.MODE === 'development') {
-        orderItemPoller.stopPolling();
-      }
+      orderItemPoller.stopPolling();
     };
   }, [userRole]);
 
@@ -49,22 +45,20 @@ const Kitchen = () => {
 
   // Activar audio con gesto del usuario
   const handleActivateAudio = async () => {
-    if (import.meta.env.MODE === 'development') {
-      const success = await notificationService.initAudioWithUserGesture();
-      setAudioReady(success);
+    const success = await notificationService.initAudioWithUserGesture();
+    setAudioReady(success);
+    
+    if (success) {
+      showSuccess('🔊 Audio activado para notificaciones');
+      // Reproducir sonidos de prueba
+      notificationService.playNotification('itemCreated');
       
-      if (success) {
-        showSuccess('🔊 Audio activado para notificaciones');
-        // Reproducir sonidos de prueba
-        notificationService.playNotification('itemCreated');
-        
-        // Reproducir sonido de eliminación después de 1 segundo
-        setTimeout(() => {
-          notificationService.playNotification('itemDeleted');
-        }, 1000);
-      } else {
-        showError('❌ Error activando audio');
-      }
+      // Reproducir sonido de eliminación después de 1 segundo
+      setTimeout(() => {
+        notificationService.playNotification('itemDeleted');
+      }, 1000);
+    } else {
+      showError('❌ Error activando audio');
     }
   };
 
@@ -414,8 +408,8 @@ const Kitchen = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Botón Activar Audio (solo en desarrollo) */}
-            {import.meta.env.MODE === 'development' && ['cocineros', 'administradores'].includes(userRole?.toLowerCase()) && (
+            {/* Botón Activar Audio */}
+            {['cocineros', 'administradores'].includes(userRole?.toLowerCase()) && (
               <button
                 onClick={handleActivateAudio}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
