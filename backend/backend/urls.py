@@ -63,6 +63,29 @@ def health_check(request):
         'message': 'Restaurant API is running'
     })
 
+def auth_debug(request):
+    """Debug endpoint to check authentication status - no auth required"""
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    user_info = {
+        'is_authenticated': hasattr(request, 'user') and request.user.is_authenticated,
+        'user': str(request.user) if hasattr(request, 'user') else 'No user',
+        'has_auth_header': bool(auth_header),
+        'auth_header_prefix': auth_header[:20] + '...' if len(auth_header) > 20 else auth_header,
+        'auth_header_length': len(auth_header),
+    }
+    
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        token_segments = len(token.split('.'))
+        user_info.update({
+            'token_length': len(token),
+            'token_segments': token_segments,
+            'token_prefix': token[:30] + '...' if len(token) > 30 else token,
+            'token_valid_format': token_segments == 3
+        })
+    
+    return JsonResponse(user_info)
+
 def create_optimized_import_function(model_class, table_name, required_columns, process_row_func=None, max_file_size_mb=10):
     """
     Optimized factory function to create Excel import functions for different models
@@ -799,6 +822,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # Health check - MUST come before api/v1/ include to bypass authentication
     path('api/v1/health/', health_check, name='health_check'),
+    # Auth debug endpoint (public - no auth required)
+    path('api/v1/auth-debug/', auth_debug, name='auth_debug'),
     # CSRF endpoint (public - no auth required)
     path('csrf/', get_csrf_token, name='csrf_token'),
     # Import endpoints outside of API middleware

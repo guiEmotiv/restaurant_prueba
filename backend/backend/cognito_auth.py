@@ -76,7 +76,7 @@ class CognitoAuthenticationMiddleware:
             return self.get_response(request)
         
         # Skip authentication for certain paths
-        skip_paths = ['/admin/', '/api/v1/health/', '/api/v1/csrf/', '/static/', '/media/']
+        skip_paths = ['/admin/', '/api/v1/health/', '/api/v1/auth-debug/', '/api/v1/csrf/', '/static/', '/media/']
         if any(request.path.startswith(path) for path in skip_paths):
             return self.get_response(request)
         
@@ -99,6 +99,10 @@ class CognitoAuthenticationMiddleware:
             logger.info(f"🔍 Token segments: {len(segments)}")
             if len(segments) != 3:
                 logger.error(f"❌ Invalid token: Not enough segments (found {len(segments)}, expected 3)")
+                logger.error(f"❌ Full token received: '{token}'")
+                # Return 401 immediately for malformed tokens
+                if request.path.startswith('/api/v1/'):
+                    return JsonResponse({'detail': 'Token de autenticación malformado.'}, status=401)
         else:
             logger.error("❌ Empty token received")
         

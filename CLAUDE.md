@@ -256,3 +256,19 @@ DATABASE_NAME=restaurant_prod.sqlite3
 **Solution**: 
 - Backend automatically configures CORS based on `DOMAIN_NAME` in `.env.ec2`
 - Ensure nginx is passing correct headers (already configured)
+
+### 403 Forbidden / Authentication Errors
+
+**Problem**: Getting 403 errors or "Invalid token: Not enough segments" in production.
+
+**Common Causes**:
+1. User not logged in with AWS Cognito
+2. Token expired or invalid
+3. Frontend not sending proper authentication headers
+
+**Solution**:
+1. Ensure users are created in AWS Cognito User Pool: `us-west-2_bdCwF60ZI`
+2. Verify user groups are assigned (administradores, meseros)
+3. Check browser console for authentication errors
+4. Clear browser cache and cookies, then login again
+5. Verify frontend is using ID Token (not Access Token) for API calls
