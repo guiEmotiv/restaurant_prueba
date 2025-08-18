@@ -82,7 +82,10 @@ class CognitoAuthenticationMiddleware:
         
         # Get token from Authorization header
         auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        logger.info(f"🔍 Raw auth header: '{auth_header[:50]}...' (length: {len(auth_header)})")
+        
         if not auth_header.startswith('Bearer '):
+            logger.info(f"🔍 No Bearer token found for path: {request.path}")
             # Return 401 for API endpoints that require authentication
             if request.path.startswith('/api/v1/'):
                 return JsonResponse({'detail': 'Las credenciales de autenticación no se proveyeron.'}, status=401)
