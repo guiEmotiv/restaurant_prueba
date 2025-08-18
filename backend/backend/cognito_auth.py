@@ -76,7 +76,7 @@ class CognitoAuthenticationMiddleware:
             return self.get_response(request)
         
         # Skip authentication for certain paths
-        skip_paths = ['/admin/', '/api/v1/health/', '/static/', '/media/']
+        skip_paths = ['/admin/', '/api/v1/health/', '/api/v1/csrf/', '/static/', '/media/']
         if any(request.path.startswith(path) for path in skip_paths):
             return self.get_response(request)
         
@@ -90,6 +90,17 @@ class CognitoAuthenticationMiddleware:
             return self.get_response(request)
         
         token = auth_header.split(' ')[1]
+        
+        # Log token info for debugging
+        if token:
+            logger.info(f"🔍 Auth header received: Bearer {token[:20]}... (length: {len(token)})")
+            # Check if token has proper JWT format (3 segments)
+            segments = token.split('.')
+            logger.info(f"🔍 Token segments: {len(segments)}")
+            if len(segments) != 3:
+                logger.error(f"❌ Invalid token: Not enough segments (found {len(segments)}, expected 3)")
+        else:
+            logger.error("❌ Empty token received")
         
         try:
             # Verify and decode the JWT token
