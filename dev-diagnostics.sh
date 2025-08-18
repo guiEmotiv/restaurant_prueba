@@ -28,7 +28,7 @@ echo "🔐 === VERIFICANDO COGNITO ==="
 if [ -f "frontend/.env" ]; then
     echo "✅ Archivo .env existe"
     echo "Variables clave:"
-    grep -E "(VITE_AWS_|VITE_DISABLE_AUTH|VITE_FORCE_COGNITO)" frontend/.env
+    grep -E "VITE_AWS_" frontend/.env
 else
     echo "❌ Archivo frontend/.env no encontrado"
 fi

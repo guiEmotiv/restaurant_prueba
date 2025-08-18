@@ -167,6 +167,26 @@ if DOMAIN_NAME:
 
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF Configuration for development
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",  # Vite development server
+    "http://127.0.0.1:5173",
+]
+
+# Add domain to CSRF if configured
+if DOMAIN_NAME:
+    CSRF_TRUSTED_ORIGINS.extend([
+        f"https://{DOMAIN_NAME}",
+        f"https://www.{DOMAIN_NAME}",
+    ])
+
+# CSRF Cookie settings for frontend
+CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = not DEBUG  # Use secure cookies in production
+CSRF_USE_SESSIONS = False  # Use cookies instead of sessions
+
 # Allow specific headers including 'Expires'
 CORS_ALLOW_HEADERS = [
     'accept',

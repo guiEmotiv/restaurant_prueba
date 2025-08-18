@@ -2,22 +2,40 @@ import { useState, useEffect } from 'react';
 import { Clock, AlertTriangle, ChefHat, Filter, User, MapPin, Package, CheckCircle, Coffee, Utensils } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
+import orderItemPoller from '../../services/orderItemPoller';
+import notificationService from '../../services/notifications';
 
 const Kitchen = () => {
   const [kitchenBoard, setKitchenBoard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedGroupTab, setSelectedGroupTab] = useState('all');
   const [selectedTableFilter, setSelectedTableFilter] = useState('all'); // all, or specific table
+  const [audioReady, setAudioReady] = useState(false);
   const { showSuccess, showError } = useToast();
+  const { userRole } = useAuth();
 
   useEffect(() => {
     loadKitchenBoard();
     
+    // Configurar notificaciones de audio (solo en desarrollo)
+    if (import.meta.env.MODE === 'development') {
+      notificationService.setCurrentUserRole(userRole);
+      orderItemPoller.setKitchenView(true);
+      orderItemPoller.startPolling();
+    }
+    
     // Auto-refresh en tiempo real cada 5 segundos
     const interval = setInterval(loadKitchenBoard, 5000);
     
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+      // Detener polling al salir de la vista
+      if (import.meta.env.MODE === 'development') {
+        orderItemPoller.stopPolling();
+      }
+    };
+  }, [userRole]);
 
   const loadKitchenBoard = async () => {
     try {
@@ -26,6 +44,27 @@ const Kitchen = () => {
       setLoading(false);
     } catch (error) {
       setLoading(false);
+    }
+  };
+
+  // Activar audio con gesto del usuario
+  const handleActivateAudio = async () => {
+    if (import.meta.env.MODE === 'development') {
+      const success = await notificationService.initAudioWithUserGesture();
+      setAudioReady(success);
+      
+      if (success) {
+        showSuccess('🔊 Audio activado para notificaciones');
+        // Reproducir sonidos de prueba
+        notificationService.playNotification('itemCreated');
+        
+        // Reproducir sonido de eliminación después de 1 segundo
+        setTimeout(() => {
+          notificationService.playNotification('itemDeleted');
+        }, 1000);
+      } else {
+        showError('❌ Error activando audio');
+      }
     }
   };
 
@@ -374,8 +413,24 @@ const Kitchen = () => {
             ))}
           </div>
 
-          <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+          <div className="flex items-center gap-3">
+            {/* Botón Activar Audio (solo en desarrollo) */}
+            {import.meta.env.MODE === 'development' && ['cocineros', 'administradores'].includes(userRole?.toLowerCase()) && (
+              <button
+                onClick={handleActivateAudio}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  audioReady
+                    ? 'bg-green-100 text-green-700 border border-green-200'
+                    : 'bg-yellow-100 text-yellow-700 border border-yellow-200 hover:bg-yellow-200'
+                }`}
+              >
+                {audioReady ? '🔊 Audio OK' : '🔇 Activar Audio'}
+              </button>
+            )}
+            
+            <div className="flex items-center gap-1">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+            </div>
           </div>
         </div>
 

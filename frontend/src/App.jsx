@@ -1,14 +1,12 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Amplify } from 'aws-amplify';
 import { ToastProvider } from './contexts/ToastContext';
-import { AuthProvider, MockAuthProvider } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleProtectedRoute from './components/auth/RoleProtectedRoute';
-import AuthLoadingScreen from './components/auth/AuthLoadingScreen';
-import NoRoleError from './components/auth/NoRoleError';
 import RoleValidator from './components/auth/RoleValidator';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
 import DashboardOperativo from './pages/DashboardOperativo';
@@ -22,28 +20,24 @@ import Ingredients from './pages/inventory/Ingredients';
 import Recipes from './pages/inventory/Recipes';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import Kitchen from './pages/operation/Kitchen';
-import RestaurantOperations from './pages/operation/RestaurantOperations';
+import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
 
 
 // Configure AWS Amplify
 Amplify.configure(amplifyConfig);
 
-// 🔐 AWS Cognito Configuration - OPTIMIZADO
+// 🔐 AWS Cognito Configuration - Required
 const isCognitoConfigured = (() => {
   const hasCredentials = !!(
     import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID && 
     import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID
   );
   
-  const isAuthEnabled = (
-    import.meta.env.VITE_DISABLE_AUTH === 'false' || 
-    import.meta.env.VITE_FORCE_COGNITO === 'true'
-  );
+  if (!hasCredentials) {
+    console.error('AWS Cognito credentials not configured. Please set VITE_AWS_COGNITO_USER_POOL_ID and VITE_AWS_COGNITO_APP_CLIENT_ID');
+  }
   
-  const cognitoEnabled = hasCredentials && isAuthEnabled;
-  
-  
-  return cognitoEnabled;
+  return hasCredentials;
 })();
 
 
@@ -112,12 +106,12 @@ const AppContent = () => {
           } />
           <Route path="/operations" element={
             <RoleProtectedRoute requiredPermission="canManageOrders">
-              <RestaurantOperations />
+              <TableOrderEcommerce />
             </RoleProtectedRoute>
           } />
           <Route path="/table-order" element={
             <RoleProtectedRoute requiredPermission="canManageOrders">
-              <RestaurantOperations />
+              <TableOrderEcommerce />
             </RoleProtectedRoute>
           } />
 
@@ -152,24 +146,30 @@ const AppContent = () => {
 
 function App() {
   try {
+    if (!isCognitoConfigured) {
+      return (
+        <div style={{ padding: '20px', color: 'red', textAlign: 'center' }}>
+          <h2>Configuration Error</h2>
+          <p>AWS Cognito credentials are required but not configured.</p>
+          <p>Please set the following environment variables:</p>
+          <ul style={{ textAlign: 'left', display: 'inline-block' }}>
+            <li>VITE_AWS_COGNITO_USER_POOL_ID</li>
+            <li>VITE_AWS_COGNITO_APP_CLIENT_ID</li>
+          </ul>
+        </div>
+      );
+    }
+
     return (
       <ToastProvider>
         <Router>
-          {isCognitoConfigured ? (
-            <LoginForm>
-              <AuthProvider>
-                <RoleValidator>
-                  <AppContent />
-                </RoleValidator>
-              </AuthProvider>
-            </LoginForm>
-          ) : (
-            <MockAuthProvider>
+          <LoginForm>
+            <AuthProvider>
               <RoleValidator>
                 <AppContent />
               </RoleValidator>
-            </MockAuthProvider>
-          )}
+            </AuthProvider>
+          </LoginForm>
         </Router>
       </ToastProvider>
     );

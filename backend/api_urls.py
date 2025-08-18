@@ -6,12 +6,16 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
+from django.middleware.csrf import get_token
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
 import pandas as pd
 
 # Import ViewSets
 from config.views import UnitViewSet, ZoneViewSet, TableViewSet, ContainerViewSet, operational_info
 from config.models import Unit
-from config.views_debug import database_debug, api_debug
+# Debug views removed - not needed for simplified setup
 from inventory.views import GroupViewSet, IngredientViewSet, RecipeViewSet, RecipeItemViewSet
 from operation.views import (
     OrderViewSet, OrderItemViewSet, PaymentViewSet, ContainerSaleViewSet
@@ -55,12 +59,19 @@ def import_units_excel(request):
     
     return Response({'status': 'Import endpoint is working', 'method': 'POST', 'files': list(request.FILES.keys())})
 
+@require_http_methods(["GET"])
+@ensure_csrf_cookie
+def get_csrf_token(request):
+    """Get CSRF token for frontend - Django view (no DRF auth)"""
+    return JsonResponse({'csrfToken': get_token(request)})
+
 urlpatterns = [
+    # CSRF endpoint for frontend
+    path('csrf/', get_csrf_token, name='csrf-token'),
     # Import endpoints FIRST to avoid router conflicts
     path('import/units/', import_units_excel, name='import-units-excel'),
     path('restaurant-config/operational_info/', operational_info, name='operational-info'),
-    path('debug/database/', database_debug, name='database-debug'),
-    path('debug/api/', api_debug, name='api-debug'),
+    # Debug endpoints removed for simplified setup
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     # Router patterns LAST

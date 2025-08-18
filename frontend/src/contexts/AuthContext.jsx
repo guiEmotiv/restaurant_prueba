@@ -236,54 +236,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// 🚫 Mock AuthProvider for development without authentication
-export const MockAuthProvider = ({ children }) => {
-  
-  const ROLES = {
-    ADMIN: 'administradores',
-    WAITER: 'meseros', 
-    COOK: 'cocineros'
-  };
-
-  // Mock user with admin permissions for development
-  const mockUser = {
-    username: 'admin-dev',
-    userId: 'mock-admin-id'
-  };
-
-  const mockValue = {
-    user: mockUser,
-    userRole: ROLES.ADMIN,
-    loading: false,
-    isAuthenticated: true,
-    isAdmin: () => true,
-    isWaiter: () => false,
-    isCook: () => false,
-    hasPermission: () => true, // ✅ All permissions in development
-    logout: () => {},
-    refreshAuth: () => Promise.resolve(),
-    getDefaultRoute: () => '/',
-    ROLES,
-    PERMISSIONS: {
-      [ROLES.ADMIN]: {
-        canViewDashboard: true,
-        canManageConfig: true,
-        canManageInventory: true,
-        canManageOrders: true,
-        canViewOrders: true,
-        canViewKitchen: true,
-        canViewTableStatus: true,
-        canManagePayments: true,
-        canViewHistory: true,
-      }
-    }
-  };
-
-  return (
-    <AuthContext.Provider value={mockValue}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
 
 export default AuthContext;

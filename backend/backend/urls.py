@@ -2,17 +2,22 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
-from django.views.generic import TemplateView
 from django.http import HttpResponse, FileResponse, Http404, JsonResponse
 from pathlib import Path
 import mimetypes
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from rest_framework import status
 from django.db import connection
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.views.decorators.http import require_http_methods
+from django.middleware.csrf import get_token
 import pandas as pd
+
+@require_http_methods(["GET"])
+@ensure_csrf_cookie
+def get_csrf_token(request):
+    """Get CSRF token for frontend - public endpoint"""
+    return JsonResponse({'csrfToken': get_token(request)})
 
 def index_view(request):
     """Serve React index.html for production"""
@@ -53,14 +58,10 @@ def serve_vite_svg(request):
 
 def health_check(request):
     """Simple health check endpoint that doesn't require authentication"""
-    from django.http import JsonResponse
     return JsonResponse({
         'status': 'ok',
         'message': 'Restaurant API is running'
     })
-
-
-from django.views.decorators.csrf import csrf_exempt
 
 def create_optimized_import_function(model_class, table_name, required_columns, process_row_func=None, max_file_size_mb=10):
     """
@@ -798,6 +799,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # Health check - MUST come before api/v1/ include to bypass authentication
     path('api/v1/health/', health_check, name='health_check'),
+    # CSRF endpoint (public - no auth required)
+    path('csrf/', get_csrf_token, name='csrf_token'),
     # Import endpoints outside of API middleware
     path('import-units/', import_units_excel_main, name='import_units'),
     path('import-zones/', import_zones_excel_main, name='import_zones'),

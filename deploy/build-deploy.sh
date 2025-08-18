@@ -121,8 +121,6 @@ validate_env_vars() {
         "VITE_AWS_REGION" 
         "VITE_AWS_COGNITO_USER_POOL_ID"
         "VITE_AWS_COGNITO_APP_CLIENT_ID"
-        "VITE_DISABLE_AUTH"
-        "VITE_FORCE_COGNITO"
     )
     
     echo -e "${BLUE}🔍 Validating environment variables in $env_file...${NC}"
@@ -140,7 +138,6 @@ validate_env_vars() {
         echo -e "${BLUE}📋 Critical configuration:${NC}"
         echo "   API URL: $(grep VITE_API_BASE_URL "$env_file" | cut -d'=' -f2)"
         echo "   Cognito Pool: $(grep VITE_AWS_COGNITO_USER_POOL_ID "$env_file" | cut -d'=' -f2)"
-        echo "   Auth Enabled: $(grep VITE_DISABLE_AUTH "$env_file" | cut -d'=' -f2)"
         return 0
     else
         echo -e "${RED}❌ Missing required environment variables:${NC}"
@@ -262,8 +259,6 @@ VITE_API_BASE_URL=https://www.$DOMAIN/api/v1
 VITE_AWS_REGION=$AWS_REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
-VITE_DISABLE_AUTH=false
-VITE_FORCE_COGNITO=true
 EOF
     
     # Install dependencies and build frontend
@@ -360,8 +355,6 @@ VITE_API_BASE_URL=https://www.$DOMAIN/api/v1
 VITE_AWS_REGION=$AWS_REGION
 VITE_AWS_COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
 VITE_AWS_COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
-VITE_DISABLE_AUTH=false
-VITE_FORCE_COGNITO=true
 EOF
     
     echo -e "${BLUE}📦 Installing dependencies...${NC}"

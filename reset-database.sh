@@ -1,34 +1,24 @@
 #!/bin/bash
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 🧹 SCRIPT DE LIMPIEZA DE DATOS OPERACIONALES
+# 🗑️  SCRIPT UNIVERSAL DE RESET DE BASE DE DATOS
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# Este script elimina SOLO los datos operacionales, manteniendo la configuración
+# Este script elimina TODOS los datos de la base de datos y reinicia los contadores
 # Funciona tanto en desarrollo local como en producción (Docker)
 #
-# ✅ SE CONSERVAN:
-#   • Unidades (config_unit)
-#   • Zonas (config_zone) 
-#   • Mesas (config_table)
-#   • Envases/Contenedores (config_container)
-#   • Grupos (inventory_group)
-#   • Ingredientes (inventory_ingredient)
-#   • Recetas (inventory_recipe)
-#   • Items de recetas (inventory_recipeitem)
-#
-# ❌ SE ELIMINAN:
-#   • Órdenes (operation_order)
-#   • Items de órdenes (operation_orderitem)
-#   • Pagos (operation_payment)
-#   • Ventas de contenedores (operation_containersale)
-#   • Sesiones de usuarios
+# CARACTERÍSTICAS:
+# ✅ Detecta automáticamente el entorno (local/docker)
+# ✅ Elimina TODOS los datos de todas las tablas
+# ✅ Reinicia contadores de ID (auto-increment)
+# ✅ Crea backup automático antes de eliminar
+# ✅ Validación completa post-limpieza
 #
 # USO:
-#   ./reset-operational-data.sh              # Desarrollo local
-#   ./reset-operational-data.sh --prod       # Producción (Docker)
-#   ./reset-operational-data.sh --backup     # Con backup
-#   ./reset-operational-data.sh --force      # Sin confirmación
+#   ./reset-database.sh              # Desarrollo local
+#   ./reset-database.sh --prod       # Producción (Docker)
+#   ./reset-database.sh --skip-backup # Sin crear backup
+#   ./reset-database.sh --force      # Sin confirmación
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -44,7 +34,7 @@ NC='\033[0m' # No Color
 
 # Configuración por defecto
 ENVIRONMENT="dev"
-CREATE_BACKUP=false
+CREATE_BACKUP=true
 SKIP_CONFIRMATION=false
 
 # Procesar argumentos
@@ -54,8 +44,8 @@ while [[ $# -gt 0 ]]; do
             ENVIRONMENT="prod"
             shift
             ;;
-        --backup)
-            CREATE_BACKUP=true
+        --skip-backup)
+            CREATE_BACKUP=false
             shift
             ;;
         --force)
@@ -67,7 +57,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Opciones:"
             echo "  --prod, --production  Ejecutar en producción (Docker)"
-            echo "  --backup             Crear backup antes de limpiar"
+            echo "  --skip-backup        No crear backup"
             echo "  --force              Sin confirmación"
             echo "  --help, -h           Mostrar esta ayuda"
             exit 0
@@ -80,8 +70,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo -e "${BLUE}🧹 === SCRIPT DE LIMPIEZA DE DATOS OPERACIONALES ===${NC}"
-echo -e "${CYAN}Entorno: ${YELLOW}$(echo $ENVIRONMENT | tr '[:lower:]' '[:upper:]')${NC}"
+echo -e "${BLUE}🗑️  === SCRIPT UNIVERSAL DE RESET DE BASE DE DATOS ===${NC}"
+echo -e "${CYAN}Entorno: ${YELLOW}${ENVIRONMENT^^}${NC}"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -117,37 +107,22 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# INFORMACIÓN DE LIMPIEZA
-# ═══════════════════════════════════════════════════════════════════════════════
-
-echo -e "${BLUE}📋 LIMPIEZA SELECTIVA DE DATOS:${NC}"
-echo ""
-echo -e "${GREEN}✅ SE CONSERVARÁN:${NC}"
-echo "   • Unidades de medida"
-echo "   • Zonas del restaurante"  
-echo "   • Configuración de mesas"
-echo "   • Envases/contenedores"
-echo "   • Grupos de productos"
-echo "   • Ingredientes y su stock"
-echo "   • Recetas del menú"
-echo ""
-echo -e "${RED}❌ SE ELIMINARÁN:${NC}"
-echo "   • Todas las órdenes/pedidos"
-echo "   • Items de pedidos"
-echo "   • Historial de pagos"
-echo "   • Ventas de contenedores"
-echo "   • Sesiones de usuarios"
-echo ""
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # CONFIRMACIÓN DE SEGURIDAD
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if [ "$SKIP_CONFIRMATION" = false ]; then
+    echo -e "${RED}⚠️  ADVERTENCIA: Este script eliminará TODOS los datos:${NC}"
+    echo "   • Configuración (zonas, mesas, unidades, envases)"
+    echo "   • Inventario (grupos, ingredientes, recetas)"
+    echo "   • Operaciones (órdenes, pagos, ventas)"
+    echo "   • Usuarios y sesiones"
+    echo "   • TODOS los datos históricos"
+    echo ""
     echo -e "${YELLOW}Base de datos: ${DB_PATH}${NC}"
     echo ""
-    read -p "¿Continuar con la limpieza operacional? (s/N): " confirmation
-    if [[ ! "$confirmation" =~ ^[sS]$ ]]; then
+    
+    read -p "¿Estás seguro? Escribe 'ELIMINAR TODO' para continuar: " confirmation
+    if [ "$confirmation" != "ELIMINAR TODO" ]; then
         echo -e "${RED}❌ Operación cancelada${NC}"
         exit 1
     fi
@@ -159,7 +134,7 @@ fi
 
 if [ "$CREATE_BACKUP" = true ]; then
     echo -e "${BLUE}💾 Creando backup de seguridad...${NC}"
-    BACKUP_NAME="backup_operational_$(date +%Y%m%d_%H%M%S).sqlite3"
+    BACKUP_NAME="backup_$(date +%Y%m%d_%H%M%S).sqlite3"
     
     if [ "$ENVIRONMENT" = "prod" ]; then
         $EXEC_PREFIX bash -c "
@@ -181,12 +156,12 @@ if [ "$CREATE_BACKUP" = true ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PASO 2: LIMPIEZA DE DATOS OPERACIONALES
+# PASO 2: RESET COMPLETO DE LA BASE DE DATOS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-echo -e "${BLUE}🗑️  Ejecutando limpieza de datos operacionales...${NC}"
+echo -e "${BLUE}🗑️  Ejecutando reset completo de base de datos...${NC}"
 
-# Script Python para limpieza selectiva
+# Script Python para reset completo
 RESET_SCRIPT='
 import os
 import sys
@@ -196,55 +171,45 @@ import django
 django.setup()
 
 from django.db import connection, transaction
-from operation.models import Order, OrderItem, Payment, ContainerSale
-from django.contrib.sessions.models import Session
-from django.contrib.auth.models import User
+from django.apps import apps
+from django.core.management.color import no_style
 
-print("🔄 Iniciando limpieza de datos operacionales...")
+print("🔄 Iniciando reset completo de base de datos...")
 
-# Definir modelos a limpiar
-models_to_clean = [
-    (OrderItem, "Items de órdenes"),
-    (Payment, "Pagos"),
-    (ContainerSale, "Ventas de contenedores"),
-    (Order, "Órdenes"),
-    (Session, "Sesiones de usuarios"),
-]
+# Obtener todos los modelos
+all_models = []
+for app_config in apps.get_app_configs():
+    if app_config.name.startswith(("config", "inventory", "operation", "auth", "django")):
+        all_models.extend(app_config.get_models())
 
+# Ordenar por dependencias
+def get_fk_count(model):
+    return -len([f for f in model._meta.get_fields() if hasattr(f, "related_model") and f.related_model])
+
+all_models.sort(key=get_fk_count)
+
+# Eliminar todos los datos
 with connection.cursor() as cursor:
     # Desactivar foreign keys temporalmente
     cursor.execute("PRAGMA foreign_keys = OFF;")
     
     total_deleted = 0
-    
-    # Eliminar datos operacionales
-    for model, description in models_to_clean:
+    for model in all_models:
+        table_name = model._meta.db_table
         try:
-            count = model.objects.count()
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            count = cursor.fetchone()[0]
             if count > 0:
-                model.objects.all().delete()
+                cursor.execute(f"DELETE FROM {table_name}")
                 total_deleted += count
-                print(f"  ✓ {description}: {count} registros eliminados")
-            else:
-                print(f"  ✓ {description}: 0 registros (ya vacío)")
+                print(f"  ✓ {model.__name__}: {count} registros eliminados")
         except Exception as e:
-            print(f"  ⚠️  Error limpiando {description}: {str(e)}")
-    
-    # Reiniciar contadores SOLO de tablas operacionales
-    print("\n🔄 Reiniciando contadores de tablas operacionales...")
-    operational_tables = [
-        "operation_order",
-        "operation_orderitem", 
-        "operation_payment",
-        "operation_containersale"
-    ]
-    
-    for table in operational_tables:
-        try:
-            cursor.execute(f"DELETE FROM sqlite_sequence WHERE name=?", (table,))
-            print(f"  ✓ Contador reiniciado: {table}")
-        except Exception as e:
+            # Tabla puede no existir
             pass
+    
+    # Reiniciar TODOS los contadores de secuencia
+    print("\n🔄 Reiniciando contadores de ID...")
+    cursor.execute("DELETE FROM sqlite_sequence;")
     
     # Reactivar foreign keys
     cursor.execute("PRAGMA foreign_keys = ON;")
@@ -252,28 +217,9 @@ with connection.cursor() as cursor:
     # Optimizar base de datos
     cursor.execute("VACUUM;")
 
-print(f"\n✅ Total eliminados: {total_deleted} registros operacionales")
-print("✅ Configuración del restaurante preservada")
+print(f"\n✅ Total eliminados: {total_deleted} registros")
+print("✅ Contadores de ID reiniciados a 1")
 print("✅ Base de datos optimizada")
-
-# Mostrar estado de datos preservados
-from config.models import Unit, Zone, Table, Container
-from inventory.models import Group, Ingredient, Recipe
-
-print("\n📊 Datos preservados:")
-preserved_counts = {
-    "Unidades": Unit.objects.count(),
-    "Zonas": Zone.objects.count(),
-    "Mesas": Table.objects.count(),
-    "Envases": Container.objects.count(),
-    "Grupos": Group.objects.count(),
-    "Ingredientes": Ingredient.objects.count(),
-    "Recetas": Recipe.objects.count(),
-}
-
-for model_name, count in preserved_counts.items():
-    if count > 0:
-        print(f"  ✓ {model_name}: {count}")
 '
 
 if [ "$ENVIRONMENT" = "prod" ]; then
@@ -287,32 +233,28 @@ fi
 # PASO 3: VERIFICACIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-echo -e "${BLUE}🔍 Verificando limpieza...${NC}"
+echo -e "${BLUE}🔍 Verificando estado final...${NC}"
 
 VERIFY_SCRIPT='
-from operation.models import Order, OrderItem, Payment, ContainerSale
+from django.apps import apps
 
-print("\n📊 Verificación de limpieza operacional:")
+print("\n📊 Estado de la base de datos:")
+total = 0
+for app_name in ["config", "inventory", "operation"]:
+    app = apps.get_app_config(app_name)
+    print(f"\n{app_name.upper()}:")
+    for model in app.get_models():
+        count = model.objects.count()
+        total += count
+        if count > 0:
+            print(f"  ⚠️  {model.__name__}: {count} registros")
+        else:
+            print(f"  ✓ {model.__name__}: 0 registros")
 
-operational_models = {
-    "Órdenes": Order.objects.count(),
-    "Items de orden": OrderItem.objects.count(),
-    "Pagos": Payment.objects.count(),
-    "Ventas de contenedores": ContainerSale.objects.count(),
-}
-
-all_clean = True
-for model_name, count in operational_models.items():
-    if count > 0:
-        print(f"  ⚠️  {model_name}: {count} (debería ser 0)")
-        all_clean = False
-    else:
-        print(f"  ✓ {model_name}: 0")
-
-if all_clean:
-    print("\n✅ Datos operacionales eliminados correctamente")
+if total == 0:
+    print("\n✅ BASE DE DATOS COMPLETAMENTE VACÍA")
 else:
-    print("\n⚠️  Algunos datos operacionales no se eliminaron")
+    print(f"\n⚠️  Aún quedan {total} registros en la BD")
 '
 
 if [ "$ENVIRONMENT" = "prod" ]; then
@@ -327,27 +269,28 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 
 echo ""
-echo -e "${GREEN}🎉 === LIMPIEZA OPERACIONAL COMPLETADA ===${NC}"
+echo -e "${GREEN}🎉 === RESET COMPLETADO EXITOSAMENTE ===${NC}"
 echo ""
 echo -e "${BLUE}📋 RESUMEN:${NC}"
-echo "   ✅ Configuración del restaurante preservada"
-echo "   ✅ Menú y recetas intactas"
-echo "   ✅ Datos operacionales eliminados"
-echo "   ✅ Contadores operacionales reiniciados"
-echo "   ✅ Base de datos optimizada"
+echo "   ✅ Base de datos completamente vacía"
+echo "   ✅ Contadores de ID reiniciados (próximo ID = 1)"
+echo "   ✅ Base de datos optimizada (VACUUM ejecutado)"
 if [ "$CREATE_BACKUP" = true ]; then
     echo "   ✅ Backup disponible: $BACKUP_NAME"
 fi
 echo ""
 
 if [ "$ENVIRONMENT" = "prod" ]; then
-    echo -e "${BLUE}🚀 Sistema listo para nuevas órdenes${NC}"
-    echo "   URL: https://www.xn--elfogndedonsoto-zrb.com"
+    echo -e "${BLUE}🎯 PRÓXIMOS PASOS:${NC}"
+    echo "   1. Acceder a: https://www.xn--elfogndedonsoto-zrb.com"
+    echo "   2. Configurar datos básicos desde la interfaz"
+    echo "   3. Importar datos usando las plantillas Excel"
 else
-    echo -e "${BLUE}🚀 Sistema listo para nuevas órdenes${NC}"
-    echo "   Frontend: cd frontend && npm run dev"
-    echo "   Backend: cd backend && python manage.py runserver"
+    echo -e "${BLUE}🎯 PRÓXIMOS PASOS:${NC}"
+    echo "   1. cd frontend && npm run dev"
+    echo "   2. cd backend && python manage.py runserver"
+    echo "   3. Configurar datos básicos desde http://localhost:5173"
 fi
 
 echo ""
-echo -e "${YELLOW}ℹ️  La configuración del restaurante se ha mantenido intacta${NC}"
+echo -e "${YELLOW}ℹ️  La base de datos está ahora en estado pristino${NC}"

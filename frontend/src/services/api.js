@@ -29,17 +29,78 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: API_CONFIG.TIMEOUT
+  timeout: API_CONFIG.TIMEOUT,
+  withCredentials: true,  // Enable cookies for CSRF
+  xsrfCookieName: 'csrftoken',
+  xsrfHeaderName: 'X-CSRFToken'
 });
 
 // Export API_BASE_URL for use in other components
 export { API_BASE_URL };
 
+// Debug function for authentication
+export const debugAuth = async () => {
+  try {
+    const { fetchAuthSession } = await import('aws-amplify/auth');
+    const session = await fetchAuthSession();
+    
+    console.log('🔐 Auth Debug Report:', {
+      hasTokens: !!session.tokens,
+      hasIdToken: !!session.tokens?.idToken,
+      hasAccessToken: !!session.tokens?.accessToken,
+      idTokenPrefix: session.tokens?.idToken?.toString().substring(0, 50) + '...',
+      accessTokenPrefix: session.tokens?.accessToken?.toString().substring(0, 50) + '...',
+    });
+    
+    return session;
+  } catch (error) {
+    console.error('❌ Auth Debug Error:', error);
+    return null;
+  }
+};
 
-// Add request interceptor for authentication
+// Make debug function available globally in development
+if (import.meta.env.MODE === 'development') {
+  window.debugAuth = debugAuth;
+}
+
+
+// Get CSRF token function
+const getCSRFToken = async () => {
+  try {
+    // Check if token is already in cookies
+    const token = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('csrftoken='))
+      ?.split('=')[1];
+    
+    if (token) return token;
+    
+    // If not in cookies, get from main server (not API)
+    const baseUrl = API_BASE_URL.replace('/api/v1', '');
+    const response = await fetch(`${baseUrl}/csrf/`, {
+      credentials: 'include'
+    });
+    const data = await response.json();
+    return data.csrfToken;
+  } catch (error) {
+    logger.warn('Failed to get CSRF token:', error);
+    return null;
+  }
+};
+
+// Add request interceptor for authentication and CSRF
 api.interceptors.request.use(
   async (config) => {
     logger.api(config.method?.toUpperCase(), config.url, config.data);
+    
+    // Add CSRF token for non-GET requests
+    if (config.method && config.method.toLowerCase() !== 'get') {
+      const csrfToken = await getCSRFToken();
+      if (csrfToken) {
+        config.headers['X-CSRFToken'] = csrfToken;
+      }
+    }
     
     // Add JWT token for authentication
     try {
@@ -47,15 +108,27 @@ api.interceptors.request.use(
       const { fetchAuthSession } = await import('aws-amplify/auth');
       const session = await fetchAuthSession();
       
+      logger.info('🔐 Auth Debug:', {
+        hasTokens: !!session.tokens,
+        hasIdToken: !!session.tokens?.idToken,
+        hasAccessToken: !!session.tokens?.accessToken,
+        url: config.url
+      });
+      
       // IMPORTANTE: Usar ID Token en lugar de Access Token para obtener grupos
       // El ID Token incluye los grupos del usuario (cognito:groups)
       if (session.tokens?.idToken) {
         config.headers.Authorization = `Bearer ${session.tokens.idToken}`;
+        logger.info('✅ ID Token attached to request');
       } else if (session.tokens?.accessToken) {
         // Fallback to access token if ID token not available
         config.headers.Authorization = `Bearer ${session.tokens.accessToken}`;
+        logger.info('✅ Access Token attached to request');
+      } else {
+        logger.warn('❌ No auth tokens available');
       }
     } catch (error) {
+      logger.error('❌ Auth error:', error);
       // If not authenticated or error getting token, continue without auth
     }
     

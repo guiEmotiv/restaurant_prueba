@@ -8,6 +8,7 @@ const TableOrderEcommerce = () => {
   const { user, userRole, hasPermission } = useAuth();
   const { showToast } = useToast();
 
+
   // Estados principales
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
@@ -153,6 +154,7 @@ const TableOrderEcommerce = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [step]); // Añadimos step como dependencia
+
 
   // Computed property para órdenes de la mesa actual
   const currentTableOrders = useMemo(() => {
@@ -780,7 +782,12 @@ const TableOrderEcommerce = () => {
       if (currentOrder) {
         // Para órdenes existentes: usar add_item
         for (const item of cart) {
-          await apiService.orders.addItem(currentOrder.id, mapCartItemToOrderData(item));
+          const newItem = await apiService.orders.addItem(currentOrder.id, mapCartItemToOrderData(item));
+          
+          // Log de item creado (solo en desarrollo)
+          if (import.meta.env.MODE === 'development') {
+            console.log('🔔 Item creado por:', userRole, '- Item:', item.recipe.name);
+          }
         }
         showToast('Items agregados al pedido', 'success');
       } else {
@@ -791,6 +798,11 @@ const TableOrderEcommerce = () => {
           items: cart.map(mapCartItemToOrderData)
         };
         const newOrder = await apiService.orders.create(newOrderData);
+        
+        // Log de nuevo pedido creado (solo en desarrollo)
+        if (import.meta.env.MODE === 'development') {
+          console.log('🔔 Nuevo pedido creado por:', userRole, '- Items:', cart.length);
+        }
         
         // Actualizar estado local eficientemente
         setAllOrders([...allOrders, newOrder]);

@@ -379,18 +379,16 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             # Obtener información del container para este item
             container_id = None
             container_price = None
-            print(f"🔍 DEBUG: selected_container_id = {selected_container_id}")
             if selected_container_id:
-                # Buscar container directamente usando SQL crudo para evitar foreign key issues
-                from django.db import connection
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT id, price FROM container WHERE id = ? AND is_active = 1", [selected_container_id])
-                    result = cursor.fetchone()
-                    print(f"🔍 DEBUG: SQL result = {result}")
-                    if result:
-                        container_id = result[0]
-                        container_price = result[1]
-                        print(f"✅ DEBUG: Found container {container_id} with price {container_price}")
+                # Buscar container usando Django ORM
+                try:
+                    from config.models import Container
+                    container = Container.objects.get(id=selected_container_id, is_active=True)
+                    container_id = container.id
+                    container_price = container.price
+                except Container.DoesNotExist:
+                    container_id = None
+                    container_price = None
             
             # Crear OrderItems individuales (uno por cada cantidad)
             created_items = []
@@ -503,14 +501,13 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         """Actualizar orden con nuevos items y container sales"""
-        print(f"🔄 Updating order {instance.id}")
-        print(f"📋 Validated data keys: {validated_data.keys()}")
+        # Update order processing
         
         items_data = validated_data.pop('items_data', None)
         container_sales_data = validated_data.pop('container_sales_data', None)
         
-        print(f"📦 Items data: {items_data}")
-        print(f"🥤 Container sales data: {container_sales_data}")
+# Debug: Items data processing
+# Debug: Container sales data processing
         
         # Actualizar campos básicos
         for attr, value in validated_data.items():
@@ -524,14 +521,12 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             
             # Crear nuevos items
             for item_data in items_data:
-                print(f"🔧 Processing item: {item_data}")
                 selected_container_id = item_data.pop('selected_container', None)
                 quantity = item_data.get('quantity', 1)
                 
                 try:
                     # Crear OrderItem
                     order_item = OrderItem.objects.create(order=instance, **item_data)
-                    print(f"✅ Created item: {order_item.id} - {order_item.recipe.name}")
                     
                     # Crear ContainerSale si hay contenedor seleccionado (independiente de is_takeaway)
                     if selected_container_id:
@@ -545,12 +540,10 @@ class OrderDetailSerializer(serializers.ModelSerializer):
                                 unit_price=container.price,
                                 total_price=container.price * quantity
                             )
-                            print(f"📦 Created container sale: {container_sale.id}")
                         except Container.DoesNotExist:
-                            print(f"❌ Container not found: {selected_container_id}")
+                            pass  # Container not found, continue without container
                             
                 except Exception as e:
-                    print(f"❌ Error creating item: {e}")
                     raise
             
             # Crear container sales adicionales si se especifican
