@@ -28,6 +28,7 @@
 ```
 
 **URLs**:
+
 - **Dev**: http://localhost:5173 + http://localhost:8000/api/v1/
 - **Prod**: https://www.xn--elfogndedonsoto-zrb.com/
 
@@ -36,6 +37,7 @@
 ## 🚀 **AUTOMATED DEPLOYMENT FEATURES**
 
 ### **Local Development** (`./deploy.sh --dev`)
+
 - ✅ Auto-installs npm dependencies if missing
 - ✅ Kills existing processes on port 5173
 - ✅ Handles problematic migrations automatically
@@ -43,6 +45,7 @@
 - ✅ Color-coded output for better visibility
 
 ### **Production Deployment** (`./deploy.sh --prod`)
+
 - ✅ Checks for uncommitted changes
 - ✅ Auto-backups database before deployment
 - ✅ Smart migration handling with fallbacks
@@ -50,6 +53,7 @@
 - ✅ Validates nginx configuration
 
 ### **Remote Deployment** (`./deploy-remote.sh`)
+
 ```bash
 # Quick deploy from local to production
 ./deploy-remote.sh deploy
@@ -62,8 +66,9 @@
 ```
 
 **What it does automatically**:
+
 1. ✅ Builds frontend with production config
-2. ✅ Updates Docker containers with correct settings  
+2. ✅ Updates Docker containers with correct settings
 3. ✅ Applies database migrations (handles known issues)
 4. ✅ Performs health check verification
 
@@ -72,11 +77,13 @@
 ## 🎯 **CRITICAL SUCCESS FACTORS**
 
 ### **Backend Configuration**
+
 - **MUST use**: `DJANGO_SETTINGS_MODULE=backend.settings_ec2` in production
 - **Database migrations**: Always applied automatically by deploy script
 - **Container name**: `restaurant-backend` (critical for nginx proxy)
 
-### **Kitchen View Real-time Features** 
+### **Kitchen View Real-time Features**
+
 ```javascript
 // NOW ENABLED IN PRODUCTION - No development restrictions
 notificationService.setCurrentUserRole(userRole);
@@ -84,7 +91,8 @@ orderItemPoller.setKitchenView(true);
 orderItemPoller.startPolling();
 ```
 
-### **Nginx Proxy** 
+### **Nginx Proxy**
+
 ```nginx
 # Simplified - Django handles CORS
 location /api/ {
@@ -102,6 +110,7 @@ location /api/ {
 ### **Environment Variables**
 
 **Backend Development:**
+
 ```bash
 # Development settings in container
 DEBUG=True
@@ -111,6 +120,7 @@ DJANGO_SETTINGS_MODULE=backend.settings
 ```
 
 **Frontend Development** (`.env.development`):
+
 ```bash
 # Required for Cognito to initialize properly
 VITE_AWS_COGNITO_USER_POOL_ID=us-west-2_bdCwF60ZI
@@ -119,6 +129,7 @@ VITE_AWS_REGION=us-west-2
 ```
 
 **Production** (`.env.ec2`):
+
 ```bash
 DEBUG=False
 USE_COGNITO_AUTH=True
@@ -130,6 +141,7 @@ COGNITO_APP_CLIENT_ID=4i9hrd7srgbqbtun09p43ncfn0
 ```
 
 ### **Docker Compose** (Simplified)
+
 ```yaml
 services:
   app:
@@ -150,16 +162,17 @@ services:
 
 ## 🔍 **INSTANT PROBLEM RESOLUTION**
 
-| Issue | Command | Expected Result |
-|-------|---------|-----------------|
-| **500 on orders** | `./deploy.sh --migrate` | Auto-fixes migration issues |
-| **403 Forbidden** | Logout/login (JWT expired) | New valid token |
-| **502 Bad Gateway** | `docker-compose restart nginx` | nginx starts without errors |
-| **Container issues** | `./deploy.sh --check` | Health status report |
-| **Migration errors** | `bash scripts/migration-helper.sh` | Handles problematic migrations |
-| **Settings check** | `docker exec restaurant-backend printenv DJANGO_SETTINGS_MODULE` | `backend.settings_ec2` |
+| Issue                | Command                                                          | Expected Result                |
+| -------------------- | ---------------------------------------------------------------- | ------------------------------ |
+| **500 on orders**    | `./deploy.sh --migrate`                                          | Auto-fixes migration issues    |
+| **403 Forbidden**    | Logout/login (JWT expired)                                       | New valid token                |
+| **502 Bad Gateway**  | `docker-compose restart nginx`                                   | nginx starts without errors    |
+| **Container issues** | `./deploy.sh --check`                                            | Health status report           |
+| **Migration errors** | `bash scripts/migration-helper.sh`                               | Handles problematic migrations |
+| **Settings check**   | `docker exec restaurant-backend printenv DJANGO_SETTINGS_MODULE` | `backend.settings_ec2`         |
 
 ### **Known Migration Fixes (Automated)**
+
 - ✅ `config.0013`: RestaurantOperationalConfig table missing → Auto-faked
 - ✅ `operation.0021`: CartItem table missing → Auto-faked
 - ✅ `operation.0018-0020`: Container fields → Applied in sequence
@@ -169,10 +182,12 @@ services:
 ## ✅ **SIMPLIFIED DEPLOYMENT WORKFLOW**
 
 ### **Option 1: Quick Deploy (Recommended)**
+
 ```bash
 # From your local machine - one command!
 ./deploy-remote.sh deploy
 ```
+
 - Automatically commits changes if needed
 - Pushes to git
 - Deploys to EC2
@@ -180,16 +195,19 @@ services:
 - Shows deployment status
 
 ### **Option 2: Deploy with Database Sync**
+
 ```bash
 # When you want production to match development exactly
 ./deploy-remote.sh deploy-sync
 ```
+
 - Backs up production database
 - Deploys code changes
 - Replaces production DB with dev DB
 - Restarts services
 
 ### **Option 3: Manual Deploy Steps**
+
 ```bash
 # If you prefer step-by-step control
 git add -A && git commit -m "Update" && git push
@@ -236,7 +254,7 @@ restaurant-web/
 # Quick health check
 docker ps --format "table {{.Names}}\t{{.Status}}"
 
-# View logs  
+# View logs
 docker-compose logs app nginx --tail=20
 
 # Restart services
@@ -262,15 +280,17 @@ Kitchen View ← Real-time Polling ← Order Updates ← Database
 ## 📋 **FILES ELIMINATED/OPTIMIZED**
 
 ### **Removed Redundancy**:
+
 - ❌ `prod.sh` (59 lines) - Merged into `deploy.sh`
-- ❌ `deploy-prod.sh` (59 lines) - Merged into `deploy.sh` 
+- ❌ `deploy-prod.sh` (59 lines) - Merged into `deploy.sh`
 - ❌ Duplicate Cognito env vars - Reduced by 50%
 - ❌ Nginx CORS headers - Django handles them
 - ❌ Complex nginx locations - Simplified to 3 blocks
 
 ### **Optimizations Applied**:
+
 - ✅ Single deployment script (`deploy.sh`)
-- ✅ Nginx config reduced from 131 to 50 lines  
+- ✅ Nginx config reduced from 131 to 50 lines
 - ✅ Environment vars reduced from 55 to 17 lines
 - ✅ Reusable nginx proxy configuration
 - ✅ Kitchen view production-ready (no dev restrictions)
@@ -284,6 +304,7 @@ Kitchen View ← Real-time Polling ← Order Updates ← Database
 ## 🆕 **WHAT'S NEW IN v2.0**
 
 ### **Deployment Improvements**
+
 1. **One-Command Remote Deploy**: `./deploy-remote.sh deploy`
 2. **Automatic Migration Fixes**: Handles all known problematic migrations
 3. **Database Sync Option**: Easy dev→prod database sync with backups
@@ -293,6 +314,7 @@ Kitchen View ← Real-time Polling ← Order Updates ← Database
 7. **Port Conflict Resolution**: Auto-kills processes on port 5173
 
 ### **Error Prevention**
+
 - ✅ Waits for containers to be ready before migrations
 - ✅ Checks for uncommitted changes before deploy
 - ✅ Auto-backups production database
@@ -300,5 +322,36 @@ Kitchen View ← Real-time Polling ← Order Updates ← Database
 - ✅ Retries failed migrations with fixes
 
 ### **New Scripts**
+
 - `deploy-remote.sh`: Complete remote deployment automation
 - `scripts/migration-helper.sh`: Intelligent migration problem solver
+
+### RECOMENDACIÓN PARA CADA CASO
+
+Para Desarrollo:
+
+# Limpiar solo órdenes/pagos (mantener configuración)
+
+./reset-operational-data.sh
+
+# Reset completo (empezar de cero)
+
+./reset-database.sh
+
+Para Producción EC2:
+
+# Limpiar solo datos operacionales (recomendado)
+
+./reset-operational-data.sh --prod --backup
+
+# Reset total (cuidado - elimina TODO)
+
+./reset-database.sh --prod --backup
+
+Todos los scripts:
+
+- Crean backup automático
+- Detectan entorno (local/Docker)
+- Tienen confirmación de seguridad
+- Muestran resumen de lo que se eliminará
+- Funcionan en dev y producción

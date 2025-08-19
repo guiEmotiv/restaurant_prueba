@@ -160,17 +160,159 @@ def create_optimized_import_function(model_class, table_name, required_columns, 
                 deleted_count = model_class.objects.count()
                 logger.info(f'Deleting {deleted_count} existing {model_class.__name__} records')
                 
-                # Delete existing data
+                # Delete existing data with proper foreign key handling for PROTECT constraints
+                # Import often requires deleting operational data due to recipe dependencies
+                def clean_operational_data():
+                    """Helper to clean all operational data that might reference recipes"""
+                    from operation.models import OrderItem, Order, Payment, ContainerSale
+                    
+                    operational_counts = {
+                        'OrderItems': OrderItem.objects.count(),
+                        'Orders': Order.objects.count(), 
+                        'Payments': Payment.objects.count(),
+                        'ContainerSales': ContainerSale.objects.count()
+                    }
+                    
+                    total_operational = sum(operational_counts.values())
+                    if total_operational > 0:
+                        logger.info(f'Cleaning operational data: {operational_counts}')
+                        # Delete in dependency order
+                        OrderItem.objects.all().delete()
+                        Payment.objects.all().delete()
+                        ContainerSale.objects.all().delete()
+                        Order.objects.all().delete()
+                        return total_operational
+                    return 0
+                
+                if model_class.__name__ == 'Unit':
+                    # For Units, delete all dependent models to avoid PROTECT constraints
+                    from inventory.models import Ingredient, Recipe, RecipeItem
+                    
+                    # Clean operational data first (orders reference recipes)
+                    operational_deleted = clean_operational_data()
+                    deleted_count += operational_deleted
+                    
+                    # Delete inventory data in order: RecipeItems -> Recipes -> Ingredients -> Units
+                    recipe_items_count = RecipeItem.objects.count()
+                    recipes_count = Recipe.objects.count()
+                    ingredients_count = Ingredient.objects.count()
+                    
+                    if recipe_items_count > 0:
+                        logger.info(f'Deleting {recipe_items_count} RecipeItems')
+                        RecipeItem.objects.all().delete()
+                        deleted_count += recipe_items_count
+                    
+                    if recipes_count > 0:
+                        logger.info(f'Deleting {recipes_count} Recipes')
+                        Recipe.objects.all().delete()
+                        deleted_count += recipes_count
+                    
+                    if ingredients_count > 0:
+                        logger.info(f'Deleting {ingredients_count} Ingredients')
+                        Ingredient.objects.all().delete()
+                        deleted_count += ingredients_count
+                
+                elif model_class.__name__ == 'Zone':
+                    # For Zones, delete operational data first (orders reference tables)
+                    operational_deleted = clean_operational_data()
+                    deleted_count += operational_deleted
+                    
+                    # Then delete dependent Tables
+                    from config.models import Table
+                    tables_count = Table.objects.count()
+                    if tables_count > 0:
+                        logger.info(f'Deleting {tables_count} dependent Tables')
+                        Table.objects.all().delete()
+                        deleted_count += tables_count
+                
+                elif model_class.__name__ == 'Group':
+                    # For Groups, clean operational data first (orders reference recipes)
+                    operational_deleted = clean_operational_data()
+                    deleted_count += operational_deleted
+                    
+                    # Then delete dependent Recipes
+                    from inventory.models import Recipe, RecipeItem
+                    recipe_items_count = RecipeItem.objects.count()
+                    recipes_count = Recipe.objects.count()
+                    
+                    if recipe_items_count > 0:
+                        logger.info(f'Deleting {recipe_items_count} RecipeItems')
+                        RecipeItem.objects.all().delete()
+                        deleted_count += recipe_items_count
+                    
+                    if recipes_count > 0:
+                        logger.info(f'Deleting {recipes_count} dependent Recipes')
+                        Recipe.objects.all().delete()
+                        deleted_count += recipes_count
+                
+                elif model_class.__name__ == 'Container':
+                    # For Containers, clean operational data first
+                    operational_deleted = clean_operational_data()
+                    deleted_count += operational_deleted
+                    
+                    # Then delete dependent models
+                    from inventory.models import Recipe, RecipeItem
+                    
+                    recipe_items_count = RecipeItem.objects.count()
+                    recipes_count = Recipe.objects.count()
+                    
+                    if recipe_items_count > 0:
+                        logger.info(f'Deleting {recipe_items_count} RecipeItems')
+                        RecipeItem.objects.all().delete()
+                        deleted_count += recipe_items_count
+                    
+                    if recipes_count > 0:
+                        logger.info(f'Deleting {recipes_count} Recipes')
+                        Recipe.objects.all().delete()
+                        deleted_count += recipes_count
+                
+                # Finally delete the target model
                 model_class.objects.all().delete()
                 
-                # Reset SQLite sequence safely
+                # Reset SQLite sequence safely for all affected tables
                 with connection.cursor() as cursor:
                     try:
-                        # Use parameterized query with proper escaping
-                        cursor.execute("DELETE FROM sqlite_sequence WHERE name = %s", [table_name])
-                        logger.debug(f'Reset SQLite sequence for table: {table_name}')
+                        tables_to_reset = [table_name]
+                        
+                        # Add dependent table sequences that were also deleted (using correct table names)
+                        operational_tables = ['order_item', 'order', 'payment', 'container_sale']
+                        
+                        if model_class.__name__ == 'Unit':
+                            tables_to_reset.extend(operational_tables + ['recipe_item', 'recipe', 'ingredient'])
+                        elif model_class.__name__ == 'Zone':
+                            tables_to_reset.extend(operational_tables + ['table'])
+                        elif model_class.__name__ == 'Group':
+                            tables_to_reset.extend(operational_tables + ['recipe_item', 'recipe'])
+                        elif model_class.__name__ == 'Container':
+                            tables_to_reset.extend(operational_tables + ['recipe_item', 'recipe'])
+                        
+                        # Reset sequences for all affected tables
+                        for table in tables_to_reset:
+                            try:
+                                # SQLite uses ? for parameters, not %s
+                                cursor.execute("DELETE FROM sqlite_sequence WHERE name = ?", [table])
+                                logger.info(f'✅ Reset sequence for table: {table}')
+                            except Exception as table_error:
+                                logger.debug(f'Table {table} sequence not found (may not exist): {table_error}')
+                        
+                        # Additional verification: ensure all sequences are reset
+                        cursor.execute("SELECT name FROM sqlite_sequence WHERE name IN ({})".format(
+                            ','.join(['?' for _ in tables_to_reset])
+                        ), tables_to_reset)
+                        remaining = cursor.fetchall()
+                        if remaining:
+                            logger.warning(f'Some sequences not reset: {[r[0] for r in remaining]}')
+                        else:
+                            logger.info(f'✅ All {len(tables_to_reset)} table sequences reset successfully')
+                            
                     except Exception as seq_error:
-                        logger.warning(f'Could not reset sequence for {table_name}: {seq_error}')
+                        logger.error(f'Error resetting sequences: {seq_error}')
+                        # Try alternative approach if main method fails
+                        try:
+                            cursor.execute("DELETE FROM sqlite_sequence WHERE name = ?", [table_name])
+                            logger.info(f'✅ Fallback: Reset sequence for main table: {table_name}')
+                        except Exception as fallback_error:
+                            logger.error(f'Fallback sequence reset failed: {fallback_error}')
                 
                 # Process rows efficiently
                 items_to_create = []
@@ -239,17 +381,17 @@ from inventory.models import Group, Ingredient, Recipe, RecipeItem
 
 # Units import (simple) - Enhanced
 import_units_excel_main = create_optimized_import_function(
-    Unit, 'config_unit', ['name'], max_file_size_mb=5
+    Unit, 'unit', ['name'], max_file_size_mb=5
 )
 
 # Zones import (simple) - Enhanced
 import_zones_excel_main = create_optimized_import_function(
-    Zone, 'config_zone', ['name'], max_file_size_mb=5
+    Zone, 'zone', ['name'], max_file_size_mb=5
 )
 
 # Groups import (simple) - Enhanced
 import_groups_excel_main = create_optimized_import_function(
-    Group, 'inventory_group', ['name'], max_file_size_mb=5
+    Group, 'group', ['name'], max_file_size_mb=5
 )
 
 # Tables import (requires zone reference) - Optimized
@@ -298,7 +440,7 @@ if hasattr(process_tables_row_optimized, '_zone_cache'):
     del process_tables_row_optimized._zone_cache
 
 import_tables_excel_main = create_optimized_import_function(
-    Table, 'config_table', ['zone', 'table_number'], 
+    Table, 'table', ['zone', 'table_number'], 
     process_tables_row_optimized, max_file_size_mb=5
 )
 
@@ -361,7 +503,7 @@ def process_containers_row_optimized(row, row_num, errors):
         return None
 
 import_containers_excel_main = create_optimized_import_function(
-    Container, 'config_container', ['name', 'price'], 
+    Container, 'container', ['name', 'price'], 
     process_containers_row_optimized, max_file_size_mb=5
 )
 
@@ -444,7 +586,7 @@ if hasattr(process_ingredients_row_optimized, '_unit_cache'):
     del process_ingredients_row_optimized._unit_cache
 
 import_ingredients_excel_main = create_optimized_import_function(
-    Ingredient, 'inventory_ingredient', ['unit', 'name', 'unit_price'], 
+    Ingredient, 'ingredient', ['unit', 'name', 'unit_price'], 
     process_ingredients_row_optimized, max_file_size_mb=10
 )
 
@@ -725,11 +867,22 @@ def import_recipes_excel_main(request):
             # Reset SQLite sequences safely
             with connection.cursor() as cursor:
                 try:
-                    cursor.execute("DELETE FROM sqlite_sequence WHERE name = %s", ['inventory_recipe'])
-                    cursor.execute("DELETE FROM sqlite_sequence WHERE name = %s", ['inventory_recipeitem'])
-                    logger.debug('Reset SQLite sequences for recipe tables')
+                    # SQLite uses ? for parameters, not %s
+                    cursor.execute("DELETE FROM sqlite_sequence WHERE name = ?", ['recipe'])
+                    cursor.execute("DELETE FROM sqlite_sequence WHERE name = ?", ['recipe_item'])
+                    logger.info('✅ Reset SQLite sequences for recipe tables')
+                    
+                    # Verify sequences were reset
+                    cursor.execute("SELECT name FROM sqlite_sequence WHERE name IN (?, ?)", 
+                                 ['recipe', 'recipe_item'])
+                    remaining = cursor.fetchall()
+                    if remaining:
+                        logger.warning(f'Some recipe sequences not reset: {[r[0] for r in remaining]}')
+                    else:
+                        logger.info('✅ All recipe table sequences reset successfully')
+                        
                 except Exception as seq_error:
-                    logger.warning(f'Could not reset sequences for recipe tables: {seq_error}')
+                    logger.error(f'Error resetting recipe sequences: {seq_error}')
             
             # Process rows efficiently
             recipes_to_create = []
