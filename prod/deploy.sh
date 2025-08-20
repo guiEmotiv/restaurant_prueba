@@ -170,7 +170,14 @@ cd ..
 # Deploy containers
 log INFO "Desplegando containers..."
 docker-compose down
-docker-compose up -d app nginx
+
+# Ensure nginx uses SSL configuration  
+log INFO "Configurando nginx para SSL..."
+sed -i 's|./nginx/conf.d/simple.conf:/etc/nginx/conf.d/default.conf|./nginx/conf.d/ssl.conf:/etc/nginx/conf.d/default.conf|' docker-compose.yml
+
+# Start with production profile
+log INFO "Iniciando servicios de producción..."
+docker-compose --profile production up -d
 
 # Esperar backend
 log INFO "Esperando backend..."
