@@ -1,230 +1,284 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# DEPLOYMENT - Restaurant Web (Dev → Prod EC2)
+# DEPLOYMENT - Restaurant Web (Dev → Prod EC2) - OPTIMIZED
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 set -e
 cd "$(dirname "$0")/.."
 
-# Colores
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# 🎨 Colors
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 
-log() {
-    case $1 in
-        ERROR) echo -e "${RED}❌ $2${NC}" ;;
-        SUCCESS) echo -e "${GREEN}✅ $2${NC}" ;;
-        WARNING) echo -e "${YELLOW}⚠️  $2${NC}" ;;
-        INFO) echo -e "${BLUE}ℹ️  $2${NC}" ;;
-    esac
-}
+log() { echo -e "${!1}${@:2}${NC}"; }
+success() { log GREEN "✅ $1"; }
+error() { log RED "❌ $1"; }
+warning() { log YELLOW "⚠️  $1"; }
+info() { log BLUE "ℹ️  $1"; }
+
+# ⚡ Performance optimizations
+export NODE_OPTIONS='--max-old-space-size=4096'
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
 
 show_usage() {
-    echo "Uso: $0 [OPCION]"
-    echo ""
-    echo "Opciones:"
-    echo "  --full        Deploy completo a producción"
-    echo "  --sync        Deploy + sincronizar BD (dev → prod)"
-    echo "  --build       Solo build del frontend"
-    echo "  --check       Verificar salud del sistema"
-    echo "  --rollback    Rollback a versión anterior"
-    echo "  --help        Mostrar esta ayuda"
+    cat << EOF
+🚀 DEPLOYMENT - Restaurant Web
+
+Uso: $0 [OPCION]
+
+Opciones:
+  --full        Deploy completo a producción (recomendado)
+  --sync        Deploy + sincronizar BD (dev → prod) [DESTRUCTIVO]
+  --build       Solo build del frontend
+  --quick       Deploy rápido (sin rebuild si no hay cambios)
+  --check       Verificar salud del sistema
+  --rollback    Rollback a versión anterior
+  --help        Mostrar esta ayuda
+
+Ejemplos:
+  $0 --full     # Deploy completo normal
+  $0 --quick    # Deploy inteligente (más rápido)
+  $0 --check    # Verificar estado post-deploy
+EOF
 }
 
-echo "🚀 DEPLOYMENT - RESTAURANT WEB"
-echo "==============================="
+echo "🚀 DEPLOYMENT - RESTAURANT WEB (OPTIMIZED)"
+echo "==========================================="
 
-# Procesar argumentos
+# 📋 Process arguments with optimized logic
 case "${1:-}" in
-    --full)
-        DEPLOY_TYPE="full"
-        ;;
-    --sync)
-        DEPLOY_TYPE="sync"
-        ;;
-    --build)
-        DEPLOY_TYPE="build"
-        ;;
-    --check)
-        DEPLOY_TYPE="check"
-        ;;
-    --rollback)
-        DEPLOY_TYPE="rollback"
-        ;;
-    --help)
-        show_usage
-        exit 0
-        ;;
-    "")
-        log ERROR "Se requiere una opción"
-        show_usage
-        exit 1
-        ;;
-    *)
-        log ERROR "Opción desconocida: $1"
-        show_usage
-        exit 1
-        ;;
+    --full) DEPLOY_TYPE="full" ;;
+    --sync) DEPLOY_TYPE="sync" ;;
+    --build) DEPLOY_TYPE="build" ;;
+    --quick) DEPLOY_TYPE="quick" ;;
+    --check) DEPLOY_TYPE="check" ;;
+    --rollback) DEPLOY_TYPE="rollback" ;;
+    --help) show_usage; exit 0 ;;
+    "") error "Se requiere una opción"; show_usage; exit 1 ;;
+    *) error "Opción desconocida: $1"; show_usage; exit 1 ;;
 esac
 
-# Validaciones base
-log INFO "Validando prerrequisitos..."
-command -v docker >/dev/null || { log ERROR "Docker no instalado"; exit 1; }
-command -v npm >/dev/null || { log ERROR "npm no instalado"; exit 1; }
+# ⚡ Parallel prerequisite validation
+info "Validando prerrequisitos..."
+{
+    command -v docker >/dev/null || { error "Docker no instalado"; exit 1; }
+    command -v npm >/dev/null || { error "npm no instalado"; exit 1; }
+} &
+wait
 
-# Solo check
+# 🔍 Health check (optimized)
 if [ "$DEPLOY_TYPE" = "check" ]; then
-    log INFO "Verificando salud del sistema..."
+    info "Verificando salud del sistema..."
+    
+    # Parallel health checks
+    {
+        if docker exec restaurant-backend curl -sf http://localhost:8000/api/v1/health/ >/dev/null; then
+            success "Backend responde correctamente"
+        else
+            error "Backend no responde"
+        fi
+    } &
+    
+    {
+        if docker ps | grep -q restaurant-nginx && docker exec restaurant-nginx nginx -t >/dev/null 2>&1; then
+            success "Nginx configuración válida"
+        else
+            error "Error en configuración Nginx"
+        fi
+    } &
+    
+    wait
+    
     echo ""
     echo "📊 Estado de contenedores:"
-    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep restaurant || echo "No hay contenedores corriendo"
-    echo ""
-    
-    if docker exec restaurant-backend curl -s http://localhost:8000/api/v1/health/ &>/dev/null; then
-        log SUCCESS "Backend responde correctamente"
-    else
-        log ERROR "Backend no responde"
-    fi
-    
-    if docker ps | grep -q restaurant-nginx; then
-        if docker exec restaurant-nginx nginx -t &>/dev/null; then
-            log SUCCESS "Nginx configuración válida"
-        else
-            log ERROR "Error en configuración Nginx"
-        fi
-    fi
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | grep restaurant || echo "No hay contenedores corriendo"
     exit 0
 fi
 
-# Solo build
+# 🏗️ Build only (optimized)
 if [ "$DEPLOY_TYPE" = "build" ]; then
-    log INFO "Construyendo frontend..."
+    info "Construyendo frontend..."
     cd frontend
-    npm ci --prefer-offline
+    
+    # Smart npm install
+    if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
+        npm ci --prefer-offline --silent
+    else
+        info "Dependencias npm ya están actualizadas"
+    fi
+    
     npm run build
     cd ..
-    log SUCCESS "Frontend construido en frontend/dist/"
+    success "Frontend construido en frontend/dist/"
     exit 0
 fi
 
-# Rollback
+# 🔄 Rollback (improved)
 if [ "$DEPLOY_TYPE" = "rollback" ]; then
-    log WARNING "Iniciando rollback..."
+    warning "Iniciando rollback..."
     
-    # Buscar último backup
     BACKUP_FILE=$(ls -t data/backup_prod_*.sqlite3 2>/dev/null | head -1)
     if [ -n "$BACKUP_FILE" ]; then
-        log INFO "Restaurando BD desde: $BACKUP_FILE"
+        info "Restaurando BD desde: $(basename $BACKUP_FILE)"
         cp "$BACKUP_FILE" data/restaurant_prod.sqlite3
-        docker-compose restart app
-        log SUCCESS "Rollback completado"
+        docker-compose restart app >/dev/null
+        success "Rollback completado"
     else
-        log ERROR "No se encontraron backups para rollback"
+        error "No se encontraron backups para rollback"
         exit 1
     fi
     exit 0
 fi
 
-# Deploy completo o con sync
-log INFO "Iniciando deploy: $DEPLOY_TYPE"
+# 🚀 Main deployment logic
+info "Iniciando deploy: $DEPLOY_TYPE"
 
-# Verificar cambios git
+# 📝 Git status check (optimized)
 if [ -n "$(git status --porcelain)" ]; then
-    log WARNING "Hay cambios sin commitear. ¿Continuar? (s/N)"
+    warning "Hay cambios sin commitear. ¿Continuar? (s/N)"
     read -r response
     if [[ ! "$response" =~ ^[sS]$ ]]; then
-        log ERROR "Deploy cancelado"
+        error "Deploy cancelado"
         exit 1
     fi
 fi
 
-# Backup de BD producción
+# 💾 Smart backup
 if [ -f "data/restaurant_prod.sqlite3" ]; then
-    log INFO "Creando backup de producción..."
-    cp data/restaurant_prod.sqlite3 "data/backup_prod_$(date +%Y%m%d_%H%M%S).sqlite3"
+    BACKUP_NAME="data/backup_prod_$(date +%Y%m%d_%H%M%S).sqlite3"
+    info "Creando backup: $(basename $BACKUP_NAME)"
+    cp data/restaurant_prod.sqlite3 "$BACKUP_NAME" &
 fi
 
-# Sync BD si se requiere
+# 🔄 Database sync (with safety checks)
 if [ "$DEPLOY_TYPE" = "sync" ]; then
-    log WARNING "¿Confirmar sync BD dev → prod? (s/N)"
+    warning "⚠️  OPERACIÓN DESTRUCTIVA: Sync BD dev → prod"
+    echo "   Esto reemplazará TODOS los datos de producción"
+    echo "   ¿Confirmar sync BD dev → prod? (s/N)"
     read -r response
     if [[ ! "$response" =~ ^[sS]$ ]]; then
-        log ERROR "Sync cancelado"
+        error "Sync cancelado"
         exit 1
     fi
     
-    log INFO "Sincronizando base de datos..."
+    if [ ! -f "data/restaurant_dev.sqlite3" ]; then
+        error "Archivo restaurant_dev.sqlite3 no encontrado"
+        exit 1
+    fi
+    
+    info "Sincronizando base de datos..."
     cp data/restaurant_dev.sqlite3 data/restaurant_prod.sqlite3
 fi
 
-# Build frontend
-log INFO "Construyendo frontend..."
-cd frontend
-npm ci --prefer-offline
-npm run build
-cd ..
+# 🏗️ Smart frontend build
+should_build_frontend() {
+    [ "$DEPLOY_TYPE" = "quick" ] || return 0
+    
+    # Check if build is needed
+    [ ! -d "frontend/dist" ] && return 0
+    [ "frontend/package-lock.json" -nt "frontend/dist" ] && return 0
+    [ "frontend/src" -nt "frontend/dist" ] && return 0
+    
+    return 1
+}
 
-# Deploy containers
-log INFO "Desplegando containers..."
-docker-compose down
+if should_build_frontend; then
+    info "Construyendo frontend..."
+    cd frontend
+    
+    # Parallel npm operations when possible
+    if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
+        npm ci --prefer-offline --silent
+    fi
+    
+    npm run build
+    cd ..
+else
+    info "⚡ Frontend build skipped (no changes detected)"
+fi
 
-# Ensure nginx uses SSL configuration  
-log INFO "Configurando nginx para SSL..."
-sed -i 's|./nginx/conf.d/simple.conf:/etc/nginx/conf.d/default.conf|./nginx/conf.d/ssl.conf:/etc/nginx/conf.d/default.conf|' docker-compose.yml
+# 🐳 Optimized container deployment
+info "Desplegando containers..."
 
-# Start with production profile
-log INFO "Iniciando servicios de producción..."
+# Parallel operations
+{
+    # Ensure SSL configuration
+    sed -i.bak 's|./nginx/conf.d/simple.conf|./nginx/conf.d/ssl.conf|g' docker-compose.yml
+} &
+
+{
+    # Graceful container shutdown
+    docker-compose down --timeout 10 >/dev/null 2>&1
+} &
+
+wait
+
+# Start services with optimized timing
+info "Iniciando servicios de producción..."
 docker-compose --profile production up -d
 
-# Esperar backend
-log INFO "Esperando backend..."
-for i in {1..30}; do
-    if docker exec restaurant-backend python -c "import django; print('OK')" &>/dev/null 2>&1; then
+# ⏱️ Smart backend wait (optimized)
+info "Esperando backend..."
+for i in {1..20}; do
+    if docker exec restaurant-backend python -c "import django" >/dev/null 2>&1; then
         break
     fi
     sleep 1
+    [ $i -eq 10 ] && info "Backend tardando más de lo esperado..."
 done
 
-# Migraciones
-log INFO "Aplicando migraciones..."
-if ! docker exec restaurant-backend python /app/backend/manage.py migrate; then
-    log WARNING "Aplicando fixes conocidos..."
-    docker exec restaurant-backend python /app/backend/manage.py migrate config 0013 --fake 2>/dev/null || true
-    docker exec restaurant-backend python /app/backend/manage.py migrate operation 0021 --fake 2>/dev/null || true
-    docker exec restaurant-backend python /app/backend/manage.py migrate
+# 🔄 Intelligent migrations
+info "Aplicando migraciones..."
+if ! docker exec restaurant-backend python /app/backend/manage.py migrate --verbosity=0; then
+    warning "Aplicando fixes conocidos..."
+    
+    # Parallel migration fixes
+    {
+        docker exec restaurant-backend python /app/backend/manage.py migrate config 0013 --fake >/dev/null 2>&1 || true
+    } &
+    {
+        docker exec restaurant-backend python /app/backend/manage.py migrate operation 0021 --fake >/dev/null 2>&1 || true
+    } &
+    
+    wait
+    docker exec restaurant-backend python /app/backend/manage.py migrate --verbosity=0
 fi
 
-# Health check
-log INFO "Verificando despliegue..."
-sleep 5
+# 🏥 Parallel health checks
+info "Verificando despliegue..."
 
-if docker exec restaurant-backend curl -s http://localhost:8000/api/v1/health/ &>/dev/null; then
-    log SUCCESS "Backend funcionando"
-else
-    log ERROR "Error en backend"
-    exit 1
-fi
+{
+    if docker exec restaurant-backend curl -sf http://localhost:8000/api/v1/health/ >/dev/null; then
+        success "Backend funcionando"
+    else
+        error "Error en backend"
+        exit 1
+    fi
+} &
 
-if docker exec restaurant-nginx nginx -t &>/dev/null; then
-    log SUCCESS "Nginx funcionando"
-else
-    log ERROR "Error en Nginx"
-    exit 1
-fi
+{
+    sleep 2  # Give nginx time to start
+    if docker exec restaurant-nginx nginx -t >/dev/null 2>&1; then
+        success "Nginx funcionando"
+    else
+        error "Error en Nginx"
+        exit 1
+    fi
+} &
 
-# Resultado final
+wait
+
+# 🎉 Success output (optimized)
 echo ""
-log SUCCESS "🎉 DEPLOY COMPLETADO"
+success "🎉 DEPLOY COMPLETADO"
 echo ""
 echo "🌐 URLs de producción:"
 echo "   🏠 Sitio: https://www.xn--elfogndedonsoto-zrb.com/"
 echo "   🔧 API:   https://www.xn--elfogndedonsoto-zrb.com/api/v1/"
 echo ""
-echo "🔧 Monitoreo:"
+echo "🔧 Comandos útiles:"
 echo "   📋 Logs: docker-compose logs app nginx -f"
 echo "   ❤️  Check: ./prod/deploy.sh --check"
+echo "   ⚡ Quick: ./prod/deploy.sh --quick"
 echo ""
 echo "✨ Sistema en producción"
