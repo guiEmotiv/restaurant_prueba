@@ -32,10 +32,11 @@
 2. ✅ Verificación de cambios git
 3. ✅ Backup automático de BD producción
 4. ✅ Build optimizado del frontend
-5. ✅ Deploy de containers (app + nginx)
-6. ✅ Migraciones con auto-fix
-7. ✅ Health check completo
-8. ✅ URLs de verificación
+5. ✅ Configuración automática SSL (nginx)
+6. ✅ Deploy de containers con profile producción
+7. ✅ Migraciones con auto-fix
+8. ✅ Health check completo
+9. ✅ URLs de verificación HTTPS
 
 ### Deploy con Sync (`--sync`)
 - **Incluye todo lo anterior +**
