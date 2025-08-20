@@ -46,6 +46,9 @@ class DashboardViewSet(viewsets.ViewSet):
             # Agregar distribución de estados de items
             dashboard_data['item_status_breakdown'] = self._calculate_item_status_breakdown(all_detailed_data)
             
+            # Agregar recetas no vendidas
+            dashboard_data['unsold_recipes'] = self._get_unsold_recipes(detailed_data, selected_date)
+            
             return Response(dashboard_data)
         
         except Exception as e:
@@ -344,6 +347,42 @@ class DashboardViewSet(viewsets.ViewSet):
             })
         
         return breakdown
+    
+    def _get_unsold_recipes(self, detailed_data, selected_date):
+        """
+        Obtiene las recetas que no fueron vendidas en la fecha seleccionada
+        """
+        from inventory.models import Recipe
+        
+        # Obtener IDs de recetas vendidas en esta fecha
+        sold_recipe_ids = set()
+        for row in detailed_data:
+            if row.get('recipe_name') and row.get('recipe_name') != 'Sin receta':
+                # Buscar el ID de la receta por nombre
+                try:
+                    recipe = Recipe.objects.filter(name=row['recipe_name']).first()
+                    if recipe:
+                        sold_recipe_ids.add(recipe.id)
+                except:
+                    pass
+        
+        # Obtener todas las recetas activas que no fueron vendidas
+        unsold_recipes = Recipe.objects.select_related('group').exclude(
+            id__in=sold_recipe_ids
+        ).filter(
+            is_active=True  # Solo recetas activas
+        ).order_by('name')  # Sin límite - mostrar todas las recetas no vendidas
+        
+        unsold_list = []
+        for recipe in unsold_recipes:
+            unsold_list.append({
+                'name': recipe.name,
+                'category': recipe.group.name if recipe.group else 'Sin categoría',
+                'price': float(recipe.base_price),
+                'preparation_time': recipe.preparation_time or 0
+            })
+        
+        return unsold_list
     
     def _generate_dashboard_from_details(self, detailed_data, selected_date):
         """

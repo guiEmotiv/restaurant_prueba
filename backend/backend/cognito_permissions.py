@@ -1,11 +1,12 @@
 """
 Custom permission classes for AWS Cognito authentication
-Groups: administradores, meseros, cocineros
+Groups: administradores, meseros, cocineros, cajeros
 
 Permisos por grupo:
 - Administradores: full acceso a todas las vistas y módulos
 - Cocineros: vista cocina + modificar estado de pedidos
-- Meseros: estado mesas + historial + crear/modificar pedidos + pagos
+- Meseros: estado mesas + historial + crear/modificar pedidos
+- Cajeros: estado mesas + historial + procesar pagos
 """
 from rest_framework import permissions
 
@@ -79,7 +80,7 @@ class CognitoOrderStatusPermission(permissions.BasePermission):
 
 class CognitoWaiterAndAdminPermission(permissions.BasePermission):
     """
-    Solo meseros y administradores:
+    Solo meseros, cajeros y administradores:
     - Para estado de mesas, historial, pedidos (sin pagos)
     """
     
@@ -97,23 +98,34 @@ class CognitoWaiterAndAdminPermission(permissions.BasePermission):
         if hasattr(request.user, 'is_waiter') and request.user.is_waiter():
             return True
             
+        # Cajeros tienen acceso
+        if hasattr(request.user, 'is_cashier') and request.user.is_cashier():
+            return True
+            
         return False
 
 
 class CognitoPaymentPermission(permissions.BasePermission):
     """
-    Solo administradores pueden procesar pagos
+    Solo administradores y cajeros pueden procesar pagos
     - Meseros y cocineros NO pueden procesar pagos
     """
     
     def has_permission(self, request, view):
-        return (
-            request.user and 
-            hasattr(request.user, 'is_authenticated') and 
-            request.user.is_authenticated and
-            hasattr(request.user, 'is_admin') and
-            request.user.is_admin()
-        )
+        if not (request.user and 
+                hasattr(request.user, 'is_authenticated') and 
+                request.user.is_authenticated):
+            return False
+            
+        # Administradores tienen acceso completo
+        if hasattr(request.user, 'is_admin') and request.user.is_admin():
+            return True
+            
+        # Cajeros pueden procesar pagos
+        if hasattr(request.user, 'is_cashier') and request.user.is_cashier():
+            return True
+            
+        return False
 
 
 class CognitoReadOnlyForNonAdmins(permissions.BasePermission):
@@ -135,7 +147,8 @@ class CognitoReadOnlyForNonAdmins(permissions.BasePermission):
             
         # Otros roles solo lectura
         if (hasattr(request.user, 'is_waiter') and request.user.is_waiter()) or \
-           (hasattr(request.user, 'is_cook') and request.user.is_cook()):
+           (hasattr(request.user, 'is_cook') and request.user.is_cook()) or \
+           (hasattr(request.user, 'is_cashier') and request.user.is_cashier()):
             return request.method in permissions.SAFE_METHODS
             
         return False

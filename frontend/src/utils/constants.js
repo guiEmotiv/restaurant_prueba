@@ -15,7 +15,8 @@ export const API_CONFIG = {
 export const USER_ROLES = {
   ADMIN: 'administradores',
   WAITER: 'meseros', 
-  COOK: 'cocineros'
+  COOK: 'cocineros',
+  CASHIER: 'cajeros'
 };
 
 // Order Status

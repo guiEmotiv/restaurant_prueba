@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, ChefHat, Package, Search, FileSpreadsheet } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
-import RecipeModal from '../../components/recipe/RecipeModalFixed';
+import RecipeModal from '../../components/recipe/RecipeModalOptimized';
 import GenericExcelImportModal from '../../components/common/GenericExcelImportModal';
 import { EXCEL_IMPORT_CONFIGS } from '../../utils/excelImportConfigs';
 import { useToast } from '../../contexts/ToastContext';
@@ -36,15 +36,19 @@ const Recipes = () => {
     }
     
     if (groupFilter) {
-      filtered = filtered.filter(recipe => 
-        recipe.group_id === parseInt(groupFilter)
-      );
+      filtered = filtered.filter(recipe => {
+        const groupId = recipe.group_id || recipe.group?.id;
+        const filterGroupId = parseInt(groupFilter);
+        
+        // Comparar tanto como number como string para mayor compatibilidad
+        return groupId === filterGroupId || groupId === groupFilter || String(groupId) === String(filterGroupId);
+      });
     }
     
     if (availableFilter !== '') {
       const isAvailable = availableFilter === 'true';
       filtered = filtered.filter(recipe => 
-        recipe.is_available === isAvailable
+        recipe.is_available_calculated === isAvailable
       );
     }
     
@@ -92,9 +96,16 @@ const Recipes = () => {
     setIsModalOpen(true);
   };
 
-  const handleEdit = (recipe) => {
-    setSelectedRecipe(recipe);
-    setIsModalOpen(true);
+  const handleEdit = async (recipe) => {
+    try {
+      // Cargar la receta completa con ingredientes desde el API
+      const fullRecipe = await apiService.recipes.getById(recipe.id);
+      setSelectedRecipe(fullRecipe);
+      setIsModalOpen(true);
+    } catch (error) {
+      console.error('Error loading full recipe:', error);
+      showError('Error al cargar la receta');
+    }
   };
 
 
@@ -238,11 +249,18 @@ const Recipes = () => {
               className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
             >
               <option value="">Todos ({recipes.length})</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name} ({recipes.filter(r => r.group_id === group.id).length})
-                </option>
-              ))}
+              {groups.map((group) => {
+                const count = recipes.filter(r => {
+                  const groupId = r.group_id || r.group?.id;
+                  return groupId === group.id || groupId === String(group.id) || String(groupId) === String(group.id);
+                }).length;
+                
+                return (
+                  <option key={group.id} value={group.id}>
+                    {group.name} ({count})
+                  </option>
+                );
+              })}
             </select>
           </div>
           
@@ -256,8 +274,8 @@ const Recipes = () => {
               className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
             >
               <option value="">Todas ({recipes.length})</option>
-              <option value="true">Disponibles ({recipes.filter(r => r.is_available).length})</option>
-              <option value="false">No disponibles ({recipes.filter(r => !r.is_available).length})</option>
+              <option value="true">Con stock ({recipes.filter(r => r.is_available_calculated).length})</option>
+              <option value="false">Sin stock ({recipes.filter(r => !r.is_available_calculated).length})</option>
             </select>
           </div>
           
@@ -310,9 +328,6 @@ const Recipes = () => {
                   Stock Disponible
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Versión Activa
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
@@ -320,7 +335,7 @@ const Recipes = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {recipes.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
                     No hay recetas disponibles
                   </td>
                 </tr>
@@ -342,7 +357,11 @@ const Recipes = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        recipe.is_active 
+                          ? 'bg-purple-100 text-purple-800' 
+                          : 'bg-gray-100 text-gray-500'
+                      }`}>
                         v{recipe.version}
                       </span>
                     </td>
@@ -390,29 +409,6 @@ const Recipes = () => {
                           Sin Stock
                         </span>
                       )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <button
-                        onClick={() => handleToggleActive(recipe)}
-                        className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
-                          recipe.is_active 
-                            ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
-                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        } transition-colors cursor-pointer`}
-                        title={`${recipe.is_active ? 'Versión activa - Click para desactivar' : 'Versión inactiva - Click para activar (desactiva otras versiones)'}`}
-                      >
-                        {recipe.is_active ? (
-                          <>
-                            <span className="w-2 h-2 bg-blue-600 rounded-full mr-1"></span>
-                            v{recipe.version} ✓
-                          </>
-                        ) : (
-                          <>
-                            <span className="w-2 h-2 bg-gray-400 rounded-full mr-1"></span>
-                            v{recipe.version}
-                          </>
-                        )}
-                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
                       <div className="flex justify-center gap-2">

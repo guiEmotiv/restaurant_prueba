@@ -8,6 +8,7 @@ import {
   Package, 
   ShoppingCart,
   Ruler,
+  Bell,
   MapPin,
   Table,
   Apple,
@@ -221,7 +222,8 @@ const Layout = ({ children }) => {
                   <div className="text-xs text-gray-500">
                     {userRole === 'administradores' ? 'Administrador' : 
                      userRole === 'meseros' ? 'Mesero' : 
-                     userRole === 'cocineros' ? 'Cocinero' : 'Sin rol'}
+                     userRole === 'cocineros' ? 'Cocinero' : 
+                     userRole === 'cajeros' ? 'Cajero' : 'Sin rol'}
                   </div>
                 </div>
               </div>

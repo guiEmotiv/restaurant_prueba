@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Clock, AlertTriangle, ChefHat, Filter, User, MapPin, Package, CheckCircle, Coffee, Utensils } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Clock, AlertTriangle, ChefHat, Filter, User, MapPin, Package, CheckCircle, Coffee, Utensils, Bell, BellOff } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,10 +11,11 @@ const Kitchen = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGroupTab, setSelectedGroupTab] = useState('all');
   const [selectedTableFilter, setSelectedTableFilter] = useState('all'); // all, or specific table
-  const [audioReady, setAudioReady] = useState(() => {
-    // Cargar estado desde localStorage
-    const saved = localStorage.getItem('kitchenAudioEnabled');
-    return saved === 'true';
+  const [audioReady, setAudioReady] = useState(false); // Se activará automáticamente
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    item: null,
+    newStatus: null
   });
   const { showSuccess, showError } = useToast();
   const { userRole } = useAuth();
@@ -27,7 +28,11 @@ const Kitchen = () => {
     orderItemPoller.setKitchenView(true);
     orderItemPoller.startPolling();
     
-    // Auto-refresh en tiempo real cada 5 segundos
+    // 🔊 NO INICIALIZAR AUDIO AUTOMÁTICAMENTE - esperar interacción del usuario
+    
+    // Sistema simplificado - solo sonidos de cocina
+    
+    // Auto-refresh en tiempo real cada 5 segundos (volvemos al sistema original)
     const interval = setInterval(loadKitchenBoard, 5000);
     
     return () => {
@@ -37,7 +42,8 @@ const Kitchen = () => {
     };
   }, [userRole]);
 
-  const loadKitchenBoard = async () => {
+  // 🚀 OPTIMIZACIÓN: loadKitchenBoard con useCallback
+  const loadKitchenBoard = useCallback(async () => {
     try {
       const data = await apiService.orders.getKitchenBoard();
       setKitchenBoard(Array.isArray(data) ? data : []);
@@ -45,84 +51,167 @@ const Kitchen = () => {
     } catch (error) {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Toggle audio con gesto del usuario
-  const handleToggleAudio = async () => {
-    if (audioReady) {
-      // Desactivar audio
-      notificationService.disableAudio();
-      setAudioReady(false);
-      localStorage.setItem('kitchenAudioEnabled', 'false');
-      showSuccess('Audio desactivado');
-    } else {
-      // Activar audio
+  // 🎯 FUNCIÓN PARA ACTIVAR AUDIO SI FALTA (solo cuando el usuario interactúa)
+  const ensureAudioReady = useCallback(async () => {
+    if (!audioReady) {
       const success = await notificationService.initAudioWithUserGesture();
       setAudioReady(success);
-      localStorage.setItem('kitchenAudioEnabled', success.toString());
-      
       if (success) {
-        showSuccess('Audio activado para notificaciones');
-        // Reproducir sonidos de prueba
-        notificationService.playNotification('itemCreated');
-        
-        // Reproducir sonido de eliminación después de 1 segundo
-        setTimeout(() => {
-          notificationService.playNotification('itemDeleted');
-        }, 1000);
-      } else {
-        showError('Error activando audio');
       }
     }
-  };
+  }, [audioReady]);
 
+  // Función para activar audio manualmente
+  const activateAudio = useCallback(async () => {
+    try {
+      const success = await notificationService.initAudioWithUserGesture();
+      setAudioReady(success);
+      if (success) {
+        showSuccess('Audio activado correctamente');
+      } else {
+        showError('No se pudo activar el audio');
+      }
+    } catch (error) {
+      showError('Error al activar el audio');
+    }
+  }, [showSuccess, showError]);
+
+  // Función para desactivar audio manualmente
+  const deactivateAudio = useCallback(() => {
+    try {
+      notificationService.disableAudio();
+      setAudioReady(false);
+      showSuccess('Audio desactivado');
+    } catch (error) {
+      showError('Error al desactivar el audio');
+    }
+  }, [showSuccess, showError]);
+
+  // Función toggle para audio
+  const toggleAudio = useCallback(async () => {
+    if (audioReady) {
+      deactivateAudio();
+    } else {
+      await activateAudio();
+    }
+  }, [audioReady, activateAudio, deactivateAudio]);
+
+
+  // Sistema simplificado - sin notificaciones a meseros
 
   // Función para obtener el siguiente estado según el flujo
-  const getNextStatus = (currentStatus) => {
+  const getNextStatus = useCallback((currentStatus) => {
     const statusFlow = {
       'CREATED': 'PREPARING',
       'PREPARING': 'SERVED'
     };
     return statusFlow[currentStatus];
-  };
+  }, []);
 
-  const updateItemStatus = async (itemId, newStatus) => {
-    const statusMessages = {
-      'PREPARING': '¿Estás seguro de que deseas iniciar la preparación de este item?',
-      'SERVED': '¿Estás seguro de que deseas marcar este item como entregado?'
-    };
+  // Función para abrir modal de confirmación
+  const openConfirmModal = useCallback((item, newStatus) => {
+    setConfirmModal({
+      isOpen: true,
+      item: item,
+      newStatus: newStatus
+    });
+  }, []);
+
+  // Función para cerrar modal
+  const closeConfirmModal = useCallback(() => {
+    setConfirmModal({
+      isOpen: false,
+      item: null,
+      newStatus: null
+    });
+  }, []);
+
+  // ⚡ OPTIMIZADO: Memoizar tablas con items (movido antes de confirmStatusChange para resolver dependencias)
+  const tablesWithItems = useMemo(() => {
+    const allItems = kitchenBoard.flatMap(recipe => 
+      recipe.items.map(item => ({
+        zone: item.order_zone,
+        table: item.order_table,
+        key: `${item.order_zone}-${item.order_table}`
+      }))
+    );
+
+    // Agrupar por mesa y contar items
+    const tableGroups = {};
+    allItems.forEach(item => {
+      if (!tableGroups[item.key]) {
+        tableGroups[item.key] = {
+          zone: item.zone,
+          table: item.table,
+          key: item.key,
+          count: 0
+        };
+      }
+      tableGroups[item.key].count++;
+    });
+
+    return Object.values(tableGroups).sort((a, b) => {
+      // Ordenar por zona y luego por número de mesa
+      if (a.zone !== b.zone) return a.zone.localeCompare(b.zone);
+      return parseInt(a.table) - parseInt(b.table);
+    });
+  }, [kitchenBoard]);
+
+  // 🚀 OPTIMIZACIÓN: confirmStatusChange con useCallback
+  const confirmStatusChange = useCallback(async () => {
+    const { item, newStatus } = confirmModal;
     
     const successMessages = {
       'PREPARING': 'Item en preparación',
-      'SERVED': 'Item marcado como entregado'
+      'SERVED': 'Item marcado como servido'
     };
 
-    // Mostrar confirmación apropiada
-    const confirmed = window.confirm(statusMessages[newStatus] || '¿Confirmar cambio de estado?');
-    if (!confirmed) {
-      return;
-    }
-
     try {
-      await apiService.orderItems.updateStatus(itemId, newStatus);
+      await apiService.orderItems.updateStatus(item.id, newStatus);
       await loadKitchenBoard();
+      
+      // Si ya no quedan items para la mesa filtrada, cambiar a "Todas"
+      setTimeout(() => {
+        // tablesWithItems ya está memoizado arriba
+        const hasCurrentTable = tablesWithItems.some(table => table.key === selectedTableFilter);
+        
+        
+        if (selectedTableFilter !== 'all' && !hasCurrentTable) {
+          setSelectedTableFilter('all');
+        }
+      }, 100); // Pequeño delay para asegurar que los datos estén actualizados
+      
       showSuccess(successMessages[newStatus] || 'Estado actualizado');
+      closeConfirmModal();
     } catch (error) {
       const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
       showError('Error al actualizar el estado: ' + errorMessage);
     }
-  };
+  }, [confirmModal, loadKitchenBoard, tablesWithItems, selectedTableFilter, showSuccess, closeConfirmModal, showError]);
 
-  const formatTime = (minutes) => {
+  // 🚀 OPTIMIZACIÓN: handleCardClick con useCallback
+  const handleCardClick = useCallback(async (e, item) => {
+    // 🔊 Asegurar que el audio esté listo cuando el usuario interactúa
+    await ensureAudioReady();
+    
+    const nextStatus = getNextStatus(item.status);
+    if (nextStatus) {
+      openConfirmModal(item, nextStatus);
+    }
+  }, [ensureAudioReady, getNextStatus, openConfirmModal]);
+
+  const formatTime = useCallback((minutes) => {
     if (minutes < 60) {
       return `${minutes}m`;
     }
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m`;
-  };
+  }, []);
 
-  const formatCreationTime = (isoDateString) => {
+  const formatCreationTime = useCallback((isoDateString) => {
     try {
       const date = new Date(isoDateString);
       const time = date.toLocaleTimeString('es-PE', { 
@@ -134,10 +223,10 @@ const Kitchen = () => {
     } catch (error) {
       return '--:--hr';
     }
-  };
+  }, []);
 
   // Calcular tiempo secuencial por estación
-  const calculateStationQueue = (items) => {
+  const calculateStationQueue = useCallback((items) => {
     // Agrupar items por estación (grupo) y ordenar por tiempo de creación
     const stations = {};
     items.forEach(item => {
@@ -168,11 +257,12 @@ const Kitchen = () => {
 
     // Retornar array plano con los datos de cola calculados
     return Object.values(stations).flat();
-  };
+  }, []);
 
-  const getTimeStatus = (item) => {
-    const now = new Date();
-    const createdAt = new Date(item.created_at);
+  // ⚡ OPTIMIZADO: Usar useMemo para cachear cálculos costosos por timestamp
+  const getTimeStatus = useCallback((item) => {
+    const now = Date.now(); // Más rápido que new Date()
+    const createdAt = new Date(item.created_at).getTime();
     const elapsedSinceCreation = (now - createdAt) / (1000 * 60); // minutos desde creación
 
     // Determinar el tiempo base según el estado
@@ -182,7 +272,7 @@ const Kitchen = () => {
       baseTime = elapsedSinceCreation;
       statusText = 'Pendiente';
     } else if (item.status === 'PREPARING') {
-      const preparingAt = item.preparing_at ? new Date(item.preparing_at) : createdAt;
+      const preparingAt = item.preparing_at ? new Date(item.preparing_at).getTime() : createdAt;
       baseTime = (now - preparingAt) / (1000 * 60);
       statusText = 'Preparando';
     }
@@ -190,22 +280,23 @@ const Kitchen = () => {
     // Calcular porcentaje basado en tiempo de preparación
     const percentage = (baseTime / item.preparation_time) * 100;
     
-    // Determinar color basado en el estado del item
-    let color, textColor, bgColor, borderColor;
+    // 🎨 OPTIMIZADO: Usar objeto constante para colores
+    const statusColors = {
+      'CREATED': {
+        color: 'bg-green-500',
+        textColor: 'text-green-600',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200'
+      },
+      'PREPARING': {
+        color: 'bg-yellow-400',
+        textColor: 'text-yellow-600',
+        bgColor: 'bg-yellow-50',
+        borderColor: 'border-yellow-200'
+      }
+    };
     
-    if (item.status === 'CREATED') {
-      // Estado CREATED - Verde
-      color = 'bg-green-500';
-      textColor = 'text-green-600';
-      bgColor = 'bg-green-50';
-      borderColor = 'border-green-200';
-    } else if (item.status === 'PREPARING') {
-      // Estado PREPARING - Amarillo
-      color = 'bg-yellow-400';
-      textColor = 'text-yellow-600';
-      bgColor = 'bg-yellow-50';
-      borderColor = 'border-yellow-200';
-    }
+    const colors = statusColors[item.status] || statusColors['CREATED'];
     
     // Determinar el tiempo a mostrar y estado de urgencia
     let displayTime, urgencyStatus;
@@ -222,20 +313,18 @@ const Kitchen = () => {
     }
     
     return {
-      color,
-      textColor,
+      ...colors,
       status: urgencyStatus, // Para el icono de alerta
-      bgColor,
-      borderColor,
       progress: percentage,
       displayTime,
       statusText: statusText,
       itemStatus: item.status
     };
-  };
+  }, []);
 
   // Función para obtener el icono del estado
-  const getStatusIcon = (itemStatus) => {
+  // 🚀 OPTIMIZACIÓN: getStatusIcon con useCallback
+  const getStatusIcon = useCallback((itemStatus) => {
     if (itemStatus === 'CREATED') {
       return (
         <Clock className="h-4 w-4" title="Pendiente" />
@@ -246,10 +335,10 @@ const Kitchen = () => {
       );
     }
     return null;
-  };
+  }, []);
 
-  // Organizar items por grupos para Kanban
-  const getKanbanColumns = () => {
+  // ⚡ OPTIMIZADO: Memoizar columnas kanban - solo recalcular cuando cambien dependencias
+  const kanbanColumns = useMemo(() => {
     // Obtener todos los items individuales
     const allItems = kitchenBoard.flatMap(recipe => 
       recipe.items.map(item => ({
@@ -297,58 +386,42 @@ const Kitchen = () => {
     });
 
     // Filtrar por pestaña seleccionada
-    const columns = {};
-    
     if (selectedGroupTab === 'all') {
       // Mostrar todos los grupos dinámicos
       return dynamicGroups;
     } else {
       // Solo mostrar el grupo seleccionado si existe
+      const columns = {};
       if (dynamicGroups[selectedGroupTab]) {
         columns[selectedGroupTab] = dynamicGroups[selectedGroupTab];
       }
       return columns;
     }
-  };
+  }, [kitchenBoard, selectedTableFilter, selectedGroupTab, calculateStationQueue]);
 
-  const kanbanColumns = getKanbanColumns();
-  const totalItems = Object.values(kanbanColumns).reduce((sum, col) => sum + col.items.length, 0);
-
-  // Obtener todas las mesas únicas con items pendientes
-  const getTablesWithItems = () => {
-    const allItems = kitchenBoard.flatMap(recipe => 
-      recipe.items.map(item => ({
-        zone: item.order_zone,
-        table: item.order_table,
-        key: `${item.order_zone}-${item.order_table}`
-      }))
-    );
-
-    // Agrupar por mesa y contar items
-    const tableGroups = {};
-    allItems.forEach(item => {
-      if (!tableGroups[item.key]) {
-        tableGroups[item.key] = {
-          zone: item.zone,
-          table: item.table,
-          key: item.key,
-          count: 0
-        };
-      }
-      tableGroups[item.key].count++;
-    });
-
-    return Object.values(tableGroups).sort((a, b) => {
-      // Ordenar por zona y luego por número de mesa
-      if (a.zone !== b.zone) return a.zone.localeCompare(b.zone);
-      return parseInt(a.table) - parseInt(b.table);
-    });
-  };
-
-  const tablesWithItems = getTablesWithItems();
   
-  // Obtener grupos dinámicos para las pestañas (siempre todos los grupos que tienen items)
-  const getDynamicGroupsForTabs = () => {
+  // ⚡ OPTIMIZADO: Memoizar total de items
+  const totalItems = useMemo(() => {
+    return Object.values(kanbanColumns).reduce((sum, col) => sum + col.items.length, 0);
+  }, [kanbanColumns]);
+  
+  // Detectar cuando la mesa filtrada ya no tiene items y cambiar a "Todas"
+  useEffect(() => {
+    if (selectedTableFilter !== 'all') {
+      // tablesWithItems ya está memoizado arriba
+      const hasCurrentTable = tablesWithItems.some(table => table.key === selectedTableFilter);
+      
+      
+      if (!hasCurrentTable && kitchenBoard.length > 0) {
+        setSelectedTableFilter('all');
+      }
+    }
+  }, [kitchenBoard, selectedTableFilter, tablesWithItems]);
+
+  // tablesWithItems ya está memoizado arriba
+  
+  // ⚡ OPTIMIZADO: Memoizar grupos dinámicos para tabs
+  const dynamicGroupsForTabs = useMemo(() => {
     const allItems = kitchenBoard.flatMap(recipe => 
       recipe.items.map(item => ({
         ...item,
@@ -374,9 +447,7 @@ const Kitchen = () => {
     });
     
     return Object.values(dynamicGroups);
-  };
-  
-  const dynamicGroupsForTabs = getDynamicGroupsForTabs();
+  }, [kitchenBoard]);
 
   if (loading) {
     return (
@@ -391,8 +462,8 @@ const Kitchen = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm px-4 py-3 border-b border-gray-200">
+      {/* Header Fijo */}
+      <div className="sticky top-0 z-10 bg-white shadow-sm px-4 py-3 border-b border-gray-200">
         <div className="flex items-center justify-between">
           {/* Filtros por Mesa */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -422,20 +493,19 @@ const Kitchen = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Botón Toggle Audio */}
-            {['cocineros', 'administradores'].includes(userRole?.toLowerCase()) && (
-              <button
-                onClick={handleToggleAudio}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  audioReady
-                    ? 'bg-green-100 text-green-700 border border-green-200'
-                    : 'bg-yellow-100 text-yellow-700 border border-yellow-200 hover:bg-yellow-200'
-                }`}
-              >
-                {audioReady ? 'Audio ON' : 'Audio OFF'}
-              </button>
-            )}
-            
+            {/* Botón toggle para audio */}
+            <button
+              onClick={toggleAudio}
+              className={`p-3 rounded-lg transition-colors ${
+                audioReady
+                  ? 'bg-green-100 text-green-700 border border-green-200 hover:bg-green-200'
+                  : 'bg-orange-100 text-orange-700 border border-orange-200 hover:bg-orange-200'
+              }`}
+              title={audioReady ? 'Clic para desactivar audio' : 'Clic para activar audio'}
+            >
+              {audioReady ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
+            </button>
+
             <div className="flex items-center gap-1">
               <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
             </div>
@@ -520,8 +590,8 @@ const Kitchen = () => {
                     return (
                       <div
                         key={item.id}
-                        onClick={() => updateItemStatus(item.id, getNextStatus(item.status))}
-                        className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor}`}
+                        onClick={(e) => handleCardClick(e, item)}
+                        className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} relative`}
                       >
                         {/* Barra de progreso de tiempo */}
                         <div className="mb-3">
@@ -564,6 +634,7 @@ const Kitchen = () => {
                             <User className="h-4 w-4" />
                             <span>{item.waiter_name}</span>
                           </div>
+
 
                           {/* Para llevar */}
                           {item.is_takeaway && (
@@ -633,7 +704,7 @@ const Kitchen = () => {
                       return (
                         <div
                           key={item.id}
-                          onClick={() => updateItemStatus(item.id, getNextStatus(item.status))}
+                          onClick={(e) => handleCardClick(e, item)}
                           className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} relative`}
                         >
                           {/* Barra de progreso de tiempo */}
@@ -678,6 +749,7 @@ const Kitchen = () => {
                               <User className="h-4 w-4" />
                               <span>{item.waiter_name}</span>
                             </div>
+
 
                             {/* Para llevar */}
                             {item.is_takeaway && (
@@ -727,6 +799,79 @@ const Kitchen = () => {
           )
         )}
       </div>
+
+      {/* Modal de confirmación */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-100 rounded-full">
+                {confirmModal.newStatus === 'PREPARING' ? 
+                  <ChefHat className="h-6 w-6 text-blue-600" /> :
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                }
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {confirmModal.newStatus === 'PREPARING' ? 
+                    'Iniciar Preparación' : 
+                    'Marcar como Servido'
+                  }
+                </h3>
+                <p className="text-sm text-gray-600">Pedido #{confirmModal.item?.order_id}</p>
+              </div>
+            </div>
+
+            {/* Información del item */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Coffee className="h-4 w-4 text-gray-600" />
+                <span className="font-medium text-gray-900">{confirmModal.item?.recipe_name}</span>
+              </div>
+              <div className="flex items-center gap-4 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  <span>{confirmModal.item?.order_zone} - {confirmModal.item?.order_table}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <User className="h-4 w-4" />
+                  <span>{confirmModal.item?.waiter_name}</span>
+                </div>
+              </div>
+            </div>
+
+
+            {/* Mensaje de confirmación */}
+            <p className="text-gray-700 mb-6">
+              {confirmModal.newStatus === 'PREPARING' ? 
+                '¿Estás seguro de que deseas iniciar la preparación de este item?' :
+                '¿Estás seguro de que deseas marcar este item como servido?'
+              }
+            </p>
+
+            {/* Botones */}
+            <div className="flex gap-3">
+              <button
+                onClick={closeConfirmModal}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmStatusChange}
+                className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors ${
+                  confirmModal.newStatus === 'PREPARING' ? 
+                    'bg-blue-600 hover:bg-blue-700' : 
+                    'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {confirmModal.newStatus === 'PREPARING' ? 'Iniciar' : 'Entregar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

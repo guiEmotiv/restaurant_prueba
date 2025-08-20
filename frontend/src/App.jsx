@@ -52,6 +52,11 @@ const AppContent = () => {
               <DashboardOperativo />
             </RoleProtectedRoute>
           } />
+          <Route path="/dashboard-operativo" element={
+            <RoleProtectedRoute requiredPermission="canViewDashboard">
+              <DashboardOperativo />
+            </RoleProtectedRoute>
+          } />
           <Route path="/dashboard-financiero" element={
             <RoleProtectedRoute requiredPermission="canViewDashboard">
               <DashboardFinanciero />
@@ -162,15 +167,15 @@ function App() {
 
     return (
       <ToastProvider>
-        <Router>
-          <LoginForm>
-            <AuthProvider>
+        <AuthProvider>
+          <Router>
+            <LoginForm>
               <RoleValidator>
                 <AppContent />
               </RoleValidator>
-            </AuthProvider>
-          </LoginForm>
-        </Router>
+            </LoginForm>
+          </Router>
+        </AuthProvider>
       </ToastProvider>
     );
   } catch (error) {

@@ -51,14 +51,15 @@ class NotificationService {
     // Configuraciones de sonidos
     const soundConfigs = {
       itemCreated: { 
-        frequencies: [261.63, 329.63, 392], // Do-Mi-Sol ascendente
-        duration: 0.2, 
-        type: 'sine' 
+        frequencies: [523.25, 659.25, 783.99, 1046.50], // Campana de restaurante - Do-Mi-Sol-Do alta
+        duration: 0.4, 
+        type: 'sine',
+        bellEffect: true
       },
       itemDeleted: { 
-        frequencies: [392, 329.63, 261.63], // Sol-Mi-Do descendente  
-        duration: 0.15, 
-        type: 'sawtooth' 
+        frequencies: [261.63, 329.63, 392], // Do-Mi-Sol ascendente (sonido anterior de creación)
+        duration: 0.2, 
+        type: 'sine' 
       }
     };
 
@@ -72,6 +73,50 @@ class NotificationService {
   playSequence(config) {
     if (!this.audioContext) return;
 
+    if (config.bellEffect) {
+      // Efecto de campana de restaurante con reverberación
+      this.playBellSound(config);
+    } else {
+      // Sonido normal secuencial
+      this.playNormalSequence(config);
+    }
+  }
+
+  // Efecto de campana con reverberación
+  playBellSound(config) {
+    const startTime = this.audioContext.currentTime;
+    
+    // Crear múltiples osciladores para efecto de campana
+    config.frequencies.forEach((freq, index) => {
+      const oscillator = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
+      
+      // Crear un filtro pasa-bajo para suavizar el sonido
+      const filter = this.audioContext.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(2000, startTime);
+      
+      oscillator.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      // Configurar la frecuencia
+      oscillator.frequency.setValueAtTime(freq, startTime);
+      oscillator.type = 'sine';
+      
+      // Envelope de campana - ataque rápido y decay largo
+      const noteTime = startTime + (index * 0.1); // Notas más rápidas
+      gainNode.gain.setValueAtTime(0, noteTime);
+      gainNode.gain.linearRampToValueAtTime(0.4, noteTime + 0.01); // Ataque muy rápido
+      gainNode.gain.exponentialRampToValueAtTime(0.001, noteTime + 1.5); // Decay largo
+      
+      oscillator.start(noteTime);
+      oscillator.stop(noteTime + 1.5);
+    });
+  }
+
+  // Sonido normal secuencial
+  playNormalSequence(config) {
     const oscillator = this.audioContext.createOscillator();
     const gainNode = this.audioContext.createGain();
     
@@ -102,15 +147,8 @@ class NotificationService {
     return this.allowedRoles.includes(this.currentUserRole?.toLowerCase());
   }
 
-  // Reproducir sonido
+  // 🔊 Reproducir sonido (SIEMPRE ACTIVO - sin verificar localStorage)
   playNotification(type = 'itemCreated') {
-    // Verificar si el audio está habilitado por el usuario
-    const audioEnabled = localStorage.getItem('kitchenAudioEnabled') === 'true';
-    
-    if (!audioEnabled) {
-      return;
-    }
-
     if (!this.isAudioReady()) {
       return;
     }
@@ -120,7 +158,7 @@ class NotificationService {
       try {
         generator();
       } catch (error) {
-        // Error reproduciendo sonido - continuar silenciosamente
+        console.error('🚨 Error reproduciendo sonido:', error);
       }
     }
   }

@@ -13,7 +13,7 @@ const RoleValidator = ({ children }) => {
     );
   }
 
-  // Show error if authenticated but no role
+  // Show error if authenticated but no role (pero esperamos un poco)
   if (isAuthenticated && !userRole) {
     return <NoRoleError />;
   }

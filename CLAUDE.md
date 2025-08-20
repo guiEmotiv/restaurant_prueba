@@ -7,24 +7,32 @@
 
 ---
 
-## ⚡ **ENHANCED DEPLOYMENT COMMANDS**
+## ⚡ **COMANDOS PRINCIPALES - ARQUITECTURA POR CARPETAS**
 
 ```bash
-# Development
-./deploy.sh --dev      # Start dev environment (handles migrations automatically)
-./deploy.sh --check    # Health check
-./deploy.sh --migrate  # Run migrations with auto-fixes
+# 🔧 DESARROLLO (carpeta dev/)
+./dev/start.sh             # Iniciar desarrollo completo
+./dev/stop.sh              # Parar desarrollo
+                          # Documentación: ./dev/README.md
 
-# Production Deploy
-./deploy.sh --prod     # Deploy to production
-./deploy.sh --sync     # Sync dev DB to prod (with backup)
+# 🚀 DEPLOYMENT (carpeta prod/)
+./prod/deploy.sh --full    # Deploy completo a producción  
+./prod/deploy.sh --sync    # Deploy + sync BD dev→prod
+./prod/deploy.sh --build   # Solo build frontend
+./prod/deploy.sh --check   # Health check
+./prod/deploy.sh --rollback # Rollback de emergencia
+                          # Documentación: ./prod/README.md
 
-# Remote Deployment (NEW!)
-./deploy-remote.sh deploy       # Standard deployment
-./deploy-remote.sh deploy-sync  # Deploy with DB sync
-./deploy-remote.sh status      # Check remote status
-./deploy-remote.sh backup      # Backup production DB
-./deploy-remote.sh logs        # View remote logs
+# 📋 DOCUMENTACIÓN COMPLETA
+./dev/README.md           # Guía desarrollo
+./prod/README.md          # Guía deployment
+./backup/README.md        # Guía backup/restore  
+./CLAUDE.md               # Esta guía (overview)
+
+# 💾 BACKUP Y RESTAURACIÓN
+./backup/backup-dev.sh --create    # Backup desarrollo
+./backup/backup-prod.sh --create   # Backup producción
+./backup/reset-data.sh --operational --dev  # Reset datos dev
 ```
 
 **URLs**:
@@ -34,43 +42,116 @@
 
 ---
 
-## 🚀 **AUTOMATED DEPLOYMENT FEATURES**
+## 🏗️ **ARQUITECTURA FINAL OPTIMIZADA**
 
-### **Local Development** (`./deploy.sh --dev`)
+### **📁 Estructura por Carpetas (CLARA Y ORGANIZADA)**
 
-- ✅ Auto-installs npm dependencies if missing
-- ✅ Kills existing processes on port 5173
-- ✅ Handles problematic migrations automatically
-- ✅ Waits for containers to be ready
-- ✅ Color-coded output for better visibility
-
-### **Production Deployment** (`./deploy.sh --prod`)
-
-- ✅ Checks for uncommitted changes
-- ✅ Auto-backups database before deployment
-- ✅ Smart migration handling with fallbacks
-- ✅ Health checks after deployment
-- ✅ Validates nginx configuration
-
-### **Remote Deployment** (`./deploy-remote.sh`)
-
-```bash
-# Quick deploy from local to production
-./deploy-remote.sh deploy
-
-# Deploy with database sync (replaces prod with dev data)
-./deploy-remote.sh deploy-sync
-
-# Check production status
-./deploy-remote.sh status
+```
+restaurant-web/
+├── dev/                # 🔧 DESARROLLO
+│   ├── start.sh        #   Iniciar desarrollo
+│   ├── stop.sh         #   Parar desarrollo  
+│   └── README.md       #   Documentación desarrollo
+│
+├── prod/               # 🚀 DEPLOYMENT  
+│   ├── deploy.sh       #   Deploy a producción
+│   └── README.md       #   Documentación deployment
+│
+├── backup/             # 💾 BACKUP Y RESTAURACIÓN
+│   ├── backup-dev.sh   #   Backup desarrollo
+│   ├── backup-prod.sh  #   Backup producción
+│   ├── reset-data.sh   #   Reset datos (dev/prod)
+│   └── README.md       #   Documentación backup
+│
+├── CLAUDE.md           # 📋 Esta guía (overview)
+├── frontend/           # ⚛️ React + Vite
+├── backend/            # 🐍 Django API  
+├── nginx/              # 🌐 Configuración web server
+└── data/               # 💾 Base de datos SQLite
+    └── backups/        #   Backups organizados
+        ├── dev/        #     Backups desarrollo
+        └── prod/       #     Backups producción
 ```
 
-**What it does automatically**:
+### **🎯 Funciones Automatizadas**
 
-1. ✅ Builds frontend with production config
-2. ✅ Updates Docker containers with correct settings
-3. ✅ Applies database migrations (handles known issues)
-4. ✅ Performs health check verification
+**Desarrollo (`./dev/start.sh`):**
+- ✅ Validación de prerrequisitos (Docker, npm)
+- ✅ Limpieza automática de procesos anteriores  
+- ✅ Instalación inteligente de dependencias
+- ✅ Backend con hot-reload y migraciones auto-fix
+- ✅ Frontend en background (no bloquea terminal)
+- ✅ Comando de parada limpia (`./dev/stop.sh`)
+
+**Deployment (`./prod/deploy.sh --full`):**
+- ✅ Backup automático de BD antes de cambios
+- ✅ Build optimizado de frontend para producción
+- ✅ Migraciones con manejo inteligente de errores
+- ✅ Health checks completos post-deployment
+- ✅ Rollback automático de emergencia
+- ✅ Sync de BD dev→prod opcional (`--sync`)
+
+---
+
+## 🔍 **VALIDACIÓN EN TIEMPO REAL OPTIMIZADA**
+
+### **Sistema Simple y Efectivo**
+
+**SOLUCIÓN IMPLEMENTADA**: Validación Just-In-Time antes de acciones críticas
+
+```javascript
+// Antes de eliminar un item - verificar estado actual
+const currentStatus = await checkItemCurrentStatus(itemId);
+if (currentStatus !== 'CREATED') {
+  showToast(`No se puede eliminar: el item ya está ${statusLabel[currentStatus]}`, 'error');
+  return;
+}
+```
+
+### **Problema Resuelto de Manera Eficiente**
+
+**ANTES**: Los items se podían eliminar sin verificar su estado actual en cocina.
+
+**AHORA**: Verificación instantánea del estado real antes de cada acción de eliminación.
+
+### **Ventajas del Sistema Actual**:
+
+- ✅ **Carga rápida**: No más SSE lento ni reconexiones constantes  
+- ✅ **Validación precisa**: Consulta el estado real justo antes de eliminar
+- ✅ **Mensajes claros**: "No se puede eliminar: el item ya está en preparación"
+- ✅ **Sin complejidad**: Sistema simple que funciona de manera confiable
+- ✅ **Auto-refresh inteligente**: Kitchen cada 5s, Tables cada 8s
+
+### **Flujos de Validación**:
+
+#### **🔸 Eliminar Item Individual**:
+1. Usuario intenta eliminar item
+2. Sistema verifica estado actual: `GET /api/v1/order-items/{id}/`
+3. Si estado = 'CREATED' → Permitir eliminación
+4. Si estado ≠ 'CREATED' → Mensaje: "No se puede eliminar: el item ya está en preparación"
+
+#### **🔸 Eliminar Orden Completa**:
+1. Usuario intenta eliminar orden
+2. Sistema verifica estado actual: `GET /api/v1/orders/{id}/`
+3. Analiza todos los items de la orden
+4. Si TODOS están 'CREATED' → Permitir eliminación
+5. Si NO → Mensaje específico: "No se puede eliminar el pedido #123: Tiene items ya procesados: 2 en preparación, 1 servido"
+
+### **🎯 Mensajes Específicos por Estado**:
+
+```javascript
+// Items individuales
+'PREPARING' → "No se puede eliminar: el item ya está en preparación"
+'SERVED' → "No se puede eliminar: el item ya está servido" 
+'PAID' → "No se puede eliminar: el item ya está pagado"
+
+// Órdenes completas
+"Tiene items ya procesados: 2 en preparación, 1 servido"
+"Tiene items ya procesados: 3 servidos"
+"Tiene items ya procesados: 1 en preparación, 2 servidos, 1 pagado"
+```
+
+**Configuración Zero** - Funciona automáticamente sin setup adicional.
 
 ---
 
@@ -164,7 +245,7 @@ services:
 
 | Issue                | Command                                                          | Expected Result                |
 | -------------------- | ---------------------------------------------------------------- | ------------------------------ |
-| **500 on orders**    | `./deploy.sh --migrate`                                          | Auto-fixes migration issues    |
+| **500 on orders**    | `./tools/deploy/deploy.sh --migrate`                                          | Auto-fixes migration issues    |
 | **403 Forbidden**    | Logout/login (JWT expired)                                       | New valid token                |
 | **502 Bad Gateway**  | `docker-compose restart nginx`                                   | nginx starts without errors    |
 | **Container issues** | `./deploy.sh --check`                                            | Health status report           |
@@ -214,7 +295,7 @@ git add -A && git commit -m "Update" && git push
 ssh -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com
 cd /opt/restaurant-web
 git pull origin main
-./deploy.sh --prod
+./tools/deploy/deploy.sh --prod
 ```
 
 ---
@@ -355,3 +436,57 @@ Todos los scripts:
 - Tienen confirmación de seguridad
 - Muestran resumen de lo que se eliminará
 - Funcionan en dev y producción
+
+  🎯 PRÓXIMO DEPLOY OPTIMIZADO
+
+  Para tu próximo deploy de dev → prod, simplemente usa:
+
+  # Deploy estándar (recomendado)
+
+  ./deploy-v3.sh prod
+
+  # Deploy zero-downtime (si tienes blue-green setup)
+
+  ./deploy-v3.sh prod blue-green
+
+  # Si algo falla, rollback inmediato
+
+  ./deploy-v3.sh --rollback
+
+  🔧 MIGRACIÓN GRADUAL
+
+  1. Fase de Testing (ahora): Usa deploy-v3.sh dev para probar
+  2. Primera Producción: Usa deploy-v3.sh prod para el próximo deploy
+  3. Consolidación: Eventualmente reemplaza deploy.sh por deploy-v3.sh
+
+  💡 BENEFICIOS INMEDIATOS
+
+  - ✅ 1 comando en lugar de múltiples pasos
+  - ✅ Backup automático antes de cada deploy
+  - ✅ Rollback en 1 comando si algo falla
+  - ✅ Config sync automático (no más nginx mapping errors)
+  - ✅ Validación completa pre y post deploy
+  - ✅ Health checks inteligentes con retry
+
+  🚀 Nuevo Flujo de Desarrollo:
+
+  # OPCIÓN 1 (RECOMENDADA): Script ultra-simple
+
+  ./dev-simple.sh
+
+  # OPCIÓN 2: Script original mejorado
+
+  ./tools/deploy/deploy.sh --dev
+
+  # OPCIÓN 3: Manual (si todo falla)
+
+  docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d app
+  cd frontend && npm run dev
+
+  🛡️ Prevención de Errores:
+
+  - ✅ Usa docker-compose up estándar (más confiable)
+  - ✅ Configuración por archivos (más limpia)
+  - ✅ Manejo de errores simple (menos puntos de falla)
+  - ✅ Documentación completa con troubleshooting
+  - ✅ Comando de reset total para emergencias

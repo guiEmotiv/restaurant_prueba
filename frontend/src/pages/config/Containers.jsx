@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, FileSpreadsheet } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import Button from '../../components/common/Button';
@@ -25,63 +25,118 @@ const Containers = () => {
       required: true,
       render: (value) => `S/ ${parseFloat(value || 0).toFixed(2)}`
     },
-    { key: 'stock', title: 'Stock', required: true },
+    { 
+      key: 'stock', 
+      title: 'Stock', 
+      required: true,
+      render: (value) => (
+        <span className={`${parseInt(value) <= 5 ? 'text-red-600 font-semibold' : parseInt(value) <= 10 ? 'text-yellow-600 font-medium' : 'text-green-600'}`}>
+          {value}
+        </span>
+      )
+    },
+    {
+      key: 'is_active',
+      title: 'Estado',
+      render: (value, item) => {
+        const hasStock = parseInt(item.stock) > 0;
+        const isActive = value && hasStock;
+        return isActive ? 
+          <span className="text-green-600 font-medium">Disponible</span> : 
+          hasStock ? 
+            <span className="text-yellow-600 font-medium">Inactivo</span> :
+            <span className="text-red-600 font-medium">Sin Stock</span>;
+      }
+    },
     { 
       key: 'created_at', 
       title: 'Fecha de Creación',
       render: (value) => new Date(value).toLocaleDateString('es-PE')
+    },
+    { 
+      key: 'updated_at', 
+      title: 'Última Actualización',
+      render: (value) => new Date(value).toLocaleDateString('es-PE')
     }
   ];
 
-  useEffect(() => {
-    loadContainers();
-  }, []);
-
-  const loadContainers = async () => {
+  // 🚀 OPTIMIZACIÓN: loadContainers con useCallback y cache-busting optimizado
+  const loadContainers = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiService.containers.getAll();
+      // Timestamp simple sin Math.random innecesario
+      const data = await apiService.containers.getAll({ _t: Date.now() });
       const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
       setContainers(sortedData);
     } catch (error) {
       showError('Error al cargar los envases');
+      console.error('Error cargando containers:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
 
-  const handleOpenModal = (container = null) => {
+  useEffect(() => {
+    loadContainers();
+  }, [loadContainers]);
+
+  // 🚀 OPTIMIZACIÓN: Auto-refresh simplificado y eficiente
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadContainers();
+      }
+    };
+
+    // Solo listener de visibilidad - más eficiente
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // 🚀 OPTIMIZACIÓN: Intervalo más largo (60s) para reducir carga
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        loadContainers();
+      }
+    }, 60000); // 60 segundos en lugar de 30
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [loadContainers]);
+
+  // 🚀 OPTIMIZACIÓN: Handlers con useCallback para evitar re-renders
+  const handleOpenModal = useCallback((container = null) => {
     setSelectedContainer(container);
     setShowContainerModal(true);
-  };
+  }, []);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setShowContainerModal(false);
     setSelectedContainer(null);
-  };
+  }, []);
 
-  const handleModalSave = () => {
+  const handleModalSave = useCallback(() => {
     loadContainers();
-  };
+  }, [loadContainers]);
 
-  const handleAdd = () => {
+  const handleAdd = useCallback(() => {
     handleOpenModal();
-  };
+  }, [handleOpenModal]);
 
-  const handleImportExcel = () => {
+  const handleImportExcel = useCallback(() => {
     setShowImportModal(true);
-  };
+  }, []);
 
-  const handleImportSuccess = () => {
+  const handleImportSuccess = useCallback(() => {
     loadContainers();
     setShowImportModal(false);
-  };
+  }, [loadContainers]);
 
-  const handleEdit = (container) => {
+  const handleEdit = useCallback((container) => {
     handleOpenModal(container);
-  };
+  }, [handleOpenModal]);
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     try {
       await apiService.containers.delete(id);
       await loadContainers();
@@ -93,7 +148,7 @@ const Containers = () => {
         showError('Error al eliminar el envase');
       }
     }
-  };
+  }, [loadContainers, showSuccess, showError]);
 
   return (
     <div className="space-y-6">

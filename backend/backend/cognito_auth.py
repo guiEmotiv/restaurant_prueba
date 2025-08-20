@@ -39,6 +39,9 @@ class CognitoUser:
     def is_cook(self):
         return 'cocineros' in self.groups
         
+    def is_cashier(self):
+        return 'cajeros' in self.groups
+        
     def has_perm(self, perm, obj=None):
         """Check if user has specific permission (required by Django)"""
         return self.is_admin()  # Admins have all permissions
@@ -308,3 +311,8 @@ def admin_required(view_func):
 def waiter_or_admin_required(view_func):
     """Require waiter or admin group membership"""
     return cognito_required(['meseros', 'administradores'])(view_func)
+
+
+def cashier_or_admin_required(view_func):
+    """Require cashier or admin group membership"""
+    return cognito_required(['cajeros', 'administradores'])(view_func)

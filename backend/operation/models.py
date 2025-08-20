@@ -2,6 +2,9 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.utils import timezone
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
+from django.apps import apps
 from decimal import Decimal
 from config.models import Table, Container
 from inventory.models import Recipe, Ingredient
@@ -115,6 +118,12 @@ class Order(models.Model):
     def is_fully_paid(self):
         """Verifica si la orden está completamente pagada"""
         return self.get_pending_amount() <= Decimal('0.00')
+    
+    def delete(self, *args, **kwargs):
+        """Override delete para asegurar que el stock se restaure cuando se elimina la orden completa"""
+        # Los OrderItems se eliminan automáticamente por CASCADE, y cada uno restaura su stock
+        # No necesitamos hacer nada extra aquí, pero documentamos el comportamiento
+        super().delete(*args, **kwargs)
 
 
 class OrderItem(models.Model):
@@ -179,8 +188,32 @@ class OrderItem(models.Model):
         # Calculate total_price based on quantity and unit_price
         self.total_price = self.unit_price * self.quantity
         
-        # Remove customizations cost calculation (OrderItemIngredient removed)
-            
+        # Descontar stock del container si es un nuevo OrderItem para llevar
+        is_creating = self.pk is None
+        if is_creating and self.container and self.has_taper:
+            try:
+                # SIEMPRE usar 1 envase por receta (independientemente de quantity)
+                container_quantity = 1
+                
+                # Descontar stock del container
+                self.container.update_stock(container_quantity, 'subtract')
+                
+                # Crear ContainerSale correspondiente para tracking
+                # Usar una importación tardía para evitar circular
+                ContainerSale = apps.get_model('operation', 'ContainerSale')
+                ContainerSale.objects.create(
+                    order=self.order,
+                    container=self.container,
+                    quantity=container_quantity,
+                    unit_price=self.container.price,
+                    total_price=self.container.price * container_quantity
+                )
+            except Exception as e:
+                # Log del error pero no fallar la creación
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error descontando stock de container en OrderItem: {e}")
+        
         super().save(*args, **kwargs)
         
         # Recalcular total de la orden después de guardar el item
@@ -239,9 +272,21 @@ class OrderItem(models.Model):
     def delete(self, *args, **kwargs):
         """Override delete para recalcular el total de la orden"""
         order = self.order
+        
+        # La restauración de stock se maneja por el signal pre_delete
+        # para asegurar que funcione también con eliminaciones CASCADE
+        
         super().delete(*args, **kwargs)
         # Recalcular total de la orden después de eliminar el item
-        order.calculate_total()
+        if order and order.pk:  # Verificar que la orden aún existe
+            order.calculate_total()
+    
+    def restore_ingredients_stock(self):
+        """Restaura el stock de ingredientes cuando se elimina el order item"""
+        for recipe_item in self.recipe.recipeitem_set.all():
+            # Restaurar stock multiplicado por la cantidad del order item
+            quantity_to_restore = recipe_item.quantity * self.quantity
+            recipe_item.ingredient.update_stock(quantity_to_restore, 'add')
     
     def get_paid_amount(self):
         """Obtiene el monto pagado de este item"""
@@ -402,3 +447,40 @@ class ContainerSale(models.Model):
 
 # ELIMINADO: Modelos Cart y CartItem 
 # Sistema de carritos temporales eliminado para simplificar operaciones
+
+
+# Django Signals para manejo de stock
+@receiver(pre_delete, sender=OrderItem)
+def restore_stock_signal(sender, instance, **kwargs):
+    """
+    Signal que se ejecuta antes de eliminar un OrderItem.
+    Restaura el stock de ingredientes y containers incluso cuando se elimina por CASCADE.
+    """
+    try:
+        # 1. Restaurar stock de ingredientes
+        for recipe_item in instance.recipe.recipeitem_set.all():
+            # Restaurar stock multiplicado por la cantidad del order item
+            quantity_to_restore = recipe_item.quantity * instance.quantity
+            recipe_item.ingredient.update_stock(quantity_to_restore, 'add')
+        
+        # 2. Restaurar stock de container si el OrderItem lo tiene
+        if instance.container:
+            # SIEMPRE restaurar 1 envase por receta (independientemente de quantity)
+            container_quantity = 1
+            instance.container.update_stock(container_quantity, 'add')
+    except Exception as e:
+        # Log del error pero no fallar la eliminación
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error restaurando stock en eliminación de OrderItem {instance.id}: {e}")
+
+
+@receiver(pre_delete, sender=ContainerSale)
+def restore_container_stock_signal(sender, instance, **kwargs):
+    """
+    Signal que se ejecuta antes de eliminar un ContainerSale.
+    DESHABILITADO: La restauración se maneja desde OrderItem para evitar duplicación.
+    """
+    # DESHABILITADO: Evitar doble restauración
+    # La restauración de stock se maneja desde el signal de OrderItem
+    pass

@@ -47,8 +47,95 @@ const TableOrderEcommerce = () => {
   const [bluetoothConnected, setBluetoothConnected] = useState(false);
   const [connectingBluetooth, setConnectingBluetooth] = useState(false);
 
+  // 🎰 Auto-update simple para vista de mesas (volvemos al sistema anterior)
+  const TABLES_REFRESH_INTERVAL = 8000; // 8 segundos para vista de mesas
+
+  useEffect(() => {
+    loadInitialData();
+    
+    // Auto-update SOLO para vista de mesas
+    if (step === 'tables') {
+      const interval = setInterval(async () => {
+        if (!document.hidden) {
+          try {
+            const allOrders = await apiService.orders.getAll();
+            const activeOrders = allOrders?.filter(o => o.status === 'CREATED') || [];
+            
+            setAllOrders(activeOrders);
+            
+            if (import.meta.env.MODE === 'development') {
+            }
+          } catch (error) {
+            if (import.meta.env.MODE === 'development') {
+            }
+          }
+        }
+      }, TABLES_REFRESH_INTERVAL);
+      
+      return () => clearInterval(interval);
+    }
+    
+    if (import.meta.env.MODE === 'development') {
+    }
+  }, [step]);
+
   // Helper functions para gestión de pedidos
-  const canDeleteOrder = (order) => {
+  
+  // 🚀 OPTIMIZACIÓN: getItemStatusColor con useCallback
+  const getItemStatusColor = useCallback((status) => {
+    switch (status) {
+      case 'CREATED': return 'bg-green-500'; // Verde para creados
+      case 'PREPARING': return 'bg-yellow-500'; // Amarillo para preparando
+      case 'SERVED': return 'bg-blue-500'; // Azul para servidos
+      case 'PAID': return 'bg-gray-500'; // Gris para pagados
+      default: return 'bg-gray-400'; // Gris claro por defecto
+    }
+  }, []);
+
+  // 🚀 OPTIMIZACIÓN: getSelectedContainer con useCallback
+  const getSelectedContainer = useCallback((recipe) => {
+    if (!containers.length || !recipe?.container_id) return null;
+    
+    // Buscar EXCLUSIVAMENTE el envase configurado en la receta
+    const recipeContainer = containers.find(c => c.id === recipe.container_id);
+    
+    // Solo retornarlo si existe y tiene stock - SIN FALLBACK
+    return (recipeContainer && recipeContainer.stock > 0) ? recipeContainer : null;
+  }, [containers]);
+
+  // 🚀 OPTIMIZACIÓN: validateTakeawayContainer con useCallback
+  const validateTakeawayContainer = useCallback((recipe) => {
+    if (!recipe?.container_id) {
+      return {
+        isValid: false,
+        message: "Esta receta no tiene envase configurado para llevar"
+      };
+    }
+    
+    const recommendedContainer = containers.find(c => c.id === recipe.container_id);
+    if (!recommendedContainer || recommendedContainer.stock <= 0) {
+      return {
+        isValid: false,
+        message: `El envase "${containers.find(c => c.id === recipe.container_id)?.name || 'configurado'}" no tiene stock disponible`
+      };
+    }
+    
+    return { isValid: true, container: recommendedContainer };
+  }, [containers]);
+  // 🚀 OPTIMIZACIÓN: checkOrderCurrentStatus con useCallback
+  const checkOrderCurrentStatus = useCallback(async (orderId) => {
+    try {
+      const order = await apiService.orders.getById(orderId);
+      return order;
+    } catch (error) {
+      if (import.meta.env.MODE === 'development') {
+      }
+      return null;
+    }
+  }, []);
+
+  // 🚀 OPTIMIZACIÓN: canDeleteOrder con useCallback
+  const canDeleteOrder = useCallback((order) => {
     // Se puede eliminar si:
     // 1. El pedido está vacío (sin items), O
     // 2. TODOS los items están en estado CREATED
@@ -58,9 +145,48 @@ const TableOrderEcommerce = () => {
     
     // Solo se puede eliminar si TODOS los items están CREATED
     return createdItems.length === order.items.length;
-  };
+  }, []);
 
-  const canProcessPayment = (order) => {
+  // 🚀 OPTIMIZACIÓN: analyzeOrderDeletionStatus con useCallback
+  const analyzeOrderDeletionStatus = useCallback((order) => {
+    if (!order.items || order.items.length === 0) {
+      return { canDelete: true, reason: '' };
+    }
+
+    const statusGroups = {
+      CREATED: order.items.filter(item => item.status === 'CREATED'),
+      PREPARING: order.items.filter(item => item.status === 'PREPARING'),
+      SERVED: order.items.filter(item => item.status === 'SERVED'),
+      PAID: order.items.filter(item => item.status === 'PAID')
+    };
+
+    const totalItems = order.items.length;
+    
+    if (statusGroups.CREATED.length === totalItems) {
+      return { canDelete: true, reason: '' };
+    }
+
+    // Construir mensaje específico
+    let reasons = [];
+    if (statusGroups.PREPARING.length > 0) {
+      reasons.push(`${statusGroups.PREPARING.length} en preparación`);
+    }
+    if (statusGroups.SERVED.length > 0) {
+      reasons.push(`${statusGroups.SERVED.length} servido${statusGroups.SERVED.length > 1 ? 's' : ''}`);
+    }
+    if (statusGroups.PAID.length > 0) {
+      reasons.push(`${statusGroups.PAID.length} pagado${statusGroups.PAID.length > 1 ? 's' : ''}`);
+    }
+
+    const reasonText = reasons.join(', ');
+    return { 
+      canDelete: false, 
+      reason: `Tiene items ya procesados: ${reasonText}` 
+    };
+  }, []);
+
+  // 🚀 OPTIMIZACIÓN: canProcessPayment con useCallback
+  const canProcessPayment = useCallback((order) => {
     if (!order || order.status === 'PAID' || !order.items || order.items.length === 0) {
       return false;
     }
@@ -70,9 +196,8 @@ const TableOrderEcommerce = () => {
       item.status === 'SERVED' && !item.is_fully_paid
     );
     
-    
     return servedUnpaidItems.length > 0;
-  };
+  }, []);
 
   // Cargar datos iniciales
   const loadInitialData = useCallback(async () => {
@@ -99,62 +224,10 @@ const TableOrderEcommerce = () => {
     }
   }, [showToast]);
 
+  // Cargar datos iniciales al montar componente
   useEffect(() => {
     loadInitialData();
-    
-    // Auto-refresh optimizado: solo cuando la ventana esté activa
-    let interval = null;
-    
-    const startRefresh = () => {
-      if (interval) return; // Evitar múltiples intervalos
-      
-      interval = setInterval(async () => {
-        // Solo actualizar si el usuario está en la vista de mesas u órdenes
-        if (step === 'tables' || step === 'orders') {
-          try {
-            const allOrders = await apiService.orders.getAll();
-            const activeOrders = allOrders?.filter(o => o.status === 'CREATED') || [];
-            
-            // Solo actualizar si hay cambios reales (evita re-renders innecesarios)
-            setAllOrders(prevOrders => {
-              if (JSON.stringify(prevOrders.map(o => o.id).sort()) === 
-                  JSON.stringify(activeOrders.map(o => o.id).sort())) {
-                return prevOrders; // Sin cambios, no actualizar
-              }
-              return activeOrders;
-            });
-          } catch (error) {
-          }
-        }
-      }, 15000); // Aumentamos a 15s para reducir carga
-    };
-
-    const stopRefresh = () => {
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-    };
-
-    // Gestionar visibilidad de página
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        stopRefresh();
-      } else {
-        startRefresh();
-      }
-    };
-
-    // Iniciar refresh y configurar listeners
-    startRefresh();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      stopRefresh();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [step]); // Añadimos step como dependencia
-
+  }, [loadInitialData]);
 
   // Computed property para órdenes de la mesa actual
   const currentTableOrders = useMemo(() => {
@@ -164,6 +237,16 @@ const TableOrderEcommerce = () => {
       return orderTableId === selectedTable.id;
     });
   }, [allOrders, selectedTable]);
+
+  // Sincronización simple de currentOrder (solo cuando cambia allOrders)
+  useEffect(() => {
+    if (currentOrder && allOrders.length > 0) {
+      const updatedCurrentOrder = allOrders.find(order => order.id === currentOrder.id);
+      if (updatedCurrentOrder && updatedCurrentOrder !== currentOrder) {
+        setCurrentOrder(updatedCurrentOrder);
+      }
+    }
+  }, [allOrders, currentOrder?.id]);
 
   // Cargar órdenes de mesa específica con items detallados (optimizado)
   const loadTableOrders = async (tableId) => {
@@ -263,16 +346,16 @@ const TableOrderEcommerce = () => {
     setStep('orders');
   };
 
-  // Crear nuevo pedido
-  const handleCreateNewOrder = () => {
+  // 🚀 OPTIMIZACIÓN: handleCreateNewOrder con useCallback
+  const handleCreateNewOrder = useCallback(() => {
     setCart([]);
     setCurrentOrder(null);
     setIsCartOpen(false); // Cerrar carrito al crear nuevo pedido
     setStep('menu');
-  };
+  }, []);
 
-  // Editar pedido existente
-  const handleEditOrder = (order) => {
+  // 🚀 OPTIMIZACIÓN: handleEditOrder con useCallback
+  const handleEditOrder = useCallback((order) => {
     setCurrentOrder(order);
     // CORRECCIÓN: No pre-llenar carrito con items existentes
     // El carrito debe empezar vacío para agregar NUEVOS items únicamente
@@ -280,24 +363,26 @@ const TableOrderEcommerce = () => {
     // NO abrir automáticamente - el usuario decide cuándo ver la lista
     setIsCartOpen(false);
     setStep('menu');
-  };
+  }, []);
 
-  // Funciones para modal de notas
-  const openNoteModal = (recipe) => {
+  // 🚀 OPTIMIZACIÓN: openNoteModal con useCallback
+  const openNoteModal = useCallback((recipe) => {
     setSelectedRecipe(recipe);
     setNoteText('');
     setIsTakeaway(false);
     setIsNoteModalOpen(true);
-  };
+  }, []);
 
-  const closeNoteModal = () => {
+  // 🚀 OPTIMIZACIÓN: closeNoteModal con useCallback
+  const closeNoteModal = useCallback(() => {
     setIsNoteModalOpen(false);
     setSelectedRecipe(null);
     setNoteText('');
     setIsTakeaway(false);
-  };
+  }, []);
 
-  const handleAddWithNotes = () => {
+  // 🚀 OPTIMIZACIÓN: handleAddWithNotes con useCallback
+  const handleAddWithNotes = useCallback(() => {
     if (!selectedRecipe) return;
     
     const existingIndex = cart.findIndex(item => 
@@ -315,10 +400,15 @@ const TableOrderEcommerce = () => {
       let basePrice = parseFloat(selectedRecipe.price || selectedRecipe.base_price || 0);
       let containerPrice = 0;
       
-      // Si es para llevar, agregar precio del contenedor
-      if (isTakeaway && containers.length > 0) {
-        // Usar el primer contenedor por defecto (puede mejorarse con selección)
-        containerPrice = parseFloat(containers[0].price || 0);
+      // Validar si es para llevar - SOLO envase de receta permitido
+      if (isTakeaway) {
+        const validation = validateTakeawayContainer(selectedRecipe);
+        if (!validation.isValid) {
+          showToast(validation.message, 'error');
+          return; // No agregar al carrito
+        }
+        // Si es válido, usar el envase de la receta
+        containerPrice = parseFloat(validation.container.price || 0);
       }
       
       const totalUnitPrice = basePrice + containerPrice;
@@ -335,10 +425,10 @@ const TableOrderEcommerce = () => {
     }
     
     closeNoteModal();
-  };
+  }, [cart, selectedRecipe, noteText, isTakeaway, validateTakeawayContainer, showToast, closeNoteModal]);
 
-  // Agregar al carrito con campo de precio consistente (función simple)
-  const addToCart = (recipe) => {
+  // 🚀 OPTIMIZACIÓN: addToCart con useCallback
+  const addToCart = useCallback((recipe) => {
     const existingIndex = cart.findIndex(item => 
       item.recipe.id === recipe.id && 
       item.notes === '' && 
@@ -364,10 +454,10 @@ const TableOrderEcommerce = () => {
     }
     
     // No abrir automáticamente - solo respuesta visual en el badge
-  };
+  }, [cart]);
 
-  // Actualizar item del carrito
-  const updateCartItem = (index, field, value) => {
+  // 🚀 OPTIMIZACIÓN: updateCartItem con useCallback
+  const updateCartItem = useCallback((index, field, value) => {
     const newCart = [...cart];
     newCart[index][field] = value;
     
@@ -376,20 +466,20 @@ const TableOrderEcommerce = () => {
     }
     
     setCart(newCart);
-  };
+  }, [cart]);
 
-  // Eliminar del carrito
-  const removeFromCart = (index) => {
+  // 🚀 OPTIMIZACIÓN: removeFromCart con useCallback
+  const removeFromCart = useCallback((index) => {
     setCart(cart.filter((_, i) => i !== index));
-  };
+  }, [cart]);
 
-  // Total del carrito (solo items nuevos)
-  const getCartTotal = () => {
+  // 🚀 OPTIMIZACIÓN: getCartTotal con useMemo
+  const getCartTotal = useMemo(() => {
     return cart.reduce((total, item) => total + item.total_price, 0);
-  };
+  }, [cart]);
 
-  // Total del pedido existente (incluyendo envases)
-  const getCurrentOrderTotal = () => {
+  // 🚀 OPTIMIZACIÓN: getCurrentOrderTotal con useMemo
+  const getCurrentOrderTotal = useMemo(() => {
     if (!currentOrder) return 0;
     // Usar grand_total si existe, sino calcular manualmente
     const grandTotal = currentOrder.grand_total;
@@ -400,30 +490,51 @@ const TableOrderEcommerce = () => {
     const totalAmount = parseFloat(currentOrder.total_amount || 0);
     const containersTotal = parseFloat(currentOrder.containers_total || 0);
     return totalAmount + containersTotal;
-  };
+  }, [currentOrder]);
 
-  // Total completo (pedido existente + carrito)
-  const getCompleteTotal = () => {
-    return getCurrentOrderTotal() + getCartTotal();
-  };
+  // 🚀 OPTIMIZACIÓN: getCompleteTotal con useMemo
+  const getCompleteTotal = useMemo(() => {
+    return getCurrentOrderTotal + getCartTotal;
+  }, [getCurrentOrderTotal, getCartTotal]);
 
-  // Eliminar pedido completo
+  // Eliminar pedido completo con validación en tiempo real
   const handleDeleteOrder = async (order) => {
-    if (!canDeleteOrder(order)) {
-      showToast('No se puede eliminar: algunos items ya están en proceso', 'error');
-      return;
-    }
-
-    const confirmed = window.confirm(`¿Estás seguro de eliminar el pedido #${order.id}?`);
-    if (!confirmed) return;
-
     try {
       setSaving(true);
+      
+      // 🔍 VALIDACIÓN EN TIEMPO REAL: Verificar estado actual completo de la orden
+      if (import.meta.env.MODE === 'development') {
+      }
+      
+      const currentOrder = await checkOrderCurrentStatus(order.id);
+      
+      if (!currentOrder) {
+        showToast('Error al verificar el estado de la orden', 'error');
+        return;
+      }
+      
+      // Analizar estado actual y generar mensaje específico
+      const analysis = analyzeOrderDeletionStatus(currentOrder);
+      
+      if (!analysis.canDelete) {
+        showToast(`No se puede eliminar el pedido #${order.id}: ${analysis.reason}`, 'error');
+        return;
+      }
+      
+      // Si llegamos aquí, todos los items están CREATED y se puede eliminar
+      const confirmed = window.confirm(`¿Estás seguro de eliminar el pedido #${order.id}?`);
+      if (!confirmed) return;
+
       await apiService.orders.delete(order.id);
       showToast('Pedido eliminado correctamente', 'success');
-      loadTableOrders(selectedTable.id);
+      await loadTableOrders(selectedTable.id);
+      
     } catch (error) {
-      showToast('Error al eliminar pedido', 'error');
+      if (error.response?.status === 400 && error.response?.data?.error?.includes('status')) {
+        showToast('No se puede eliminar: algunos items ya están en proceso', 'error');
+      } else {
+        showToast('Error al eliminar pedido', 'error');
+      }
     } finally {
       setSaving(false);
     }
@@ -450,7 +561,8 @@ const TableOrderEcommerce = () => {
   };
 
   // Manejar selección/deselección de items
-  const handleItemSelection = (itemId) => {
+  // 🚀 OPTIMIZACIÓN: handleItemSelection con useCallback
+  const handleItemSelection = useCallback((itemId) => {
     // Verificar que el item esté en estado SERVED y no esté ya pagado
     const item = selectedOrderForPayment.items.find(i => i.id === itemId);
     if (!item || item.status !== 'SERVED' || item.is_fully_paid) {
@@ -465,10 +577,10 @@ const TableOrderEcommerce = () => {
         return [...prev, itemId];
       }
     });
-  };
+  }, [selectedOrderForPayment, showToast]);
 
-  // Seleccionar/deseleccionar todos los items SERVED
-  const handleSelectAllServedItems = () => {
+  // 🚀 OPTIMIZACIÓN: Seleccionar/deseleccionar todos los items SERVED con useCallback
+  const handleSelectAllServedItems = useCallback(() => {
     const servedItems = selectedOrderForPayment.items.filter(item => 
       item.status === 'SERVED' && !item.is_fully_paid
     );
@@ -482,10 +594,10 @@ const TableOrderEcommerce = () => {
       const servedIds = servedItems.map(item => item.id);
       setSelectedItems(prev => [...new Set([...prev, ...servedIds])]);
     }
-  };
+  }, [selectedOrderForPayment, selectedItems]);
 
-  // Manejar conexión/desconexión Bluetooth
-  const handleBluetoothToggle = async (enabled) => {
+  // 🚀 OPTIMIZACIÓN: Manejar conexión/desconexión Bluetooth con useCallback
+  const handleBluetoothToggle = useCallback(async (enabled) => {
     if (enabled) {
       setConnectingBluetooth(true);
       try {
@@ -510,16 +622,16 @@ const TableOrderEcommerce = () => {
       setBluetoothConnected(false);
       showToast('Impresora Bluetooth desconectada', 'info');
     }
-  };
+  }, [bluetoothPrinter, showToast]);
 
-  // Verificar si todos los items están pagados
-  const areAllItemsPaid = (order) => {
+  // 🚀 OPTIMIZACIÓN: Verificar si todos los items están pagados con useCallback
+  const areAllItemsPaid = useCallback((order) => {
     if (!order.items || order.items.length === 0) return false;
     return order.items.every(item => item.status === 'PAID' || item.is_fully_paid);
-  };
+  }, []);
 
-  // Imprimir comprobante para items seleccionados
-  const printSelectedItemsReceipt = async (paidItems) => {
+  // 🚀 OPTIMIZACIÓN: Imprimir comprobante para items seleccionados con useCallback
+  const printSelectedItemsReceipt = useCallback(async (paidItems) => {
     try {
       if (!bluetoothConnected) {
         await bluetoothPrinter.connect();
@@ -549,10 +661,10 @@ const TableOrderEcommerce = () => {
     } catch (error) {
       showToast(`Error al imprimir: ${error.message}`, 'error');
     }
-  };
+  }, [bluetoothConnected, selectedOrderForPayment, selectedTable, user, bluetoothPrinter, showToast]);
 
-  // Imprimir comprobante completo del pedido
-  const printFullReceipt = async () => {
+  // 🚀 OPTIMIZACIÓN: Imprimir comprobante completo del pedido con useCallback
+  const printFullReceipt = useCallback(async () => {
     try {
       if (!bluetoothPrinter.isBluetoothSupported()) {
         showToast(bluetoothPrinter.getBluetoothErrorMessage(), 'error');
@@ -590,10 +702,10 @@ const TableOrderEcommerce = () => {
     } catch (error) {
       showToast(`Error al imprimir comprobante completo: ${error.message}`, 'error');
     }
-  };
+  }, [bluetoothConnected, selectedOrderForPayment, selectedTable, user, bluetoothPrinter, showToast]);
 
-  // Procesar pago de items seleccionados
-  const handleProcessSelectedPayment = async () => {
+  // 🚀 OPTIMIZACIÓN: Procesar pago de items seleccionados con useCallback
+  const handleProcessSelectedPayment = useCallback(async () => {
     if (selectedItems.length === 0) {
       showToast('Debe seleccionar al menos un item para pagar', 'error');
       return;
@@ -725,12 +837,13 @@ const TableOrderEcommerce = () => {
     } finally {
       setPaymentProcessing(false);
     }
-  };
+  }, [selectedItems, selectedOrderForPayment, paymentMethod, paymentDescription, user, withPrinting, bluetoothConnected, printSelectedItemsReceipt, loadTableOrders, selectedTable, allOrders, showToast, apiService]);
 
 
 
   // Función unificada de mapeo de items del carrito
   const mapCartItemToOrderData = (item) => {
+    
     const data = {
       recipe: item.recipe.id,
       quantity: item.quantity,
@@ -739,38 +852,163 @@ const TableOrderEcommerce = () => {
       has_taper: item.is_takeaway || false
     };
     
-    // Si es para llevar y tenemos contenedores, agregar el primer contenedor
+    // Si es para llevar, usar el envase de la receta (validación ya hecha)
     if (item.is_takeaway && containers.length > 0) {
-      data.selected_container = containers[0].id;
+      const recipe = recipes.find(r => r.id === item.recipe.id);
+      
+      // Para pedidos para llevar, SOLO usar el envase configurado en la receta
+      if (recipe?.container_id) {
+        const recipeContainer = containers.find(c => c.id === recipe.container_id);
+        
+        if (recipeContainer && recipeContainer.stock > 0) {
+          data.selected_container = recipeContainer.id;
+        }
+      }
     }
-    
     
     return data;
   };
 
   // Manejo especializado de errores
-  const handleSaveOrderError = (error) => {
-    
+  const handleSaveOrderError = useCallback((error) => {
     if (error.response?.status === 400) {
       const errorDetails = error.response.data;
-      if (errorDetails.details?.recipe) {
+      
+      // Primero verificar si hay un array de items con problemas
+      if (errorDetails.items && Array.isArray(errorDetails.items)) {
+        // Procesar cada item con problemas
+        const problemItems = errorDetails.items.map(item => {
+          // Buscar el nombre de la receta en diferentes posibles campos
+          let recipeName = item.recipe_name || item.name;
+          let errorMsg = item.error || item.message;
+          
+          // Si recipe es un array, puede contener el mensaje de error o datos de receta
+          if (item.recipe && Array.isArray(item.recipe) && item.recipe.length > 0) {
+            const recipeData = item.recipe[0];
+            
+            // Si el primer elemento es un string, es el mensaje de error
+            if (typeof recipeData === 'string') {
+              errorMsg = recipeData; // "No hay suficiente stock para esta receta"
+            } else if (typeof recipeData === 'object') {
+              // Si es un objeto, buscar el nombre
+              recipeName = recipeData.name || recipeData.recipe_name || recipeData.id;
+            }
+          } else if (item.recipe && typeof item.recipe === 'object') {
+            // Si recipe es un objeto directo
+            recipeName = item.recipe.name || item.recipe.recipe_name;
+          }
+          
+          if (recipeName) {
+            return recipeName;
+          } else if (errorMsg && errorMsg.includes('stock')) {
+            // Si tenemos mensaje de error pero no nombre, intentar extraer de carrito
+            // Para múltiples items, no duplicar, solo marcar como problemático
+            return 'item-with-stock-issue'; // Marcador temporal para procesar después
+          } else {
+            // Si no encontramos nombre, buscar en el carrito por ID si existe
+            if (item.recipe_id || (item.recipe && Array.isArray(item.recipe) && item.recipe[0]?.id)) {
+              const searchId = item.recipe_id || item.recipe[0]?.id;
+              const cartItem = cart.find(c => c.recipe.id === searchId);
+              if (cartItem) {
+                return cartItem.recipe.name;
+              }
+            }
+            return 'Item desconocido';
+          }
+        });
+        
+        // Procesar los marcadores de items con problemas de stock
+        const stockIssueCount = problemItems.filter(item => item === 'item-with-stock-issue').length;
+        const namedItems = problemItems.filter(item => item !== 'item-with-stock-issue');
+        
+        let finalMessage = '';
+        
+        if (stockIssueCount > 0 && namedItems.length === 0) {
+          // Solo items sin nombre, usar lista del carrito
+          const cartNames = cart.map(c => c.recipe.name).join(', ');
+          finalMessage = `Sin stock de ingredientes. Items: ${cartNames}`;
+        } else if (namedItems.length > 0 && stockIssueCount === 0) {
+          // Solo items con nombre
+          if (namedItems.length === 1) {
+            finalMessage = `Sin stock: "${namedItems[0]}" no tiene ingredientes suficientes`;
+          } else {
+            finalMessage = `Sin stock para: ${namedItems.join(', ')}`;
+          }
+        } else {
+          // Mezcla de items con y sin nombre
+          const allNames = [...namedItems];
+          if (stockIssueCount > 0) {
+            const cartNames = cart.map(c => c.recipe.name);
+            // Agregar solo los que no están ya en namedItems
+            cartNames.forEach(name => {
+              if (!allNames.includes(name)) {
+                allNames.push(name);
+              }
+            });
+          }
+          finalMessage = `Sin stock para: ${allNames.join(', ')}`;
+        }
+        
+        showToast(finalMessage, 'error');
+        return; // Salir temprano para no procesar otros casos
+      }
+      
+      // Verificar si el error es por falta de stock
+      const errorMessage = errorDetails.error || errorDetails.message || '';
+      const errorMessageLower = errorMessage.toLowerCase();
+      
+      if (errorMessageLower.includes('stock') || errorMessageLower.includes('ingrediente')) {
+        // Intentar identificar qué recetas tienen problema
+        if (errorDetails.details?.recipe_name) {
+          showToast(`Sin stock: "${errorDetails.details.recipe_name}" no tiene ingredientes suficientes`, 'error');
+        } else if (errorDetails.details?.items) {
+          // Si hay múltiples items con problemas
+          const itemsWithIssues = errorDetails.details.items.join(', ');
+          showToast(`Sin stock para: ${itemsWithIssues}`, 'error');
+        } else if (errorDetails.recipe_name) {
+          // A veces el nombre viene directamente
+          showToast(`Sin stock: "${errorDetails.recipe_name}" no tiene ingredientes suficientes`, 'error');
+        } else {
+          // Buscar en el carrito cuáles podrían ser los problemáticos
+          const cartRecipeNames = cart.map(item => item.recipe.name).join(', ');
+          showToast(`Sin stock de ingredientes. Items en carrito: ${cartRecipeNames}`, 'error');
+        }
+      } else if (errorDetails.details?.recipe) {
         showToast('Receta no válida o no disponible', 'error');
       } else if (errorDetails.details?.quantity) {
         showToast('Cantidad no válida', 'error');
+      } else if (errorMessage) {
+        // Si hay un mensaje de error específico, mostrarlo
+        showToast(errorMessage, 'error');
       } else {
-        showToast(errorDetails.error || 'Datos inválidos en el pedido', 'error');
+        showToast('Error al procesar el pedido', 'error');
       }
     } else if (error.response?.status === 404) {
       showToast('Pedido no encontrado', 'error');
     } else if (error.response?.status === 422) {
-      showToast('No hay stock suficiente para el pedido', 'error');
+      // 422 generalmente indica problemas de validación o stock
+      const errorData = error.response.data;
+      const errorMsg = errorData?.error || errorData?.message || '';
+      const errorDetails = errorData?.details;
+      
+      // Siempre asumir que 422 es problema de stock para recetas
+      if (errorDetails?.recipe_name || errorData?.recipe_name) {
+        const recipeName = errorDetails?.recipe_name || errorData?.recipe_name;
+        showToast(`Sin stock: "${recipeName}" no tiene ingredientes suficientes`, 'error');
+      } else if (errorDetails?.ingredient_name) {
+        showToast(`Sin stock del ingrediente: ${errorDetails.ingredient_name}`, 'error');
+      } else {
+        // Listar items del carrito para ayudar al usuario
+        const cartRecipeNames = cart.map(item => `${item.recipe.name} (x${item.quantity})`).join(', ');
+        showToast(`Sin stock de ingredientes. Items en carrito: ${cartRecipeNames}`, 'error');
+      }
     } else {
       showToast('Error al guardar pedido. Intente nuevamente.', 'error');
     }
-  };
+  }, [cart, showToast]);
 
-  // Guardar pedido optimizado
-  const saveOrder = async () => {
+  // 🚀 OPTIMIZACIÓN: Guardar pedido optimizado con useCallback
+  const saveOrder = useCallback(async () => {
     if (cart.length === 0) {
       showToast('Agregue items al pedido', 'error');
       return;
@@ -786,7 +1024,6 @@ const TableOrderEcommerce = () => {
           
           // Log de item creado (solo en desarrollo)
           if (import.meta.env.MODE === 'development') {
-            console.log('🔔 Item creado por:', userRole, '- Item:', item.recipe.name);
           }
         }
         showToast('Items agregados al pedido', 'success');
@@ -801,7 +1038,6 @@ const TableOrderEcommerce = () => {
         
         // Log de nuevo pedido creado (solo en desarrollo)
         if (import.meta.env.MODE === 'development') {
-          console.log('🔔 Nuevo pedido creado por:', userRole, '- Items:', cart.length);
         }
         
         // Actualizar estado local eficientemente
@@ -809,7 +1045,7 @@ const TableOrderEcommerce = () => {
         showToast('Pedido creado', 'success');
       }
 
-      // Recarga SOLO lo necesario
+      // Recarga necesaria después de guardar
       await loadTableOrders(selectedTable.id);
       
       setCart([]);
@@ -821,7 +1057,7 @@ const TableOrderEcommerce = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [cart, currentOrder, selectedTable, user, mapCartItemToOrderData, allOrders, loadTableOrders, handleSaveOrderError, showToast, apiService]);
 
   // Filtrar recetas
   const filteredRecipes = useMemo(() => {
@@ -840,15 +1076,25 @@ const TableOrderEcommerce = () => {
     return filtered;
   }, [recipes, selectedGroup, searchTerm]);
 
+  // Contar recetas por grupo (todas las recetas cargadas ya están filtradas como activas y disponibles)
+  const recipeCountByGroup = useMemo(() => {
+    const counts = {};
+    for (const recipe of recipes) {
+      const groupId = recipe.group?.id || 'sin_grupo';
+      counts[groupId] = (counts[groupId] || 0) + 1;
+    }
+    return counts;
+  }, [recipes]);
+
   // Agrupar mesas por zona con manejo robusto
   const tablesByZone = useMemo(() => {
-    return tables.reduce((acc, table) => {
-      // Manejo robusto de diferentes estructuras de zona del backend
+    const zones = {};
+    for (const table of tables) {
       const zoneName = table.zone?.name || table.zone_name || 'Sin Zona';
-      if (!acc[zoneName]) acc[zoneName] = [];
-      acc[zoneName].push(table);
-      return acc;
-    }, {});
+      if (!zones[zoneName]) zones[zoneName] = [];
+      zones[zoneName].push(table);
+    }
+    return zones;
   }, [tables]);
 
   // Crear un Map de estados de mesa para evitar recálculo en filtros
@@ -892,44 +1138,96 @@ const TableOrderEcommerce = () => {
     return Object.keys(tablesByZone);
   }, [tablesByZone]);
 
-  // Función para alternar carrito - DEBE estar antes de cualquier return condicional
+  // Función simple para actualizar cuando sea necesario
+  const refreshCurrentData = useCallback(async () => {
+    try {
+      if (selectedTable && (step === 'orders' || step === 'menu' || step === 'payment')) {
+        await loadTableOrders(selectedTable.id);
+      }
+    } catch (error) {
+      if (import.meta.env.MODE === 'development') {
+      }
+    }
+  }, [step, selectedTable, loadTableOrders]);
+  
+  // Función para alternar carrito
   const toggleCart = useCallback(() => {
     setIsCartOpen(prev => !prev);
   }, []);
 
-  // Helper para verificar si un item se puede eliminar
-  const canDeleteItem = (item) => {
+  // 🚀 OPTIMIZACIÓN: Verificar estado actual del item en tiempo real antes de eliminar con useCallback
+  const checkItemCurrentStatus = useCallback(async (itemId) => {
+    try {
+      const item = await apiService.orderItems.getById(itemId);
+      return item.status;
+    } catch (error) {
+      return null;
+    }
+  }, [apiService]);
+
+  // Helper para verificar si un item se puede eliminar (validación local)
+  const canDeleteItem = useCallback((item) => {
+    // Solo se puede eliminar si está en estado CREATED
     return item.status === 'CREATED';
-  };
+  }, []);
 
-  // Eliminar item individual del pedido existente
-  const handleDeleteOrderItem = async (itemId) => {
+  // 🚀 OPTIMIZACIÓN: Eliminar item individual del pedido existente con validación en tiempo real con useCallback
+  const handleDeleteOrderItem = useCallback(async (itemId) => {
     if (!currentOrder) return;
-
-    const confirmed = window.confirm('¿Eliminar este item del pedido?');
-    if (!confirmed) return;
 
     try {
       setSaving(true);
+      
+      // 🔍 VALIDACIÓN EN TIEMPO REAL: Verificar estado actual del item
+      if (import.meta.env.MODE === 'development') {
+      }
+      
+      const currentStatus = await checkItemCurrentStatus(itemId);
+      
+      if (currentStatus === null) {
+        showToast('Error al verificar el estado del item', 'error');
+        return;
+      }
+      
+      if (currentStatus !== 'CREATED') {
+        const statusLabels = {
+          'PREPARING': 'en preparación',
+          'SERVED': 'servido',
+          'PAID': 'pagado'
+        };
+        
+        showToast(
+          `No se puede eliminar: el item ya está ${statusLabels[currentStatus] || 'procesado'}`, 
+          'error'
+        );
+        return;
+      }
+      
+      // Si llegamos aquí, el item está CREATED y se puede eliminar
+      const confirmed = window.confirm('¿Eliminar este item del pedido?');
+      if (!confirmed) return;
+
       await apiService.orderItems.delete(itemId);
       
       // Recargar el pedido actual para actualizar la lista
       const updatedOrder = await apiService.orders.getById(currentOrder.id);
       setCurrentOrder(updatedOrder);
       
-      // También actualizar la lista general de órdenes
+      // Actualizar después de eliminar item
       await loadTableOrders(selectedTable.id);
       
-      // Recargar datos para actualizar la vista de pedidos
-      await loadInitialData();
-      
       showToast('Item eliminado del pedido', 'success');
+      
     } catch (error) {
-      showToast('Error al eliminar item', 'error');
+      if (error.response?.status === 400 && error.response?.data?.error?.includes('status')) {
+        showToast('No se puede eliminar: el item ya está en proceso', 'error');
+      } else {
+        showToast('Error al eliminar item', 'error');
+      }
     } finally {
       setSaving(false);
     }
-  };
+  }, [currentOrder, checkItemCurrentStatus, selectedTable, loadTableOrders, showToast, apiService]);
 
   // TODOS los hooks deben estar antes de este return condicional
   if (loading && step === 'tables') {
@@ -1138,18 +1436,22 @@ const TableOrderEcommerce = () => {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditOrder(order)}
-                          className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                          title="Editar pedido"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
+                        {/* Botón editar - oculto para cajeros */}
+                        {userRole !== 'cajeros' && (
+                          <button
+                            onClick={() => handleEditOrder(order)}
+                            className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            title="Editar pedido"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        )}
                         
-                        {canDeleteOrder(order) && (
+                        {/* Botón eliminar - solo visible si todos los items están en CREATED y no es cajero */}
+                        {canDeleteOrder(order) && userRole !== 'cajeros' && (
                           <button
                             onClick={() => handleDeleteOrder(order)}
                             disabled={saving}
@@ -1186,14 +1488,10 @@ const TableOrderEcommerce = () => {
                             <div key={item.id || index} className="flex justify-between text-sm">
                               <div className="flex items-center space-x-2">
                                 <div 
-                                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                    item.status === 'PAID' ? 'bg-gray-500' :
-                                    item.status === 'SERVED' ? 'bg-blue-500' :
-                                    item.status === 'PREPARING' ? 'bg-yellow-500' : 'bg-green-500'
-                                  }`} 
+                                  className={`w-2 h-2 rounded-full flex-shrink-0 ${getItemStatusColor(item.status)}`} 
                                   title={
                                     item.status === 'PAID' ? 'Pagado' :
-                                    item.status === 'SERVED' ? 'Entregado' : 
+                                    item.status === 'SERVED' ? 'Servido' : 
                                     item.status === 'PREPARING' ? 'En Preparación' :
                                     item.status === 'CREATED' ? 'Pendiente' : 'Desconocido'
                                   }
@@ -1214,9 +1512,16 @@ const TableOrderEcommerce = () => {
                                   )}
                                 </div>
                               </div>
-                              <span className="text-gray-600">
-                                S/ {parseFloat(item.total_with_container || item.total_price || 0).toFixed(2)}
-                              </span>
+                              <div className="text-right">
+                                <span className="text-gray-600">
+                                  S/ {parseFloat(item.total_with_container || item.total_price || 0).toFixed(2)}
+                                </span>
+                                {item.container_info && item.container_info.total_price > 0 && (
+                                  <div className="text-xs text-gray-500">
+                                    Plato: S/ {parseFloat(item.total_price || 0).toFixed(2)} + Envase: S/ {parseFloat(item.container_info.total_price || 0).toFixed(2)}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1227,18 +1532,20 @@ const TableOrderEcommerce = () => {
               </div>
             )}
             
-            {/* Botón flotante "Nuevo Pedido" */}
-            <div className="fixed bottom-4 right-4 z-40">
-              <button
-                onClick={handleCreateNewOrder}
-                className="w-14 h-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-110 transition-all duration-300 flex items-center justify-center"
-                title="Nuevo Pedido"
-              >
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-            </div>
+            {/* Botón flotante "Nuevo Pedido" - oculto para cajeros */}
+            {userRole !== 'cajeros' && (
+              <div className="fixed bottom-4 right-4 z-40">
+                <button
+                  onClick={handleCreateNewOrder}
+                  className="w-14 h-14 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-110 transition-all duration-300 flex items-center justify-center"
+                  title="Nuevo Pedido"
+                >
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1258,13 +1565,13 @@ const TableOrderEcommerce = () => {
             <div className="mb-4">
               <select
                 value={selectedGroup || ''}
-                onChange={(e) => setSelectedGroup(e.target.value || null)}
+                onChange={(e) => setSelectedGroup(e.target.value ? parseInt(e.target.value) : null)}
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">Todos los grupos</option>
+                <option value="">Todos los grupos ({recipes.length})</option>
                 {groups.map(group => (
                   <option key={group.id} value={group.id}>
-                    {group.name}
+                    {group.name} ({recipeCountByGroup[group.id] || 0})
                   </option>
                 ))}
               </select>
@@ -1374,19 +1681,24 @@ const TableOrderEcommerce = () => {
                     {((currentOrder && currentOrder.items && currentOrder.items.length > 0) || cart.length > 0) ? (
                       <div className="flex-1 overflow-y-auto">
                         {/* Items existentes del pedido */}
-                        {currentOrder && currentOrder.items && currentOrder.items.map((item, index) => (
+                        {currentOrder && currentOrder.items && currentOrder.items.map((item, index) => {
+                          const itemNumber = index + 1;
+                          return (
                           <div key={`existing-${item.id || index}`} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
                             <div className="flex items-center gap-3">
+                              {/* Número del item */}
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-600 text-xs font-medium flex items-center justify-center">
+                                {itemNumber}.
+                              </div>
+                              
                               {/* Estado del item */}
                               <div 
                                 className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                                  item.status === 'PAID' ? 'bg-gray-500' :
-                                  item.status === 'SERVED' ? 'bg-blue-500' :
-                                  item.status === 'PREPARING' ? 'bg-yellow-500' : 'bg-green-500'
+                                  getItemStatusColor(item.status)
                                 }`} 
                                 title={
                                   item.status === 'PAID' ? 'Pagado' :
-                                  item.status === 'SERVED' ? 'Entregado' : 
+                                  item.status === 'SERVED' ? 'Servido' : 
                                   item.status === 'PREPARING' ? 'En Preparación' :
                                   item.status === 'CREATED' ? 'Pendiente' : 'Desconocido'
                                 }
@@ -1406,16 +1718,19 @@ const TableOrderEcommerce = () => {
                                     </div>
                                   )}
                                 </div>
-                                <p className="text-xs text-gray-500">
-                                  x{item.quantity} • S/ {parseFloat(item.total_with_container || item.total_price || 0).toFixed(2)}
-                                  {item.notes && (
-                                    <span className="text-blue-600 italic ml-1">• {item.notes}</span>
+                                <div className="text-xs text-gray-500">
+                                  <p>x{item.quantity} • S/ {parseFloat(item.total_with_container || item.total_price || 0).toFixed(2)}</p>
+                                  {item.container_info && item.container_info.total_price > 0 && (
+                                    <p className="text-gray-400">Plato: S/ {parseFloat(item.total_price || 0).toFixed(2)} + Envase ({item.container_info.container_name}): S/ {parseFloat(item.container_info.total_price || 0).toFixed(2)}</p>
                                   )}
-                                </p>
+                                  {item.notes && (
+                                    <span className="text-blue-600 italic">• {item.notes}</span>
+                                  )}
+                                </div>
                               </div>
                               
-                              {/* Botón eliminar solo si está CREATED */}
-                              {canDeleteItem(item) && (
+                              {/* Botón eliminar solo si está CREATED y no es cajero */}
+                              {canDeleteItem(item) && userRole !== 'cajeros' && (
                                 <button
                                   onClick={() => handleDeleteOrderItem(item.id)}
                                   disabled={saving}
@@ -1428,15 +1743,24 @@ const TableOrderEcommerce = () => {
                               )}
                             </div>
                           </div>
-                        ))}
+                        );})}
                         
                         {/* Items nuevos en carrito */}
-                        {cart.map((item, index) => (
+                        {cart.map((item, index) => {
+                          // Calcular el número considerando items existentes
+                          const existingItemsCount = (currentOrder && currentOrder.items) ? currentOrder.items.length : 0;
+                          const itemNumber = existingItemsCount + index + 1;
+                          return (
                           <div key={`cart-${index}`} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
                             <div className="flex items-center gap-3">
+                              {/* Número del item */}
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-medium flex items-center justify-center">
+                                {itemNumber}.
+                              </div>
+                              
                               {/* Indicador de nuevo item */}
                               <div 
-                                className="w-3 h-3 rounded-full flex-shrink-0 bg-blue-500" 
+                                className={`w-3 h-3 rounded-full flex-shrink-0 ${getItemStatusColor('CREATED')}`} 
                                 title="Nuevo item"
                               />
                               
@@ -1475,7 +1799,7 @@ const TableOrderEcommerce = () => {
                               </div>
                             </div>
                           </div>
-                        ))}
+                        );})}
                       </div>
                     ) : (
                       <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -1497,13 +1821,13 @@ const TableOrderEcommerce = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Total</span>
                         <span className="text-lg font-semibold text-gray-900">
-                          S/ {getCompleteTotal().toFixed(2)}
+                          S/ {getCompleteTotal.toFixed(2)}
                         </span>
                       </div>
                     </div>
                     
-                    {/* Botón de acción estilo negro */}
-                    {cart.length > 0 && (
+                    {/* Botón de acción estilo negro - oculto para cajeros */}
+                    {cart.length > 0 && userRole !== 'cajeros' && (
                       <button
                         onClick={saveOrder}
                         disabled={saving}
@@ -1583,8 +1907,8 @@ const TableOrderEcommerce = () => {
                           className="h-3 w-3 text-blue-600 border-gray-300 rounded"
                         />
                         <div 
-                          className="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0" 
-                          title="Entregado"
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${getItemStatusColor('SERVED')}`} 
+                          title="Servido"
                         />
                         <div className="flex-1 min-w-0 flex justify-between items-center">
                           <div className="flex-1 min-w-0">
@@ -1620,7 +1944,7 @@ const TableOrderEcommerce = () => {
                           className="h-3 w-3 text-gray-400 border-gray-300 rounded opacity-50 cursor-not-allowed"
                         />
                         <div 
-                          className="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" 
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${getItemStatusColor('PAID')}`} 
                           title="Pagado"
                         />
                         <div className="flex-1 min-w-0 flex justify-between items-center">
@@ -1657,7 +1981,7 @@ const TableOrderEcommerce = () => {
                           className="h-3 w-3 text-gray-400 border-gray-300 rounded opacity-50 cursor-not-allowed"
                         />
                         <div 
-                          className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" 
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${getItemStatusColor('PREPARING')}`} 
                           title="En Preparación"
                         />
                         <div className="flex-1 min-w-0 flex justify-between items-center">
@@ -1694,7 +2018,7 @@ const TableOrderEcommerce = () => {
                           className="h-3 w-3 text-gray-400 border-gray-300 rounded opacity-50 cursor-not-allowed"
                         />
                         <div 
-                          className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" 
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${getItemStatusColor('CREATED')}`} 
                           title="Pendiente"
                         />
                         <div className="flex-1 min-w-0 flex justify-between items-center">
@@ -1889,9 +2213,29 @@ const TableOrderEcommerce = () => {
                 <div className="flex items-center justify-between py-2">
                   <div className="flex-1">
                     <span className="text-sm font-medium text-gray-800">Para llevar</span>
-                    {containers.length > 0 && isTakeaway && (
-                      <span className="text-xs text-gray-500 ml-2">+S/{containers[0].price || 0}</span>
-                    )}
+                    {containers.length > 0 && isTakeaway && (() => {
+                      const selectedContainer = getSelectedContainer(selectedRecipe);
+                      const isRecommended = selectedRecipe?.container_id === selectedContainer?.id;
+                      const validation = validateTakeawayContainer(selectedRecipe);
+                      
+                      return (
+                        <div className="ml-2">
+                          <span className="text-xs text-gray-500">
+                            +S/{selectedContainer?.price || 0} ({selectedContainer?.name})
+                          </span>
+                          {!validation.isValid && (
+                            <span className="text-xs text-red-600 italic ml-1">
+                              ⚠ {validation.message}
+                            </span>
+                          )}
+                          {validation.isValid && isRecommended && (
+                            <span className="text-xs text-green-600 italic ml-1">
+                              ✓ Envase de receta
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <button
                     onClick={() => setIsTakeaway(!isTakeaway)}
@@ -1914,7 +2258,7 @@ const TableOrderEcommerce = () => {
                     <span className="text-lg font-semibold text-gray-900">
                       S/ {(
                         parseFloat(selectedRecipe?.price || selectedRecipe?.base_price || 0) +
-                        (isTakeaway && containers.length > 0 ? parseFloat(containers[0].price || 0) : 0)
+                        (isTakeaway ? parseFloat(getSelectedContainer(selectedRecipe)?.price || 0) : 0)
                       ).toFixed(2)}
                     </span>
                   </div>

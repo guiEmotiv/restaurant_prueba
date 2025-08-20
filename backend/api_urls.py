@@ -22,6 +22,7 @@ from operation.views import (
     # OrderItemIngredientViewSet removed - functionality deprecated
 )
 from operation.views_dashboard import DashboardViewSet
+from operation.sse_views import order_updates_stream, kitchen_updates_stream
 
 # Create router and register viewsets
 router = DefaultRouter()
@@ -68,6 +69,9 @@ def get_csrf_token(request):
 urlpatterns = [
     # CSRF endpoint for frontend
     path('csrf/', get_csrf_token, name='csrf-token'),
+    # Server-Sent Events endpoints
+    path('sse/orders/', order_updates_stream, name='sse-orders'),
+    path('sse/kitchen/', kitchen_updates_stream, name='sse-kitchen'),
     # Import endpoints FIRST to avoid router conflicts
     path('import/units/', import_units_excel, name='import-units-excel'),
     path('restaurant-config/operational_info/', operational_info, name='operational-info'),

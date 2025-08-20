@@ -93,6 +93,17 @@ class Container(models.Model):
     def __str__(self):
         return f"{self.name} - {self.price}"
 
+    def update_stock(self, quantity, operation='subtract'):
+        """Actualiza el stock del envase"""
+        if operation == 'subtract':
+            if self.stock < quantity:
+                raise ValidationError(f"Stock insuficiente. Stock actual: {self.stock}")
+            self.stock -= quantity
+        elif operation == 'add':
+            self.stock += quantity
+        
+        self.save()
+
     def delete(self, *args, **kwargs):
         # Soft delete - solo marcamos como inactivo si tiene ventas asociadas
         if hasattr(self, 'containersale_set') and self.containersale_set.exists():

@@ -74,7 +74,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'container', 'container_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage', 
+            'id', 'group', 'group_name', 'container', 'container_id', 'container_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage', 
             'ingredients_cost', 'profit_amount', 'is_available', 'is_active', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'ingredients_list', 'created_at', 'updated_at'
         ]
@@ -177,7 +177,7 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'container', 'container_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage',
+            'id', 'group', 'group_name', 'container', 'container_id', 'container_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage',
             'ingredients_cost', 'profit_amount', 'is_available', 'is_active', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'ingredients_list', 'created_at', 'updated_at', 
             'recipe_items'

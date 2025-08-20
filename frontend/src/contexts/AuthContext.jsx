@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }) => {
       canViewOrders: true,
       canViewKitchen: false,
       canViewTableStatus: true,
-      canManagePayments: false,   // SOLO administradores pueden procesar pagos
+      canManagePayments: false,   // SOLO administradores y cajeros pueden procesar pagos
       canViewHistory: false,
     },
     [ROLES.COOK]: {
@@ -57,6 +57,17 @@ export const AuthProvider = ({ children }) => {
       canViewTableStatus: false,
       canManagePayments: false,
       canViewHistory: false,
+    },
+    [ROLES.CASHIER]: {
+      canViewDashboard: false,
+      canManageConfig: false,
+      canManageInventory: false,
+      canManageOrders: true,      // Pueden ver/procesar pedidos para pagos
+      canViewOrders: true,        // Necesario para ver pedidos a pagar
+      canViewKitchen: false,
+      canViewTableStatus: true,   // Pueden ver estado de mesas para operaciones
+      canManagePayments: true,    // Función principal de cajeros
+      canViewHistory: true,       // Pueden ver historial de transacciones
     }
   };
 
@@ -75,7 +86,6 @@ export const AuthProvider = ({ children }) => {
                     idTokenPayload?.['cognito:groups'] || 
                     [];
       
-      
       // Check which group the user belongs to
       if (groups.includes(ROLES.ADMIN)) {
         return ROLES.ADMIN;
@@ -83,8 +93,9 @@ export const AuthProvider = ({ children }) => {
         return ROLES.WAITER;
       } else if (groups.includes(ROLES.COOK)) {
         return ROLES.COOK;
+      } else if (groups.includes(ROLES.CASHIER)) {
+        return ROLES.CASHIER;
       }
-      
       return null;
     } catch (error) {
       return null;
@@ -192,6 +203,7 @@ export const AuthProvider = ({ children }) => {
   const isAdmin = () => userRole === ROLES.ADMIN;
   const isWaiter = () => userRole === ROLES.WAITER;
   const isCook = () => userRole === ROLES.COOK;
+  const isCashier = () => userRole === ROLES.CASHIER;
 
   const refreshAuth = async () => {
     await checkAuthState();
@@ -208,6 +220,8 @@ export const AuthProvider = ({ children }) => {
         return '/operations';  // Gestión de Mesas
       case ROLES.COOK:
         return '/kitchen';  // Cocina
+      case ROLES.CASHIER:
+        return '/operations';  // Vista de operaciones para procesar pagos
       default:
         return '/';
     }
@@ -221,6 +235,7 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     isWaiter,
     isCook,
+    isCashier,
     hasPermission,
     logout,
     refreshAuth,

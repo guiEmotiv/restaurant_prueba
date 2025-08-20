@@ -284,24 +284,17 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         # Retornar el primer item (para compatibilidad con la API)
         order_item = created_items[0] if created_items else None
         
-        # Crear ContainerSale para mantener compatibilidad y control de stock
-        if container:
-            # Reducir stock del envase
-            container.stock -= quantity
-            container.save()
-            
-            # Crear ContainerSale para tracking
-            ContainerSale.objects.create(
-                order=order,
-                container=container,
-                quantity=quantity,
-                unit_price=container.price,
-                total_price=container.price * quantity
-            )
+        # DESHABILITADO: El descuento de stock ahora se maneja automáticamente en OrderItem.save()
+        # Ya no necesitamos crear ContainerSale manualmente aquí
         
         # Calcular el precio total para todos los items creados
         for item in created_items:
             item.calculate_total_price()
+        
+        # Consumir ingredientes para todos los items creados
+        recipe = validated_data['recipe']
+        for item in created_items:
+            recipe.consume_ingredients()
         
         return order_item
 
@@ -409,19 +402,8 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                     (c for c, q in containers_to_reduce if c.id == selected_container_id), 
                     None
                 )
-                if container:
-                    # Reducir stock del envase
-                    container.stock -= quantity
-                    container.save()
-                    
-                    # Crear ContainerSale
-                    ContainerSale.objects.create(
-                        order=order,
-                        container=container,
-                        quantity=quantity,
-                        unit_price=container.price,
-                        total_price=container.price * quantity
-                    )
+                # DESHABILITADO: El descuento de stock y ContainerSale ahora se maneja automáticamente en OrderItem.save()
+                pass
         
         # Consumir ingredientes
         order.consume_ingredients_on_creation()
@@ -528,41 +510,14 @@ class OrderDetailSerializer(serializers.ModelSerializer):
                     # Crear OrderItem
                     order_item = OrderItem.objects.create(order=instance, **item_data)
                     
-                    # Crear ContainerSale si hay contenedor seleccionado (independiente de is_takeaway)
-                    if selected_container_id:
-                        from config.models import Container
-                        try:
-                            container = Container.objects.get(id=selected_container_id, is_active=True)
-                            container_sale = ContainerSale.objects.create(
-                                order=instance,
-                                container=container,
-                                quantity=quantity,
-                                unit_price=container.price,
-                                total_price=container.price * quantity
-                            )
-                        except Container.DoesNotExist:
-                            pass  # Container not found, continue without container
+                    # DESHABILITADO: ContainerSale se crea automáticamente en OrderItem.save()
+                    # No crear ContainerSale aquí para evitar duplicación
                             
                 except Exception as e:
                     raise
             
-            # Crear container sales adicionales si se especifican
-            if container_sales_data:
-                for container_sale_data in container_sales_data:
-                    from config.models import Container
-                    try:
-                        container = Container.objects.get(
-                            id=container_sale_data['container'], is_active=True
-                        )
-                        ContainerSale.objects.create(
-                            order=instance,
-                            container=container,
-                            quantity=container_sale_data['quantity'],
-                            unit_price=container.price,
-                            total_price=container.price * container_sale_data['quantity']
-                        )
-                    except Container.DoesNotExist:
-                        pass
+            # DESHABILITADO: ContainerSales se crean automáticamente en OrderItem.save()
+            # No crear ContainerSales adicionales aquí para evitar duplicación
         
         # Recalcular totales
         instance.calculate_total()

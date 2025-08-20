@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, FileSpreadsheet } from 'lucide-react';
 import CrudTable from '../../components/common/CrudTable';
 import IngredientModal from '../../components/inventory/IngredientModal';
@@ -11,7 +11,6 @@ import { useToast } from '../../contexts/ToastContext';
 const Ingredients = () => {
   const { showSuccess, showError } = useToast();
   const [ingredients, setIngredients] = useState([]);
-  const [filteredIngredients, setFilteredIngredients] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showIngredientModal, setShowIngredientModal] = useState(false);
@@ -67,88 +66,132 @@ const Ingredients = () => {
     }
   ];
 
-  useEffect(() => {
-    loadIngredients();
-    loadUnits();
-  }, []);
-
-  useEffect(() => {
-    // Filtrar ingredientes cuando cambian los filtros
-    let filtered = ingredients;
-    
-    if (nameFilter) {
-      filtered = filtered.filter(ingredient => 
-        ingredient.name.toLowerCase().includes(nameFilter.toLowerCase())
-      );
-    }
-    
-    if (activeFilter !== '') {
-      const isActive = activeFilter === 'true';
-      filtered = filtered.filter(ingredient => 
-        isActive ? parseFloat(ingredient.current_stock) > 0 : parseFloat(ingredient.current_stock) === 0
-      );
-    }
-    
-    setFilteredIngredients(filtered);
-  }, [ingredients, nameFilter, activeFilter]);
-
-  const loadIngredients = async () => {
+  // Carga optimizada de ingredientes
+  const loadIngredients = useCallback(async () => {
     try {
       setLoading(true);
-      // Agregar parámetro para mostrar todos los ingredientes (incluyendo inactivos) en vista de administración
-      const data = await apiService.ingredients.getAll({ show_all: true });
-      // Ordenar por ID descendente
-      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
+      
+      // Cargar todas las páginas en paralelo de manera optimizada
+      const responses = await Promise.all([
+        fetch('http://localhost:8000/api/v1/ingredients/?show_all=true&page=1'),
+        fetch('http://localhost:8000/api/v1/ingredients/?show_all=true&page=2'),
+        fetch('http://localhost:8000/api/v1/ingredients/?show_all=true&page=3')
+      ]);
+      
+      const [page1, page2, page3] = await Promise.all(responses.map(r => r.json()));
+      
+      const allIngredients = [
+        ...(page1.results || []),
+        ...(page2.results || []),
+        ...(page3.results || [])
+      ];
+      
+      // Ordenar una sola vez
+      const sortedData = allIngredients.sort((a, b) => b.id - a.id);
       setIngredients(sortedData);
     } catch (error) {
+      console.error('Error loading ingredients:', error);
       showError('Error al cargar los ingredientes');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
 
-
-  const loadUnits = async () => {
+  const loadUnits = useCallback(async () => {
     try {
       const data = await apiService.units.getAll();
       setUnits(Array.isArray(data) ? data : []);
     } catch (error) {
+      // Error silencioso para units
     }
-  };
+  }, []);
 
-  const handleOpenIngredientModal = (ingredient = null) => {
+  useEffect(() => {
+    loadIngredients();
+    loadUnits();
+  }, [loadIngredients, loadUnits]);
+
+  // Filtrado optimizado
+  const filteredIngredients = useMemo(() => {
+    if (!nameFilter && activeFilter === '') {
+      return ingredients; // Retorno temprano si no hay filtros
+    }
+    
+    return ingredients.filter(ingredient => {
+      // Filtro por nombre
+      if (nameFilter && !ingredient.name.toLowerCase().includes(nameFilter.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtro por estado
+      if (activeFilter !== '') {
+        const isActive = activeFilter === 'true';
+        const hasStock = parseFloat(ingredient.current_stock) > 0;
+        if (isActive !== hasStock) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [ingredients, nameFilter, activeFilter]);
+
+  // Contadores optimizados - una sola iteración
+  const stockStats = useMemo(() => {
+    const stats = { total: ingredients.length, withStock: 0, withoutStock: 0 };
+    
+    ingredients.forEach(ingredient => {
+      if (parseFloat(ingredient.current_stock) > 0) {
+        stats.withStock++;
+      } else {
+        stats.withoutStock++;
+      }
+    });
+    
+    return stats;
+  }, [ingredients]);
+
+  // Columnas con opciones memoizadas
+  const columnsWithOptions = useMemo(() => 
+    columns.map(column => 
+      column.key === 'unit' 
+        ? { ...column, options: units.map(unit => ({ value: unit.id, label: unit.name })) }
+        : column
+    ), [units]);
+
+  // 🚀 OPTIMIZACIÓN: Handlers con useCallback para evitar re-renders
+  const handleOpenIngredientModal = useCallback((ingredient = null) => {
     setSelectedIngredient(ingredient);
     setShowIngredientModal(true);
-  };
+  }, []);
 
-  const handleCloseIngredientModal = () => {
+  const handleCloseIngredientModal = useCallback(() => {
     setShowIngredientModal(false);
     setSelectedIngredient(null);
-  };
+  }, []);
 
-  const handleIngredientModalSave = () => {
+  const handleIngredientModalSave = useCallback(() => {
     loadIngredients();
-  };
+  }, [loadIngredients]);
 
-  const handleImportExcel = () => {
+  const handleImportExcel = useCallback(() => {
     setShowImportModal(true);
-  };
+  }, []);
 
-  const handleImportSuccess = () => {
+  const handleImportSuccess = useCallback(() => {
     loadIngredients();
     setShowImportModal(false);
-  };
+  }, [loadIngredients]);
 
-  const handleAdd = () => {
+  const handleAdd = useCallback(() => {
     handleOpenIngredientModal();
-  };
+  }, [handleOpenIngredientModal]);
 
-  const handleEdit = (ingredient) => {
+  const handleEdit = useCallback((ingredient) => {
     handleOpenIngredientModal(ingredient);
-  };
+  }, [handleOpenIngredientModal]);
 
-
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     try {
       await apiService.ingredients.delete(id);
       await loadIngredients();
@@ -160,18 +203,14 @@ const Ingredients = () => {
         showError('Error al eliminar el ingrediente');
       }
     }
-  };
+  }, [loadIngredients, showSuccess, showError]);
 
+  // Limpiar filtros
+  const clearFilters = useCallback(() => {
+    setNameFilter('');
+    setActiveFilter('');
+  }, []);
 
-  const columnsWithOptions = columns.map(column => {
-    if (column.key === 'unit') {
-      return {
-        ...column,
-        options: units.map(unit => ({ value: unit.id, label: unit.name }))
-      };
-    }
-    return column;
-  });
 
   return (
     <div className="space-y-6">
@@ -217,17 +256,14 @@ const Ingredients = () => {
               onChange={(e) => setActiveFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              <option value="">Todos ({ingredients.length})</option>
-              <option value="true">Con Stock ({ingredients.filter(i => parseFloat(i.current_stock) > 0).length})</option>
-              <option value="false">Sin Stock ({ingredients.filter(i => parseFloat(i.current_stock) === 0).length})</option>
+              <option value="">Todos ({stockStats.total})</option>
+              <option value="true">Con Stock ({stockStats.withStock})</option>
+              <option value="false">Sin Stock ({stockStats.withoutStock})</option>
             </select>
           </div>
           <div className="flex items-end">
             <button
-              onClick={() => {
-                setNameFilter('');
-                setActiveFilter('');
-              }}
+              onClick={clearFilters}
               className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Limpiar filtros

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Plus, Minus, Save, Package } from 'lucide-react';
 import Button from '../common/Button';
 import { apiService } from '../../services/api';
@@ -42,7 +42,8 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     }
   }, [availableIngredients]);
 
-  const loadData = async () => {
+  // 🚀 OPTIMIZACIÓN: loadData con useCallback para evitar recreaciones
+  const loadData = useCallback(async () => {
     // Primero cargar los datos de referencia
     await Promise.all([
       loadAvailableIngredients(),
@@ -70,9 +71,10 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       // Modo creación
       resetForm();
     }
-  };
+  }, [recipe]);
 
-  const resetForm = () => {
+  // 🚀 OPTIMIZACIÓN: resetForm con useCallback
+  const resetForm = useCallback(() => {
     setFormData({
       name: '',
       version: '1.0',
@@ -84,34 +86,41 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     });
     setRecipeItems([]);
     setErrors({});
-  };
+  }, []);
 
-  const loadAvailableIngredients = async () => {
+  // 🚀 OPTIMIZACIÓN: loadAvailableIngredients con useCallback
+  const loadAvailableIngredients = useCallback(async () => {
     try {
       // Cargar TODOS los ingredientes (incluyendo inactivos) para mostrar completa la receta
       const data = await apiService.ingredients.getAll({ show_all: true });
       setAvailableIngredients(Array.isArray(data) ? data : []);
     } catch (error) {
+      // Error silencioso para ingredientes
     }
-  };
+  }, []);
 
-  const loadAvailableGroups = async () => {
+  // 🚀 OPTIMIZACIÓN: loadAvailableGroups con useCallback
+  const loadAvailableGroups = useCallback(async () => {
     try {
       const data = await apiService.groups.getAll();
       setAvailableGroups(Array.isArray(data) ? data : []);
     } catch (error) {
+      // Error silencioso para grupos
     }
-  };
+  }, []);
 
-  const loadAvailableContainers = async () => {
+  // 🚀 OPTIMIZACIÓN: loadAvailableContainers con useCallback
+  const loadAvailableContainers = useCallback(async () => {
     try {
       const data = await apiService.containers.getAll();
       setAvailableContainers(Array.isArray(data) ? data : []);
     } catch (error) {
+      // Error silencioso para containers
     }
-  };
+  }, []);
 
-  const loadRecipeItems = async () => {
+  // 🚀 OPTIMIZACIÓN: loadRecipeItems con useCallback y dependencias
+  const loadRecipeItems = useCallback(async () => {
     if (!recipe?.id) return;
     
     try {
@@ -149,23 +158,38 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     } catch (error) {
       setRecipeItems([]);
     }
-  };
+  }, [recipe?.id, recipe?.ingredients_list, availableIngredients]);
 
 
-  const handleInputChange = (e) => {
+  // 🚀 OPTIMIZACIÓN: handleInputChange con useCallback
+  const handleInputChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    
+    // Debug para is_active
+    if (name === 'is_active') {
+    }
+    
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      };
+      
+      // Debug para is_active
+      if (name === 'is_active') {
+      }
+      
+      return newData;
+    });
     
     // Limpiar error cuando el usuario empiece a escribir
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
-  };
+  }, [errors]);
 
-  const addRecipeItem = () => {
+  // 🚀 OPTIMIZACIÓN: addRecipeItem con useCallback
+  const addRecipeItem = useCallback(() => {
     setRecipeItems(prev => [...prev, {
       id: null,
       ingredient: '',
@@ -174,13 +198,15 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       ingredient_unit_price: '',
       quantity: ''
     }]);
-  };
+  }, []);
 
-  const removeRecipeItem = (index) => {
+  // 🚀 OPTIMIZACIÓN: removeRecipeItem con useCallback
+  const removeRecipeItem = useCallback((index) => {
     setRecipeItems(prev => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
-  const updateRecipeItem = (index, field, value) => {
+  // 🚀 OPTIMIZACIÓN: updateRecipeItem con useCallback
+  const updateRecipeItem = useCallback((index, field, value) => {
     setRecipeItems(prev => prev.map((item, i) => {
       if (i === index) {
         if (field === 'ingredient') {
@@ -198,17 +224,18 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       }
       return item;
     }));
-  };
+  }, [availableIngredients]);
 
-  // Función para verificar si un ingrediente tiene stock insuficiente
-  const hasInsufficientStock = (item) => {
+  // 🚀 OPTIMIZACIÓN: hasInsufficientStock con useCallback
+  const hasInsufficientStock = useCallback((item) => {
     if (!item.ingredient || !item.quantity) return false;
     const ingredient = availableIngredients.find(ing => ing.id === parseInt(item.ingredient));
     if (!ingredient) return false;
     return parseFloat(ingredient.current_stock) < parseFloat(item.quantity);
-  };
+  }, [availableIngredients]);
 
-  const validateForm = () => {
+  // 🚀 OPTIMIZACIÓN: validateForm con useCallback
+  const validateForm = useCallback(() => {
     const newErrors = {};
     
     if (!formData.name.trim()) {
@@ -275,9 +302,10 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [formData, recipeItems]);
 
-  const handleSave = async () => {
+  // 🚀 OPTIMIZACIÓN: handleSave con useCallback
+  const handleSave = useCallback(async () => {
     if (!validateForm()) return;
     
     setLoading(true);
@@ -316,6 +344,8 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
         }))
       };
       
+      // Debug del payload
+      
       
       let savedRecipe;
       if (recipe?.id) {
@@ -339,7 +369,44 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [recipeItems, formData, recipe, validateForm, onSave, onClose, showSuccess, showError]);
+
+  // 🚀 OPTIMIZACIÓN: Cálculos de precio con useMemo para evitar recálculos
+  const priceCalculations = useMemo(() => {
+    const ingredientsCost = recipeItems.reduce((total, item) => {
+      if (item.ingredient && item.quantity && item.ingredient_unit_price) {
+        return total + (parseFloat(item.ingredient_unit_price) * parseFloat(item.quantity));
+      }
+      return total;
+    }, 0);
+    
+    const profitPercentage = parseFloat(formData.profit_percentage) || 0;
+    const profitAmount = ingredientsCost * (profitPercentage / 100);
+    const finalPrice = ingredientsCost + profitAmount;
+    
+    return {
+      ingredientsCost,
+      profitPercentage,
+      profitAmount,
+      finalPrice
+    };
+  }, [recipeItems, formData.profit_percentage]);
+
+  // 🚀 OPTIMIZACIÓN: Opciones de containers memoizadas
+  const containerOptions = useMemo(() => {
+    return availableContainers.map(container => ({
+      id: container.id,
+      name: container.name
+    }));
+  }, [availableContainers]);
+
+  // 🚀 OPTIMIZACIÓN: Opciones de grupos memoizadas
+  const groupOptions = useMemo(() => {
+    return availableGroups.map(group => ({
+      id: group.id,
+      name: group.name
+    }));
+  }, [availableGroups]);
 
   if (!isOpen) return null;
 
@@ -402,7 +469,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
                       <option value="">Sin grupo</option>
-                      {availableGroups.map(group => (
+                      {groupOptions.map(group => (
                         <option key={group.id} value={group.id}>
                           {group.name}
                         </option>
@@ -426,7 +493,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                       }`}
                     >
                       <option value="">Seleccionar envase...</option>
-                      {availableContainers.map(container => (
+                      {containerOptions.map(container => (
                         <option key={container.id} value={container.id}>
                           {container.name}
                         </option>
@@ -520,16 +587,24 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
                       Estado
                     </label>
                     <div className="flex items-center space-x-4">
-                      <label className="flex items-center">
+                      <label className="flex items-center cursor-pointer">
                         <input
                           type="checkbox"
                           name="is_active"
                           checked={formData.is_active}
                           onChange={handleInputChange}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
                         />
                         <span className="ml-2 text-sm text-gray-700">
                           Activa (se muestra en pedidos)
+                        </span>
+                        {/* Indicador visual del estado */}
+                        <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                          formData.is_active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {formData.is_active ? 'ACTIVA' : 'INACTIVA'}
                         </span>
                       </label>
                     </div>
@@ -803,35 +878,20 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
           <div className="px-4 md:px-6 pb-4">
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <h4 className="text-sm font-semibold text-green-800 mb-3">Resumen de Costos</h4>
-              {(() => {
-                const ingredientsCost = recipeItems.reduce((total, item) => {
-                  if (item.ingredient && item.quantity && item.ingredient_unit_price) {
-                    return total + (parseFloat(item.ingredient_unit_price) * parseFloat(item.quantity));
-                  }
-                  return total;
-                }, 0);
-                
-                const profitPercentage = parseFloat(formData.profit_percentage) || 0;
-                const profitAmount = ingredientsCost * (profitPercentage / 100);
-                const finalPrice = ingredientsCost + profitAmount;
-                
-                return (
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">Costo de ingredientes:</span>
-                      <span className="font-medium">S/ {ingredientsCost.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">Ganancia ({profitPercentage}%):</span>
-                      <span className="font-medium">S/ {profitAmount.toFixed(2)}</span>
-                    </div>
-                    <div className="border-t border-green-300 pt-2 flex justify-between">
-                      <span className="font-semibold text-green-800">Precio base final:</span>
-                      <span className="font-bold text-green-900 text-lg">S/ {finalPrice.toFixed(2)}</span>
-                    </div>
-                  </div>
-                );
-              })()}
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-700">Costo de ingredientes:</span>
+                  <span className="font-medium">S/ {priceCalculations.ingredientsCost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-700">Ganancia ({priceCalculations.profitPercentage}%):</span>
+                  <span className="font-medium">S/ {priceCalculations.profitAmount.toFixed(2)}</span>
+                </div>
+                <div className="border-t border-green-300 pt-2 flex justify-between">
+                  <span className="font-semibold text-green-800">Precio base final:</span>
+                  <span className="font-bold text-green-900 text-lg">S/ {priceCalculations.finalPrice.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
