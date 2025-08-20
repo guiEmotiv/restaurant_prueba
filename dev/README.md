@@ -157,4 +157,39 @@ scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.c
 
 ---
 
+## 🚀 Deploy a Producción
+
+### Estructura Optimizada
+```bash
+# Deploy completo con el nuevo script
+./prod/deploy.sh --full
+
+# Otras opciones disponibles
+./prod/deploy.sh --sync     # Deploy + sync BD dev→prod
+./prod/deploy.sh --build    # Solo build frontend
+./prod/deploy.sh --check    # Verificar salud del sistema
+./prod/deploy.sh --rollback # Rollback a versión anterior
+```
+
+### 📋 Flujo completo Dev → Prod
+```bash
+# 1. Desarrollo y testing
+./dev/start.sh
+
+# 2. Commit y push cambios
+git add -A && git commit -m "feat: nueva funcionalidad" && git push
+
+# 3. Deploy a producción (desde local)
+./prod/deploy.sh --full
+```
+
+### 🎯 Ventajas del Nuevo Script
+- **Optimizado**: Build automático y migraciones inteligentes
+- **Backups**: Automático antes de cada deploy
+- **Health checks**: Verificación post-deploy
+- **Rollback**: Un comando para volver atrás
+- **Clean**: Scripts organizados en carpetas `dev/` y `prod/`
+
+---
+
 **🚀 Desarrollo con datos reales = Testing más efectivo**
