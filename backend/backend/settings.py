@@ -158,7 +158,7 @@ REST_FRAMEWORK = {
 # Override authentication/permissions based on Cognito setting
 if USE_COGNITO_AUTH:
     REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] = [
-        "backend.cognito_drf_auth.CognitoAuthentication",
+        "backend.cognito_drf_auth.CognitoJWTAuthentication",
     ]
     REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"] = [
         "rest_framework.permissions.IsAuthenticated",
