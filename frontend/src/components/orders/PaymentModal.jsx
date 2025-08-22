@@ -152,27 +152,27 @@ const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
               <button
                 type="button"
                 onClick={() => handleChange('payment_method', 'CASH')}
-                className={`p-4 border-2 rounded-lg flex flex-col items-center transition-colors ${
+                className={`p-5 border-2 rounded-lg flex flex-col items-center transition-colors ${
                   formData.payment_method === 'CASH'
                     ? 'border-blue-500 bg-blue-50 text-blue-700'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
-                <DollarSign className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium">Efectivo</span>
+                <DollarSign className="h-7 w-7 mb-2" />
+                <span className="text-base font-medium">Efectivo</span>
               </button>
               
               <button
                 type="button"
                 onClick={() => handleChange('payment_method', 'CARD')}
-                className={`p-4 border-2 rounded-lg flex flex-col items-center transition-colors ${
+                className={`p-5 border-2 rounded-lg flex flex-col items-center transition-colors ${
                   formData.payment_method === 'CARD'
                     ? 'border-blue-500 bg-blue-50 text-blue-700'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
-                <CreditCard className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium">Tarjeta</span>
+                <CreditCard className="h-7 w-7 mb-2" />
+                <span className="text-base font-medium">Tarjeta</span>
               </button>
             </div>
           </div>
@@ -201,8 +201,8 @@ const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {
             <textarea
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              rows={3}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-base"
+              rows={4}
               placeholder="Notas del pago..."
             />
           </div>

@@ -9,6 +9,7 @@ class OrderItemPoller {
     this.knownItems = new Set();
     this.intervalMs = 5000;
     this.isKitchenView = false;
+    this.updateCallback = null;
   }
 
   // Configurar vista de cocina
@@ -16,20 +17,25 @@ class OrderItemPoller {
     this.isKitchenView = isKitchen;
   }
 
+  // Configurar callback para actualizar la UI
+  setUpdateCallback(callback) {
+    this.updateCallback = callback;
+  }
+
   // Verificar si puede notificar
   canNotify() {
     return this.isKitchenView && notificationService.canListen();
   }
 
-  // Inicializar items conocidos
+  // Inicializar items conocidos usando kitchen board
   async initializeOrderItems() {
     try {
-      const orders = await apiService.orders.getAll();
+      const kitchenBoard = await apiService.orders.getKitchenBoard();
       this.knownItems.clear();
       
-      orders.forEach(order => {
-        order.items?.forEach(item => {
-          this.knownItems.add(`${item.id}-${item.created_at || order.created_at}`);
+      kitchenBoard.forEach(recipe => {
+        recipe.items?.forEach(item => {
+          this.knownItems.add(`${item.id}-${item.created_at}`);
         });
       });
       
@@ -38,19 +44,17 @@ class OrderItemPoller {
     }
   }
 
-  // Detectar cambios en order items
+  // Detectar cambios en order items usando kitchen board
   async checkForNewOrderItems() {
-    if (!this.canNotify()) return;
-
     try {
-      const orders = await apiService.orders.getAll();
+      const kitchenBoard = await apiService.orders.getKitchenBoard();
       const currentItems = new Set();
       const newItems = [];
       
       // Procesar items actuales
-      orders.forEach(order => {
-        order.items?.forEach(item => {
-          const itemKey = `${item.id}-${item.created_at || order.created_at}`;
+      kitchenBoard.forEach(recipe => {
+        recipe.items?.forEach(item => {
+          const itemKey = `${item.id}-${item.created_at}`;
           currentItems.add(itemKey);
           
           if (!this.knownItems.has(itemKey)) {
@@ -59,19 +63,22 @@ class OrderItemPoller {
         });
       });
       
-      // Detectar eliminados
-      const deletedCount = this.knownItems.size - currentItems.size + newItems.length;
+      // Detectar cambios (nuevos items o items eliminados)
+      const hasChanges = newItems.length > 0 || this.knownItems.size !== currentItems.size;
       
       // Actualizar items conocidos
       this.knownItems = currentItems;
       
-      // Reproducir sonidos
-      if (newItems.length > 0) {
-        notificationService.playNotification('itemCreated');
+      // Si hay cambios, actualizar la vista
+      if (hasChanges && this.updateCallback) {
+        this.updateCallback();
       }
-
-      if (deletedCount > 0) {
-        notificationService.playNotification('itemDeleted');
+      
+      // Reproducir sonidos solo si está en vista de cocina
+      if (this.isKitchenView && this.canNotify()) {
+        if (newItems.length > 0) {
+          notificationService.playNotification('itemCreated');
+        }
       }
       
     } catch (error) {

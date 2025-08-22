@@ -123,14 +123,16 @@ const Kitchen = () => {
   useEffect(() => {
     loadKitchenBoard();
     
-    // Configurar notificaciones de audio y polling - usar solo uno
+    // Configurar notificaciones de audio y polling automático
     notificationService.setCurrentUserRole(userRole);
     orderItemPoller.setKitchenView(true);
+    orderItemPoller.setUpdateCallback(loadKitchenBoard); // Actualizar vista automáticamente
     orderItemPoller.startPolling();
     
     return () => {
       // Detener polling al salir de la vista
       orderItemPoller.stopPolling();
+      orderItemPoller.setUpdateCallback(null);
     };
   }, [userRole, loadKitchenBoard]);
 

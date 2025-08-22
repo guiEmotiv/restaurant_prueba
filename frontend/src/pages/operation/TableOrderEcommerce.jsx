@@ -2102,7 +2102,7 @@ const TableOrderEcommerce = () => {
 
             {/* Configuración de pago minimalista */}
             {selectedItems.length > 0 && (
-              <div className="bg-white border border-gray-200 p-3 space-y-3">
+              <div className="bg-white border border-gray-200 p-2 space-y-2">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-600">{selectedItems.length} item(s)</span>
                   <span className="font-medium text-gray-900">
@@ -2126,7 +2126,7 @@ const TableOrderEcommerce = () => {
                       <button
                         key={method.value}
                         onClick={() => setPaymentMethod(method.value)}
-                        className={`flex-1 py-1 px-2 text-xs border ${
+                        className={`flex-1 py-2 px-3 text-sm border rounded ${
                           paymentMethod === method.value
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
                             : 'border-gray-300 text-gray-700 hover:bg-gray-50'
@@ -2140,12 +2140,12 @@ const TableOrderEcommerce = () => {
 
                 {/* Descripción/Notas minimalista */}
                 <div>
-                  <input
-                    type="text"
+                  <textarea
                     value={paymentDescription}
                     onChange={(e) => setPaymentDescription(e.target.value)}
-                    className="w-full px-2 py-1 text-xs border border-gray-300 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:border-blue-500 outline-none"
                     placeholder="Notas adicionales..."
+                    rows={2}
                   />
                 </div>
 
@@ -2162,9 +2162,9 @@ const TableOrderEcommerce = () => {
                         handleBluetoothToggle(checked);
                       }}
                       disabled={connectingBluetooth}
-                      className="h-3 w-3 text-blue-600 border-gray-300 disabled:opacity-50"
+                      className="h-4 w-4 text-blue-600 border-gray-300 rounded disabled:opacity-50"
                     />
-                    <label htmlFor="withPrinting" className="text-gray-700">
+                    <label htmlFor="withPrinting" className="text-sm text-gray-700">
                       Imprimir
                     </label>
                     {/* Estado de conexión Bluetooth */}
@@ -2186,7 +2186,7 @@ const TableOrderEcommerce = () => {
                 <button
                   onClick={handleProcessSelectedPayment}
                   disabled={paymentProcessing}
-                  className="w-full bg-green-600 text-white py-2 px-3 text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-green-600 text-white py-3 px-4 text-base rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {paymentProcessing ? 'Procesando...' : 'Procesar Pago'}
                 </button>

@@ -311,7 +311,7 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
                     <button
                       key={method}
                       onClick={() => setCurrentSplit({ ...currentSplit, payment_method: method })}
-                      className={`p-3 rounded-lg border-2 transition-colors ${
+                      className={`p-4 rounded-lg border-2 transition-colors ${
                         currentSplit.payment_method === method
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
@@ -319,7 +319,7 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
                     >
                       <div className="flex items-center justify-center gap-2">
                         {getPaymentMethodIcon(method)}
-                        <span className="text-sm font-medium">{getPaymentMethodLabel(method)}</span>
+                        <span className="text-base font-medium">{getPaymentMethodLabel(method)}</span>
                       </div>
                     </button>
                   ))}
@@ -333,8 +333,8 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
                 <textarea
                   value={currentSplit.notes}
                   onChange={(e) => setCurrentSplit({ ...currentSplit, notes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  rows={2}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base"
+                  rows={3}
                   placeholder="Notas del pago..."
                 />
               </div>
@@ -534,16 +534,16 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
               variant="success" 
               onClick={onFullPayment}
               disabled={processing}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 px-6 py-3 text-lg"
             >
               {processing ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   Procesando...
                 </>
               ) : (
                 <>
-                  <Check className="h-4 w-4" />
+                  <Check className="h-5 w-5" />
                   Procesar Pago Completo
                 </>
               )}
@@ -553,16 +553,16 @@ const SplitPaymentModal = ({ isOpen, onClose, onSubmit, order, processing = fals
               variant="success" 
               onClick={handleSplitPayment}
               disabled={processing || splits.length === 0 || getPendingAmount() !== 0}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 px-6 py-3 text-lg"
             >
               {processing ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   Procesando...
                 </>
               ) : (
                 <>
-                  <Check className="h-4 w-4" />
+                  <Check className="h-5 w-5" />
                   Procesar Pagos Divididos ({splits.length})
                 </>
               )}
