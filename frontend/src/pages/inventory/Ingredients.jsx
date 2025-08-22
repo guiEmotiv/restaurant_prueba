@@ -66,28 +66,16 @@ const Ingredients = () => {
     }
   ];
 
-  // Carga optimizada de ingredientes
+  // Carga optimizada de ingredientes usando apiService
   const loadIngredients = useCallback(async () => {
     try {
       setLoading(true);
       
-      // Cargar todas las páginas en paralelo de manera optimizada
-      const responses = await Promise.all([
-        fetch('http://localhost:8000/api/v1/ingredients/?show_all=true&page=1'),
-        fetch('http://localhost:8000/api/v1/ingredients/?show_all=true&page=2'),
-        fetch('http://localhost:8000/api/v1/ingredients/?show_all=true&page=3')
-      ]);
+      // Usar apiService para manejar autenticación correctamente
+      const data = await apiService.ingredients.getAll();
       
-      const [page1, page2, page3] = await Promise.all(responses.map(r => r.json()));
-      
-      const allIngredients = [
-        ...(page1.results || []),
-        ...(page2.results || []),
-        ...(page3.results || [])
-      ];
-      
-      // Ordenar una sola vez
-      const sortedData = allIngredients.sort((a, b) => b.id - a.id);
+      // Ordenar por ID descendente
+      const sortedData = Array.isArray(data) ? data.sort((a, b) => b.id - a.id) : [];
       setIngredients(sortedData);
     } catch (error) {
       console.error('Error loading ingredients:', error);

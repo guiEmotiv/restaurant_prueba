@@ -365,23 +365,49 @@ const TableOrderEcommerce = () => {
     setStep('menu');
   }, []);
 
-  // 🚀 OPTIMIZACIÓN: openNoteModal con useCallback
+  // 🚀 OPTIMIZACIÓN: openNoteModal con useCallback y scroll lock
   const openNoteModal = useCallback((recipe) => {
+    // 💾 Guardar scroll position ANTES de abrir modal
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    document.body.setAttribute('data-scroll-locked', scrollY.toString());
+    
     setSelectedRecipe(recipe);
     setNoteText('');
     setIsTakeaway(false);
     setIsNoteModalOpen(true);
   }, []);
 
-  // 🚀 OPTIMIZACIÓN: closeNoteModal con useCallback
+  // 🚀 OPTIMIZACIÓN: closeNoteModal con useCallback y unlock scroll
   const closeNoteModal = useCallback(() => {
+    // 🔓 UNLOCK: Restaurar scroll position desde data attribute
+    const scrollY = document.body.getAttribute('data-scroll-locked');
+    
+    // Limpiar estilos de scroll lock
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.removeAttribute('data-scroll-locked');
+    
     setIsNoteModalOpen(false);
     setSelectedRecipe(null);
     setNoteText('');
     setIsTakeaway(false);
+    
+    // Restaurar scroll position exacta
+    if (scrollY) {
+      window.scrollTo(0, parseInt(scrollY, 10));
+    }
   }, []);
 
-  // 🚀 OPTIMIZACIÓN: handleAddWithNotes con useCallback
+  // ✅ Mensaje temporal de éxito para items agregados
+  const showSuccessMessage = useCallback((recipeName) => {
+    showToast(`✅ ${recipeName} agregado al pedido`, 'success', 1000);
+  }, [showToast]);
+
+  // 🚀 OPTIMIZACIÓN: handleAddWithNotes con useCallback (scroll lock maneja la posición)
   const handleAddWithNotes = useCallback(() => {
     if (!selectedRecipe) return;
     
@@ -424,10 +450,15 @@ const TableOrderEcommerce = () => {
       }]);
     }
     
+    // ✅ Mostrar mensaje de éxito
+    showSuccessMessage(selectedRecipe.name);
+    
+    // 🚫 Cerrar modal (scroll lock maneja la restauración)
     closeNoteModal();
-  }, [cart, selectedRecipe, noteText, isTakeaway, validateTakeawayContainer, showToast, closeNoteModal]);
+    
+  }, [cart, selectedRecipe, noteText, isTakeaway, validateTakeawayContainer, showToast, closeNoteModal, showSuccessMessage]);
 
-  // 🚀 OPTIMIZACIÓN: addToCart con useCallback
+  // 🚀 OPTIMIZACIÓN: addToCart con useCallback y mensaje de éxito
   const addToCart = useCallback((recipe) => {
     const existingIndex = cart.findIndex(item => 
       item.recipe.id === recipe.id && 
@@ -453,25 +484,30 @@ const TableOrderEcommerce = () => {
       }]);
     }
     
+    // ✅ Mostrar mensaje de éxito
+    showSuccessMessage(recipe.name);
+    
     // No abrir automáticamente - solo respuesta visual en el badge
-  }, [cart]);
+  }, [cart, showSuccessMessage]);
 
-  // 🚀 OPTIMIZACIÓN: updateCartItem con useCallback
+  // 🚀 OPTIMIZACIÓN: updateCartItem con useCallback y función callback
   const updateCartItem = useCallback((index, field, value) => {
-    const newCart = [...cart];
-    newCart[index][field] = value;
-    
-    if (field === 'quantity') {
-      newCart[index].total_price = newCart[index].unit_price * value;
-    }
-    
-    setCart(newCart);
-  }, [cart]);
+    setCart(prevCart => {
+      const newCart = [...prevCart];
+      newCart[index][field] = value;
+      
+      if (field === 'quantity') {
+        newCart[index].total_price = newCart[index].unit_price * value;
+      }
+      
+      return newCart;
+    });
+  }, []);
 
   // 🚀 OPTIMIZACIÓN: removeFromCart con useCallback
   const removeFromCart = useCallback((index) => {
-    setCart(cart.filter((_, i) => i !== index));
-  }, [cart]);
+    setCart(prevCart => prevCart.filter((_, i) => i !== index));
+  }, []);
 
   // 🚀 OPTIMIZACIÓN: getCartTotal con useMemo
   const getCartTotal = useMemo(() => {
@@ -1076,25 +1112,23 @@ const TableOrderEcommerce = () => {
     return filtered;
   }, [recipes, selectedGroup, searchTerm]);
 
-  // Contar recetas por grupo (todas las recetas cargadas ya están filtradas como activas y disponibles)
+  // 🚀 OPTIMIZACIÓN: Contar recetas por grupo usando reduce para mejor performance
   const recipeCountByGroup = useMemo(() => {
-    const counts = {};
-    for (const recipe of recipes) {
+    return recipes.reduce((counts, recipe) => {
       const groupId = recipe.group?.id || 'sin_grupo';
       counts[groupId] = (counts[groupId] || 0) + 1;
-    }
-    return counts;
+      return counts;
+    }, {});
   }, [recipes]);
 
-  // Agrupar mesas por zona con manejo robusto
+  // 🚀 OPTIMIZACIÓN: Agrupar mesas por zona usando reduce para mejor performance
   const tablesByZone = useMemo(() => {
-    const zones = {};
-    for (const table of tables) {
+    return tables.reduce((zones, table) => {
       const zoneName = table.zone?.name || table.zone_name || 'Sin Zona';
       if (!zones[zoneName]) zones[zoneName] = [];
       zones[zoneName].push(table);
-    }
-    return zones;
+      return zones;
+    }, {});
   }, [tables]);
 
   // Crear un Map de estados de mesa para evitar recálculo en filtros
@@ -1236,8 +1270,15 @@ const TableOrderEcommerce = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header responsive mejorado con breadcrumbs */}
-      <div className="bg-white shadow-sm">
+      {/* Header responsive mejorado con breadcrumbs - Fijo solo cuando no está en vista de mesas */}
+      <div 
+        className={`bg-white shadow-sm transition-transform duration-300 ${
+          step === 'tables' 
+            ? 'relative z-10' 
+            : `sticky top-0 z-[60] ${isCartOpen ? '-translate-y-full' : 'translate-y-0'}`
+        }`} 
+        data-header-fixed
+      >
         <div className="px-3 sm:px-4 py-3">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
@@ -1271,33 +1312,72 @@ const TableOrderEcommerce = () => {
           </div>
           
           <div className="flex items-center justify-between">
-            <h1 className="text-base sm:text-lg font-bold truncate">
+            {/* Título a la izquierda */}
+            <h1 className="text-base sm:text-lg font-bold truncate flex-1">
               {step === 'tables' && 'Seleccionar Mesa'}
               {step === 'orders' && 'Lista de Pedidos'}
-              {step === 'menu' && (currentOrder ? `Pedido #${currentOrder.id}` : '')}
+              {step === 'menu' && (currentOrder ? `Pedido #${currentOrder.id}` : 'Nuevo Pedido')}
               {step === 'payment' && `Pagar Pedido #${selectedOrderForPayment?.id}`}
             </h1>
             
+            {/* Botón Atrás en el centro */}
             {step !== 'tables' && (
-              <button
-                onClick={() => {
-                  if (step === 'menu') {
-                    setStep('orders');
-                  } else if (step === 'payment') {
-                    setStep('orders');
-                    setSelectedOrderForPayment(null);
-                    setSelectedItems([]);
-                    setPaymentMethod('CASH');
-                    setPaymentDescription('');
-                    setWithPrinting(false);
-                  } else {
-                    setStep('tables');
-                  }
-                }}
-                className="text-blue-600 hover:text-blue-700 flex items-center gap-1 text-sm"
-              >
-                ← Atrás
-              </button>
+              <div className="flex-1 flex justify-center">
+                <button
+                  onClick={() => {
+                    if (step === 'menu') {
+                      setStep('orders');
+                    } else if (step === 'payment') {
+                      setStep('orders');
+                      setSelectedOrderForPayment(null);
+                      setSelectedItems([]);
+                      setPaymentMethod('CASH');
+                      setPaymentDescription('');
+                      setWithPrinting(false);
+                    } else {
+                      setStep('tables');
+                    }
+                  }}
+                  className="text-blue-600 hover:text-blue-700 flex items-center gap-1 text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  ← Atrás
+                </button>
+              </div>
+            )}
+            
+            {/* Carrito en el header (solo en vista menu) */}
+            {step === 'menu' ? (
+              <div className="flex-1 flex justify-end">
+                <button
+                  onClick={toggleCart}
+                  className={`relative p-2 rounded-lg transition-all duration-300 ${
+                    cart.length > 0 || currentOrder
+                      ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50' 
+                      : 'text-gray-400 hover:text-gray-500 hover:bg-gray-50'
+                  }`}
+                  title="Ver pedido"
+                >
+                  {/* Icono de comanda/nota de pedido más grande */}
+                  <svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  
+                  {/* Badge con cantidad total */}
+                  {(() => {
+                    const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
+                    const orderCount = currentOrder?.items?.length || 0;
+                    const totalCount = cartCount + orderCount;
+                    
+                    return totalCount > 0 && (
+                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {totalCount}
+                      </div>
+                    );
+                  })()} 
+                </button>
+              </div>
+            ) : (
+              <div className="flex-1"></div>
             )}
           </div>
         </div>
@@ -1577,85 +1657,52 @@ const TableOrderEcommerce = () => {
               </select>
             </div>
 
-            {/* Lista de recetas */}
+            {/* Lista de recetas - Rediseñada con dos botones */}
             <div className="space-y-2 mb-20">
               {filteredRecipes.map(recipe => (
                 <div key={recipe.id} className="bg-white border rounded p-3">
-                  <div className="flex justify-between items-center">
-                    <div className="flex-1">
-                      <div className="font-semibold">{recipe.name}</div>
-                      <div className="text-sm text-gray-600">
+                  <div className="flex gap-2 h-16">
+                    {/* Botón principal con nombre y precio */}
+                    <button
+                      onClick={() => addToCart(recipe)}
+                      className="flex-1 flex flex-col justify-center p-3 text-left bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded-lg transition-colors group"
+                    >
+                      <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                        {recipe.name}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
                         S/ {recipe.price || recipe.base_price || '0.00'}
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => openNoteModal(recipe)}
-                        className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => addToCart(recipe)}
-                        className="px-3 py-1 text-sm text-gray-600 hover:text-gray-700 border border-gray-600 rounded hover:bg-gray-50"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                      </button>
-                    </div>
+                    </button>
+                    
+                    {/* Botón de nota con lápiz */}
+                    <button
+                      onClick={() => openNoteModal(recipe)}
+                      className="w-16 h-16 flex items-center justify-center text-gray-600 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      title="Agregar nota"
+                    >
+                      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Carrito flotante responsive con panel lateral */}
-            <div className="fixed bottom-4 right-4 z-50">
-              {/* Ícono del carrito siempre visible */}
-              <div className="relative">
-                <button
-                  onClick={toggleCart}
-                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center ${
-                    cart.length > 0 || currentOrder
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-110' 
-                      : 'bg-gray-300 text-gray-500'
-                  }`}
-                >
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.5 1.5M7 13l-1.5 1.5M16.5 14.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-9.75 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                  </svg>
-                  
-                  {/* Badge con cantidad total */}
-                  {(() => {
-                    // Sumar cantidades del carrito (items pendientes)
-                    const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
-                    // Contar items existentes del pedido
-                    const orderCount = currentOrder?.items?.length || 0;
-                    const totalCount = cartCount + orderCount;
-                    
-                    return totalCount > 0 && (
-                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 sm:h-6 sm:w-6 flex items-center justify-center">
-                        {totalCount}
-                      </div>
-                    );
-                  })()}
-                </button>
-              </div>
-            </div>
+            {/* El carrito ahora está integrado en el header */}
 
             {/* Panel lateral del carrito */}
             {isCartOpen && (
               <>
                 {/* Overlay */}
                 <div 
-                  className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                  className="fixed inset-0 bg-black bg-opacity-50 z-[65]"
                   onClick={toggleCart}
                 />
                 
                 {/* Panel lateral deslizante */}
-                <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col">
+                <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-xl z-[70] transform transition-transform duration-300 ease-in-out flex flex-col">
                   {/* Header del panel lateral */}
                   <div className="bg-gray-50 px-4 py-4 border-b flex-shrink-0">
                     <div className="flex items-center justify-between">
@@ -2161,132 +2208,78 @@ const TableOrderEcommerce = () => {
         )}
       </div>
 
-      {/* Modal ultra-minimalista para móviles */}
+      {/* Modal simplificado */}
       {isNoteModalOpen && (
-        <>
-          {/* Overlay optimizado */}
-          <div 
-            className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm"
-            onClick={closeNoteModal}
-          />
-          
-          {/* Modal responsive */}
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="bg-white w-full max-w-sm mx-auto rounded-t-3xl sm:rounded-2xl shadow-2xl transform transition-all duration-300 ease-out">
-              {/* Header ultra-compacto */}
-              <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
-                  {selectedRecipe?.name}
-                </h3>
-                <button
-                  onClick={closeNoteModal}
-                  className="p-2 -m-2 text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">{selectedRecipe?.name}</h3>
+              <button onClick={closeNoteModal} className="text-gray-500 hover:text-gray-700">
+                ✕
+              </button>
+            </div>
 
-              {/* Content compacto */}
-              <div className="px-4 py-4 space-y-4">
-                {/* Campo de notas optimizado para móvil */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-2">
-                    Comentario
-                  </label>
-                  <textarea
-                    value={noteText}
-                    onChange={(e) => setNoteText(e.target.value)}
-                    placeholder="Ej: Sin cebolla, extra salsa..."
-                    className="w-full p-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition-all"
-                    rows="2"
-                    style={{
-                      fontSize: '16px', // Prevent zoom on iOS
-                      WebkitAppearance: 'none',
-                      minHeight: '60px'
-                    }}
-                  />
-                </div>
+            {/* Delivery checkbox */}
+            <div className="mb-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isTakeaway}
+                  onChange={(e) => setIsTakeaway(e.target.checked)}
+                  className="w-5 h-5"
+                />
+                <span className="text-sm font-medium">Delivery</span>
+                {isTakeaway && containers.length > 0 && (
+                  <span className="text-sm text-gray-500">
+                    (+S/{getSelectedContainer(selectedRecipe)?.price || 0})
+                  </span>
+                )}
+              </label>
+            </div>
 
-                {/* Para llevar compacto */}
-                <div className="flex items-center justify-between py-2">
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-gray-800">Para llevar</span>
-                    {containers.length > 0 && isTakeaway && (() => {
-                      const selectedContainer = getSelectedContainer(selectedRecipe);
-                      const isRecommended = selectedRecipe?.container_id === selectedContainer?.id;
-                      const validation = validateTakeawayContainer(selectedRecipe);
-                      
-                      return (
-                        <div className="ml-2">
-                          <span className="text-xs text-gray-500">
-                            +S/{selectedContainer?.price || 0} ({selectedContainer?.name})
-                          </span>
-                          {!validation.isValid && (
-                            <span className="text-xs text-red-600 italic ml-1">
-                              ⚠ {validation.message}
-                            </span>
-                          )}
-                          {validation.isValid && isRecommended && (
-                            <span className="text-xs text-green-600 italic ml-1">
-                              ✓ Envase de receta
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                  <button
-                    onClick={() => setIsTakeaway(!isTakeaway)}
-                    className={`relative w-10 h-6 rounded-full transition-all duration-200 ${
-                      isTakeaway ? 'bg-gray-800' : 'bg-gray-200'
-                    }`}
-                  >
-                    <div
-                      className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
-                        isTakeaway ? 'translate-x-4' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
+            {/* Comentario */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Comentario</label>
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Ej: Sin cebolla, extra salsa..."
+                className="w-full p-3 border rounded-lg resize-none"
+                rows="3"
+              />
+            </div>
 
-                {/* Precio minimalista */}
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Total</span>
-                    <span className="text-lg font-semibold text-gray-900">
-                      S/ {(
-                        parseFloat(selectedRecipe?.price || selectedRecipe?.base_price || 0) +
-                        (isTakeaway ? parseFloat(getSelectedContainer(selectedRecipe)?.price || 0) : 0)
-                      ).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Botones optimizados para móvil */}
-              <div className="px-4 pb-4 pt-2">
-                <div className="flex gap-2">
-                  <button
-                    onClick={closeNoteModal}
-                    className="flex-1 py-3 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleAddWithNotes}
-                    className="flex-1 py-3 text-sm font-medium text-white bg-gray-900 rounded-xl hover:bg-gray-800 active:bg-gray-700 transition-colors"
-                  >
-                    Agregar
-                  </button>
-                </div>
-                {/* Safe area para móviles */}
-                <div className="h-2 sm:hidden" />
+            {/* Total */}
+            <div className="mb-6 p-3 bg-gray-50 rounded-lg">
+              <div className="flex justify-between">
+                <span>Total:</span>
+                <span className="font-semibold">
+                  S/ {(
+                    parseFloat(selectedRecipe?.price || selectedRecipe?.base_price || 0) +
+                    (isTakeaway ? parseFloat(getSelectedContainer(selectedRecipe)?.price || 0) : 0)
+                  ).toFixed(2)}
+                </span>
               </div>
             </div>
+
+            {/* Botones */}
+            <div className="flex gap-3">
+              <button
+                onClick={closeNoteModal}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAddWithNotes}
+                className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Agregar
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
 
     </div>

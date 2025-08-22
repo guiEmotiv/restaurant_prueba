@@ -96,6 +96,7 @@ const RecipeModal = ({ isOpen, onClose, recipe = null, onSave }) => {
       setAvailableIngredients(Array.isArray(data) ? data : []);
     } catch (error) {
       // Error silencioso para ingredientes
+      setAvailableIngredients([]);
     }
   }, []);
 

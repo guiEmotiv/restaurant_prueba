@@ -196,6 +196,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'notes': item.notes,
                 'is_takeaway': item.is_takeaway,
                 'created_at': item.created_at.isoformat(),
+                'preparing_at': item.preparing_at.isoformat() if item.preparing_at else None,
                 'elapsed_time_minutes': elapsed_minutes,
                 'preparation_time': item.recipe.preparation_time,
                 'is_overdue': is_overdue,

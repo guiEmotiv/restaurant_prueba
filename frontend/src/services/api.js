@@ -333,10 +333,30 @@ export const apiService = {
   ingredients: {
     getAll: async (params = {}, retries = 2) => {
       try {
-        const queryParams = new URLSearchParams(params).toString();
-        const url = queryParams ? `/ingredients/?${queryParams}` : '/ingredients/';
-        const response = await api.get(url);
-        return handlePaginatedResponse(response);
+        // Fetch all ingredients by requesting all pages
+        let allIngredients = [];
+        let page = 1;
+        let hasNextPage = true;
+        
+        while (hasNextPage) {
+          const pageParams = { ...params, page };
+          const queryParams = new URLSearchParams(pageParams).toString();
+          const url = queryParams ? `/ingredients/?${queryParams}` : '/ingredients/';
+          const response = await api.get(url);
+          
+          if (response.data && response.data.results) {
+            allIngredients = [...allIngredients, ...response.data.results];
+            hasNextPage = !!response.data.next;
+            page++;
+          } else if (Array.isArray(response.data)) {
+            // Non-paginated response
+            return response.data;
+          } else {
+            hasNextPage = false;
+          }
+        }
+        
+        return allIngredients;
       } catch (error) {
         // Retry logic para navegación robusta
         if (retries > 0 && (error.code === 'NETWORK_ERROR' || error.response?.status >= 500)) {

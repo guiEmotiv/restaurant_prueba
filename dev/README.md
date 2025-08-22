@@ -15,6 +15,7 @@ scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.c
 ```
 
 ### 🎯 Resultado
+
 - **Desarrollo = Producción** (datos idénticos)
 - **Historial completo**: Órdenes, pagos, inventario
 - **IDs originales**: Sin modificaciones
@@ -45,6 +46,7 @@ scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.c
 ## 📊 Gestión de Base de Datos
 
 ### 🔄 Sincronizar con Producción
+
 ```bash
 # Obtener datos actuales de producción
 scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com:/opt/restaurant-web/data/restaurant_prod.sqlite3 data/restaurant_dev.sqlite3
@@ -54,12 +56,14 @@ scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.c
 ```
 
 ### 🧹 Limpiar Datos Operacionales de Producción
+
 ```bash
 # Limpiar órdenes/pagos en producción (SOLO si es necesario)
 ./backup/clean-prod-operational-data.sh
 ```
 
 ### 📁 Archivos de BD
+
 - **Desarrollo**: `data/restaurant_dev.sqlite3` (copia de prod)
 - **Producción**: EC2 `/opt/restaurant-web/data/restaurant_prod.sqlite3`
 - **Backups**: `data/backups/prod/`
@@ -84,18 +88,21 @@ docker ps && curl -s http://localhost:8000/api/v1/health/
 ## ❌ Solución de Problemas
 
 ### Puerto ocupado
+
 ```bash
 ./dev/stop.sh
 ./dev/start.sh
 ```
 
 ### Error de dependencias npm
+
 ```bash
 rm -rf frontend/node_modules frontend/.vite
 ./dev/start.sh
 ```
 
 ### BD desactualizada o corrupta
+
 ```bash
 # Descargar nueva copia de producción
 scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com:/opt/restaurant-web/data/restaurant_prod.sqlite3 data/restaurant_dev.sqlite3
@@ -105,6 +112,7 @@ scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.c
 ```
 
 ### Reset completo (emergencia)
+
 ```bash
 ./dev/stop.sh
 docker-compose down --volumes --remove-orphans
@@ -118,6 +126,7 @@ rm -f data/restaurant_dev.sqlite3
 ## 🎯 Flujo de Desarrollo Recomendado
 
 ### 📅 Inicio de día
+
 ```bash
 # 1. Sincronizar con producción (opcional, si necesitas datos frescos)
 scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com:/opt/restaurant-web/data/restaurant_prod.sqlite3 data/restaurant_dev.sqlite3
@@ -127,11 +136,13 @@ scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.c
 ```
 
 ### 🔧 Durante desarrollo
+
 - **Hot-reload automático**: Los cambios se reflejan inmediatamente
 - **Datos reales**: Testea con órdenes, inventario e historial real
 - **Debug efectivo**: Reproduce problemas reales de producción
 
 ### 📤 Fin de día
+
 ```bash
 ./dev/stop.sh
 ```
@@ -141,55 +152,19 @@ scp -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.c
 ## 💡 Ventajas del Nuevo Flujo
 
 ### ✅ **Simplicidad**
+
 - **Un comando** para sincronizar datos
 - **Sin scripts complejos** que puedan fallar
 - **Directo desde EC2** sin pasos intermedios
 
-### ✅ **Confiabilidad** 
+### ✅ **Confiabilidad**
+
 - **Copia exacta** bit por bit de producción
 - **Sin modificaciones** de IDs o relaciones
 - **Siempre funciona** (SCP es muy estable)
 
 ### ✅ **Eficiencia**
+
 - **Rápido**: Descarga en segundos (BD pequeña)
 - **Actualizado**: Datos de producción al momento
 - **Testing real**: Detecta problemas que no aparecen con datos sintéticos
-
----
-
-## 🚀 Deploy a Producción
-
-### Estructura Optimizada
-```bash
-# Deploy completo con el nuevo script
-./prod/deploy.sh --full
-
-# Otras opciones disponibles
-./prod/deploy.sh --sync     # Deploy + sync BD dev→prod
-./prod/deploy.sh --build    # Solo build frontend
-./prod/deploy.sh --check    # Verificar salud del sistema
-./prod/deploy.sh --rollback # Rollback a versión anterior
-```
-
-### 📋 Flujo completo Dev → Prod
-```bash
-# 1. Desarrollo y testing
-./dev/start.sh
-
-# 2. Commit y push cambios
-git add -A && git commit -m "feat: nueva funcionalidad" && git push
-
-# 3. Deploy a producción (desde local)
-./prod/deploy.sh --full
-```
-
-### 🎯 Ventajas del Nuevo Script
-- **Optimizado**: Build automático y migraciones inteligentes
-- **Backups**: Automático antes de cada deploy
-- **Health checks**: Verificación post-deploy
-- **Rollback**: Un comando para volver atrás
-- **Clean**: Scripts organizados en carpetas `dev/` y `prod/`
-
----
-
-**🚀 Desarrollo con datos reales = Testing más efectivo**

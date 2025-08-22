@@ -9,7 +9,6 @@ import { useToast } from '../../contexts/ToastContext';
  * - Mejor manejo de errores del backend
  * - Estado del checkbox is_active más consistente
  * - Validaciones optimizadas
- * - Debug mejorado para troubleshooting
  */
 const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
   const { showSuccess, showError } = useToast();
@@ -32,17 +31,6 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   
-  // Estados para debugging
-  const [debugInfo, setDebugInfo] = useState({
-    showDebug: false,
-    lastError: null,
-    lastPayload: null
-  });
-
-  // Función para mostrar/ocultar debug
-  const toggleDebug = () => {
-    setDebugInfo(prev => ({ ...prev, showDebug: !prev.showDebug }));
-  };
 
   // Reset del formulario
   const resetForm = useCallback(() => {
@@ -57,7 +45,6 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
     });
     setRecipeItems([]);
     setErrors({});
-    setDebugInfo(prev => ({ ...prev, lastError: null, lastPayload: null }));
   }, []);
 
   // Cargar ingredientes de receta usando API
@@ -90,19 +77,8 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
     try {
       // Usar un solo endpoint optimizado que retorne todos los datos
       const [allIngredients, groups, containers] = await Promise.all([
-        // Cargar todas las páginas en paralelo de manera más eficiente
-        Promise.all([
-          fetch('http://localhost:8000/api/v1/ingredients/?show_all=true&page=1'),
-          fetch('http://localhost:8000/api/v1/ingredients/?show_all=true&page=2'),
-          fetch('http://localhost:8000/api/v1/ingredients/?show_all=true&page=3')
-        ]).then(async responses => {
-          const [page1, page2, page3] = await Promise.all(responses.map(r => r.json()));
-          return [
-            ...(page1.results || []),
-            ...(page2.results || []),
-            ...(page3.results || [])
-          ];
-        }),
+        // Usar apiService para manejar autenticación correctamente
+        apiService.ingredients.getAll({ show_all: true }),
         apiService.groups.getAll(),
         apiService.containers.getAll()
       ]);
@@ -313,7 +289,6 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
         }))
       };
       
-      setDebugInfo(prev => ({ ...prev, lastPayload: recipeData }));
       
       let savedRecipe;
       if (recipe?.id) {
@@ -360,14 +335,6 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
         errorMessage = error.message;
       }
       
-      setDebugInfo(prev => ({ 
-        ...prev, 
-        lastError: {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message
-        }
-      }));
       
       showError(errorMessage);
     } finally {
@@ -387,14 +354,6 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
               {recipe ? 'Editar Receta' : 'Nueva Receta'}
             </h2>
             
-            {/* Debug Toggle */}
-            <button
-              onClick={toggleDebug}
-              className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
-              title="Toggle Debug Info"
-            >
-              Debug
-            </button>
           </div>
           
           <button
@@ -405,26 +364,6 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
           </button>
         </div>
 
-        {/* Debug Panel */}
-        {debugInfo.showDebug && (
-          <div className="bg-gray-50 border-b p-4">
-            <h4 className="text-sm font-semibold mb-2">Debug Information</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <strong>Form State:</strong>
-                <pre className="bg-white p-2 rounded mt-1 overflow-auto max-h-20">
-                  {JSON.stringify(formData, null, 2)}
-                </pre>
-              </div>
-              <div>
-                <strong>Last Error:</strong>
-                <pre className="bg-red-50 p-2 rounded mt-1 overflow-auto max-h-20">
-                  {debugInfo.lastError ? JSON.stringify(debugInfo.lastError, null, 2) : 'None'}
-                </pre>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
@@ -565,38 +504,20 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
                   </div>
                 </div>
 
-                {/* Cuarta fila: Activar Versión */}
-                <div className={`p-3 rounded-lg border-2 ${
-                  formData.is_active 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-gray-50 border-gray-300'
-                }`}>
-                  <label className="flex items-center cursor-pointer">
+                {/* Cuarta fila: Estado Activo - Simplificado */}
+                <div>
+                  <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       name="is_active"
                       checked={formData.is_active}
                       onChange={handleInputChange}
-                      className={`h-4 w-4 rounded focus:ring-2 ${
-                        formData.is_active
-                          ? 'text-green-600 focus:ring-green-500 border-green-400'
-                          : 'text-gray-400 focus:ring-gray-400 border-gray-400'
-                      }`}
+                      className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
                     />
-                    <span className={`ml-3 text-sm font-medium ${
-                      formData.is_active ? 'text-green-800' : 'text-gray-600'
-                    }`}>
-                      {formData.is_active ? '✅' : '⚪'} Activar versión v{formData.version}
+                    <span className="text-sm font-medium text-gray-700">
+                      Receta activa
                     </span>
                   </label>
-                  <p className={`mt-1 text-xs ${
-                    formData.is_active ? 'text-green-600' : 'text-gray-500'
-                  }`}>
-                    {formData.is_active 
-                      ? 'Esta versión estará disponible para pedidos. Se desactivarán otras versiones.'
-                      : 'Esta versión no estará disponible para pedidos hasta que la actives.'
-                    }
-                  </p>
                 </div>
 
               </div>

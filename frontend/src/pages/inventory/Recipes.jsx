@@ -322,6 +322,9 @@ const Recipes = () => {
                   % Ganancia
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tiempo Prep.
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ingredientes
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -335,7 +338,7 @@ const Recipes = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {recipes.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
                     No hay recetas disponibles
                   </td>
                 </tr>
@@ -389,6 +392,11 @@ const Recipes = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                         {recipe.profit_percentage}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                        {recipe.preparation_time || 0} min
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
@@ -510,8 +518,12 @@ const Recipes = () => {
                         </dd>
                       </div>
                       <div>
-                        <dt className="font-medium text-gray-500">Tiempo</dt>
-                        <dd className="text-base font-semibold text-gray-900">{recipe.preparation_time} min</dd>
+                        <dt className="font-medium text-gray-500">Tiempo Prep.</dt>
+                        <dd className="text-base font-semibold text-gray-900">
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                            {recipe.preparation_time || 0} min
+                          </span>
+                        </dd>
                       </div>
                     </div>
                     

@@ -1,10 +1,99 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Clock, AlertTriangle, ChefHat, Filter, User, MapPin, Package, CheckCircle, Coffee, Utensils, Bell, BellOff } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
 import orderItemPoller from '../../services/orderItemPoller';
 import notificationService from '../../services/notifications';
+
+// Componente memoizado para tarjetas de items
+const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
+  return (
+    <div
+      key={item.id}
+      onClick={(e) => handleCardClick(e, item)}
+      className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} relative`}
+    >
+      {/* Barra de progreso de tiempo */}
+      <div className="mb-3">
+        <div className="w-full bg-gray-200 rounded-full h-1.5">
+          <div 
+            className={`h-1.5 rounded-full transition-all duration-300 ${timeStatus.color}`}
+            style={{ width: `${Math.min(timeStatus.progress, 100)}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Información principal */}
+      <div className="space-y-2">
+        {/* Header con número de pedido y tiempo */}
+        <div className="flex justify-between items-start">
+          <span className="text-lg font-bold text-gray-900">#{item.order_id}</span>
+          <div className="text-right">
+            <div className={`text-sm font-medium ${timeStatus.textColor}`}>
+              {timeStatus.displayTime}
+            </div>
+            <div className="text-xs text-gray-500">
+              {new Date(item.created_at).toLocaleTimeString('es-PE', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+              })}hr
+            </div>
+          </div>
+        </div>
+
+        {/* Receta */}
+        <div className="font-medium text-gray-900 text-center py-2 bg-gray-50 rounded">
+          {item.recipe_name}
+        </div>
+
+        {/* Ubicación */}
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <MapPin className="h-4 w-4" />
+          <span>{item.order_zone} - {item.order_table}</span>
+        </div>
+
+        {/* Mesero */}
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <User className="h-4 w-4" />
+          <span>{item.waiter_name}</span>
+        </div>
+
+        {/* Para llevar */}
+        {item.is_takeaway && (
+          <div className="flex items-center gap-2 text-sm text-orange-600">
+            <Package className="h-4 w-4" />
+            <span>Para llevar</span>
+          </div>
+        )}
+
+        {/* Personalizaciones */}
+        {item.customizations_count > 0 && (
+          <div className="text-sm text-blue-600">
+            +{item.customizations_count} personalización{item.customizations_count > 1 ? 'es' : ''}
+          </div>
+        )}
+
+        {/* Notas */}
+        {item.notes && item.notes.trim() && (
+          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
+            <strong>Notas:</strong> {item.notes}
+          </div>
+        )}
+      </div>
+
+      {/* Badge de urgencia */}
+      {timeStatus.status === 'overdue' && (
+        <div className="absolute -top-1 -right-1">
+          <div className="bg-red-500 text-white rounded-full p-1 animate-pulse">
+            <AlertTriangle className="h-3 w-3" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
 
 const Kitchen = () => {
   const [kitchenBoard, setKitchenBoard] = useState([]);
@@ -20,28 +109,6 @@ const Kitchen = () => {
   const { showSuccess, showError } = useToast();
   const { userRole } = useAuth();
 
-  useEffect(() => {
-    loadKitchenBoard();
-    
-    // Configurar notificaciones de audio y polling
-    notificationService.setCurrentUserRole(userRole);
-    orderItemPoller.setKitchenView(true);
-    orderItemPoller.startPolling();
-    
-    // 🔊 NO INICIALIZAR AUDIO AUTOMÁTICAMENTE - esperar interacción del usuario
-    
-    // Sistema simplificado - solo sonidos de cocina
-    
-    // Auto-refresh en tiempo real cada 5 segundos (volvemos al sistema original)
-    const interval = setInterval(loadKitchenBoard, 5000);
-    
-    return () => {
-      clearInterval(interval);
-      // Detener polling al salir de la vista
-      orderItemPoller.stopPolling();
-    };
-  }, [userRole]);
-
   // 🚀 OPTIMIZACIÓN: loadKitchenBoard con useCallback
   const loadKitchenBoard = useCallback(async () => {
     try {
@@ -52,6 +119,20 @@ const Kitchen = () => {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    loadKitchenBoard();
+    
+    // Configurar notificaciones de audio y polling - usar solo uno
+    notificationService.setCurrentUserRole(userRole);
+    orderItemPoller.setKitchenView(true);
+    orderItemPoller.startPolling();
+    
+    return () => {
+      // Detener polling al salir de la vista
+      orderItemPoller.stopPolling();
+    };
+  }, [userRole, loadKitchenBoard]);
 
   // 🎯 FUNCIÓN PARA ACTIVAR AUDIO SI FALTA (solo cuando el usuario interactúa)
   const ensureAudioReady = useCallback(async () => {
@@ -69,12 +150,12 @@ const Kitchen = () => {
       const success = await notificationService.initAudioWithUserGesture();
       setAudioReady(success);
       if (success) {
-        showSuccess('Audio activado correctamente');
+        showSuccess('Audio activado correctamente', 500);
       } else {
-        showError('No se pudo activar el audio');
+        showError('No se pudo activar el audio', 500);
       }
     } catch (error) {
-      showError('Error al activar el audio');
+      showError('Error al activar el audio', 500);
     }
   }, [showSuccess, showError]);
 
@@ -83,9 +164,9 @@ const Kitchen = () => {
     try {
       notificationService.disableAudio();
       setAudioReady(false);
-      showSuccess('Audio desactivado');
+      showSuccess('Audio desactivado', 500);
     } catch (error) {
-      showError('Error al desactivar el audio');
+      showError('Error al desactivar el audio', 500);
     }
   }, [showSuccess, showError]);
 
@@ -172,24 +253,13 @@ const Kitchen = () => {
       await apiService.orderItems.updateStatus(item.id, newStatus);
       await loadKitchenBoard();
       
-      // Si ya no quedan items para la mesa filtrada, cambiar a "Todas"
-      setTimeout(() => {
-        // tablesWithItems ya está memoizado arriba
-        const hasCurrentTable = tablesWithItems.some(table => table.key === selectedTableFilter);
-        
-        
-        if (selectedTableFilter !== 'all' && !hasCurrentTable) {
-          setSelectedTableFilter('all');
-        }
-      }, 100); // Pequeño delay para asegurar que los datos estén actualizados
-      
-      showSuccess(successMessages[newStatus] || 'Estado actualizado');
+      showSuccess(successMessages[newStatus] || 'Estado actualizado', 500);
       closeConfirmModal();
     } catch (error) {
       const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
-      showError('Error al actualizar el estado: ' + errorMessage);
+      showError('Error al actualizar el estado: ' + errorMessage, 500);
     }
-  }, [confirmModal, loadKitchenBoard, tablesWithItems, selectedTableFilter, showSuccess, closeConfirmModal, showError]);
+  }, [confirmModal, loadKitchenBoard, showSuccess, closeConfirmModal, showError]);
 
   // 🚀 OPTIMIZACIÓN: handleCardClick con useCallback
   const handleCardClick = useCallback(async (e, item) => {
@@ -211,19 +281,6 @@ const Kitchen = () => {
     return `${hours}h ${remainingMinutes}m`;
   }, []);
 
-  const formatCreationTime = useCallback((isoDateString) => {
-    try {
-      const date = new Date(isoDateString);
-      const time = date.toLocaleTimeString('es-PE', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-      });
-      return `${time}hr`;
-    } catch (error) {
-      return '--:--hr';
-    }
-  }, []);
 
   // Calcular tiempo secuencial por estación
   const calculateStationQueue = useCallback((items) => {
@@ -259,26 +316,77 @@ const Kitchen = () => {
     return Object.values(stations).flat();
   }, []);
 
-  // ⚡ OPTIMIZADO: Usar useMemo para cachear cálculos costosos por timestamp
-  const getTimeStatus = useCallback((item) => {
+  // ⚡ OPTIMIZADO: Memoizar cálculos de tiempo por item
+  const getTimeStatus = useMemo(() => {
+    const cache = new Map();
+    return (item) => {
+      const cacheKey = `${item.id}-${item.status}-${item.preparing_at || ''}-${Math.floor(Date.now() / 1000)}`; // Cache por segundo
+      
+      if (cache.has(cacheKey)) {
+        return cache.get(cacheKey);
+      }
+      
+      const result = calculateTimeStatus(item);
+      cache.set(cacheKey, result);
+      
+      // Limpiar cache viejo
+      if (cache.size > 100) {
+        const firstKey = cache.keys().next().value;
+        cache.delete(firstKey);
+      }
+      
+      return result;
+    };
+  }, []);
+
+  const calculateTimeStatus = useCallback((item) => {
     const now = Date.now(); // Más rápido que new Date()
     const createdAt = new Date(item.created_at).getTime();
-    const elapsedSinceCreation = (now - createdAt) / (1000 * 60); // minutos desde creación
+    let elapsedSinceCreation = (now - createdAt) / (1000 * 60); // minutos desde creación
+    
+    
+    // 🔧 CORRECCIÓN: Evitar tiempos negativos por diferencias de zona horaria o sincronización
+    if (elapsedSinceCreation < 0) {
+      console.warn(`⚠️ Tiempo negativo detectado para item ${item.id}:`, {
+        now: new Date(now).toISOString(),
+        created_at: item.created_at,
+        difference_minutes: elapsedSinceCreation
+      });
+      elapsedSinceCreation = 0; // Resetear a 0 si es negativo
+    }
 
-    // Determinar el tiempo base según el estado
-    let baseTime, statusText;
+    // ✅ El tiempo transcurrido SIEMPRE es desde la creación
+    let displayTime = elapsedSinceCreation; // Tiempo total desde creación para mostrar
+    let progressTime = 0; // Tiempo para la barra de progreso
+    let isOverdue = false; // Para determinar si mostrar alerta
+    let statusText;
     
     if (item.status === 'CREATED') {
-      baseTime = elapsedSinceCreation;
       statusText = 'Pendiente';
+      // En estado CREATED, la barra de progreso permanece en 0
+      progressTime = 0;
     } else if (item.status === 'PREPARING') {
-      const preparingAt = item.preparing_at ? new Date(item.preparing_at).getTime() : createdAt;
-      baseTime = (now - preparingAt) / (1000 * 60);
       statusText = 'Preparando';
+      // Solo cuando está en PREPARING, calculamos el progreso
+      if (item.preparing_at) {
+        const preparingAt = new Date(item.preparing_at).getTime();
+        const preparingTime = (now - preparingAt) / (1000 * 60);
+        progressTime = preparingTime; // Tiempo desde que inició la preparación
+        
+        // Verificar si se excedió el tiempo de preparación
+        if (preparingTime > item.preparation_time) {
+          isOverdue = true;
+        }
+      } else {
+        // Si no hay preparing_at, la barra empieza en 0
+        // Esto asegura que la barra sea independiente del tiempo transcurrido
+        progressTime = 0;
+      }
     }
     
-    // Calcular porcentaje basado en tiempo de preparación
-    const percentage = (baseTime / item.preparation_time) * 100;
+    // Calcular porcentaje de la barra basado en progressTime
+    // Limitamos al 100% para que la barra no se desborde visualmente
+    const percentage = Math.min((progressTime / item.preparation_time) * 100, 100);
     
     // 🎨 OPTIMIZADO: Usar objeto constante para colores
     const statusColors = {
@@ -298,25 +406,25 @@ const Kitchen = () => {
     
     const colors = statusColors[item.status] || statusColors['CREATED'];
     
-    // Determinar el tiempo a mostrar y estado de urgencia
-    let displayTime, urgencyStatus;
-    if (percentage > 100) {
-      const overdueMinutes = Math.ceil(baseTime - item.preparation_time);
-      displayTime = `+${overdueMinutes}m`;
+    // Determinar el tiempo a mostrar
+    let displayTimeFormatted;
+    
+    // El tiempo mostrado siempre es desde la creación
+    displayTimeFormatted = `${Math.ceil(displayTime)}m`;
+    
+    // El estado de urgencia ahora se basa en si se excedió el tiempo de preparación durante PREPARING
+    let urgencyStatus;
+    if (isOverdue && item.status === 'PREPARING') {
       urgencyStatus = 'overdue';
-    } else if (percentage > 80) {
-      displayTime = `${Math.ceil(baseTime)}m`;
-      urgencyStatus = 'urgent';
     } else {
-      displayTime = `${Math.ceil(baseTime)}m`;
       urgencyStatus = 'normal';
     }
     
     return {
       ...colors,
-      status: urgencyStatus, // Para el icono de alerta
-      progress: percentage,
-      displayTime,
+      status: urgencyStatus, // Para el icono de alerta (solo 'overdue' cuando está en PREPARING y excede tiempo)
+      progress: percentage, // Porcentaje de la barra (0 en CREATED, progreso en PREPARING)
+      displayTime: displayTimeFormatted, // Tiempo mostrado (siempre desde creación)
       statusText: statusText,
       itemStatus: item.status
     };
@@ -584,92 +692,14 @@ const Kitchen = () => {
 
                 {/* Items de la columna */}
                 <div className="bg-gray-100 rounded-b-lg p-3 min-h-[400px] max-h-[calc(100vh-300px)] overflow-y-auto space-y-3">
-                  {column.items.map(item => {
-                    const timeStatus = getTimeStatus(item);
-                    
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={(e) => handleCardClick(e, item)}
-                        className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} relative`}
-                      >
-                        {/* Barra de progreso de tiempo */}
-                        <div className="mb-3">
-                          <div className="w-full bg-gray-200 rounded-full h-1.5">
-                            <div 
-                              className={`h-1.5 rounded-full transition-all duration-300 ${timeStatus.color}`}
-                              style={{ width: `${Math.min(timeStatus.progress, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Información principal */}
-                        <div className="space-y-2">
-                          {/* Header con número de pedido y tiempo */}
-                          <div className="flex justify-between items-start">
-                            <span className="text-lg font-bold text-gray-900">#{item.order_id}</span>
-                            <div className="text-right">
-                              <div className={`text-sm font-medium ${timeStatus.textColor}`}>
-                                {timeStatus.displayTime}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {formatCreationTime(item.created_at)}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Receta */}
-                          <div className="font-medium text-gray-900 text-center py-2 bg-gray-50 rounded">
-                            {item.recipe_name}
-                          </div>
-
-                          {/* Ubicación */}
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <MapPin className="h-4 w-4" />
-                            <span>{item.order_zone} - {item.order_table}</span>
-                          </div>
-
-                          {/* Mesero */}
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <User className="h-4 w-4" />
-                            <span>{item.waiter_name}</span>
-                          </div>
-
-
-                          {/* Para llevar */}
-                          {item.is_takeaway && (
-                            <div className="flex items-center gap-2 text-sm text-orange-600">
-                              <Package className="h-4 w-4" />
-                              <span>Para llevar</span>
-                            </div>
-                          )}
-
-                          {/* Personalizaciones */}
-                          {item.customizations_count > 0 && (
-                            <div className="text-sm text-blue-600">
-                              +{item.customizations_count} personalización{item.customizations_count > 1 ? 'es' : ''}
-                            </div>
-                          )}
-
-                          {/* Notas */}
-                          {item.notes && item.notes.trim() && (
-                            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                              <strong>Notas:</strong> {item.notes}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Badge de urgencia */}
-                        {timeStatus.status === 'overdue' && (
-                          <div className="absolute -top-1 -right-1">
-                            <div className="bg-red-500 text-white rounded-full p-1 animate-pulse">
-                              <AlertTriangle className="h-3 w-3" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {column.items.map(item => (
+                    <OrderItemCard
+                      key={item.id}
+                      item={item}
+                      timeStatus={getTimeStatus(item)}
+                      handleCardClick={handleCardClick}
+                    />
+                  ))}
 
                   {column.items.length === 0 && (
                     <div className="text-center text-gray-500 py-8">
@@ -698,93 +728,14 @@ const Kitchen = () => {
 
                   {/* Grid de items */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-                    {column.items.map(item => {
-                      const timeStatus = getTimeStatus(item);
-                      
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={(e) => handleCardClick(e, item)}
-                          className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} relative`}
-                        >
-                          {/* Barra de progreso de tiempo */}
-                          <div className="mb-3">
-                            <div className="w-full bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className={`h-1.5 rounded-full transition-all duration-300 ${timeStatus.color}`}
-                                style={{ width: `${Math.min(timeStatus.progress, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Información principal */}
-                          <div className="space-y-2">
-                            {/* Header con número de pedido y tiempo */}
-                            <div className="flex justify-between items-start">
-                              <span className="text-lg font-bold text-gray-900">#{item.order_id}</span>
-                              <div className="text-right">
-                                <div className={`text-sm font-medium ${timeStatus.textColor}`}>
-                                  {timeStatus.displayTime}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {formatCreationTime(item.created_at)}
-                                </div>
-                              </div>
-                            </div>
-
-
-                            {/* Receta */}
-                            <div className="font-medium text-gray-900 text-center py-2 bg-gray-50 rounded">
-                              {item.recipe_name}
-                            </div>
-
-                            {/* Ubicación */}
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <MapPin className="h-4 w-4" />
-                              <span>{item.order_zone} - {item.order_table}</span>
-                            </div>
-
-                            {/* Mesero */}
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <User className="h-4 w-4" />
-                              <span>{item.waiter_name}</span>
-                            </div>
-
-
-                            {/* Para llevar */}
-                            {item.is_takeaway && (
-                              <div className="flex items-center gap-2 text-sm text-orange-600">
-                                <Package className="h-4 w-4" />
-                                <span>Para llevar</span>
-                              </div>
-                            )}
-
-                            {/* Personalizaciones */}
-                            {item.customizations_count > 0 && (
-                              <div className="text-sm text-blue-600">
-                                +{item.customizations_count} personalización{item.customizations_count > 1 ? 'es' : ''}
-                              </div>
-                            )}
-
-                            {/* Notas */}
-                            {item.notes && item.notes.trim() && (
-                              <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                                <strong>Notas:</strong> {item.notes}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Badge de urgencia */}
-                          {timeStatus.status === 'overdue' && (
-                            <div className="absolute -top-1 -right-1">
-                              <div className="bg-red-500 text-white rounded-full p-1 animate-pulse">
-                                <AlertTriangle className="h-3 w-3" />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {column.items.map(item => (
+                      <OrderItemCard
+                        key={item.id}
+                        item={item}
+                        timeStatus={getTimeStatus(item)}
+                        handleCardClick={handleCardClick}
+                      />
+                    ))}
                   </div>
 
                   {column.items.length === 0 && (
