@@ -586,10 +586,9 @@ class PaymentViewSet(viewsets.ModelViewSet):
         
         # No necesitamos las variables de timezone aquí, solo filtramos por fecha
         
-        # Filtrar órdenes PAID por fecha de paid_at
+        # Filtrar órdenes PAID sin importar la fecha - solo mostrar los que están pagados
         paid_orders = Order.objects.filter(
-            status='PAID',
-            paid_at__date=selected_date
+            status='PAID'
         ).select_related('table__zone').prefetch_related('orderitem_set__recipe__group')
         
         # Métricas básicas
@@ -661,10 +660,8 @@ class PaymentViewSet(viewsets.ModelViewSet):
         )
         active_tables = active_orders.values_list('table', flat=True).distinct().count()
         
-        # Métodos de pago del día seleccionado
-        payments_today = Payment.objects.filter(
-            created_at__date=selected_date
-        )
+        # Métodos de pago de todas las órdenes pagadas
+        payments_today = Payment.objects.all()
         payment_methods = payments_today.values('payment_method').annotate(
             total=Sum('amount')
         )

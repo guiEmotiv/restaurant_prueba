@@ -7,6 +7,7 @@ class OrderItemPoller {
     this.isPolling = false;
     this.pollInterval = null;
     this.knownItems = new Set();
+    this.knownItemIds = new Set(); // Para rastrear IDs y detectar eliminaciones reales
     this.intervalMs = 5000;
     this.isKitchenView = false;
     this.updateCallback = null;
@@ -32,6 +33,15 @@ class OrderItemPoller {
     try {
       const kitchenBoard = await apiService.orders.getKitchenBoard();
       this.knownItems.clear();
+      this.knownItemIds.clear();
+      
+      // También necesitamos rastrear todos los items existentes (no solo los de cocina)
+      const allOrders = await apiService.orders.getAll();
+      allOrders.forEach(order => {
+        order.items?.forEach(item => {
+          this.knownItemIds.add(item.id);
+        });
+      });
       
       kitchenBoard.forEach(recipe => {
         recipe.items?.forEach(item => {
@@ -47,11 +57,23 @@ class OrderItemPoller {
   // Detectar cambios en order items usando kitchen board
   async checkForNewOrderItems() {
     try {
-      const kitchenBoard = await apiService.orders.getKitchenBoard();
+      const [kitchenBoard, allOrders] = await Promise.all([
+        apiService.orders.getKitchenBoard(),
+        apiService.orders.getAll()
+      ]);
+      
       const currentItems = new Set();
+      const currentItemIds = new Set();
       const newItems = [];
       
-      // Procesar items actuales
+      // Rastrear todos los IDs de items actuales
+      allOrders.forEach(order => {
+        order.items?.forEach(item => {
+          currentItemIds.add(item.id);
+        });
+      });
+      
+      // Procesar items de cocina
       kitchenBoard.forEach(recipe => {
         recipe.items?.forEach(item => {
           const itemKey = `${item.id}-${item.created_at}`;
@@ -63,21 +85,36 @@ class OrderItemPoller {
         });
       });
       
-      // Detectar cambios (nuevos items o items eliminados)
-      const hasChanges = newItems.length > 0 || this.knownItems.size !== currentItems.size;
+      // Detectar items realmente eliminados (no solo cambios de estado)
+      const deletedItems = [];
+      this.knownItemIds.forEach(itemId => {
+        if (!currentItemIds.has(itemId)) {
+          deletedItems.push(itemId);
+        }
+      });
+      
+      // Detectar cambios
+      const hasChanges = newItems.length > 0 || deletedItems.length > 0 || 
+                        this.knownItems.size !== currentItems.size;
       
       // Actualizar items conocidos
       this.knownItems = currentItems;
+      this.knownItemIds = currentItemIds;
       
       // Si hay cambios, actualizar la vista
       if (hasChanges && this.updateCallback) {
         this.updateCallback();
       }
       
-      // Reproducir sonidos solo si está en vista de cocina
+      // Reproducir sonidos solo si está en vista de cocina y audio está activo
       if (this.isKitchenView && this.canNotify()) {
+        // Sonido cuando se crean nuevos items
         if (newItems.length > 0) {
           notificationService.playNotification('itemCreated');
+        }
+        // Sonido cuando se eliminan items del pedido (eliminación real, no cambio de estado)
+        if (deletedItems.length > 0) {
+          notificationService.playNotification('itemDeleted');
         }
       }
       

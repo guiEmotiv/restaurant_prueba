@@ -6,11 +6,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import orderItemPoller from '../../services/orderItemPoller';
 import notificationService from '../../services/notifications';
 
-// Componente memoizado para tarjetas de items
+// Componente memoizado para tarjetas de items con comparación personalizada
 const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
   return (
     <div
-      key={item.id}
       onClick={(e) => handleCardClick(e, item)}
       className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} relative`}
     >
@@ -34,7 +33,7 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
               {timeStatus.displayTime}
             </div>
             <div className="text-xs text-gray-500">
-              {new Date(item.created_at).toLocaleTimeString('es-PE', { 
+              {item.formattedTime || new Date(item.created_at).toLocaleTimeString('es-PE', { 
                 hour: '2-digit', 
                 minute: '2-digit',
                 hour12: false 
@@ -93,7 +92,36 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
       )}
     </div>
   );
+}, (prevProps, nextProps) => {
+  // Comparación personalizada para evitar re-renders innecesarios
+  return prevProps.item.id === nextProps.item.id &&
+         prevProps.item.status === nextProps.item.status &&
+         prevProps.item.preparing_at === nextProps.item.preparing_at &&
+         prevProps.timeStatus.status === nextProps.timeStatus.status &&
+         prevProps.timeStatus.progress === nextProps.timeStatus.progress &&
+         prevProps.timeStatus.displayTime === nextProps.timeStatus.displayTime;
 });
+
+// Constantes fuera del componente para evitar recreaciones
+const CREATED_COLORS = {
+  color: 'bg-green-500',
+  textColor: 'text-green-600',
+  bgColor: 'bg-green-50',
+  borderColor: 'border-green-200'
+};
+
+const PREPARING_COLORS = {
+  color: 'bg-yellow-400',
+  textColor: 'text-yellow-600',
+  bgColor: 'bg-yellow-50',
+  borderColor: 'border-yellow-200'
+};
+
+const TIME_LOCALE_OPTIONS = { 
+  hour: '2-digit', 
+  minute: '2-digit',
+  hour12: false 
+};
 
 const Kitchen = () => {
   const [kitchenBoard, setKitchenBoard] = useState([]);
@@ -129,10 +157,19 @@ const Kitchen = () => {
     orderItemPoller.setUpdateCallback(loadKitchenBoard); // Actualizar vista automáticamente
     orderItemPoller.startPolling();
     
+    // Verificar si el audio ya estaba activado
+    setAudioReady(notificationService.isAudioReady());
+    
+    // Verificar estado del audio periódicamente
+    const audioCheckInterval = setInterval(() => {
+      setAudioReady(notificationService.isAudioReady());
+    }, 1000);
+    
     return () => {
       // Detener polling al salir de la vista
       orderItemPoller.stopPolling();
       orderItemPoller.setUpdateCallback(null);
+      clearInterval(audioCheckInterval);
     };
   }, [userRole, loadKitchenBoard]);
 
@@ -274,88 +311,75 @@ const Kitchen = () => {
     }
   }, [ensureAudioReady, getNextStatus, openConfirmModal]);
 
-  const formatTime = useCallback((minutes) => {
-    if (minutes < 60) {
-      return `${minutes}m`;
-    }
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m`;
-  }, []);
+  // Función removida - no se usa en el código
 
 
-  // Calcular tiempo secuencial por estación
+  // Calcular tiempo secuencial por estación - Optimizado
   const calculateStationQueue = useCallback((items) => {
-    // Agrupar items por estación (grupo) y ordenar por tiempo de creación
-    const stations = {};
-    items.forEach(item => {
+    const stations = new Map();
+    
+    // Agrupar items por estación
+    for (const item of items) {
       const stationKey = item.recipe_group_id || 'sin-grupo';
-      if (!stations[stationKey]) stations[stationKey] = [];
-      stations[stationKey].push(item);
-    });
+      if (!stations.has(stationKey)) {
+        stations.set(stationKey, []);
+      }
+      stations.get(stationKey).push(item);
+    }
 
+    const result = [];
+    
     // Para cada estación, calcular tiempo acumulado
-    Object.keys(stations).forEach(stationKey => {
-      // Ordenar por tiempo de creación (FIFO - First In, First Out)
-      stations[stationKey].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    for (const [stationKey, stationItems] of stations) {
+      // Ordenar por tiempo de creación
+      stationItems.sort((a, b) => {
+        const timeA = a.createdAtTime || new Date(a.created_at).getTime();
+        const timeB = b.createdAtTime || new Date(b.created_at).getTime();
+        return timeA - timeB;
+      });
       
       let accumulatedTime = 0;
-      stations[stationKey] = stations[stationKey].map((item, index) => {
-        const queueStartTime = accumulatedTime; // Cuando empieza este item en minutos
+      for (let i = 0; i < stationItems.length; i++) {
+        const item = stationItems[i];
+        const queueStartTime = accumulatedTime;
         const queueEndTime = accumulatedTime + item.preparation_time;
         accumulatedTime = queueEndTime;
 
-        return {
+        result.push({
           ...item,
           queueStartTime,
           queueEndTime,
-          queuePosition: index + 1
-        };
-      });
-    });
+          queuePosition: i + 1
+        });
+      }
+    }
 
-    // Retornar array plano con los datos de cola calculados
-    return Object.values(stations).flat();
+    return result;
   }, []);
 
-  // ⚡ OPTIMIZADO: Memoizar cálculos de tiempo por item
-  const getTimeStatus = useMemo(() => {
-    const cache = new Map();
-    return (item) => {
-      const cacheKey = `${item.id}-${item.status}-${item.preparing_at || ''}-${Math.floor(Date.now() / 1000)}`; // Cache por segundo
-      
-      if (cache.has(cacheKey)) {
-        return cache.get(cacheKey);
-      }
-      
-      const result = calculateTimeStatus(item);
-      cache.set(cacheKey, result);
-      
-      // Limpiar cache viejo
-      if (cache.size > 100) {
-        const firstKey = cache.keys().next().value;
-        cache.delete(firstKey);
-      }
-      
-      return result;
-    };
-  }, []);
+  // ⚡ OPTIMIZADO: Cache más eficiente con WeakMap
+  const timeStatusCache = useMemo(() => new WeakMap(), []);
+  const lastUpdateTime = useMemo(() => Math.floor(Date.now() / 1000), [kitchenBoard]);
+  
+  const getTimeStatus = useCallback((item) => {
+    const cacheKey = `${item.id}-${item.status}-${item.preparing_at || ''}-${lastUpdateTime}`;
+    
+    // Usar objeto como key para WeakMap
+    let cacheItem = timeStatusCache.get(item);
+    if (cacheItem && cacheItem.key === cacheKey) {
+      return cacheItem.value;
+    }
+    
+    const result = calculateTimeStatus(item);
+    timeStatusCache.set(item, { key: cacheKey, value: result });
+    
+    return result;
+  }, [timeStatusCache, lastUpdateTime]);
 
   const calculateTimeStatus = useCallback((item) => {
-    const now = Date.now(); // Más rápido que new Date()
-    const createdAt = new Date(item.created_at).getTime();
-    let elapsedSinceCreation = (now - createdAt) / (1000 * 60); // minutos desde creación
-    
-    
-    // 🔧 CORRECCIÓN: Evitar tiempos negativos por diferencias de zona horaria o sincronización
-    if (elapsedSinceCreation < 0) {
-      console.warn(`⚠️ Tiempo negativo detectado para item ${item.id}:`, {
-        now: new Date(now).toISOString(),
-        created_at: item.created_at,
-        difference_minutes: elapsedSinceCreation
-      });
-      elapsedSinceCreation = 0; // Resetear a 0 si es negativo
-    }
+    const now = Date.now();
+    const createdAt = item.createdAtTime || new Date(item.created_at).getTime();
+    let elapsedSinceCreation = Math.max(0, (now - createdAt) / 60000); // minutos desde creación, evitar negativos
 
     // ✅ El tiempo transcurrido SIEMPRE es desde la creación
     let displayTime = elapsedSinceCreation; // Tiempo total desde creación para mostrar
@@ -371,17 +395,10 @@ const Kitchen = () => {
       statusText = 'Preparando';
       // Solo cuando está en PREPARING, calculamos el progreso
       if (item.preparing_at) {
-        const preparingAt = new Date(item.preparing_at).getTime();
-        const preparingTime = (now - preparingAt) / (1000 * 60);
-        progressTime = preparingTime; // Tiempo desde que inició la preparación
-        
-        // Verificar si se excedió el tiempo de preparación
-        if (preparingTime > item.preparation_time) {
-          isOverdue = true;
-        }
+        const preparingAt = item.preparingAtTime || new Date(item.preparing_at).getTime();
+        progressTime = (now - preparingAt) / 60000; // minutos
+        isOverdue = progressTime > item.preparation_time;
       } else {
-        // Si no hay preparing_at, la barra empieza en 0
-        // Esto asegura que la barra sea independiente del tiempo transcurrido
         progressTime = 0;
       }
     }
@@ -390,23 +407,8 @@ const Kitchen = () => {
     // Limitamos al 100% para que la barra no se desborde visualmente
     const percentage = Math.min((progressTime / item.preparation_time) * 100, 100);
     
-    // 🎨 OPTIMIZADO: Usar objeto constante para colores
-    const statusColors = {
-      'CREATED': {
-        color: 'bg-green-500',
-        textColor: 'text-green-600',
-        bgColor: 'bg-green-50',
-        borderColor: 'border-green-200'
-      },
-      'PREPARING': {
-        color: 'bg-yellow-400',
-        textColor: 'text-yellow-600',
-        bgColor: 'bg-yellow-50',
-        borderColor: 'border-yellow-200'
-      }
-    };
-    
-    const colors = statusColors[item.status] || statusColors['CREATED'];
+    // Usar referencias directas para evitar búsquedas
+    const colors = item.status === 'PREPARING' ? PREPARING_COLORS : CREATED_COLORS;
     
     // Determinar el tiempo a mostrar
     let displayTimeFormatted;
@@ -449,15 +451,30 @@ const Kitchen = () => {
 
   // ⚡ OPTIMIZADO: Memoizar columnas kanban - solo recalcular cuando cambien dependencias
   const kanbanColumns = useMemo(() => {
-    // Obtener todos los items individuales
-    const allItems = kitchenBoard.flatMap(recipe => 
-      recipe.items.map(item => ({
-        ...item,
-        recipe_name: recipe.recipe_name,
-        recipe_group_name: recipe.recipe_group_name || 'Sin Grupo',
-        recipe_group_id: recipe.recipe_group_id || null
-      }))
-    );
+    // Optimizado: solo crear objetos nuevos si es necesario
+    const allItems = [];
+    for (const recipe of kitchenBoard) {
+      for (const item of recipe.items) {
+        // Reutilizar objeto si ya tiene las propiedades
+        if (item.recipe_name === recipe.recipe_name && 
+            item.recipe_group_name === (recipe.recipe_group_name || 'Sin Grupo') &&
+            item.recipe_group_id === (recipe.recipe_group_id || null)) {
+          allItems.push(item);
+        } else {
+          allItems.push({
+            ...item,
+            recipe_name: recipe.recipe_name,
+            recipe_group_name: recipe.recipe_group_name || 'Sin Grupo',
+            recipe_group_id: recipe.recipe_group_id || null,
+            formattedTime: new Date(item.created_at).toLocaleTimeString('es-PE', { 
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false 
+            })
+          });
+        }
+      }
+    }
 
     // Calcular cola secuencial para todos los items
     const itemsWithQueue = calculateStationQueue(allItems);
@@ -490,8 +507,9 @@ const Kitchen = () => {
     // Ordenar items dentro de cada grupo por created_at (orden de llegada)
     Object.values(dynamicGroups).forEach(group => {
       group.items.sort((a, b) => {
-        // Ordenar por created_at ascendente (más antiguos primero)
-        return new Date(a.created_at) - new Date(b.created_at);
+        const timeA = a.createdAtTime || new Date(a.created_at).getTime();
+        const timeB = b.createdAtTime || new Date(b.created_at).getTime();
+        return timeA - timeB;
       });
     });
 
@@ -530,20 +548,18 @@ const Kitchen = () => {
 
   // tablesWithItems ya está memoizado arriba
   
-  // ⚡ OPTIMIZADO: Memoizar grupos dinámicos para tabs
+  // ⚡ OPTIMIZADO: Reutilizar datos de kanbanColumns
   const dynamicGroupsForTabs = useMemo(() => {
-    const allItems = kitchenBoard.flatMap(recipe => 
-      recipe.items.map(item => ({
-        ...item,
-        recipe_group_name: recipe.recipe_group_name || 'Sin Grupo',
-        recipe_group_id: recipe.recipe_group_id || null
-      }))
-    );
+    // Si ya tenemos kanbanColumns calculado, reutilizarlo
+    if (selectedGroupTab === 'all') {
+      return Object.values(kanbanColumns);
+    }
     
+    // Solo calcular si es necesario
     const dynamicGroups = {};
-    allItems.forEach(item => {
-      const groupKey = item.recipe_group_id || 'sin-grupo';
-      const groupName = item.recipe_group_name || 'Sin Grupo';
+    for (const recipe of kitchenBoard) {
+      const groupKey = recipe.recipe_group_id || 'sin-grupo';
+      const groupName = recipe.recipe_group_name || 'Sin Grupo';
       
       if (!dynamicGroups[groupKey]) {
         dynamicGroups[groupKey] = {
@@ -553,11 +569,11 @@ const Kitchen = () => {
         };
       }
       
-      dynamicGroups[groupKey].items.push(item);
-    });
+      dynamicGroups[groupKey].items.push(...recipe.items);
+    }
     
     return Object.values(dynamicGroups);
-  }, [kitchenBoard]);
+  }, [kitchenBoard, kanbanColumns, selectedGroupTab]);
 
   if (loading) {
     return (

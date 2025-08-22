@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   BarChart3,
   PieChart,
@@ -17,18 +17,22 @@ import {
 } from 'lucide-react';
 import { apiService, API_BASE_URL } from '../services/api';
 
-const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
-  const [timePeriod, setTimePeriod] = useState('monthly');
+const AnalyticsCharts = ({ 
+  dashboardData, 
+  selectedDate, 
+  selectedPeriod, 
+  chartType, 
+  goals,
+  onDateChange, 
+  onPeriodChange,
+  onChartTypeChange,
+  onGoalsChange 
+}) => {
   const [analyticsData, setAnalyticsData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [chartType, setChartType] = useState('production');
   const [hoveredSegment, setHoveredSegment] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
-  const [goals, setGoals] = useState({
-    sales: { meta300: 300, meta500: 500 }, // Ventas en soles
-    production: { meta300: 20, meta500: 50 } // Cantidad de recetas vendidas
-  });
 
   // Colores para categorías - Definido a nivel del componente
   const categoryColors = [
@@ -42,61 +46,54 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
     '#06b6d4', // cyan-500
   ];
 
-  // Use dashboardData passed from parent or load real data
+  // Función para obtener color consistente de categoría basado en orden global
+  const getCategoryColor = useCallback((categoryName) => {
+    if (!dashboardData?.category_breakdown) return categoryColors[0];
+    
+    const globalOrder = dashboardData.category_breakdown
+      .sort((a, b) => (b.revenue || 0) - (a.revenue || 0))
+      .map(cat => cat.category);
+    
+    const categoryIndex = globalOrder.indexOf(categoryName);
+    return categoryColors[categoryIndex >= 0 ? categoryIndex % categoryColors.length : 0];
+  }, [dashboardData]);
+
+  
+  // Use dashboardData passed from parent
   useEffect(() => {
     if (dashboardData) {
-      // Use the data passed from DashboardFinanciero
-      setAnalyticsData([dashboardData]);
-      setLoading(false);
-    } else {
-      // Fallback: load real data if no data passed
-      loadRealTimeData();
-    }
-  }, [dashboardData, timePeriod, selectedDate]);
-  
-  const loadRealTimeData = async () => {
-    setLoading(true);
-    try {
-      // Get the last 7 days of real data from the database
-      const promises = [];
-      const dates = [];
-      const baseDate = new Date(selectedDate);
-      
-      // Generate last 7 days including selected date
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(baseDate);
-        date.setDate(baseDate.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        dates.push(dateStr);
-        promises.push(apiService.dashboard.getReport(dateStr));
+      // El backend ya filtra los datos según el período seleccionado
+      // Usar directamente los sales_by_day del backend que contiene las fechas del view
+      if (dashboardData.sales_by_day && Array.isArray(dashboardData.sales_by_day) && dashboardData.sales_by_day.length > 0) {
+        // Usar datos REALES del backend - NO calcular proporcionalmente
+        const processedData = dashboardData.sales_by_day.map(dayData => {
+          
+          return {
+            date: dayData.date,
+            summary: {
+              total_revenue: dayData.revenue || 0,
+              total_orders: dayData.orders || 0,
+              total_items: dayData.items || 0
+            },
+            // Usar category_breakdown REAL del backend para este día específico
+            category_breakdown: dayData.category_breakdown || [],
+            top_dishes: dashboardData.top_dishes || [] // Usar top_dishes globales para tooltips
+          };
+        });
+        
+        setAnalyticsData(processedData);
+      } else {
+        // Si no hay sales_by_day, usar el summary general como single data point
+        setAnalyticsData([{
+          date: selectedDate,
+          summary: dashboardData.summary || {},
+          top_dishes: dashboardData.top_dishes || [],
+          category_breakdown: dashboardData.category_breakdown || []
+        }]);
       }
-      
-      
-      // Fetch all data in parallel
-      const results = await Promise.all(promises.map(p => p.catch(e => null)));
-      
-      // Filter out failed requests and add date info
-      const validData = results
-        .map((data, index) => data ? { ...data, date: dates[index] } : null)
-        .filter(Boolean);
-      
-      
-      setAnalyticsData(validData);
-      
-    } catch (error) {
-      console.error('🚨 Error loading analytics data:', error);
-      setAnalyticsData([]);
-    } finally {
       setLoading(false);
     }
-  };
-
-  // Clear tooltip when chart type changes
-  useEffect(() => {
-    setIsHovering(false);
-    setHoveredSegment(null);
-    setTooltipPosition({ x: 0, y: 0 });
-  }, [chartType]);
+  }, [dashboardData, selectedDate]);
 
   // Procesar datos para gráficas basadas en datos reales
   const chartData = useMemo(() => {
@@ -107,7 +104,10 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
     const formatDate = (dateStr) => {
       try {
         if (!dateStr) return 'Hoy';
-        const date = new Date(dateStr);
+        // Parsear fecha sin conversión de zona horaria
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        
         return date.toLocaleDateString('es-ES', { 
           weekday: 'short',
           day: 'numeric',
@@ -118,21 +118,17 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
       }
     };
 
-    // Vista VENTAS - Métrica: Total de ventas por categoría
+    // Vista VENTAS - Métrica: Total de ventas por día
     const salesData = analyticsData.map(data => {
       const revenue = Number(data.summary?.total_revenue || 0);
-      const dishes = Array.isArray(data.top_dishes) ? data.top_dishes : [];
       
-      
-      // Agrupar ingresos por categorías
-      const categoryBreakdown = {};
-      dishes.forEach(dish => {
-        const category = dish.category || 'Sin categoría';
-        if (!categoryBreakdown[category]) {
-          categoryBreakdown[category] = 0;
-        }
-        categoryBreakdown[category] += Number(dish.revenue) || 0;
-      });
+      // Usar category_breakdown REAL del backend para este día específico
+      let categoryBreakdown = {};
+      if (Array.isArray(data.category_breakdown) && data.category_breakdown.length > 0) {
+        data.category_breakdown.forEach(cat => {
+          categoryBreakdown[cat.category || 'Sin categoría'] = cat.revenue || 0;
+        });
+      }
       
       
       return {
@@ -142,28 +138,22 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
       };
     });
 
-    // Vista PRODUCCIÓN - Métrica: Cantidad de recetas por categoría
+    // Vista PRODUCCIÓN - Métrica: Cantidad de items por día
     const productionData = analyticsData.map(data => {
-      const dishes = Array.isArray(data.top_dishes) ? data.top_dishes : [];
+      const totalItems = Number(data.summary?.total_items || 0);
       
-      // Calcular total de recetas vendidas y agrupar por categoría
-      const totalRecipes = dishes.reduce((sum, dish) => sum + (Number(dish.quantity) || 0), 0);
-      
-      
-      // Agrupar por categorías para las barras divididas
-      const categoryBreakdown = {};
-      dishes.forEach(dish => {
-        const category = dish.category || 'Sin categoría';
-        if (!categoryBreakdown[category]) {
-          categoryBreakdown[category] = 0;
-        }
-        categoryBreakdown[category] += Number(dish.quantity) || 0;
-      });
+      // Usar category_breakdown REAL del backend para este día específico
+      let categoryBreakdown = {};
+      if (Array.isArray(data.category_breakdown) && data.category_breakdown.length > 0) {
+        data.category_breakdown.forEach(cat => {
+          categoryBreakdown[cat.category || 'Sin categoría'] = cat.quantity || 0;
+        });
+      }
       
       
       return {
         date: formatDate(data.date || selectedDate),
-        value: totalRecipes,
+        value: totalItems,
         categoryBreakdown: categoryBreakdown
       };
     });
@@ -186,7 +176,17 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
     });
 
     return { sales: salesData, production: productionData, customers: customersData };
-  }, [analyticsData, selectedDate, timePeriod]);
+  }, [analyticsData, selectedDate]);
+  
+  // Clear tooltip when chart type changes
+  useEffect(() => {
+    setIsHovering(false);
+    setHoveredSegment(null);
+    setTooltipPosition({ x: 0, y: 0 });
+  }, [chartType]);
+  
+  // Las metas ahora vienen del componente padre
+  // No necesitamos actualizar metas aquí
 
   // Función para generar recomendaciones
   const generateRecommendations = (data, revenueGrowth, orderGrowth) => {
@@ -317,12 +317,9 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
 
   // Función para obtener recetas por categoría
   const getCategoryRecipes = (categoryName, viewType = 'production') => {
-    if (!analyticsData || analyticsData.length === 0) return [];
+    if (!dashboardData || !dashboardData.top_dishes) return [];
     
-    const currentData = analyticsData[analyticsData.length - 1];
-    if (!currentData || !currentData.top_dishes) return [];
-    
-    return currentData.top_dishes
+    return dashboardData.top_dishes
       .filter(dish => dish.category === categoryName)
       .sort((a, b) => {
         if (viewType === 'sales') {
@@ -330,7 +327,7 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
           return (Number(b.revenue || 0)) - (Number(a.revenue || 0));
         } else {
           // Ordenar por quantity (mayor a menor)
-          return b.quantity - a.quantity;
+          return (Number(b.quantity || 0)) - (Number(a.quantity || 0));
         }
       });
   };
@@ -386,7 +383,7 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
         {/* Mini Bar Chart of Recipes */}
         <div className="space-y-2">
           <h5 className="text-sm font-medium text-gray-700 mb-2">Recetas más vendidas:</h5>
-          {recipes.slice(0, 6).map((recipe, index) => {
+          {recipes.length > 0 ? recipes.slice(0, 6).map((recipe, index) => {
             // Calcular el ancho basado en el tipo de vista
             let maxValue, currentValue, barWidth;
             
@@ -397,9 +394,9 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
               barWidth = maxValue > 0 ? (currentValue / maxValue) * 100 : 0;
             } else {
               // Para vista de producción: usar quantity
-              maxValue = recipes[0]?.quantity || 1;
-              currentValue = recipe.quantity;
-              barWidth = (currentValue / maxValue) * 100;
+              maxValue = Math.max(...recipes.map(r => Number(r.quantity || 0)));
+              currentValue = Number(recipe.quantity || 0);
+              barWidth = maxValue > 0 ? (currentValue / maxValue) * 100 : 0;
             }
             
             return (
@@ -408,9 +405,6 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                   <span className="text-gray-700 truncate flex-1 mr-2" title={recipe.name}>
                     {recipe.name}
                   </span>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* Solo mostrar info adicional si es necesario - eliminando duplicación */}
-                  </div>
                 </div>
                 
                 {/* Mini bar with single number */}
@@ -427,17 +421,26 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                   </div>
                   {/* Single label positioned outside the bar */}
                   <span className="absolute right-0 top-0 text-xs font-medium text-gray-600 -translate-y-4">
-                    {data.type === 'sales' ? `S/ ${Number(recipe.revenue || 0).toFixed(2)}` : recipe.quantity}
+                    {data.type === 'sales' ? 
+                      `S/ ${currentValue.toFixed(2)}` : 
+                      `${Math.round(currentValue)}`
+                    }
                   </span>
                 </div>
               </div>
             );
-          })}
-          
-          {recipes.length === 0 && (
-            <p className="text-sm text-gray-500 italic text-center py-2">
-              No hay recetas disponibles
-            </p>
+          }) : (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500 italic">
+                {data.category === 'Sin Categoría' ? 
+                  'No hay recetas en esta categoría' : 
+                  `No hay recetas de ${data.category} disponibles`
+                }
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Valor total: {data.type === 'sales' ? `S/ ${data.value.toFixed(2)}` : `${data.value} items`}
+              </p>
+            </div>
           )}
           
           {recipes.length > 6 && (
@@ -539,17 +542,39 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
     
 
     return (
-      <div className="relative" style={{ height: 'auto', aspectRatio: '16/9', minHeight: '320px' }}>
+      <div className="relative" style={{ height: 'auto', aspectRatio: '16/9', minHeight: '340px' }}>
         <div className="flex" style={{ height: 'calc(100% - 4rem)' }}>
           {/* Y-axis Scale */}
           <div className="w-16 flex flex-col justify-between py-4 text-xs text-gray-500">
-            {[maxValue, maxValue * 0.75, maxValue * 0.5, maxValue * 0.25, 0].map((value, index) => (
-              <div key={index} className="text-right pr-2">
-                {chartType === 'sales' ? `S/ ${value.toFixed(0)}` : 
-                 chartType === 'customers' ? value.toFixed(1) : 
-                 value.toFixed(0)}
-              </div>
-            ))}
+            {[maxValue, maxValue * 0.75, maxValue * 0.5, maxValue * 0.25, 0].map((value, index) => {
+              // Redondear valores para evitar muchos decimales
+              let displayValue = value;
+              if (chartType === 'sales') {
+                // Para ventas, redondear a enteros si es mayor a 100, sino a 2 decimales
+                displayValue = value > 100 ? Math.round(value) : Math.round(value * 100) / 100;
+                return (
+                  <div key={index} className="text-right pr-2">
+                    S/ {displayValue.toFixed(value > 100 ? 0 : 2)}
+                  </div>
+                );
+              } else if (chartType === 'production') {
+                // Para producción, siempre enteros
+                displayValue = Math.round(value);
+                return (
+                  <div key={index} className="text-right pr-2">
+                    {displayValue}
+                  </div>
+                );
+              } else {
+                // Para otros casos
+                displayValue = Math.round(value * 10) / 10;
+                return (
+                  <div key={index} className="text-right pr-2">
+                    {displayValue.toFixed(1)}
+                  </div>
+                );
+              }
+            })}
           </div>
           
           {/* Chart Area */}
@@ -567,7 +592,7 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                   }}
                 >
                   <span className="absolute right-0 -top-3 text-xs text-green-500 opacity-60 bg-white bg-opacity-80 px-1 rounded">
-                    Meta 300
+                    Promedio
                   </span>
                 </div>
                 
@@ -581,7 +606,7 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                   }}
                 >
                   <span className="absolute right-0 -top-3 text-xs text-orange-500 opacity-60 bg-white bg-opacity-80 px-1 rounded">
-                    Meta 500
+                    Máximo
                   </span>
                 </div>
               </>
@@ -615,7 +640,7 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                           {height > 15 && (
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                               <span className="text-xs font-bold text-white text-center leading-tight px-1 drop-shadow-sm">
-                                {value}
+                                {chartType === 'sales' ? value.toFixed(2) : value}
                               </span>
                             </div>
                           )}
@@ -624,7 +649,7 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                           {categories.map(([category, count], catIndex) => {
                             const segmentValue = count;
                             const segmentHeight = value > 0 ? (count / value) * 100 : 0;
-                            const categoryColor = categoryColors[catIndex % categoryColors.length];
+                            const categoryColor = getCategoryColor(category);
                             
                             
                             return (
@@ -647,7 +672,7 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                                   });
                                   setHoveredSegment({
                                     category,
-                                    value: count,
+                                    value: segmentValue,
                                     color: categoryColor,
                                     type: chartType
                                   });
@@ -658,16 +683,26 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                                   setTooltipPosition({ x: 0, y: 0 });
                                 }}
                               >
-                                {/* Etiqueta de valor para cada segmento */}
-                                {segmentHeight > 10 && count > 0 && (
+                                {/* Etiqueta de valor para cada segmento - TODAS las divisiones etiquetadas */}
+                                {segmentHeight > 8 && segmentValue > 0 && (
                                   <span className="text-xs font-bold text-white drop-shadow-sm">
-                                    {count}
+                                    {chartType === 'sales' ? 
+                                      segmentValue.toFixed(2) : 
+                                      `${segmentValue}`
+                                    }
                                   </span>
                                 )}
                               </div>
                             );
                           })}
                         </div>
+                      </div>
+                      
+                      {/* Total label below bar */}
+                      <div className="mt-2 text-center">
+                        <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                          {chartType === 'sales' ? `S/ ${value.toFixed(2)}` : `${Math.round(value)}`}
+                        </span>
                       </div>
                     </div>
                   );
@@ -701,12 +736,21 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                         {/* Value centered in bar */}
                         {height > 0 && (
                           <span className="text-xs font-bold text-white text-center leading-tight px-1">
-                            {chartType === 'sales' ? `${value.toFixed(0)}` : 
+                            {chartType === 'sales' ? value.toFixed(2) : 
                              chartType === 'customers' ? value.toFixed(1) : 
                              value.toFixed(0)}
                           </span>
                         )}
                       </div>
+                    </div>
+                    
+                    {/* Total label below bar */}
+                    <div className="mt-2 text-center">
+                      <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                        {chartType === 'sales' ? `S/ ${value.toFixed(2)}` : 
+                         chartType === 'customers' ? value.toFixed(1) : 
+                         `${Math.round(value)}`}
+                      </span>
                     </div>
                   </div>
                 );
@@ -757,139 +801,10 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          {/* Period Selector */}
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Período:</span>
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              {[
-                { key: 'monthly', label: 'Mensual' },
-                { key: 'quarterly', label: 'Trimestral' },
-                { key: 'semester', label: 'Semestral' },
-                { key: 'annual', label: 'Anual' }
-              ].map(period => (
-                <button
-                  key={period.key}
-                  onClick={() => setTimePeriod(period.key)}
-                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                    timePeriod === period.key
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  {period.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Chart Type Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">Vista:</span>
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              {[
-                { key: 'sales', label: 'Ventas', icon: DollarSign },
-                { key: 'production', label: 'Producción', icon: Clock }
-              ].map(chart => {
-                const Icon = chart.icon;
-                return (
-                  <button
-                    key={chart.key}
-                    onClick={() => setChartType(chart.key)}
-                    className={`px-3 py-1 rounded text-sm font-medium transition-colors flex items-center gap-1 ${
-                      chartType === chart.key
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {chart.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Goal Configuration - Solo para la vista actual */}
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="flex items-center justify-between mb-3">
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Meta 300:</label>
-            <input
-              type="number"
-              value={goals[chartType].meta300}
-              onChange={(e) => setGoals(prev => ({
-                ...prev,
-                [chartType]: { ...prev[chartType], meta300: Number(e.target.value) }
-              }))}
-              className="w-20 px-2 py-1 text-sm border border-green-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-            />
-            <span className="text-xs text-gray-500">
-              {chartType === 'sales' ? 'S/' : 'recetas'}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Meta 500:</label>
-            <input
-              type="number"
-              value={goals[chartType].meta500}
-              onChange={(e) => setGoals(prev => ({
-                ...prev,
-                [chartType]: { ...prev[chartType], meta500: Number(e.target.value) }
-              }))}
-              className="w-20 px-2 py-1 text-sm border border-orange-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-500"
-            />
-            <span className="text-xs text-gray-500">
-              {chartType === 'sales' ? 'S/' : 'recetas'}
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Main Chart - Solo UNA gráfica por vista */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         {chartType === 'sales' && (
-          <div>
-            
-            {/* Legend for category colors - Vista de Ventas */}
-            {chartData.sales && chartData.sales.length > 0 && chartData.sales[0].categoryBreakdown && (
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Leyenda por Categorías</h4>
-                <div className="flex flex-wrap gap-3">
-                  {Object.entries(chartData.sales[0].categoryBreakdown)
-                    .sort((a, b) => b[1] - a[1]) // Ordenar por ingreso descendente
-                    .map(([category, amount], index) => {
-                      const total = Object.values(chartData.sales[0].categoryBreakdown).reduce((sum, c) => sum + c, 0);
-                      const percentage = total > 0 ? (amount / total * 100) : 0;
-                      
-                      return (
-                        <div key={category} className="flex items-center gap-2 bg-white px-3 py-2 rounded shadow-sm">
-                          <div 
-                            className="w-4 h-4 rounded border border-gray-200"
-                            style={{ backgroundColor: categoryColors[index % categoryColors.length] }}
-                          ></div>
-                          <div>
-                            <span className="text-sm font-medium text-gray-800">{category}</span>
-                            <div className="text-xs text-gray-500">
-                              S/ {amount.toFixed(2)} ({Math.round(percentage)}%)
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-            
+          <div>            
             <SimpleBarChart 
               data={chartData.sales} 
               dataKey="value" 
@@ -898,33 +813,25 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
               chartType="sales"
               categoryColors={categoryColors}
             />
-          </div>
-        )}
-
-        {chartType === 'production' && (
-          <div>
             
-            {/* Legend for category colors - Vista de Producción */}
-            {chartData.production && chartData.production.length > 0 && chartData.production[0].categoryBreakdown && (
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Leyenda por Categorías</h4>
+            {/* Legend for category colors - Vista de Ventas */}
+            {dashboardData?.category_breakdown && dashboardData.category_breakdown.length > 0 && (
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Leyenda por Categorías - Total Período</h4>
                 <div className="flex flex-wrap gap-3">
-                  {Object.entries(chartData.production[0].categoryBreakdown)
-                    .sort((a, b) => b[1] - a[1]) // Ordenar por cantidad descendente
-                    .map(([category, count], index) => {
-                      const total = Object.values(chartData.production[0].categoryBreakdown).reduce((sum, c) => sum + c, 0);
-                      const percentage = total > 0 ? (count / total * 100) : 0;
-                      
+                  {dashboardData.category_breakdown
+                    .sort((a, b) => (b.revenue || 0) - (a.revenue || 0)) // Ordenar por ingreso descendente
+                    .map((category, index) => {
                       return (
-                        <div key={category} className="flex items-center gap-2 bg-white px-3 py-2 rounded shadow-sm">
+                        <div key={category.category} className="flex items-center gap-2 bg-white px-3 py-2 rounded shadow-sm">
                           <div 
                             className="w-4 h-4 rounded border border-gray-200"
-                            style={{ backgroundColor: categoryColors[index % categoryColors.length] }}
+                            style={{ backgroundColor: getCategoryColor(category.category) }}
                           ></div>
                           <div>
-                            <span className="text-sm font-medium text-gray-800">{category}</span>
+                            <span className="text-sm font-medium text-gray-800">{category.category}</span>
                             <div className="text-xs text-gray-500">
-                              {count} recetas ({Math.round(percentage)}%)
+                              S/ {(category.revenue || 0).toFixed(2)} ({Math.round(category.percentage || 0)}%)
                             </div>
                           </div>
                         </div>
@@ -933,7 +840,11 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
                 </div>
               </div>
             )}
-            
+          </div>
+        )}
+
+        {chartType === 'production' && (
+          <div>            
             <SimpleBarChart 
               data={chartData.production} 
               dataKey="value" 
@@ -942,6 +853,33 @@ const AnalyticsCharts = ({ dashboardData, selectedDate, onDateChange }) => {
               chartType="production"
               categoryColors={categoryColors}
             />
+            
+            {/* Legend for category colors - Vista de Producción */}
+            {dashboardData?.category_breakdown && dashboardData.category_breakdown.length > 0 && (
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Leyenda por Categorías - Total Período</h4>
+                <div className="flex flex-wrap gap-3">
+                  {dashboardData.category_breakdown
+                    .sort((a, b) => (b.quantity || 0) - (a.quantity || 0)) // Ordenar por cantidad descendente
+                    .map((category, index) => {
+                      return (
+                        <div key={category.category} className="flex items-center gap-2 bg-white px-3 py-2 rounded shadow-sm">
+                          <div 
+                            className="w-4 h-4 rounded border border-gray-200"
+                            style={{ backgroundColor: getCategoryColor(category.category) }}
+                          ></div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-800">{category.category}</span>
+                            <div className="text-xs text-gray-500">
+                              {category.quantity || 0} items ({Math.round(category.percentage || 0)}%)
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

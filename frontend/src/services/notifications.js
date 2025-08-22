@@ -25,7 +25,10 @@ class NotificationService {
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
       }
-      this.createSoundGenerators();
+      // Solo crear generadores si no existen
+      if (this.soundGenerators.size === 0) {
+        this.createSoundGenerators();
+      }
       return true;
     } catch (error) {
       return false;

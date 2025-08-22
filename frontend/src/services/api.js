@@ -552,8 +552,22 @@ export const apiService = {
 
   // Dashboard endpoints
   dashboard: {
-    getReport: async (date = null) => {
-      const url = date ? `/dashboard/report/?date=${date}` : '/dashboard/report/';
+    getReport: async (date = null, period = null) => {
+      let url = '/dashboard/report/';
+      const params = [];
+      
+      if (date) {
+        params.push(`date=${date}`);
+      }
+      
+      if (period) {
+        params.push(`period=${period}`);
+      }
+      
+      if (params.length > 0) {
+        url += `?${params.join('&')}`;
+      }
+      
       const response = await api.get(url);
       return response.data;
     },
@@ -596,6 +610,43 @@ export const apiService = {
       }, 100);
       
       return response;
+    }
+  },
+
+  // Dashboard Financiero endpoints - Vista optimizada con BD view
+  dashboardFinanciero: {
+    getReport: async (date = null, period = null) => {
+      let url = '/dashboard-financiero/report/';
+      const params = [];
+      
+      if (date) {
+        params.push(`date=${date}`);
+      }
+      
+      if (period) {
+        params.push(`period=${period}`);
+      }
+      
+      if (params.length > 0) {
+        url += `?${params.join('&')}`;
+      }
+      
+      const response = await api.get(url);
+      return response.data;
+    }
+  },
+
+  // Dashboard Operativo endpoints - Vista optimizada con BD view
+  dashboardOperativo: {
+    getReport: async (date = null) => {
+      let url = '/dashboard-operativo/report/';
+      
+      if (date) {
+        url += `?date=${date}`;
+      }
+      
+      const response = await api.get(url);
+      return response.data;
     }
   },
 

@@ -22,6 +22,8 @@ from operation.views import (
     # OrderItemIngredientViewSet removed - functionality deprecated
 )
 from operation.views_dashboard import DashboardViewSet
+from operation.views_financiero import DashboardFinancieroViewSet
+from operation.views_operativo import DashboardOperativoViewSet
 from operation.sse_views import order_updates_stream, kitchen_updates_stream
 
 # Create router and register viewsets
@@ -46,6 +48,8 @@ router.register(r'order-items', OrderItemViewSet, basename='orderitem')
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'container-sales', ContainerSaleViewSet, basename='containersale')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
+router.register(r'dashboard-financiero', DashboardFinancieroViewSet, basename='dashboard-financiero')
+router.register(r'dashboard-operativo', DashboardOperativoViewSet, basename='dashboard-operativo')
 
 # ELIMINADO: Cart routes
 # Sistema Cart eliminado para simplificar operaciones
