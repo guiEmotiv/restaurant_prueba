@@ -56,7 +56,7 @@ const DashboardOperativo = () => {
         return;
       }
       
-      await apiService.dashboard.downloadExcel(selectedDate);
+      await apiService.dashboardOperativo.downloadExcel(selectedDate);
       
       // Feedback positivo (opcional - el archivo se descarga automáticamente)
       // setTimeout(() => alert('✅ Excel descargado exitosamente'), 500);

@@ -1,5 +1,15 @@
 # 🚀 DEPLOYMENT - Restaurant Web (Dev → Prod)
 
+## 🔒 SEGURIDAD REFORZADA
+
+- ✅ **SECRET_KEY único** generado automáticamente
+- ✅ **ALLOWED_HOSTS restringido** (sin wildcard *)  
+- ✅ **USE_COGNITO_AUTH=True** por defecto en producción
+- ✅ **Rate limiting** configurado en nginx (30 req/min API, 5 req/min login)
+- ✅ **Headers de seguridad** (XSS, Content-Type, Frame Options)
+- ✅ **SSL/TLS 1.2+** con ciphers seguros
+- ✅ **Verificación automática** antes de cada deploy
+
 ## ⚡ Comandos Principales
 
 ```bash

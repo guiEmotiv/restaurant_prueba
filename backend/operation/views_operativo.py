@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.authentication import SessionAuthentication
 from django.utils import timezone
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, Q, F, Prefetch
 from django.db import connection
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -336,7 +336,7 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
         
         # Recetas no vendidas (usando datos PAID procesados)
         from inventory.models import Recipe
-        sold_recipe_names = [row[6] for row in paid_data if row[6] is not None]  # recipe_name from paid_data
+        sold_recipe_names = [row[9] for row in paid_data if row[9] is not None]  # recipe_name from paid_data
         unsold_recipes = Recipe.objects.exclude(name__in=sold_recipe_names).select_related('group')[:50]
         unsold_recipes_list = []
         for recipe in unsold_recipes:
@@ -365,3 +365,360 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
             'item_status_breakdown': item_status_breakdown,
             'unsold_recipes': unsold_recipes_list
         }
+    
+    @action(detail=False, methods=['get'])
+    def export_excel(self, request):
+        """
+        Exporta datos del dashboard operativo a Excel usando vista de BD optimizada
+        """
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+            from django.http import HttpResponse
+            from django.db import connection
+            from decimal import Decimal
+            
+            # Obtener fecha del parámetro
+            date_param = request.query_params.get('date')
+            if date_param:
+                try:
+                    selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+                except ValueError:
+                    selected_date = timezone.now().date()
+            else:
+                selected_date = timezone.now().date()
+            
+            # Usar consulta SQL directa con máximo detalle incluyendo ingredientes para trazabilidad completa
+            cursor = connection.cursor()
+            try:
+                cursor.execute("""
+                    SELECT 
+                        -- Información básica de la orden
+                        o.id as order_id,
+                        o.created_at as order_created,
+                        o.served_at as order_served,
+                        o.paid_at as order_paid,
+                        o.total_amount as order_total,
+                        o.status as order_status,
+                        o.waiter,
+                        
+                        -- Información de la mesa y zona
+                        t.table_number,
+                        z.name as zone_name,
+                        z.id as zone_id,
+                        
+                        -- Información del item
+                        oi.id as item_id,
+                        oi.quantity as item_quantity,
+                        oi.unit_price as item_unit_price,
+                        oi.total_price as item_total_price,
+                        oi.status as item_status,
+                        oi.notes as item_notes,
+                        oi.is_takeaway,
+                        oi.has_taper,
+                        oi.created_at as item_created,
+                        oi.preparing_at as item_preparing,
+                        
+                        -- Información de la receta
+                        r.id as recipe_id,
+                        r.name as recipe_name,
+                        r.version as recipe_version,
+                        r.base_price as recipe_base_price,
+                        r.preparation_time as recipe_prep_time,
+                        r.is_active as recipe_active,
+                        r.is_available as recipe_available,
+                        
+                        -- Información del grupo/categoría
+                        g.name as category_name,
+                        g.id as category_id,
+                        
+                        -- Información detallada de ingredientes
+                        ri.id as recipe_item_id,
+                        ri.quantity as ingredient_recipe_quantity,
+                        i.id as ingredient_id,
+                        i.name as ingredient_name,
+                        i.unit_price as ingredient_unit_price,
+                        i.current_stock as ingredient_stock,
+                        u.name as ingredient_unit,
+                        
+                        -- Cálculos de costos
+                        (ri.quantity * i.unit_price) as ingredient_cost,
+                        (ri.quantity * oi.quantity) as total_ingredient_quantity_used,
+                        (ri.quantity * i.unit_price * oi.quantity) as total_ingredient_cost,
+                        
+                        -- Información de pagos
+                        p.id as payment_id,
+                        p.payment_method,
+                        p.amount as payment_amount,
+                        p.tax_amount as payment_tax,
+                        p.payer_name,
+                        p.created_at as payment_date,
+                        
+                        -- Información de contenedores/envases
+                        cs.id as container_sale_id,
+                        cs.quantity as container_quantity,
+                        cs.unit_price as container_unit_price,
+                        cs.total_price as container_total_price,
+                        c.name as container_name,
+                        
+                        -- Tiempos calculados para trazabilidad
+                        CASE 
+                            WHEN oi.created_at IS NOT NULL AND oi.preparing_at IS NOT NULL 
+                            THEN CAST((julianday(oi.preparing_at) - julianday(oi.created_at)) * 24 * 60 AS INTEGER)
+                            ELSE NULL 
+                        END as prep_start_minutes,
+                        
+                        CASE 
+                            WHEN oi.preparing_at IS NOT NULL AND o.served_at IS NOT NULL 
+                            THEN CAST((julianday(o.served_at) - julianday(oi.preparing_at)) * 24 * 60 AS INTEGER)
+                            ELSE NULL 
+                        END as prep_duration_minutes,
+                        
+                        CASE 
+                            WHEN o.created_at IS NOT NULL AND o.paid_at IS NOT NULL 
+                            THEN CAST((julianday(o.paid_at) - julianday(o.created_at)) * 24 * 60 AS INTEGER)
+                            ELSE NULL 
+                        END as total_service_minutes,
+                        
+                        -- Fecha operativa
+                        DATE(datetime(o.paid_at, '-5 hours')) as operational_date
+                        
+                    FROM "order" o
+                    LEFT JOIN "table" t ON o.table_id = t.id
+                    LEFT JOIN zone z ON t.zone_id = z.id
+                    LEFT JOIN order_item oi ON o.id = oi.order_id
+                    LEFT JOIN recipe r ON oi.recipe_id = r.id
+                    LEFT JOIN "group" g ON r.group_id = g.id
+                    LEFT JOIN recipe_item ri ON r.id = ri.recipe_id
+                    LEFT JOIN ingredient i ON ri.ingredient_id = i.id
+                    LEFT JOIN unit u ON i.unit_id = u.id
+                    LEFT JOIN payment p ON o.id = p.order_id
+                    LEFT JOIN container_sale cs ON o.id = cs.order_id
+                    LEFT JOIN container c ON cs.container_id = c.id
+                    
+                    WHERE DATE(datetime(o.paid_at, '-5 hours')) = %s 
+                    AND o.status = 'PAID'
+                    
+                    ORDER BY o.created_at DESC, oi.id ASC, ri.id ASC;
+                """, [selected_date])
+                
+                dashboard_data = cursor.fetchall()
+            finally:
+                cursor.close()
+            
+            # Crear workbook de Excel
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Dashboard Operativo"
+            
+            # Estilos
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            header_alignment = Alignment(horizontal="center", vertical="center")
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            
+            # Headers completos para máxima trazabilidad
+            headers = [
+                # Información básica de orden
+                'Fecha', 'Hora Orden', 'ID Orden', 'Estado Orden', 'Total Orden', 'Mesero',
+                'Mesa', 'Zona', 'ID Zona',
+                
+                # Información de item
+                'ID Item', 'Cantidad Item', 'Precio Unit. Item', 'Precio Total Item', 'Estado Item', 'Notas Item', 
+                'Delivery', 'Con Envase', 'Hora Creación Item', 'Hora Preparación Item',
+                
+                # Información de receta
+                'ID Receta', 'Nombre Receta', 'Versión Receta', 'Precio Base Receta', 'Tiempo Prep. Receta (min)',
+                'Receta Activa', 'Receta Disponible', 'Categoría', 'ID Categoría',
+                
+                # Información detallada de ingredientes
+                'ID Ingrediente', 'Nombre Ingrediente', 'Cantidad en Receta', 'Unidad Ingrediente',
+                'Precio Unit. Ingrediente', 'Stock Actual Ingrediente', 'Costo Ingrediente en Receta',
+                'Cantidad Total Ingrediente Usado', 'Costo Total Ingrediente',
+                
+                # Información de pagos
+                'ID Pago', 'Método Pago', 'Monto Pagado', 'Impuesto Pago', 'Nombre Pagador', 'Fecha Pago',
+                
+                # Información de contenedores
+                'ID Venta Contenedor', 'Nombre Contenedor', 'Cantidad Contenedor', 'Precio Unit. Contenedor',
+                'Precio Total Contenedor',
+                
+                # Tiempos de trazabilidad
+                'Tiempo Inicio Prep. (min)', 'Tiempo Duración Prep. (min)', 'Tiempo Total Servicio (min)',
+                
+                # Fechas de seguimiento
+                'Fecha Operativa', 'Hora Servido', 'Hora Pagado'
+            ]
+            
+            # Escribir headers
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+                cell.border = border
+            
+            # Datos detallados completos
+            row_num = 2
+            
+            for row in dashboard_data:
+                (order_id, order_created, order_served, order_paid, order_total, order_status, waiter,
+                 table_number, zone_name, zone_id,
+                 item_id, item_quantity, item_unit_price, item_total_price, item_status, item_notes, 
+                 is_takeaway, has_taper, item_created, item_preparing,
+                 recipe_id, recipe_name, recipe_version, recipe_base_price, recipe_prep_time, 
+                 recipe_active, recipe_available, category_name, category_id,
+                 recipe_item_id, ingredient_recipe_quantity, ingredient_id, ingredient_name, 
+                 ingredient_unit_price, ingredient_stock, ingredient_unit,
+                 ingredient_cost, total_ingredient_quantity_used, total_ingredient_cost,
+                 payment_id, payment_method, payment_amount, payment_tax, payer_name, payment_date,
+                 container_sale_id, container_quantity, container_unit_price, container_total_price, 
+                 container_name,
+                 prep_start_minutes, prep_duration_minutes, total_service_minutes,
+                 operational_date) = row
+                
+                # Formatear fechas y horas
+                def format_datetime(dt_value):
+                    try:
+                        if dt_value:
+                            if isinstance(dt_value, str):
+                                dt = datetime.fromisoformat(dt_value.replace('Z', '+00:00'))
+                            else:
+                                dt = dt_value
+                            return dt.strftime('%H:%M')
+                        return ''
+                    except:
+                        return ''
+                
+                def format_date(dt_value):
+                    try:
+                        if dt_value:
+                            if isinstance(dt_value, str):
+                                dt = datetime.fromisoformat(dt_value.replace('Z', '+00:00'))
+                            else:
+                                dt = dt_value
+                            return dt.strftime('%d/%m/%Y %H:%M')
+                        return ''
+                    except:
+                        return ''
+                
+                # Escribir fila completa con todos los detalles
+                col_data = [
+                    # Información básica de orden
+                    selected_date.strftime('%d/%m/%Y'),
+                    format_datetime(order_created),
+                    order_id or '',
+                    order_status or '',
+                    float(order_total or 0),
+                    waiter or '',
+                    table_number or '',
+                    zone_name or '',
+                    zone_id or '',
+                    
+                    # Información de item
+                    item_id or '',
+                    item_quantity or 0,
+                    float(item_unit_price or 0),
+                    float(item_total_price or 0),
+                    item_status or '',
+                    item_notes or '',
+                    'Sí' if is_takeaway else 'No',
+                    'Sí' if has_taper else 'No',
+                    format_datetime(item_created),
+                    format_datetime(item_preparing),
+                    
+                    # Información de receta
+                    recipe_id or '',
+                    recipe_name or '',
+                    recipe_version or '',
+                    float(recipe_base_price or 0),
+                    recipe_prep_time or 0,
+                    'Sí' if recipe_active else 'No',
+                    'Sí' if recipe_available else 'No',
+                    category_name or '',
+                    category_id or '',
+                    
+                    # Información detallada de ingredientes
+                    ingredient_id or '',
+                    ingredient_name or '',
+                    float(ingredient_recipe_quantity or 0),
+                    ingredient_unit or '',
+                    float(ingredient_unit_price or 0),
+                    float(ingredient_stock or 0),
+                    float(ingredient_cost or 0),
+                    float(total_ingredient_quantity_used or 0),
+                    float(total_ingredient_cost or 0),
+                    
+                    # Información de pagos
+                    payment_id or '',
+                    payment_method or '',
+                    float(payment_amount or 0),
+                    float(payment_tax or 0),
+                    payer_name or '',
+                    format_date(payment_date),
+                    
+                    # Información de contenedores
+                    container_sale_id or '',
+                    container_name or '',
+                    container_quantity or 0,
+                    float(container_unit_price or 0),
+                    float(container_total_price or 0),
+                    
+                    # Tiempos de trazabilidad
+                    prep_start_minutes or 0,
+                    prep_duration_minutes or 0,
+                    total_service_minutes or 0,
+                    
+                    # Fechas de seguimiento
+                    operational_date or '',
+                    format_datetime(order_served),
+                    format_datetime(order_paid)
+                ]
+                
+                # Escribir datos en Excel
+                for col, value in enumerate(col_data, 1):
+                    ws.cell(row=row_num, column=col, value=value)
+                
+                # Aplicar bordes a todas las columnas
+                for col in range(1, len(headers) + 1):
+                    ws.cell(row=row_num, column=col).border = border
+                
+                row_num += 1
+            
+            # Ajustar ancho de columnas
+            for column in ws.columns:
+                max_length = 0
+                column = [cell for cell in column]
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 30)
+                ws.column_dimensions[get_column_letter(column[0].column)].width = adjusted_width
+            
+            # Preparar respuesta
+            response = HttpResponse(
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            )
+            response['Content-Disposition'] = f'attachment; filename=Dashboard_Operativo_{selected_date.strftime("%d-%m-%Y")}.xlsx'
+            
+            # Guardar el workbook en la respuesta
+            wb.save(response)
+            
+            return response
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'error': f'Error generating export: {str(e)}',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

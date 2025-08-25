@@ -11,10 +11,10 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
   return (
     <div
       onClick={(e) => handleCardClick(e, item)}
-      className={`bg-white rounded-lg p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} relative`}
+      className={`rounded-lg p-2 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} ${timeStatus.bgColor} relative`}
     >
       {/* Barra de progreso de tiempo */}
-      <div className="mb-3">
+      <div className="mb-1">
         <div className="w-full bg-gray-200 rounded-full h-1.5">
           <div 
             className={`h-1.5 rounded-full transition-all duration-300 ${timeStatus.color}`}
@@ -24,46 +24,41 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
       </div>
 
       {/* Información principal */}
-      <div className="space-y-2">
+      <div className="space-y-1">
         {/* Header con número de pedido y tiempo */}
         <div className="flex justify-between items-start">
           <span className="text-lg font-bold text-gray-900">#{item.order_id}</span>
-          <div className="text-right">
-            <div className={`text-sm font-medium ${timeStatus.textColor}`}>
-              {timeStatus.displayTime}
-            </div>
-            <div className="text-xs text-gray-500">
-              {item.formattedTime || new Date(item.created_at).toLocaleTimeString('es-PE', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: false 
-              })}hr
-            </div>
+          <div className="text-sm font-medium text-gray-900">
+            {item.formattedTime || new Date(item.created_at).toLocaleTimeString('es-PE', { 
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false 
+            })}hr | {timeStatus.displayTime}
           </div>
         </div>
 
         {/* Receta */}
-        <div className="font-medium text-gray-900 text-center py-2 bg-gray-50 rounded">
+        <div className={`font-medium text-gray-900 text-center py-1 rounded ${timeStatus.bgColor}`}>
           {item.recipe_name}
         </div>
 
         {/* Ubicación */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
+        <div className="flex items-center gap-1 text-sm text-gray-600">
           <MapPin className="h-4 w-4" />
           <span>{item.order_zone} - {item.order_table}</span>
         </div>
 
         {/* Mesero */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
+        <div className="flex items-center gap-1 text-sm text-gray-600">
           <User className="h-4 w-4" />
           <span>{item.waiter_name}</span>
         </div>
 
-        {/* Para llevar */}
+        {/* Delivery */}
         {item.is_takeaway && (
-          <div className="flex items-center gap-2 text-sm text-orange-600">
+          <div className="flex items-center gap-1 text-sm text-gray-900">
             <Package className="h-4 w-4" />
-            <span>Para llevar</span>
+            <span>Delivery</span>
           </div>
         )}
 
@@ -76,7 +71,7 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
 
         {/* Notas */}
         {item.notes && item.notes.trim() && (
-          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
+          <div className={`mt-1 p-1 rounded text-sm text-gray-900 ${timeStatus.bgColor} border ${timeStatus.borderColor}`}>
             <strong>Notas:</strong> {item.notes}
           </div>
         )}
@@ -105,16 +100,16 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
 // Constantes fuera del componente para evitar recreaciones
 const CREATED_COLORS = {
   color: 'bg-green-500',
-  textColor: 'text-green-600',
-  bgColor: 'bg-green-50',
-  borderColor: 'border-green-200'
+  textColor: 'text-green-700',
+  bgColor: 'bg-green-100',
+  borderColor: 'border-green-300'
 };
 
 const PREPARING_COLORS = {
   color: 'bg-yellow-400',
-  textColor: 'text-yellow-600',
-  bgColor: 'bg-yellow-50',
-  borderColor: 'border-yellow-200'
+  textColor: 'text-yellow-700',
+  bgColor: 'bg-yellow-100',
+  borderColor: 'border-yellow-300'
 };
 
 const TIME_LOCALE_OPTIONS = { 

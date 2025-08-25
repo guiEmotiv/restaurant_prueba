@@ -195,12 +195,22 @@ export const apiService = {
       const response = await api.get(`/${endpoint}/`);
       return handlePaginatedResponse(response);
     } catch (error) {
-      // Retry en caso de error de red durante navegación
-      if (retries > 0 && (error.code === 'NETWORK_ERROR' || error.response?.status >= 500)) {
-        logger.warn(`Retrying ${endpoint} API call. Retries left: ${retries}`);
-        await new Promise(resolve => setTimeout(resolve, 300)); // 300ms delay
+      // Better network error handling
+      const isNetworkError = (
+        error.code === 'NETWORK_ERROR' || 
+        error.code === 'ERR_NETWORK_CHANGED' ||
+        error.message?.includes('Network Error') ||
+        error.response?.status >= 500
+      );
+      
+      if (retries > 0 && isNetworkError) {
+        logger.warn(`Network error on ${endpoint}, retrying... (${retries} left)`);
+        await new Promise(resolve => setTimeout(resolve, 1000 + (3 - retries) * 500)); // Progressive backoff
         return this.getAll(endpoint, retries - 1);
       }
+      
+      // Log error for debugging
+      logger.error(`API Error on ${endpoint}:`, error.code, error.message);
       throw error;
     }
   },
@@ -395,12 +405,21 @@ export const apiService = {
         const response = await api.get(url);
         return handlePaginatedResponse(response);
       } catch (error) {
-        // Retry logic para navegación robusta
-        if (retries > 0 && (error.code === 'NETWORK_ERROR' || error.response?.status >= 500)) {
-          logger.warn(`Retrying recipes API call. Retries left: ${retries}`);
-          await new Promise(resolve => setTimeout(resolve, 300));
+        // Better network error handling
+        const isNetworkError = (
+          error.code === 'NETWORK_ERROR' || 
+          error.code === 'ERR_NETWORK_CHANGED' ||
+          error.message?.includes('Network Error') ||
+          error.response?.status >= 500
+        );
+        
+        if (retries > 0 && isNetworkError) {
+          logger.warn(`Network error on recipes API, retrying... (${retries} left)`);
+          await new Promise(resolve => setTimeout(resolve, 1000 + (3 - retries) * 500));
           return apiService.recipes.getAll(params, retries - 1);
         }
+        
+        logger.error(`Recipes API Error:`, error.code, error.message);
         throw error;
       }
     },
@@ -584,9 +603,14 @@ export const apiService = {
         throw new Error('Archivo Excel vacío recibido del servidor');
       }
       
-      // Crear enlace de descarga con mejor naming
+      // Detectar el tipo de archivo por el content-type
+      const contentType = response.headers['content-type'] || '';
+      const isExcel = contentType.includes('spreadsheet') || contentType.includes('excel');
+      const isCsv = contentType.includes('csv') || contentType.includes('text');
+      
+      // Crear blob con el tipo correcto
       const blob = new Blob([response.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        type: isExcel ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv'
       });
       
       const downloadUrl = window.URL.createObjectURL(blob);
@@ -596,7 +620,8 @@ export const apiService = {
       // Nombre más descriptivo con fecha legible
       const dateStr = date || new Date().toISOString().split('T')[0];
       const [year, month, day] = dateStr.split('-');
-      link.download = `Dashboard_Ventas_${day}-${month}-${year}.xlsx`;
+      const extension = isExcel ? 'xlsx' : 'csv';
+      link.download = `Dashboard_Ventas_${day}-${month}-${year}.${extension}`;
       
       // Asegurar que el link se descarga incluso en navegadores restrictivos
       link.style.display = 'none';
@@ -647,6 +672,52 @@ export const apiService = {
       
       const response = await api.get(url);
       return response.data;
+    },
+    downloadExcel: async (date = null) => {
+      const url = date ? `/dashboard-operativo/export_excel/?date=${date}` : '/dashboard-operativo/export_excel/';
+      
+      const response = await api.get(url, {
+        responseType: 'blob',
+        timeout: 30000 // 30 segundos para Excel pesado
+      });
+      
+      // Verificar que la respuesta es un blob válido
+      if (response.data.size === 0) {
+        throw new Error('Archivo Excel vacío recibido del servidor');
+      }
+      
+      // Detectar el tipo de archivo por el content-type
+      const contentType = response.headers['content-type'] || '';
+      const isExcel = contentType.includes('spreadsheet') || contentType.includes('excel');
+      const isCsv = contentType.includes('csv') || contentType.includes('text');
+      
+      // Crear blob con el tipo correcto
+      const blob = new Blob([response.data], {
+        type: isExcel ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv'
+      });
+      
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      // Nombre más descriptivo con fecha legible
+      const dateStr = date || new Date().toISOString().split('T')[0];
+      const [year, month, day] = dateStr.split('-');
+      const extension = isExcel ? 'xlsx' : 'csv';
+      link.download = `Dashboard_Operativo_${day}-${month}-${year}.${extension}`;
+      
+      // Asegurar que el link se descarga incluso en navegadores restrictivos
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup más robusto
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+      }, 100);
+      
+      return response;
     }
   },
 

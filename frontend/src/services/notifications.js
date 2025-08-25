@@ -55,13 +55,13 @@ class NotificationService {
     const soundConfigs = {
       itemCreated: { 
         frequencies: [523.25, 659.25, 783.99, 1046.50], // Campana de restaurante - Do-Mi-Sol-Do alta
-        duration: 0.4, 
+        duration: 0.8, // Duplicado de 0.4 a 0.8 para más duración
         type: 'sine',
         bellEffect: true
       },
       itemDeleted: { 
         frequencies: [261.63, 329.63, 392], // Do-Mi-Sol ascendente (sonido anterior de creación)
-        duration: 0.2, 
+        duration: 0.4, // Duplicado de 0.2 a 0.4 para más duración
         type: 'sine' 
       }
     };
@@ -110,11 +110,11 @@ class NotificationService {
       // Envelope de campana - ataque rápido y decay largo
       const noteTime = startTime + (index * 0.1); // Notas más rápidas
       gainNode.gain.setValueAtTime(0, noteTime);
-      gainNode.gain.linearRampToValueAtTime(0.4, noteTime + 0.01); // Ataque muy rápido
-      gainNode.gain.exponentialRampToValueAtTime(0.001, noteTime + 1.5); // Decay largo
+      gainNode.gain.linearRampToValueAtTime(1.0, noteTime + 0.01); // Volumen máximo (de 0.4 a 1.0)
+      gainNode.gain.exponentialRampToValueAtTime(0.001, noteTime + 2.5); // Decay más largo (de 1.5 a 2.5)
       
       oscillator.start(noteTime);
-      oscillator.stop(noteTime + 1.5);
+      oscillator.stop(noteTime + 2.5); // Extendido para coincidir con el decay
     });
   }
 
@@ -131,7 +131,7 @@ class NotificationService {
       
       oscillator.frequency.setValueAtTime(freq, noteTime);
       gainNode.gain.setValueAtTime(0, noteTime);
-      gainNode.gain.linearRampToValueAtTime(0.3, noteTime + 0.05);
+      gainNode.gain.linearRampToValueAtTime(1.0, noteTime + 0.05); // Volumen máximo (de 0.3 a 1.0)
       gainNode.gain.exponentialRampToValueAtTime(0.01, noteTime + config.duration - 0.05);
     });
     

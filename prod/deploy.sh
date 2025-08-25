@@ -64,6 +64,16 @@ command -v npm >/dev/null || { error "npm no instalado"; exit 1; }
 command -v ssh >/dev/null || { error "SSH no instalado"; exit 1; }
 command -v scp >/dev/null || { error "SCP no instalado"; exit 1; }
 
+# 🔒 Security Check (skip for check/rollback operations)
+if [ "$DEPLOY_TYPE" != "check" ] && [ "$DEPLOY_TYPE" != "rollback" ]; then
+    info "Ejecutando verificación de seguridad..."
+    if [ -f "prod/security-check.sh" ]; then
+        ./prod/security-check.sh || { error "Falló la verificación de seguridad"; exit 1; }
+    else
+        warning "Script de verificación de seguridad no encontrado"
+    fi
+fi
+
 # 🔍 Health check via SSH
 if [ "$DEPLOY_TYPE" = "check" ]; then
     info "Verificando salud del sistema..."

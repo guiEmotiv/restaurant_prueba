@@ -9,7 +9,7 @@ services:
       - DEBUG=True
       - DJANGO_SETTINGS_MODULE=backend.settings
       - DATABASE_NAME=restaurant_dev.sqlite3
-      - USE_COGNITO_AUTH=False
+      - USE_COGNITO_AUTH=True
       - ALLOWED_HOSTS=*
       - AWS_REGION=us-west-2
       - COGNITO_USER_POOL_ID=us-west-2_bdCwF60ZI

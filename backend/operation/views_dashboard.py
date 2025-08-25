@@ -51,7 +51,12 @@ class DashboardViewSet(viewsets.ViewSet):
             }
             
             # Agregar distribución de estados de items
-            dashboard_data['item_status_breakdown'] = self._calculate_item_status_breakdown(all_detailed_data)
+            dashboard_data['item_status_breakdown'] = {
+                'CREATED': len([row for row in all_detailed_data if row['item_status'] == 'CREATED']),
+                'PREPARING': len([row for row in all_detailed_data if row['item_status'] == 'PREPARING']),
+                'SERVED': len([row for row in all_detailed_data if row['item_status'] == 'SERVED']),
+                'PAID': len([row for row in all_detailed_data if row['item_status'] == 'PAID'])
+            }
             
             # Agregar recetas no vendidas para el período
             dashboard_data['unsold_recipes'] = self._get_unsold_recipes_period(detailed_data, period_dates)
@@ -242,16 +247,25 @@ class DashboardViewSet(viewsets.ViewSet):
     
     def _get_all_detailed_order_data(self, selected_date):
         """
-        Obtiene TODOS los datos detallados (método legacy para compatibilidad)
+        Obtiene TODOS los datos detallados para una fecha específica
         """
-        # Usar el nuevo método con período 'all' para mantener compatibilidad
-        period_dates = {
-            'start_date': None,
-            'end_date': None,
-            'display_date': selected_date,
-            'total_days': None
-        }
-        return self._get_all_detailed_order_data_period(period_dates)
+        # Obtener órdenes PAID para la fecha específica
+        paid_orders = Order.objects.filter(
+            status='PAID',
+            paid_at__date=selected_date
+        ).select_related(
+            'table__zone'
+        ).prefetch_related(
+            Prefetch('orderitem_set', queryset=OrderItem.objects.select_related(
+                'recipe__group'
+            ).prefetch_related(
+                'recipe__recipeitem_set__ingredient__unit'
+            )),
+            'payment_set'
+        )
+        
+        # Procesar con include_all_items=True para incluir TODOS los estados
+        return self._process_detailed_order_data(paid_orders, include_all_items=True)
     
     def _get_unsold_recipes(self, detailed_data, selected_date):
         """
@@ -375,7 +389,7 @@ class DashboardViewSet(viewsets.ViewSet):
                 
                 detailed_rows.append(detailed_row)
         
-        return self._process_detailed_order_data(paid_orders, include_all_items=True)
+        return detailed_rows
     
     def _calculate_item_status_breakdown(self, detailed_data):
         """
@@ -633,9 +647,15 @@ class DashboardViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def export_excel(self, request):
         """
-        Exporta datos detallados completos a Excel/CSV - TODOS LOS ITEMS (no solo PAID)
+        Exporta datos del dashboard a Excel
         """
         try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+            from django.http import HttpResponse
+            from decimal import Decimal
+            
             # Obtener fecha del parámetro
             date_param = request.query_params.get('date')
             if date_param:
@@ -646,31 +666,133 @@ class DashboardViewSet(viewsets.ViewSet):
             else:
                 selected_date = timezone.now().date()
             
-            # Obtener TODOS los datos detallados (no solo PAID) para Excel
-            all_detailed_data = self._get_all_detailed_order_data(selected_date)
-            
-            # Generar dashboard solo con items PAID
-            dashboard_data = self._generate_dashboard_from_details(
-                [row for row in all_detailed_data if row['item_status'] == 'PAID'], 
-                selected_date
+            # Obtener órdenes del día
+            orders = Order.objects.filter(
+                status='PAID',
+                paid_at__date=selected_date
+            ).select_related('table__zone').prefetch_related(
+                Prefetch('orderitem_set', queryset=OrderItem.objects.select_related(
+                    'recipe__group'
+                ).prefetch_related('recipe__recipeitem_set__ingredient')),
+                'payments'
             )
             
-            # Preparar respuesta con todos los datos para Excel
-            excel_response_data = {
-                'date': selected_date.isoformat(),
-                'detailed_data': all_detailed_data,  # TODOS los items
-                'summary': dashboard_data['summary'],
-                'item_status_breakdown': self._calculate_item_status_breakdown(all_detailed_data)
-            }
+            # Crear workbook de Excel
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Dashboard Operativo"
             
-            # Intentar Excel, fallback a CSV
-            try:
-                import openpyxl
-                return self._generate_detailed_excel(excel_response_data)
-            except ImportError:
-                return self._generate_detailed_csv(excel_response_data)
+            # Estilos
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            header_alignment = Alignment(horizontal="center", vertical="center")
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            
+            # Headers
+            headers = [
+                'Fecha', 'Hora', 'ID Orden', 'Mesa', 'Zona', 'Mesero',
+                'Receta', 'Categoría', 'Cantidad', 'Precio Unit.', 'Precio Total',
+                'Estado', 'Notas', 'Delivery', 'Método Pago', 'Monto Pagado'
+            ]
+            
+            # Escribir headers
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+                cell.border = border
+            
+            # Datos
+            row_num = 2
+            total_revenue = Decimal('0')
+            total_items = 0
+            
+            for order in orders:
+                order_payments = list(order.payments.all())
+                
+                for item in order.orderitem_set.all():
+                    # Calcular hora
+                    hora = order.created_at.strftime('%H:%M') if order.created_at else ''
+                    
+                    # Datos del item
+                    ws.cell(row=row_num, column=1, value=selected_date.strftime('%d/%m/%Y'))
+                    ws.cell(row=row_num, column=2, value=hora)
+                    ws.cell(row=row_num, column=3, value=order.id)
+                    ws.cell(row=row_num, column=4, value=order.table.number if order.table else 'N/A')
+                    ws.cell(row=row_num, column=5, value=order.table.zone.name if order.table and order.table.zone else 'N/A')
+                    ws.cell(row=row_num, column=6, value=order.waiter or 'N/A')
+                    ws.cell(row=row_num, column=7, value=item.recipe.name if item.recipe else 'N/A')
+                    ws.cell(row=row_num, column=8, value=item.recipe.group.name if item.recipe and item.recipe.group else 'N/A')
+                    ws.cell(row=row_num, column=9, value=item.quantity)
+                    ws.cell(row=row_num, column=10, value=float(item.unit_price))
+                    ws.cell(row=row_num, column=11, value=float(item.total_price))
+                    ws.cell(row=row_num, column=12, value=item.status)
+                    ws.cell(row=row_num, column=13, value=item.notes or '')
+                    ws.cell(row=row_num, column=14, value='Sí' if item.is_takeaway else 'No')
+                    
+                    # Pagos (puede haber múltiples)
+                    if order_payments:
+                        payment = order_payments[0]
+                        ws.cell(row=row_num, column=15, value=payment.payment_method)
+                        ws.cell(row=row_num, column=16, value=float(payment.amount))
+                    else:
+                        ws.cell(row=row_num, column=15, value='N/A')
+                        ws.cell(row=row_num, column=16, value=0)
+                    
+                    # Aplicar bordes
+                    for col in range(1, 17):
+                        ws.cell(row=row_num, column=col).border = border
+                    
+                    # Totales
+                    if item.status == 'PAID':
+                        total_revenue += item.total_price
+                        total_items += item.quantity
+                    
+                    row_num += 1
+            
+            # Resumen al final
+            row_num += 2
+            ws.cell(row=row_num, column=1, value="RESUMEN").font = Font(bold=True)
+            row_num += 1
+            ws.cell(row=row_num, column=1, value="Total Items Vendidos:")
+            ws.cell(row=row_num, column=2, value=total_items)
+            row_num += 1
+            ws.cell(row=row_num, column=1, value="Ingresos Totales:")
+            ws.cell(row=row_num, column=2, value=float(total_revenue))
+            
+            # Ajustar ancho de columnas
+            for column in ws.columns:
+                max_length = 0
+                column = [cell for cell in column]
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 30)
+                ws.column_dimensions[get_column_letter(column[0].column)].width = adjusted_width
+            
+            # Preparar respuesta
+            response = HttpResponse(
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            )
+            response['Content-Disposition'] = f'attachment; filename=Dashboard_Operativo_{selected_date}.xlsx'
+            
+            # Guardar el workbook en la respuesta
+            wb.save(response)
+            
+            return response
                 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return Response({
                 'error': f'Error generating export: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -122,13 +122,14 @@ with connection.cursor() as cursor:
         else:
             print(f'  ✓ {name}: ya vacío')
     
-    # Reset counters
-    operational_tables = ['operation_order', 'operation_orderitem', 'operation_payment', 'operation_containersale']
+    # Reset counters - FIX: Use correct table names
+    operational_tables = ['order', 'order_item', 'payment', 'container_sale']
     for table in operational_tables:
         try:
             cursor.execute('DELETE FROM sqlite_sequence WHERE name=?', (table,))
-        except:
-            pass
+            print(f'  ✓ Reset counter for {table}')
+        except Exception as e:
+            print(f'  ⚠️  Could not reset counter for {table}: {e}')
     
     cursor.execute('PRAGMA foreign_keys = ON;')
     cursor.execute('VACUUM;')

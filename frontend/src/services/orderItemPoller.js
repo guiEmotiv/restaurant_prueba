@@ -8,7 +8,7 @@ class OrderItemPoller {
     this.pollInterval = null;
     this.knownItems = new Set();
     this.knownItemIds = new Set(); // Para rastrear IDs y detectar eliminaciones reales
-    this.intervalMs = 5000;
+    this.intervalMs = 1000; // Polling cada 1 segundo para tiempo real
     this.isKitchenView = false;
     this.updateCallback = null;
   }
