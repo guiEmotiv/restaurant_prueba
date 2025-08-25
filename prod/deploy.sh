@@ -131,7 +131,10 @@ if [ "$DEPLOY_TYPE" != "check" ] && [ "$DEPLOY_TYPE" != "rollback" ]; then
     info "🛡️ Creando backup automático de seguridad..."
     BACKUP_NAME="backup_auto_$(date +%Y%m%d_%H%M%S).sqlite3"
     ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && cp data/restaurant_prod.sqlite3 data/$BACKUP_NAME 2>/dev/null || true"
-    success "Backup creado: $BACKUP_NAME"
+    # Copy backup to local
+    mkdir -p data/backups/prod
+    scp -i "$EC2_KEY" "$EC2_HOST:$EC2_PATH/data/$BACKUP_NAME" "data/backups/prod/"
+    success "Backup creado: $BACKUP_NAME (copiado a local data/backups/prod/)"
 fi
 
 # 🔍 Health check via SSH
@@ -304,7 +307,11 @@ fi
 if [ "$DEPLOY_TYPE" = "sync" ]; then
     info "Sincronizando base de datos..."
     # Create backup on server first
-    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && cp data/restaurant_prod.sqlite3 data/backup_prod_\$(date +%Y%m%d_%H%M%S).sqlite3 2>/dev/null || true"
+    SYNC_BACKUP_NAME="backup_prod_$(date +%Y%m%d_%H%M%S).sqlite3"
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && cp data/restaurant_prod.sqlite3 data/$SYNC_BACKUP_NAME 2>/dev/null || true"
+    # Copy backup to local
+    mkdir -p data/backups/prod
+    scp -i "$EC2_KEY" "$EC2_HOST:$EC2_PATH/data/$SYNC_BACKUP_NAME" "data/backups/prod/"
     # Copy dev database to prod
     scp -i "$EC2_KEY" data/restaurant_dev.sqlite3 "$EC2_HOST:$EC2_PATH/data/restaurant_prod.sqlite3"
 fi
