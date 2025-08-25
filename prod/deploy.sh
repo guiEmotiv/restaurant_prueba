@@ -303,7 +303,13 @@ if [ "$DEPLOY_TYPE" = "smart" ] && [ "$HAS_MIGRATIONS" = "true" ]; then
     success "Migraciones aplicadas exitosamente"
 elif [ "$DEPLOY_TYPE" = "sync" ]; then
     info "🗄️ Verificando migraciones pendientes..."
-    PENDING_MIGRATIONS=$(ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py showmigrations --plan | grep -c '\[ \]' || echo 0")
+    PENDING_MIGRATIONS=$(ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py showmigrations --plan | grep -c '\[ \]' || echo 0" | tr -d '\n' | tr -d '\r')
+    
+    # Ensure PENDING_MIGRATIONS is a valid number
+    if ! [[ "$PENDING_MIGRATIONS" =~ ^[0-9]+$ ]]; then
+        warning "Error al contar migraciones, asumiendo 0"
+        PENDING_MIGRATIONS=0
+    fi
     
     if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
         info "Aplicando $PENDING_MIGRATIONS migraciones pendientes..."
