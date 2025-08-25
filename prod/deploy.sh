@@ -241,9 +241,8 @@ if [ "$DEPLOY_TYPE" = "sync" ]; then
         read -r response
     fi
     
-    echo "Respuesta recibida: '$response'"
     if [[ ! "$response" =~ ^[sS]$ ]]; then
-        error "Sync cancelado (respuesta: '$response')"
+        error "Sync cancelado"
         exit 1
     fi
     info "Confirmación recibida, continuando..."
