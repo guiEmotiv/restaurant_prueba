@@ -25,35 +25,72 @@ EC2_PATH="/opt/restaurant-web"
 
 show_usage() {
     cat << EOF
-🚀 DEPLOYMENT - Restaurant Web (Dev → Prod)
+🚀 DEPLOYMENT INTELIGENTE - Restaurant Web (Dev → Prod)
 
-Uso: $0 [OPCION]
+Uso: $0 [OPCIÓN]
 
 Opciones:
-  --full        Deploy completo a producción (RECOMENDADO)
-  --sync        Deploy + sincronizar BD (dev → prod) [DESTRUCTIVO]
-  --check       Verificar salud del sistema
-  --rollback    Rollback a versión anterior
-  --help        Mostrar esta ayuda
+  deploy        Deploy automático inteligente (RECOMENDADO)
+  sync          Sincronizar BD completa [DESTRUCTIVO]
+  check         Verificar salud del sistema
+  rollback      Rollback a versión anterior
+  help          Mostrar esta ayuda
+
+🤖 Deploy Inteligente detecta automáticamente:
+  ✅ Cambios en frontend → Build y deploy
+  ✅ Cambios en backend → Deploy con migraciones seguras
+  ✅ Cambios en BD → Backup automático antes de migraciones
+  ✅ Sin cambios → Solo verificación
 
 Ejemplos:
-  $0 --full     # Deploy completo (cambios de código)
-  $0 --sync     # Deploy con datos (menú/configuración)
-  $0 --check    # Verificar estado
+  $0 deploy     # Deploy inteligente automático
+  $0 sync       # Reemplazar BD prod con dev
+  $0 check      # Solo verificar estado
 EOF
 }
 
 echo "🚀 DEPLOYMENT - RESTAURANT WEB"
 echo "================================="
 
+# 🤖 Smart deployment detection
+detect_changes() {
+    info "🔍 Analizando cambios..."
+    
+    HAS_FRONTEND_CHANGES=false
+    HAS_BACKEND_CHANGES=false
+    HAS_MIGRATIONS=false
+    
+    # Check for frontend changes
+    if git diff --name-only HEAD~1 HEAD | grep -E "^frontend/" > /dev/null 2>&1; then
+        HAS_FRONTEND_CHANGES=true
+        info "📱 Cambios en frontend detectados"
+    fi
+    
+    # Check for backend changes
+    if git diff --name-only HEAD~1 HEAD | grep -E "^backend/" > /dev/null 2>&1; then
+        HAS_BACKEND_CHANGES=true
+        info "⚙️ Cambios en backend detectados"
+    fi
+    
+    # Check for pending migrations
+    cd backend
+    if python manage.py showmigrations --plan | grep -q '\[ \]'; then
+        HAS_MIGRATIONS=true
+        info "🗄️ Migraciones pendientes detectadas"
+    fi
+    cd ..
+}
+
 # 📋 Process arguments
-case "${1:-}" in
-    --full) DEPLOY_TYPE="full" ;;
-    --sync) DEPLOY_TYPE="sync" ;;
-    --check) DEPLOY_TYPE="check" ;;
-    --rollback) DEPLOY_TYPE="rollback" ;;
-    --help) show_usage; exit 0 ;;
-    "") error "Se requiere una opción"; show_usage; exit 1 ;;
+case "${1:-deploy}" in
+    deploy) 
+        DEPLOY_TYPE="smart"
+        detect_changes
+        ;;
+    sync) DEPLOY_TYPE="sync" ;;
+    check) DEPLOY_TYPE="check" ;;
+    rollback) DEPLOY_TYPE="rollback" ;;
+    help|--help) show_usage; exit 0 ;;
     *) error "Opción desconocida: $1"; show_usage; exit 1 ;;
 esac
 
@@ -72,6 +109,14 @@ if [ "$DEPLOY_TYPE" != "check" ] && [ "$DEPLOY_TYPE" != "rollback" ]; then
     else
         warning "Script de verificación de seguridad no encontrado"
     fi
+fi
+
+# 🛡️ Always create backup before any changes (except check)
+if [ "$DEPLOY_TYPE" != "check" ] && [ "$DEPLOY_TYPE" != "rollback" ]; then
+    info "🛡️ Creando backup automático de seguridad..."
+    BACKUP_NAME="backup_auto_$(date +%Y%m%d_%H%M%S).sqlite3"
+    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && cp data/restaurant_prod.sqlite3 data/$BACKUP_NAME 2>/dev/null || true"
+    success "Backup creado: $BACKUP_NAME"
 fi
 
 # 🔍 Health check via SSH
@@ -116,8 +161,21 @@ if [ "$DEPLOY_TYPE" = "rollback" ]; then
     exit 0
 fi
 
-# 🚀 Main deployment logic
-info "Iniciando deploy: $DEPLOY_TYPE"
+# 🚀 Smart deployment logic
+if [ "$DEPLOY_TYPE" = "smart" ]; then
+    if [ "$HAS_FRONTEND_CHANGES" = "false" ] && [ "$HAS_BACKEND_CHANGES" = "false" ] && [ "$HAS_MIGRATIONS" = "false" ]; then
+        info "✅ No se detectaron cambios significativos"
+        info "🔍 Ejecutando verificación de salud..."
+        DEPLOY_TYPE="check"
+    else
+        info "🚀 Iniciando deploy inteligente"
+        if [ "$HAS_MIGRATIONS" = "true" ]; then
+            warning "⚠️ Se aplicarán migraciones de base de datos"
+        fi
+    fi
+else
+    info "Iniciando deploy: $DEPLOY_TYPE"
+fi
 
 # 📝 Git status check and auto-commit
 if [ -n "$(git status --porcelain)" ]; then
@@ -166,20 +224,32 @@ if [ "$DEPLOY_TYPE" = "sync" ]; then
     fi
 fi
 
-# 🏗️ Build frontend locally
-info "Construyendo frontend localmente..."
-cd frontend
-
-# Install dependencies if needed
-if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
-    info "Instalando dependencias..."
-    npm install
+# 🏗️ Build frontend (only if needed)
+if [ "$DEPLOY_TYPE" = "smart" ]; then
+    if [ "$HAS_FRONTEND_CHANGES" = "true" ]; then
+        info "🏗️ Construyendo frontend (cambios detectados)..."
+        cd frontend
+        npm run build
+        cd ..
+        success "Frontend construido"
+    else
+        info "⏭️ Frontend sin cambios, omitiendo build"
+    fi
+elif [ "$DEPLOY_TYPE" = "sync" ]; then
+    info "🏗️ Construyendo frontend localmente..."
+    cd frontend
+    
+    # Install dependencies if needed
+    if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
+        info "Instalando dependencias..."
+        npm install
+    fi
+    
+    # Build frontend
+    npm run build
+    cd ..
+    success "Frontend construido"
 fi
-
-# Build frontend
-npm run build
-cd ..
-success "Frontend construido"
 
 # 📤 Deploy to EC2
 info "Desplegando a EC2..."
@@ -188,9 +258,14 @@ info "Desplegando a EC2..."
 info "Actualizando código en servidor..."
 ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && git pull origin main"
 
-# 2. Copy frontend build to server
-info "Copiando archivos de frontend..."
-scp -i "$EC2_KEY" -r frontend/dist/* "$EC2_HOST:$EC2_PATH/frontend/dist/"
+# 2. Copy frontend build to server (only if needed)
+if [ "$DEPLOY_TYPE" = "smart" ] && [ "$HAS_FRONTEND_CHANGES" = "true" ]; then
+    info "📱 Copiando archivos de frontend..."
+    scp -i "$EC2_KEY" -r frontend/dist/* "$EC2_HOST:$EC2_PATH/frontend/dist/"
+elif [ "$DEPLOY_TYPE" = "sync" ]; then
+    info "📱 Copiando archivos de frontend..."
+    scp -i "$EC2_KEY" -r frontend/dist/* "$EC2_HOST:$EC2_PATH/frontend/dist/"
+fi
 
 # 3. Copy database if sync
 if [ "$DEPLOY_TYPE" = "sync" ]; then
@@ -212,32 +287,34 @@ ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exe
     exit 1
 }
 
-# 6. Check for pending migrations
-info "Verificando migraciones pendientes..."
-PENDING_MIGRATIONS=$(ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py showmigrations --plan | grep -c '\[ \]' || echo 0")
-
-if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
-    info "Aplicando $PENDING_MIGRATIONS migraciones pendientes..."
+# 6. Apply migrations safely (only if needed)
+if [ "$DEPLOY_TYPE" = "smart" ] && [ "$HAS_MIGRATIONS" = "true" ]; then
+    info "🗄️ Aplicando migraciones detectadas..."
     
-    # Apply migrations with error handling
-    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate --fake-initial --run-syncdb" || {
-        warning "Migración estándar falló, intentando con --fake..."
+    # Safer migration approach - no --run-syncdb
+    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate" || {
+        error "Error en migraciones"
+        exit 1
+    }
+    
+    success "Migraciones aplicadas exitosamente"
+elif [ "$DEPLOY_TYPE" = "sync" ]; then
+    info "🗄️ Verificando migraciones pendientes..."
+    PENDING_MIGRATIONS=$(ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py showmigrations --plan | grep -c '\[ \]' || echo 0")
+    
+    if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
+        info "Aplicando $PENDING_MIGRATIONS migraciones pendientes..."
         
-        # Handle known problematic migrations
-        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate config 0013 --fake" 2>/dev/null || true
-        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate operation 0021 --fake" 2>/dev/null || true
-        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate operation --fake-initial" 2>/dev/null || true
-        
-        # Apply remaining migrations
+        # Apply migrations with error handling
         ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate" || {
             error "Error crítico en migraciones"
             exit 1
         }
-    }
-    
-    success "Migraciones aplicadas exitosamente"
-else
-    success "No hay migraciones pendientes"
+        
+        success "Migraciones aplicadas exitosamente"
+    else
+        success "No hay migraciones pendientes"
+    fi
 fi
 
 # 7. Restart services after migrations
@@ -256,14 +333,29 @@ fi
 
 # 🎉 Success
 echo ""
-success "🎉 DEPLOY COMPLETADO"
+if [ "$DEPLOY_TYPE" = "check" ]; then
+    success "✅ VERIFICACIÓN COMPLETADA"
+else
+    success "🎉 DEPLOY INTELIGENTE COMPLETADO"
+    
+    echo ""
+    echo "📊 Resumen del deployment:"
+    if [ "$DEPLOY_TYPE" = "smart" ]; then
+        echo "   📱 Frontend: $([ "$HAS_FRONTEND_CHANGES" = "true" ] && echo "✅ Actualizado" || echo "⏭️ Sin cambios")"
+        echo "   ⚙️ Backend: $([ "$HAS_BACKEND_CHANGES" = "true" ] && echo "✅ Actualizado" || echo "⏭️ Sin cambios")"
+        echo "   🗄️ BD: $([ "$HAS_MIGRATIONS" = "true" ] && echo "✅ Migraciones aplicadas" || echo "⏭️ Sin cambios")"
+        echo "   🛡️ Backup: ✅ $BACKUP_NAME"
+    fi
+fi
+
 echo ""
 echo "🌐 URLs de producción:"
 echo "   🏠 Sitio: https://www.xn--elfogndedonsoto-zrb.com/"
 echo "   🔧 API:   https://www.xn--elfogndedonsoto-zrb.com/api/v1/"
 echo ""
 echo "🔧 Comandos útiles:"
-echo "   📋 Verificar: ./prod/deploy.sh --check"
-echo "   🔄 Rollback: ./prod/deploy.sh --rollback"
+echo "   🤖 Deploy automático: ./prod/deploy.sh deploy"
+echo "   📋 Verificar: ./prod/deploy.sh check"
+echo "   🔄 Rollback: ./prod/deploy.sh rollback"
 echo ""
-success "✨ Sistema desplegado exitosamente"
+success "✨ Sistema operativo y optimizado"

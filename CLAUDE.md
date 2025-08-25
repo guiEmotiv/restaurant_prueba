@@ -59,20 +59,20 @@ docker-compose --profile production up -d
 
 ## Deployment
 
-**Production Deployment:**
+**Smart Production Deployment:**
 ```bash
-./prod/deploy.sh --full    # Code changes only
-./prod/deploy.sh --sync    # Include database sync (destructive)
-./prod/deploy.sh --check   # Health check
-./prod/deploy.sh --rollback # Rollback deployment
+./prod/deploy.sh deploy    # Smart auto-deployment (RECOMMENDED)
+./prod/deploy.sh sync      # Full database sync (destructive)
+./prod/deploy.sh check     # Health check
+./prod/deploy.sh rollback  # Rollback deployment
 ```
 
-The deployment script handles:
-- Frontend build optimization
-- EC2 deployment via SSH
-- Database migrations
-- Docker container management
-- Health verification
+The smart deployment system:
+- **Auto-detects** frontend, backend, and database changes
+- **Applies only necessary updates** for maximum efficiency
+- **Creates automatic backups** before any database changes
+- **Uses safer migrations** (no --run-syncdb by default)
+- **Provides detailed deployment summaries**
 
 **Database Management:**
 - Uses SQLite for both dev (`restaurant_dev.sqlite3`) and prod (`restaurant_prod.sqlite3`)
