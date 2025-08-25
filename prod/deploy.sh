@@ -118,7 +118,7 @@ fi
 if [ "$DEPLOY_TYPE" != "check" ] && [ "$DEPLOY_TYPE" != "rollback" ]; then
     info "🛡️ Creando backup automático de seguridad..."
     BACKUP_NAME="backup_auto_$(date +%Y%m%d_%H%M%S).sqlite3"
-    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && cp data/restaurant_prod.sqlite3 data/$BACKUP_NAME 2>/dev/null || true"
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && cp data/restaurant_prod.sqlite3 data/$BACKUP_NAME 2>/dev/null || true"
     success "Backup creado: $BACKUP_NAME"
 fi
 
@@ -126,7 +126,7 @@ fi
 if [ "$DEPLOY_TYPE" = "check" ]; then
     info "Verificando salud del sistema..."
     
-    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose ps" 2>/dev/null && success "Sistema funcionando correctamente" || error "Error en el sistema"
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && /usr/local/bin/docker-compose ps" 2>/dev/null && success "Sistema funcionando correctamente" || error "Error en el sistema"
     
     # Test web response
     if curl -s -o /dev/null -w "%{http_code}" https://www.xn--elfogndedonsoto-zrb.com/ | grep -q 200; then
@@ -155,7 +155,7 @@ if [ "$DEPLOY_TYPE" = "rollback" ]; then
     fi
     
     # Rollback database
-    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && BACKUP_FILE=\$(ls -t data/backup_prod_*.sqlite3 2>/dev/null | head -1) && if [ -n \"\$BACKUP_FILE\" ]; then cp \"\$BACKUP_FILE\" data/restaurant_prod.sqlite3 && echo 'BD restaurada desde backup'; else echo 'No hay backups de BD'; fi"
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && BACKUP_FILE=\$(ls -t data/backup_prod_*.sqlite3 2>/dev/null | head -1) && if [ -n \"\$BACKUP_FILE\" ]; then cp \"\$BACKUP_FILE\" data/restaurant_prod.sqlite3 && echo 'BD restaurada desde backup'; else echo 'No hay backups de BD'; fi"
     
     # Restart services
     ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose restart app nginx"
@@ -274,7 +274,7 @@ fi
 if [ "$DEPLOY_TYPE" = "sync" ]; then
     info "Sincronizando base de datos..."
     # Create backup on server first
-    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && cp data/restaurant_prod.sqlite3 data/backup_prod_\$(date +%Y%m%d_%H%M%S).sqlite3 2>/dev/null || true"
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && cp data/restaurant_prod.sqlite3 data/backup_prod_\$(date +%Y%m%d_%H%M%S).sqlite3 2>/dev/null || true"
     # Copy dev database to prod
     scp -i "$EC2_KEY" data/restaurant_dev.sqlite3 "$EC2_HOST:$EC2_PATH/data/restaurant_prod.sqlite3"
 fi
@@ -303,7 +303,7 @@ if [ "$DEPLOY_TYPE" = "smart" ] && [ "$HAS_MIGRATIONS" = "true" ]; then
     success "Migraciones aplicadas exitosamente"
 elif [ "$DEPLOY_TYPE" = "sync" ]; then
     info "🗄️ Verificando migraciones pendientes..."
-    PENDING_MIGRATIONS=$(ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py showmigrations --plan | grep -c '\[ \]' || echo 0")
+    PENDING_MIGRATIONS=$(ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py showmigrations --plan | grep -c '\[ \]' || echo 0")
     
     if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
         info "Aplicando $PENDING_MIGRATIONS migraciones pendientes..."
