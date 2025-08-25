@@ -23,6 +23,9 @@ EC2_HOST="ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com"
 EC2_KEY="ubuntu_fds_key.pem"
 EC2_PATH="/opt/restaurant-web"
 
+# 🔧 SSH PATH fix - Ensure git and other tools are found
+SSH_PATH_PREFIX="export PATH=/usr/local/bin:/usr/bin:/bin:\$PATH &&"
+
 show_usage() {
     cat << EOF
 🚀 DEPLOYMENT INTELIGENTE - Restaurant Web (Dev → Prod)
@@ -139,16 +142,16 @@ if [ "$DEPLOY_TYPE" = "rollback" ]; then
     warning "Iniciando rollback completo (código + BD)..."
     
     # Rollback git
-    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && git log --oneline -3"
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && git log --oneline -3"
     echo "¿A qué commit hacer rollback? (ingresa hash o presiona Enter para el anterior):"
     read -r commit_hash
     
     if [ -z "$commit_hash" ]; then
         info "Haciendo rollback al commit anterior..."
-        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && git reset --hard HEAD~1"
+        ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && git reset --hard HEAD~1"
     else
         info "Haciendo rollback al commit: $commit_hash"
-        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && git reset --hard $commit_hash"
+        ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && git reset --hard $commit_hash"
     fi
     
     # Rollback database
@@ -256,7 +259,7 @@ info "Desplegando a EC2..."
 
 # 1. Update code on server
 info "Actualizando código en servidor..."
-ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && git pull origin main"
+ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && git pull origin main"
 
 # 2. Copy frontend build to server (only if needed)
 if [ "$DEPLOY_TYPE" = "smart" ] && [ "$HAS_FRONTEND_CHANGES" = "true" ]; then
