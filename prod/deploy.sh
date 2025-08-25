@@ -231,12 +231,14 @@ if [ "$DEPLOY_TYPE" = "sync" ]; then
     fi
     
     warning "⚠️  OPERACIÓN DESTRUCTIVA: Reemplazar BD producción con desarrollo"
-    echo "   ¿Confirmar sincronización? (s/N)"
+    echo -n "   ¿Confirmar sincronización? (s/N): "
     read -r response
+    echo "Respuesta recibida: '$response'"
     if [[ ! "$response" =~ ^[sS]$ ]]; then
-        error "Sync cancelado"
+        error "Sync cancelado (respuesta: '$response')"
         exit 1
     fi
+    info "Confirmación recibida, continuando..."
 fi
 
 # 🏗️ Build frontend (only if needed)
