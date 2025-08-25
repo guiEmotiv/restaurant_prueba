@@ -231,8 +231,16 @@ if [ "$DEPLOY_TYPE" = "sync" ]; then
     fi
     
     warning "⚠️  OPERACIÓN DESTRUCTIVA: Reemplazar BD producción con desarrollo"
-    echo -n "   ¿Confirmar sincronización? (s/N): "
-    read -r response
+    
+    # Auto-confirm if SYNC_CONFIRMED environment variable is set (for testing)
+    if [ "$SYNC_CONFIRMED" = "true" ]; then
+        warning "Auto-confirmando sincronización (SYNC_CONFIRMED=true)"
+        response="s"
+    else
+        echo -n "   ¿Confirmar sincronización? (s/N): "
+        read -r response
+    fi
+    
     echo "Respuesta recibida: '$response'"
     if [[ ! "$response" =~ ^[sS]$ ]]; then
         error "Sync cancelado (respuesta: '$response')"
