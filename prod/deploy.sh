@@ -26,6 +26,18 @@ EC2_PATH="/opt/restaurant-web"
 # 🔧 SSH PATH fix - Ensure git and other tools are found
 SSH_PATH_PREFIX="export PATH=/usr/local/bin:/usr/bin:/bin:\$PATH &&"
 
+# 🐍 Python detection - Find available python interpreter
+if command -v python >/dev/null 2>&1; then
+    PYTHON_CMD="python"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_CMD="python3"
+elif [ -f "$PYTHON_CMD" ]; then
+    PYTHON_CMD="$PYTHON_CMD"
+else
+    error "No se encontró Python. Instala Python o configura PATH."
+    exit 1
+fi
+
 show_usage() {
     cat << EOF
 🚀 DEPLOYMENT INTELIGENTE - Restaurant Web (Dev → Prod)
@@ -77,7 +89,7 @@ detect_changes() {
     
     # Check for pending migrations
     cd backend
-    if python manage.py showmigrations --plan | grep -q '\[ \]'; then
+    if $PYTHON_CMD manage.py showmigrations --plan | grep -q '\[ \]'; then
         HAS_MIGRATIONS=true
         info "🗄️ Migraciones pendientes detectadas"
     fi
@@ -202,9 +214,9 @@ fi
 # 📋 List pending migrations before deploy
 info "Verificando migraciones locales..."
 cd backend
-if python manage.py showmigrations --plan | grep -q '\[ \]'; then
+if $PYTHON_CMD manage.py showmigrations --plan | grep -q '\[ \]'; then
     warning "Se detectaron migraciones pendientes:"
-    python manage.py showmigrations --plan | grep '\[ \]' || true
+    $PYTHON_CMD manage.py showmigrations --plan | grep '\[ \]' || true
     echo "Estas migraciones se aplicarán en producción."
 else
     success "No hay migraciones pendientes locales"
@@ -259,7 +271,16 @@ info "Desplegando a EC2..."
 
 # 1. Update code on server
 info "Actualizando código en servidor..."
-ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && git pull origin main"
+if ! ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && git pull origin main"; then
+    error "Error de conexión SSH al servidor EC2"
+    echo "Posibles causas:"
+    echo "  - Servidor EC2 apagado o inaccesible"
+    echo "  - Problemas de conectividad de red"
+    echo "  - Llave SSH incorrecta"
+    echo ""
+    echo "Verifica la conexión con: ssh -i $EC2_KEY $EC2_HOST"
+    exit 1
+fi
 
 # 2. Copy frontend build to server (only if needed)
 if [ "$DEPLOY_TYPE" = "smart" ] && [ "$HAS_FRONTEND_CHANGES" = "true" ]; then
