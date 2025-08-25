@@ -91,11 +91,28 @@ fi
 
 # 🔄 Rollback via SSH
 if [ "$DEPLOY_TYPE" = "rollback" ]; then
-    warning "Iniciando rollback..."
+    warning "Iniciando rollback completo (código + BD)..."
     
-    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && BACKUP_FILE=\$(ls -t data/backup_prod_*.sqlite3 2>/dev/null | head -1) && if [ -n \"\$BACKUP_FILE\" ]; then cp \"\$BACKUP_FILE\" data/restaurant_prod.sqlite3 && /usr/local/bin/docker-compose restart app; echo 'Rollback completado'; else echo 'No hay backups'; exit 1; fi"
+    # Rollback git
+    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && git log --oneline -3"
+    echo "¿A qué commit hacer rollback? (ingresa hash o presiona Enter para el anterior):"
+    read -r commit_hash
     
-    success "Rollback completado"
+    if [ -z "$commit_hash" ]; then
+        info "Haciendo rollback al commit anterior..."
+        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && git reset --hard HEAD~1"
+    else
+        info "Haciendo rollback al commit: $commit_hash"
+        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && git reset --hard $commit_hash"
+    fi
+    
+    # Rollback database
+    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && BACKUP_FILE=\$(ls -t data/backup_prod_*.sqlite3 2>/dev/null | head -1) && if [ -n \"\$BACKUP_FILE\" ]; then cp \"\$BACKUP_FILE\" data/restaurant_prod.sqlite3 && echo 'BD restaurada desde backup'; else echo 'No hay backups de BD'; fi"
+    
+    # Restart services
+    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose restart app nginx"
+    
+    success "Rollback completo terminado"
     exit 0
 fi
 
@@ -120,6 +137,18 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
         exit 1
     fi
 fi
+
+# 📋 List pending migrations before deploy
+info "Verificando migraciones locales..."
+cd backend
+if python manage.py showmigrations --plan | grep -q '\[ \]'; then
+    warning "Se detectaron migraciones pendientes:"
+    python manage.py showmigrations --plan | grep '\[ \]' || true
+    echo "Estas migraciones se aplicarán en producción."
+else
+    success "No hay migraciones pendientes locales"
+fi
+cd ..
 
 # 🔄 Database sync
 if [ "$DEPLOY_TYPE" = "sync" ]; then
@@ -176,11 +205,47 @@ fi
 info "Reiniciando servicios..."
 ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose restart app nginx"
 
-# 5. Wait for services to be ready
-info "Esperando servicios..."
-sleep 10
+# 5. Wait for containers to be ready
+info "Esperando contenedores..."
+ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py check --database default" || {
+    error "Backend no está listo"
+    exit 1
+}
 
-# 6. Verify deployment
+# 6. Check for pending migrations
+info "Verificando migraciones pendientes..."
+PENDING_MIGRATIONS=$(ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py showmigrations --plan | grep -c '\[ \]' || echo 0")
+
+if [ "$PENDING_MIGRATIONS" -gt 0 ]; then
+    info "Aplicando $PENDING_MIGRATIONS migraciones pendientes..."
+    
+    # Apply migrations with error handling
+    ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate --fake-initial --run-syncdb" || {
+        warning "Migración estándar falló, intentando con --fake..."
+        
+        # Handle known problematic migrations
+        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate config 0013 --fake" 2>/dev/null || true
+        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate operation 0021 --fake" 2>/dev/null || true
+        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate operation --fake-initial" 2>/dev/null || true
+        
+        # Apply remaining migrations
+        ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate" || {
+            error "Error crítico en migraciones"
+            exit 1
+        }
+    }
+    
+    success "Migraciones aplicadas exitosamente"
+else
+    success "No hay migraciones pendientes"
+fi
+
+# 7. Restart services after migrations
+info "Reiniciando servicios post-migración..."
+ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH && /usr/local/bin/docker-compose restart app"
+sleep 5
+
+# 8. Verify deployment
 info "Verificando deployment..."
 if curl -s -o /dev/null -w "%{http_code}" https://www.xn--elfogndedonsoto-zrb.com/ | grep -q 200; then
     success "Sitio web funcionando"

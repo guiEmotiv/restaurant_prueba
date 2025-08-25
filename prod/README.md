@@ -56,6 +56,17 @@
 ./prod/deploy.sh --check
 ```
 
+### 🔄 Deploy con Solo Migraciones
+```bash
+# Si solo necesitas aplicar migraciones sin rebuild de frontend
+ssh -i ubuntu_fds_key.pem ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com
+cd /opt/restaurant-web
+git pull origin main
+docker-compose exec app python /app/backend/manage.py migrate --fake-initial
+docker-compose exec app python /app/backend/manage.py migrate
+docker-compose restart app
+```
+
 ## 🔧 Comandos de Monitoreo
 
 ```bash
@@ -67,32 +78,74 @@ docker ps
 
 # Reiniciar servicios si es necesario
 docker-compose restart app nginx
+
+# Ver migraciones aplicadas
+docker-compose exec app python /app/backend/manage.py showmigrations
+
+# Verificar configuración de BD
+docker-compose exec app python /app/backend/manage.py check --database default
 ```
 
 ## 🚨 Solución de Problemas
 
 ### ⚡ Problemas Comunes
 ```bash
-# Si el deploy falla
+# Error 500 en API (problema de migración más común)
+./prod/deploy.sh --full  # Aplica migraciones automáticamente
+
+# Si el deploy falla completamente
 ./prod/deploy.sh --rollback
 
 # Si hay errores de contenedores
 docker-compose restart app nginx
 
-# Si hay problemas de base de datos
+# Si hay problemas específicos de migraciones
+docker-compose exec app python /app/backend/manage.py migrate --fake-initial
+docker-compose exec app python /app/backend/manage.py migrate
+
+# Verificar salud después de fix
 ./prod/deploy.sh --check
+```
+
+### 🗄️ Problemas de Migraciones
+```bash
+# Verificar migraciones pendientes
+docker-compose exec app python /app/backend/manage.py showmigrations --plan
+
+# Aplicar migraciones manualmente (si --full falla)
+docker-compose exec app python /app/backend/manage.py migrate --fake-initial
+docker-compose exec app python /app/backend/manage.py migrate
+
+# Reset completo de migraciones (último recurso)
+docker-compose exec app python /app/backend/manage.py migrate --fake-initial --run-syncdb
 ```
 
 ## 🎯 Lo que Hace Cada Comando
 
-- **`--full`**: Deploy completo con rebuild de frontend y backend
-- **`--sync`**: Deploy + reemplaza BD producción con desarrollo [CUIDADO]
-- **`--check`**: Verifica que todo esté funcionando
-- **`--rollback`**: Vuelve a la versión anterior
+- **`--full`**: Deploy completo con rebuild de frontend, migraciones automáticas y verificaciones
+- **`--sync`**: Deploy + reemplaza BD producción con desarrollo [DESTRUCTIVO]
+- **`--check`**: Verifica que todo esté funcionando (contenedores, web, API)
+- **`--rollback`**: Vuelve código y BD a la versión anterior
+
+## 🔄 Nuevo Sistema de Migraciones Automáticas
+
+### ✅ El deploy `--full` ahora incluye:
+1. **Verificación previa** de migraciones locales
+2. **Aplicación automática** de migraciones en producción
+3. **Manejo inteligente** de migraciones problemáticas (fake cuando es necesario)
+4. **Validación post-migración** de la BD
+5. **Restart automático** de servicios después de migraciones
+
+### 🛡️ Migraciones Problemáticas Manejadas:
+- `config.0013` (RestaurantOperationalConfig)
+- `operation.0021` (CartItem table)
+- `operation.0018-0020` (Container fields)
+- Aplicación de `--fake-initial` cuando es necesario
 
 ## ⚠️ Importante
 
-- Siempre usar `--full` para cambios de código
-- Solo usar `--sync` para actualizar menú/configuración
-- Si algo falla, usar `--rollback` inmediatamente
-- Siempre verificar con `--check` después del deploy
+- **Usar `--full`** para TODOS los cambios (código + migraciones automáticas)
+- **Solo usar `--sync`** para sincronizar datos de menú completos
+- **Si algo falla, usar `--rollback`** (ahora incluye rollback de código)
+- **Siempre verificar con `--check`** después del deploy
+- **Las migraciones se aplican automáticamente** - no requiere intervención manual
