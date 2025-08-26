@@ -126,6 +126,65 @@ if [ "$DEPLOY_TYPE" != "check" ] && [ "$DEPLOY_TYPE" != "rollback" ]; then
     fi
 fi
 
+# 🧹 Clean EC2 to optimize space (for all deploy operations)
+if [ "$DEPLOY_TYPE" != "check" ]; then
+    info "🧹 Limpiando servidor EC2 para optimizar espacio..."
+    
+    # Check disk space before cleaning
+    DISK_USAGE_BEFORE=$(ssh -i "$EC2_KEY" "$EC2_HOST" "df -h / | awk 'NR==2 {print \$5}' | sed 's/%//'")
+    info "Espacio en disco antes de limpieza: ${DISK_USAGE_BEFORE}%"
+    
+    # Clean Docker logs
+    ssh -i "$EC2_KEY" "$EC2_HOST" "sudo sh -c 'truncate -s 0 /var/lib/docker/containers/*/*-json.log' 2>/dev/null || true" && \
+        success "Logs de Docker limpiados" || warning "No se pudieron limpiar algunos logs de Docker"
+    
+    # Clean old application logs
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && find data/logs -name '*.log' -mtime +7 -delete 2>/dev/null || true" && \
+        success "Logs antiguos de aplicación eliminados"
+    
+    # Keep only last 5 backups
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH/data && ls -t backup*.sqlite3 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true" && \
+        success "Backups antiguos eliminados (manteniendo últimos 5)"
+    
+    # Clean unused Docker images and volumes
+    ssh -i "$EC2_KEY" "$EC2_HOST" "sudo docker system prune -af --volumes 2>/dev/null || true" && \
+        success "Imágenes y volúmenes Docker no utilizados eliminados"
+    
+    # Clean old frontend assets (keep only last 3 builds for each file type)
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH/frontend/dist/assets && \
+        (ls -t index-*.js 2>/dev/null | tail -n +4 | xargs rm -f 2>/dev/null || true) && \
+        (ls -t index-*.css 2>/dev/null | tail -n +4 | xargs rm -f 2>/dev/null || true) && \
+        (ls -t vendor-*.js 2>/dev/null | tail -n +7 | xargs rm -f 2>/dev/null || true)" && \
+        success "Assets frontend antiguos eliminados"
+    
+    # Clean npm cache
+    ssh -i "$EC2_KEY" "$EC2_HOST" "$SSH_PATH_PREFIX cd $EC2_PATH && npm cache clean --force 2>/dev/null || true" && \
+        success "Cache npm limpiado"
+    
+    # Check disk space after cleaning
+    DISK_USAGE_AFTER=$(ssh -i "$EC2_KEY" "$EC2_HOST" "df -h / | awk 'NR==2 {print \$5}' | sed 's/%//'")
+    success "Espacio en disco después de limpieza: ${DISK_USAGE_AFTER}% (liberado: $((DISK_USAGE_BEFORE - DISK_USAGE_AFTER))%)"
+    
+    # Warning if still low on space
+    if [ "$DISK_USAGE_AFTER" -gt 85 ]; then
+        warning "⚠️ El disco sigue con poco espacio (${DISK_USAGE_AFTER}%). Considera aumentar el tamaño del disco EC2."
+    fi
+    
+    # Configure Docker log rotation if not already configured
+    ssh -i "$EC2_KEY" "$EC2_HOST" "if [ ! -f /etc/docker/daemon.json ]; then \
+        echo '🔧 Configurando rotación automática de logs Docker...'; \
+        sudo bash -c 'cat > /etc/docker/daemon.json <<EOF
+{
+  \"log-driver\": \"json-file\",
+  \"log-opts\": {
+    \"max-size\": \"10m\",
+    \"max-file\": \"3\"
+  }
+}
+EOF' && sudo systemctl restart docker && echo '✅ Rotación de logs Docker configurada'; \
+    fi" || warning "No se pudo configurar rotación de logs Docker"
+fi
+
 # 🛡️ Always create backup before any changes (except check)
 if [ "$DEPLOY_TYPE" != "check" ] && [ "$DEPLOY_TYPE" != "rollback" ]; then
     info "🛡️ Creando backup automático de seguridad..."
