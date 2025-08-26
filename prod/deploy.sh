@@ -26,13 +26,14 @@ KEY="ubuntu_fds_key.pem"
 PATH_EC2="/opt/restaurant-web"
 START=$(date +%s)
 
-# 🔍 Smart change detection
+# 🔍 Smart change detection with migration mapping
 detect_changes() {
-    info "Analizando cambios..."
+    info "Analizando cambios y migraciones..."
     
     HAS_FRONTEND=false
     HAS_BACKEND=false
     HAS_MIGRATIONS=false
+    PENDING_MIGRATIONS=""
     
     # Git changes
     if [ -n "$(git status --porcelain)" ]; then
@@ -50,14 +51,37 @@ detect_changes() {
         info "Backend changes detected"
     fi
     
-    # Check migrations
-    if cd backend && python3 manage.py showmigrations --plan 2>/dev/null | grep -q '\[ \]'; then
+    # 🎯 ADVANCED MIGRATION ANALYSIS
+    info "Analizando estado de migraciones..."
+    
+    # Check local migrations first
+    cd backend
+    local local_pending=$(python3 manage.py showmigrations --plan 2>/dev/null | grep -c '\[ \]' || echo "0")
+    
+    if [ "$local_pending" -gt 0 ]; then
+        info "📊 Migraciones pendientes locales: $local_pending"
+        
+        # Get specific pending migrations
+        PENDING_MIGRATIONS=$(python3 manage.py showmigrations --plan 2>/dev/null | grep '\[ \]' | head -5)
+        info "🔍 Primeras 5 migraciones pendientes:"
+        echo "$PENDING_MIGRATIONS" | while read -r migration; do
+            echo "   • $migration"
+        done
+        
+        # Check if this is a fresh database (all migrations pending)
+        local total_migrations=$(python3 manage.py showmigrations --plan 2>/dev/null | wc -l || echo "0")
+        if [ "$local_pending" -eq "$total_migrations" ]; then
+            warn "🚨 BASE DE DATOS VACÍA - Todas las migraciones pendientes ($local_pending/$total_migrations)"
+            warn "Esto indica que necesitas inicializar la base de datos"
+        fi
+        
         HAS_MIGRATIONS=true
-        info "Migrations pending"
+    else
+        ok "✅ No hay migraciones pendientes localmente"
     fi
     cd ..
     
-    ok "Change detection complete"
+    ok "Análisis de cambios completado"
 }
 
 # 🧹 Ultra-fast cleanup (single SSH call)
@@ -149,10 +173,32 @@ deploy_to_ec2() {
             /usr/bin/rm -f /tmp/frontend_${DEPLOY_ID}.tar.gz frontend/dist.bak.* 2>/dev/null || true
         fi
         
-        # Migrations (with backup)
+        # Migrations (with comprehensive handling)
         if [ '$HAS_MIGRATIONS' = true ]; then
-            /usr/bin/cp data/restaurant_prod.sqlite3 data/backup_migration_${DEPLOY_ID}.sqlite3
-            /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate
+            echo '🗄️  Aplicando migraciones...'
+            
+            # Check if database exists
+            if [ -f data/restaurant_prod.sqlite3 ]; then
+                echo '📋 Creando backup antes de migraciones...'
+                /usr/bin/cp data/restaurant_prod.sqlite3 data/backup_migration_${DEPLOY_ID}.sqlite3
+                
+                # Check server migration status
+                SERVER_PENDING=\$(/usr/local/bin/docker-compose exec -T app python /app/backend/manage.py showmigrations --plan | grep -c '\[ \]' || echo '0')
+                echo \"📊 Migraciones pendientes en servidor: \$SERVER_PENDING\"
+                
+                if [ \"\$SERVER_PENDING\" -gt 0 ]; then
+                    echo '🔄 Aplicando migraciones incrementales...'
+                    /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate --verbosity=2
+                else
+                    echo '✅ Servidor ya tiene todas las migraciones aplicadas'
+                fi
+            else
+                echo '🚨 Base de datos no existe - Inicializando desde cero...'
+                echo '📝 Aplicando todas las migraciones iniciales...'
+                /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate --verbosity=2
+            fi
+            
+            echo '✅ Proceso de migraciones completado'
         fi
         
         # Service restart (minimal downtime)
