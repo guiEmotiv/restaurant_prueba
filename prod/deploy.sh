@@ -42,15 +42,46 @@ detect_changes() {
         git add -A && git commit -m "deploy: Auto-commit $(date '+%Y%m%d_%H%M%S')" && git push -q
     fi
     
-    # Check last 2 commits for changes
-    if git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E '^frontend/' >/dev/null; then
+    # 🎯 ENHANCED CHANGE DETECTION - Check recent commits and server sync
+    info "🔍 Detectando cambios desde último deploy exitoso..."
+    
+    # Check if there are any uncommitted changes first
+    if [ -n "$(git status --porcelain | grep -E '^(frontend|backend)/')" ]; then
+        info "📝 Cambios sin commitear detectados"
         HAS_FRONTEND=true
-        info "📱 Frontend changes detected"
+        HAS_BACKEND=true
     fi
     
-    if git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E '^backend/' >/dev/null; then
-        HAS_BACKEND=true
-        info "⚙️  Backend changes detected"
+    # Get server's current commit (more reliable than diff)
+    local server_commit=""
+    if server_commit=$(ssh -i "$KEY" "$EC2" "cd $PATH_EC2 && git rev-parse HEAD" 2>/dev/null); then
+        info "📡 Último commit en servidor: ${server_commit:0:8}"
+        
+        # Check for changes since server commit
+        if git diff --name-only "$server_commit" HEAD 2>/dev/null | grep -E '^frontend/' >/dev/null; then
+            HAS_FRONTEND=true
+            info "📱 Frontend changes detected (since server)"
+            git diff --name-only "$server_commit" HEAD 2>/dev/null | grep -E '^frontend/' | head -3 | while read -r file; do
+                echo "   • $file"
+            done
+        fi
+        
+        if git diff --name-only "$server_commit" HEAD 2>/dev/null | grep -E '^backend/' >/dev/null; then
+            HAS_BACKEND=true
+            info "⚙️  Backend changes detected (since server)"
+        fi
+    else
+        warn "⚠️  No se pudo obtener commit del servidor, usando fallback"
+        # Fallback: check last 10 commits for safety
+        if git diff --name-only HEAD~10 HEAD 2>/dev/null | grep -E '^frontend/' >/dev/null; then
+            HAS_FRONTEND=true
+            info "📱 Frontend changes detected (last 10 commits)"
+        fi
+        
+        if git diff --name-only HEAD~10 HEAD 2>/dev/null | grep -E '^backend/' >/dev/null; then
+            HAS_BACKEND=true
+            info "⚙️  Backend changes detected (last 10 commits)"
+        fi
     fi
     
     # 🎯 FRONTEND QUALITY ANALYSIS
@@ -169,22 +200,36 @@ ec2_cleanup() {
     }
 }
 
-# 🏗️ Optimized build (only if needed)
+# 🏗️ FORCE BUILD - Always build when frontend changes detected
 build_frontend() {
-    [ "$HAS_FRONTEND" != true ] && return 0
+    if [ "$HAS_FRONTEND" != true ]; then
+        info "⏭️  No frontend changes detected, skipping build"
+        return 0
+    fi
     
-    info "Building frontend..."
+    info "🔨 Building frontend (changes detected)..."
     cd frontend
     
-    # Smart npm install
-    [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ] && {
+    # Always ensure fresh dependencies for production build
+    if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
+        info "📦 Installing/updating dependencies..."
         npm ci --prefer-offline --no-audit --silent
-    }
+    fi
     
-    # Clean build
-    rm -rf dist && npm run build --silent
+    # Force clean build to ensure all changes are captured
+    info "🧹 Cleaning previous build..."
+    rm -rf dist
+    
+    info "⚡ Building with optimization..."
+    npm run build --silent
+    
+    # Verify build was successful
+    if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
+        cd .. && err "❌ Frontend build failed"
+    fi
+    
     cd ..
-    ok "Frontend built"
+    ok "✅ Frontend build completed successfully"
 }
 
 # 🚀 Ultra-efficient deployment (single SSH session)
