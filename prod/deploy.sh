@@ -42,45 +42,99 @@ detect_changes() {
         git add -A && git commit -m "deploy: Auto-commit $(date '+%Y%m%d_%H%M%S')" && git push -q
     fi
     
-    # 🎯 ENHANCED CHANGE DETECTION - Check recent commits and server sync
-    info "🔍 Detectando cambios desde último deploy exitoso..."
+    # 🎯 COMPREHENSIVE CHANGE DETECTION - All possible scenarios
+    info "🔍 Detectando TODOS los tipos de cambios..."
     
-    # Check if there are any uncommitted changes first
-    if [ -n "$(git status --porcelain | grep -E '^(frontend|backend)/')" ]; then
+    HAS_DOCKER_CHANGES=false
+    HAS_NGINX_CHANGES=false
+    HAS_ENV_CHANGES=false
+    
+    # Check uncommitted changes first
+    if [ -n "$(git status --porcelain)" ]; then
         info "📝 Cambios sin commitear detectados"
-        HAS_FRONTEND=true
-        HAS_BACKEND=true
+        git status --porcelain | while read -r line; do
+            echo "   • $line"
+        done
+        
+        # Categorize uncommitted changes
+        if git status --porcelain | grep -E '^.*(frontend|src)/' >/dev/null; then
+            HAS_FRONTEND=true
+        fi
+        if git status --porcelain | grep -E '^.*(backend)/' >/dev/null; then
+            HAS_BACKEND=true
+        fi
+        if git status --porcelain | grep -E '^.*(docker-compose|Dockerfile)' >/dev/null; then
+            HAS_DOCKER_CHANGES=true
+        fi
+        if git status --porcelain | grep -E '^.*(nginx)/' >/dev/null; then
+            HAS_NGINX_CHANGES=true
+        fi
     fi
     
-    # Get server's current commit (more reliable than diff)
+    # Get server's current commit (most reliable method)
     local server_commit=""
     if server_commit=$(ssh -i "$KEY" "$EC2" "cd $PATH_EC2 && git rev-parse HEAD" 2>/dev/null); then
-        info "📡 Último commit en servidor: ${server_commit:0:8}"
+        info "📡 Servidor actual: ${server_commit:0:8}"
+        local local_commit=$(git rev-parse HEAD)
         
-        # Check for changes since server commit
-        if git diff --name-only "$server_commit" HEAD 2>/dev/null | grep -E '^frontend/' >/dev/null; then
-            HAS_FRONTEND=true
-            info "📱 Frontend changes detected (since server)"
-            git diff --name-only "$server_commit" HEAD 2>/dev/null | grep -E '^frontend/' | head -3 | while read -r file; do
-                echo "   • $file"
-            done
-        fi
-        
-        if git diff --name-only "$server_commit" HEAD 2>/dev/null | grep -E '^backend/' >/dev/null; then
-            HAS_BACKEND=true
-            info "⚙️  Backend changes detected (since server)"
+        if [ "$server_commit" != "$local_commit" ]; then
+            info "🔄 Servidor desincronizado, analizando diferencias..."
+            
+            # Comprehensive change analysis
+            local changed_files=$(git diff --name-only "$server_commit" HEAD 2>/dev/null)
+            
+            if echo "$changed_files" | grep -E '^frontend/' >/dev/null; then
+                HAS_FRONTEND=true
+                info "📱 Frontend changes detected:"
+                echo "$changed_files" | grep -E '^frontend/' | head -5 | while read -r file; do
+                    echo "   • $file"
+                done
+            fi
+            
+            if echo "$changed_files" | grep -E '^backend/' >/dev/null; then
+                HAS_BACKEND=true
+                info "⚙️  Backend changes detected:"
+                echo "$changed_files" | grep -E '^backend/' | head -5 | while read -r file; do
+                    echo "   • $file"
+                done
+            fi
+            
+            if echo "$changed_files" | grep -E '^(docker-compose|Dockerfile)' >/dev/null; then
+                HAS_DOCKER_CHANGES=true
+                info "🐳 Docker configuration changes detected"
+            fi
+            
+            if echo "$changed_files" | grep -E '^nginx/' >/dev/null; then
+                HAS_NGINX_CHANGES=true
+                info "🌐 Nginx configuration changes detected"
+            fi
+            
+            if echo "$changed_files" | grep -E '\.(env|json)$' >/dev/null; then
+                HAS_ENV_CHANGES=true
+                info "⚙️  Configuration changes detected"
+            fi
+        else
+            ok "✅ Servidor sincronizado con HEAD"
         fi
     else
-        warn "⚠️  No se pudo obtener commit del servidor, usando fallback"
-        # Fallback: check last 10 commits for safety
-        if git diff --name-only HEAD~10 HEAD 2>/dev/null | grep -E '^frontend/' >/dev/null; then
+        warn "⚠️  No se pudo conectar al servidor, usando análisis local"
+        # Comprehensive fallback - check last 15 commits
+        local recent_changes=$(git diff --name-only HEAD~15 HEAD 2>/dev/null)
+        
+        if echo "$recent_changes" | grep -E '^frontend/' >/dev/null; then
             HAS_FRONTEND=true
-            info "📱 Frontend changes detected (last 10 commits)"
+            info "📱 Frontend changes (últimos 15 commits)"
         fi
         
-        if git diff --name-only HEAD~10 HEAD 2>/dev/null | grep -E '^backend/' >/dev/null; then
+        if echo "$recent_changes" | grep -E '^backend/' >/dev/null; then
             HAS_BACKEND=true
-            info "⚙️  Backend changes detected (last 10 commits)"
+            info "⚙️  Backend changes (últimos 15 commits)"
+        fi
+        
+        if echo "$recent_changes" | grep -E '^(docker-compose|Dockerfile|nginx)' >/dev/null; then
+            HAS_DOCKER_CHANGES=true
+            HAS_NGINX_CHANGES=true
+            info "🐳 Infrastructure changes (últimos 15 commits)"
         fi
     fi
     
@@ -263,13 +317,13 @@ deploy_to_ec2() {
             /usr/bin/rm -f /tmp/frontend_${DEPLOY_ID}.tar.gz frontend/dist.bak.* 2>/dev/null || true
         fi
         
-        # Migrations (with comprehensive handling)
+        # 🗄️  COMPREHENSIVE DATABASE MIGRATIONS
         if [ '$HAS_MIGRATIONS' = true ]; then
-            echo '🗄️  Aplicando migraciones...'
+            echo '🗄️  Aplicando migraciones con verificación completa...'
             
-            # Check if database exists
+            # Always backup before migrations
             if [ -f data/restaurant_prod.sqlite3 ]; then
-                echo '📋 Creando backup antes de migraciones...'
+                echo '📋 Creando backup de seguridad...'
                 /usr/bin/cp data/restaurant_prod.sqlite3 data/backup_migration_${DEPLOY_ID}.sqlite3
                 
                 # Check server migration status
@@ -279,6 +333,14 @@ deploy_to_ec2() {
                 if [ \"\$SERVER_PENDING\" -gt 0 ]; then
                     echo '🔄 Aplicando migraciones incrementales...'
                     /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate --verbosity=2
+                    
+                    # Verify migrations applied successfully
+                    REMAINING=\$(/usr/local/bin/docker-compose exec -T app python /app/backend/manage.py showmigrations --plan | grep -c '\[ \]' || echo '0')
+                    if [ \"\$REMAINING\" -eq 0 ]; then
+                        echo '✅ Todas las migraciones aplicadas exitosamente'
+                    else
+                        echo \"⚠️  Aún quedan \$REMAINING migraciones pendientes\"
+                    fi
                 else
                     echo '✅ Servidor ya tiene todas las migraciones aplicadas'
                 fi
@@ -286,13 +348,32 @@ deploy_to_ec2() {
                 echo '🚨 Base de datos no existe - Inicializando desde cero...'
                 echo '📝 Aplicando todas las migraciones iniciales...'
                 /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate --verbosity=2
+                echo '✅ Base de datos inicializada completamente'
             fi
-            
-            echo '✅ Proceso de migraciones completado'
         fi
         
-        # Service restart (minimal downtime)
-        /usr/local/bin/docker-compose restart app nginx >/dev/null
+        # 🐳 DOCKER & NGINX INFRASTRUCTURE UPDATES
+        local services_to_restart=\"\"
+        if [ '$HAS_DOCKER_CHANGES' = true ] || [ '$HAS_NGINX_CHANGES' = true ]; then
+            echo '🔧 Cambios de infraestructura detectados...'
+            
+            if [ '$HAS_DOCKER_CHANGES' = true ]; then
+                echo '🐳 Reconstruyendo contenedores con cambios...'
+                /usr/local/bin/docker-compose build --no-cache app
+                services_to_restart=\"app nginx\"
+            fi
+            
+            if [ '$HAS_NGINX_CHANGES' = true ]; then
+                echo '🌐 Actualizando configuración de Nginx...'
+                services_to_restart=\"nginx \$services_to_restart\"
+            fi
+            
+            echo \"🔄 Reiniciando servicios: \$services_to_restart\"
+            /usr/local/bin/docker-compose restart \$services_to_restart >/dev/null
+        else
+            echo '🔄 Reinicio estándar de servicios...'
+            /usr/local/bin/docker-compose restart app nginx >/dev/null
+        fi
         
         # Quick health check
         /usr/bin/sleep 5
@@ -324,13 +405,18 @@ main_deploy() {
             # Success report
             DURATION=$(($(date +%s) - START))
             echo ""
-            ok "🎉 DEPLOYMENT COMPLETE (${DURATION}s)"
+            ok "🎉 COMPREHENSIVE DEPLOYMENT COMPLETE (${DURATION}s)"
             echo ""
-            echo "   📱 Frontend: $([ "$HAS_FRONTEND" = true ] && echo "✅ Updated" || echo "⏭️  No changes")"
-            echo "   ⚙️  Backend:  $([ "$HAS_BACKEND" = true ] && echo "✅ Updated" || echo "⏭️  No changes")"  
-            echo "   🗄️  DB:       $([ "$HAS_MIGRATIONS" = true ] && echo "✅ Migrated" || echo "⏭️  No changes")"
+            echo "   📱 Frontend:      $([ "$HAS_FRONTEND" = true ] && echo "✅ Updated" || echo "⏭️  No changes")"
+            echo "   ⚙️  Backend:       $([ "$HAS_BACKEND" = true ] && echo "✅ Updated" || echo "⏭️  No changes")"  
+            echo "   🗄️  Database:      $([ "$HAS_MIGRATIONS" = true ] && echo "✅ Migrated" || echo "⏭️  No changes")"
+            echo "   🐳 Docker:        $([ "$HAS_DOCKER_CHANGES" = true ] && echo "✅ Rebuilt" || echo "⏭️  No changes")"
+            echo "   🌐 Nginx:         $([ "$HAS_NGINX_CHANGES" = true ] && echo "✅ Updated" || echo "⏭️  No changes")"
+            echo "   ⚙️  Config:        $([ "$HAS_ENV_CHANGES" = true ] && echo "✅ Updated" || echo "⏭️  No changes")"
+            echo "   🔍 Lint Issues:   $([ "$HAS_LINT_ISSUES" = true ] && echo "⚠️  $lint_issues found" || echo "✅ Clean")"
             echo ""
-            echo "   🌐 https://www.xn--elfogndedonsoto-zrb.com/"
+            echo "   🌐 Production: https://www.xn--elfogndedonsoto-zrb.com/"
+            echo "   🔧 API:        https://www.xn--elfogndedonsoto-zrb.com/api/v1/"
             ;;
             
         "check")
