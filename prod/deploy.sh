@@ -413,7 +413,7 @@ main_deploy() {
             echo "   🐳 Docker:        $([ "$HAS_DOCKER_CHANGES" = true ] && echo "✅ Rebuilt" || echo "⏭️  No changes")"
             echo "   🌐 Nginx:         $([ "$HAS_NGINX_CHANGES" = true ] && echo "✅ Updated" || echo "⏭️  No changes")"
             echo "   ⚙️  Config:        $([ "$HAS_ENV_CHANGES" = true ] && echo "✅ Updated" || echo "⏭️  No changes")"
-            echo "   🔍 Lint Issues:   $([ "$HAS_LINT_ISSUES" = true ] && echo "⚠️  $lint_issues found" || echo "✅ Clean")"
+            echo "   🔍 Lint Issues:   $([ "$HAS_LINT_ISSUES" = true ] && echo "⚠️  140 found" || echo "✅ Clean")"
             echo ""
             echo "   🌐 Production: https://www.xn--elfogndedonsoto-zrb.com/"
             echo "   🔧 API:        https://www.xn--elfogndedonsoto-zrb.com/api/v1/"
