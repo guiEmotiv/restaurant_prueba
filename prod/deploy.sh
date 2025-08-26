@@ -91,8 +91,12 @@ ec2_cleanup() {
         echo \"DISK:\$DISK\"
     " 2>/dev/null | grep "DISK:" | cut -d: -f2 | {
         read disk_usage
-        ok "Cleanup done (Disk: ${disk_usage}%)"
-        [ "$disk_usage" -gt 90 ] && warn "Low disk space: ${disk_usage}%"
+        if [ -n "$disk_usage" ] && [ "$disk_usage" -gt 0 ] 2>/dev/null; then
+            ok "Cleanup done (Disk: ${disk_usage}%)"
+            [ "$disk_usage" -gt 90 ] && warn "Low disk space: ${disk_usage}%"
+        else
+            ok "Cleanup done"
+        fi
     }
 }
 
@@ -131,32 +135,32 @@ deploy_to_ec2() {
     # Single SSH session for all operations
     ssh -i "$KEY" "$EC2" "
         cd $PATH_EC2
-        export PATH=/usr/local/bin:\$PATH
+        export PATH=/usr/local/bin:/usr/bin:/bin:\$PATH
         
         # Git update
-        git pull -q origin main
+        /usr/bin/git pull -q origin main
         
         # Frontend deployment (atomic)
         if [ -f '/tmp/frontend_${DEPLOY_ID}.tar.gz' ]; then
-            mkdir -p .staging_${DEPLOY_ID}
-            tar -xzf /tmp/frontend_${DEPLOY_ID}.tar.gz -C .staging_${DEPLOY_ID}/
-            [ -d frontend/dist ] && mv frontend/dist frontend/dist.bak.${DEPLOY_ID}
-            mv .staging_${DEPLOY_ID} frontend/dist
-            rm -f /tmp/frontend_${DEPLOY_ID}.tar.gz frontend/dist.bak.* 2>/dev/null || true
+            /usr/bin/mkdir -p .staging_${DEPLOY_ID}
+            /usr/bin/tar -xzf /tmp/frontend_${DEPLOY_ID}.tar.gz -C .staging_${DEPLOY_ID}/
+            [ -d frontend/dist ] && /usr/bin/mv frontend/dist frontend/dist.bak.${DEPLOY_ID}
+            /usr/bin/mv .staging_${DEPLOY_ID} frontend/dist
+            /usr/bin/rm -f /tmp/frontend_${DEPLOY_ID}.tar.gz frontend/dist.bak.* 2>/dev/null || true
         fi
         
         # Migrations (with backup)
         if [ '$HAS_MIGRATIONS' = true ]; then
-            cp data/restaurant_prod.sqlite3 data/backup_migration_${DEPLOY_ID}.sqlite3
-            docker-compose exec -T app python /app/backend/manage.py migrate
+            /usr/bin/cp data/restaurant_prod.sqlite3 data/backup_migration_${DEPLOY_ID}.sqlite3
+            /usr/local/bin/docker-compose exec -T app python /app/backend/manage.py migrate
         fi
         
         # Service restart (minimal downtime)
-        docker-compose restart app nginx >/dev/null
+        /usr/local/bin/docker-compose restart app nginx >/dev/null
         
         # Quick health check
-        sleep 5
-        curl -sf http://localhost >/dev/null && echo 'OK' || echo 'FAIL'
+        /usr/bin/sleep 5
+        /usr/bin/curl -sf http://localhost >/dev/null && echo 'OK' || echo 'FAIL'
     " | tail -1 | {
         read status
         [ "$status" = "OK" ] && ok "Deployment successful" || err "Deployment failed"
