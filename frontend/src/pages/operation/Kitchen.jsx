@@ -6,11 +6,46 @@ import { useAuth } from '../../contexts/AuthContext';
 import orderItemPoller from '../../services/orderItemPoller';
 import notificationService from '../../services/notifications';
 
-// Componente memoizado para tarjetas de items con comparación personalizada
+// 🚀 OPTIMIZACIÓN: Cache global de fechas para máximo rendimiento
+const dateCache = new Map();
+const timeFormatterPeru = new Intl.DateTimeFormat('es-PE', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false
+});
+
+// Función ultra-optimizada para parsear fechas
+const getCachedTime = (dateString, type = 'timestamp') => {
+  const cacheKey = `${dateString}_${type}`;
+  if (!dateCache.has(cacheKey)) {
+    const date = new Date(dateString);
+    if (type === 'timestamp') {
+      dateCache.set(cacheKey, date.getTime());
+    } else if (type === 'formatted') {
+      dateCache.set(cacheKey, timeFormatterPeru.format(date));
+    }
+  }
+  return dateCache.get(cacheKey);
+};
+
+// Limpiar cache periódicamente para evitar memory leaks
+setInterval(() => {
+  if (dateCache.size > 1000) {
+    dateCache.clear();
+  }
+}, 300000); // 5 minutos
+
+// 🚀 OPTIMIZACIÓN: OrderItemCard ultra-eficiente con memoización profunda
 const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
+  // Cache del tiempo formateado para evitar recálculos
+  const formattedTime = item.formattedTime || getCachedTime(item.created_at, 'formatted');
+  
+  // Click handler optimizado - crear función inline estable
+  const onCardClick = (e) => handleCardClick(e, item);
+  
   return (
     <div
-      onClick={(e) => handleCardClick(e, item)}
+      onClick={onCardClick}
       className={`rounded-lg p-2 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} ${timeStatus.bgColor} relative`}
     >
       {/* Barra de progreso de tiempo */}
@@ -29,11 +64,7 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
         <div className="flex justify-between items-start">
           <span className="text-lg font-bold text-gray-900">#{item.order_id}</span>
           <div className="text-sm font-medium text-gray-900">
-            {item.formattedTime || new Date(item.created_at).toLocaleTimeString('es-PE', { 
-              hour: '2-digit', 
-              minute: '2-digit',
-              hour12: false 
-            })}hr | {timeStatus.displayTime}
+            {formattedTime}hr | {timeStatus.displayTime}
           </div>
         </div>
 
@@ -88,13 +119,14 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
     </div>
   );
 }, (prevProps, nextProps) => {
-  // Comparación personalizada para evitar re-renders innecesarios
+  // 🎯 COMPARACIÓN OPTIMIZADA: Permitir actualización de tiempo cada segundo
   return prevProps.item.id === nextProps.item.id &&
          prevProps.item.status === nextProps.item.status &&
          prevProps.item.preparing_at === nextProps.item.preparing_at &&
          prevProps.timeStatus.status === nextProps.timeStatus.status &&
          prevProps.timeStatus.progress === nextProps.timeStatus.progress &&
-         prevProps.timeStatus.displayTime === nextProps.timeStatus.displayTime;
+         prevProps.timeStatus.displayTime === nextProps.timeStatus.displayTime &&
+         prevProps.timeStatus.itemStatus === nextProps.timeStatus.itemStatus;
 });
 
 // Constantes fuera del componente para evitar recreaciones
@@ -129,11 +161,12 @@ const Kitchen = () => {
     item: null,
     newStatus: null
   });
-  const [, forceUpdate] = useState({}); // Para forzar re-renders
+  // 🔧 SOLUCIÓN: Estado para forzar re-renders estable
+  const [timeUpdateTrigger, setTimeUpdateTrigger] = useState(0);
   const { showSuccess, showError } = useToast();
   const { userRole } = useAuth();
 
-  // 🚀 OPTIMIZACIÓN: loadKitchenBoard con useCallback
+  // 🚀 OPTIMIZACIÓN: loadKitchenBoard con useCallback - SIMPLIFICADO
   const loadKitchenBoard = useCallback(async () => {
     try {
       const data = await apiService.orders.getKitchenBoard();
@@ -167,9 +200,10 @@ const Kitchen = () => {
       setAudioReady(notificationService.isAudioReady());
     }, 1000);
     
-    // Actualizar los tiempos transcurridos cada segundo
+    // 🚀 OPTIMIZACIÓN: Actualizar tiempos automáticamente cada segundo
     const timeUpdateInterval = setInterval(() => {
-      forceUpdate({});
+      // Siempre actualizar para que el tiempo transcurrido se actualice automáticamente
+      setTimeUpdateTrigger(prev => (prev + 1) % 1000000); // Evitar números muy grandes
     }, 1000);
     
     return () => {
@@ -308,16 +342,22 @@ const Kitchen = () => {
     }
   }, [confirmModal, loadKitchenBoard, showSuccess, closeConfirmModal, showError]);
 
-  // 🚀 OPTIMIZACIÓN: handleCardClick con useCallback
-  const handleCardClick = useCallback(async (e, item) => {
-    // 🔊 Asegurar que el audio esté listo cuando el usuario interactúa
-    await ensureAudioReady();
+  // 🚀 OPTIMIZACIÓN ULTRA: handleCardClick optimizado sin async innecesario
+  const handleCardClick = useCallback((e, item) => {
+    // Prevenir propagación inmediatamente
+    e?.stopPropagation();
     
-    const nextStatus = getNextStatus(item.status);
+    // 🔊 Audio en background - no bloquear UI
+    ensureAudioReady();
+    
+    // Cálculo directo del siguiente estado sin función
+    const nextStatus = item.status === 'CREATED' ? 'PREPARING' : 
+                      item.status === 'PREPARING' ? 'SERVED' : null;
+    
     if (nextStatus) {
       openConfirmModal(item, nextStatus);
     }
-  }, [ensureAudioReady, getNextStatus, openConfirmModal]);
+  }, [ensureAudioReady, openConfirmModal]);
 
   // Función removida - no se usa en el código
 
@@ -340,9 +380,10 @@ const Kitchen = () => {
     // Para cada estación, calcular tiempo acumulado
     for (const [stationKey, stationItems] of stations) {
       // Ordenar por tiempo de creación
+      // 🚀 OPTIMIZACIÓN: Ordenamiento con cache de timestamps
       stationItems.sort((a, b) => {
-        const timeA = a.createdAtTime || new Date(a.created_at).getTime();
-        const timeB = b.createdAtTime || new Date(b.created_at).getTime();
+        const timeA = a.createdAtTime || getCachedTime(a.created_at, 'timestamp');
+        const timeB = b.createdAtTime || getCachedTime(b.created_at, 'timestamp');
         return timeA - timeB;
       });
       
@@ -365,68 +406,54 @@ const Kitchen = () => {
     return result;
   }, []);
 
-  // ⚡ OPTIMIZADO: Cache más eficiente con WeakMap
-  const timeStatusCache = useMemo(() => new WeakMap(), []);
-  
+  // 🚀 OPTIMIZACIÓN ULTRA: getTimeStatus con precisión de segundos
   const getTimeStatus = useCallback((item) => {
-    // No usar cache para que se actualice cada segundo
-    return calculateTimeStatus(item);
-  }, []);
-
-  const calculateTimeStatus = useCallback((item) => {
     const now = Date.now();
-    const createdAt = item.createdAtTime || new Date(item.created_at).getTime();
-    let elapsedSinceCreation = Math.max(0, (now - createdAt) / 60000); // minutos desde creación, evitar negativos
-
-    // ✅ El tiempo transcurrido SIEMPRE es desde la creación
-    let displayTime = elapsedSinceCreation; // Tiempo total desde creación para mostrar
-    let progressTime = 0; // Tiempo para la barra de progreso
-    let isOverdue = false; // Para determinar si mostrar alerta
-    let statusText;
+    // Usar cache para timestamps
+    const createdAt = getCachedTime(item.created_at, 'timestamp');
+    const elapsedMs = Math.max(0, now - createdAt); // milisegundos totales
+    const elapsedSinceCreation = elapsedMs / 60000; // minutos para cálculos
     
-    if (item.status === 'CREATED') {
-      statusText = 'Pendiente';
-      // En estado CREATED, la barra de progreso permanece en 0
-      progressTime = 0;
-    } else if (item.status === 'PREPARING') {
-      statusText = 'Preparando';
-      // Solo cuando está en PREPARING, calculamos el progreso
-      if (item.preparing_at) {
-        const preparingAt = item.preparingAtTime || new Date(item.preparing_at).getTime();
-        progressTime = (now - preparingAt) / 60000; // minutos
-        isOverdue = progressTime > item.preparation_time;
-      } else {
-        progressTime = 0;
-      }
+    let progressTime = 0;
+    let isOverdue = false;
+    const isCreated = item.status === 'CREATED';
+    const statusText = isCreated ? 'Pendiente' : 'Preparando';
+    
+    if (!isCreated && item.preparing_at) {
+      const preparingAt = getCachedTime(item.preparing_at, 'timestamp');
+      progressTime = (now - preparingAt) / 60000;
+      isOverdue = progressTime > item.preparation_time;
     }
     
-    // Calcular porcentaje de la barra basado en progressTime
-    // Limitamos al 100% para que la barra no se desborde visualmente
-    const percentage = Math.min((progressTime / item.preparation_time) * 100, 100);
+    // Calcular porcentaje con Math.min inline
+    const percentage = progressTime === 0 ? 0 : Math.min((progressTime / item.preparation_time) * 100, 100);
     
-    // Usar referencias directas para evitar búsquedas
-    const colors = item.status === 'PREPARING' ? PREPARING_COLORS : CREATED_COLORS;
+    // Usar referencia directa a colores
+    const colors = isCreated ? CREATED_COLORS : PREPARING_COLORS;
     
-    // Determinar el tiempo a mostrar
+    // 🎯 FORMATO CON PRECISIÓN DE SEGUNDOS
+    const totalSeconds = Math.floor(elapsedMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    
     let displayTimeFormatted;
-    
-    // El tiempo mostrado siempre es desde la creación
-    displayTimeFormatted = `${Math.ceil(displayTime)}m`;
-    
-    // El estado de urgencia ahora se basa en si se excedió el tiempo de preparación durante PREPARING
-    let urgencyStatus;
-    if (isOverdue && item.status === 'PREPARING') {
-      urgencyStatus = 'overdue';
+    if (minutes === 0) {
+      // Solo segundos si es menor a 1 minuto
+      displayTimeFormatted = `${seconds}s`;
+    } else if (minutes < 10) {
+      // Minutos y segundos si es menor a 10 minutos
+      displayTimeFormatted = `${minutes}m ${seconds}s`;
     } else {
-      urgencyStatus = 'normal';
+      // Solo minutos si es 10+ minutos para no sobrecargar
+      displayTimeFormatted = `${minutes}m`;
     }
     
     return {
       ...colors,
-      status: urgencyStatus, // Para el icono de alerta (solo 'overdue' cuando está en PREPARING y excede tiempo)
-      progress: percentage, // Porcentaje de la barra (0 en CREATED, progreso en PREPARING)
-      displayTime: displayTimeFormatted, // Tiempo mostrado (siempre desde creación)
-      statusText: statusText,
+      status: (isOverdue && !isCreated) ? 'overdue' : 'normal',
+      progress: percentage,
+      displayTime: displayTimeFormatted,
+      statusText,
       itemStatus: item.status
     };
   }, []);
@@ -452,10 +479,13 @@ const Kitchen = () => {
     const allItems = [];
     for (const recipe of kitchenBoard) {
       for (const item of recipe.items) {
-        // Reutilizar objeto si ya tiene las propiedades
-        if (item.recipe_name === recipe.recipe_name && 
-            item.recipe_group_name === (recipe.recipe_group_name || 'Sin Grupo') &&
-            item.recipe_group_id === (recipe.recipe_group_id || null)) {
+        // 🚀 OPTIMIZACIÓN: Reutilizar objetos y cache de tiempo formateado
+        const needsEnrichment = item.recipe_name !== recipe.recipe_name || 
+                               item.recipe_group_name !== (recipe.recipe_group_name || 'Sin Grupo') ||
+                               item.recipe_group_id !== (recipe.recipe_group_id || null) ||
+                               !item.formattedTime;
+
+        if (!needsEnrichment) {
           allItems.push(item);
         } else {
           allItems.push({
@@ -463,11 +493,7 @@ const Kitchen = () => {
             recipe_name: recipe.recipe_name,
             recipe_group_name: recipe.recipe_group_name || 'Sin Grupo',
             recipe_group_id: recipe.recipe_group_id || null,
-            formattedTime: new Date(item.created_at).toLocaleTimeString('es-PE', { 
-              hour: '2-digit', 
-              minute: '2-digit',
-              hour12: false 
-            })
+            formattedTime: getCachedTime(item.created_at, 'formatted')
           });
         }
       }
@@ -501,11 +527,11 @@ const Kitchen = () => {
       dynamicGroups[groupKey].items.push(item);
     });
 
-    // Ordenar items dentro de cada grupo por created_at (orden de llegada)
+    // 🚀 OPTIMIZACIÓN: Ordenar items con cache de timestamps
     Object.values(dynamicGroups).forEach(group => {
       group.items.sort((a, b) => {
-        const timeA = a.createdAtTime || new Date(a.created_at).getTime();
-        const timeB = b.createdAtTime || new Date(b.created_at).getTime();
+        const timeA = a.createdAtTime || getCachedTime(a.created_at, 'timestamp');
+        const timeB = b.createdAtTime || getCachedTime(b.created_at, 'timestamp');
         return timeA - timeB;
       });
     });
@@ -522,7 +548,7 @@ const Kitchen = () => {
       }
       return columns;
     }
-  }, [kitchenBoard, selectedTableFilter, selectedGroupTab, calculateStationQueue]);
+  }, [kitchenBoard, selectedTableFilter, selectedGroupTab, calculateStationQueue, timeUpdateTrigger]);
 
   
   // ⚡ OPTIMIZADO: Memoizar total de items
