@@ -131,7 +131,7 @@ if [ "$DEPLOY_TYPE" != "check" ]; then
     info "🧹 Limpiando servidor EC2 para optimizar espacio..."
     
     # Check disk space before cleaning
-    DISK_USAGE_BEFORE=$(ssh -i "$EC2_KEY" "$EC2_HOST" "df -h / | awk 'NR==2 {print \$5}' | sed 's/%//'")
+    DISK_USAGE_BEFORE=$(ssh -i "$EC2_KEY" "$EC2_HOST" "/usr/bin/df -h / | /usr/bin/awk 'NR==2 {print \$5}' | /usr/bin/sed 's/%//'")
     info "Espacio en disco antes de limpieza: ${DISK_USAGE_BEFORE}%"
     
     # Clean Docker logs
@@ -162,7 +162,7 @@ if [ "$DEPLOY_TYPE" != "check" ]; then
         success "Cache npm limpiado"
     
     # Check disk space after cleaning
-    DISK_USAGE_AFTER=$(ssh -i "$EC2_KEY" "$EC2_HOST" "df -h / | awk 'NR==2 {print \$5}' | sed 's/%//'")
+    DISK_USAGE_AFTER=$(ssh -i "$EC2_KEY" "$EC2_HOST" "/usr/bin/df -h / | /usr/bin/awk 'NR==2 {print \$5}' | /usr/bin/sed 's/%//'")
     success "Espacio en disco después de limpieza: ${DISK_USAGE_AFTER}% (liberado: $((DISK_USAGE_BEFORE - DISK_USAGE_AFTER))%)"
     
     # Warning if still low on space
