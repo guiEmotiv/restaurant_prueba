@@ -140,6 +140,12 @@ const Kitchen = () => {
       setKitchenBoard(Array.isArray(data) ? data : []);
       setLoading(false);
     } catch (error) {
+      // Manejo específico para ERR_NETWORK_CHANGED
+      if (error.message?.includes('Network connection changed')) {
+        console.warn('Kitchen: Network changed, keeping current data');
+        setLoading(false);
+        return;
+      }
       setLoading(false);
     }
   }, []);

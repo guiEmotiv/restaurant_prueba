@@ -8,7 +8,7 @@ class OrderItemPoller {
     this.pollInterval = null;
     this.knownItems = new Set();
     this.knownItemIds = new Set(); // Para rastrear IDs y detectar eliminaciones reales
-    this.intervalMs = 1000; // Polling cada 1 segundo para tiempo real
+    this.intervalMs = 3000; // Polling cada 3 segundos para reducir carga de red
     this.isKitchenView = false;
     this.updateCallback = null;
   }
@@ -31,53 +31,45 @@ class OrderItemPoller {
   // Inicializar items conocidos usando kitchen board
   async initializeOrderItems() {
     try {
+      // Solo usar kitchen board para reducir llamadas API
       const kitchenBoard = await apiService.orders.getKitchenBoard();
       this.knownItems.clear();
       this.knownItemIds.clear();
       
-      // También necesitamos rastrear todos los items existentes (no solo los de cocina)
-      const allOrders = await apiService.orders.getAll();
-      allOrders.forEach(order => {
-        order.items?.forEach(item => {
+      kitchenBoard.forEach(recipe => {
+        recipe.items?.forEach(item => {
+          this.knownItems.add(`${item.id}-${item.created_at}`);
           this.knownItemIds.add(item.id);
         });
       });
       
-      kitchenBoard.forEach(recipe => {
-        recipe.items?.forEach(item => {
-          this.knownItems.add(`${item.id}-${item.created_at}`);
-        });
-      });
-      
     } catch (error) {
-      // Error inicializando - continuar silenciosamente
+      // Manejo específico para ERR_NETWORK_CHANGED
+      if (error.message?.includes('Network connection changed')) {
+        console.warn('OrderItemPoller: Network changed during initialization');
+        return;
+      }
+      
+      // Error inicializando - continuar silenciosamente para otros errores
     }
   }
 
   // Detectar cambios en order items usando kitchen board
   async checkForNewOrderItems() {
     try {
-      const [kitchenBoard, allOrders] = await Promise.all([
-        apiService.orders.getKitchenBoard(),
-        apiService.orders.getAll()
-      ]);
+      // Solo usar kitchen board para reducir llamadas API
+      const kitchenBoard = await apiService.orders.getKitchenBoard();
       
       const currentItems = new Set();
       const currentItemIds = new Set();
       const newItems = [];
-      
-      // Rastrear todos los IDs de items actuales
-      allOrders.forEach(order => {
-        order.items?.forEach(item => {
-          currentItemIds.add(item.id);
-        });
-      });
       
       // Procesar items de cocina
       kitchenBoard.forEach(recipe => {
         recipe.items?.forEach(item => {
           const itemKey = `${item.id}-${item.created_at}`;
           currentItems.add(itemKey);
+          currentItemIds.add(item.id);
           
           if (!this.knownItems.has(itemKey)) {
             newItems.push({ recipe_name: item.recipe_name, itemKey });
@@ -85,7 +77,7 @@ class OrderItemPoller {
         });
       });
       
-      // Detectar items realmente eliminados (no solo cambios de estado)
+      // Detectar items eliminados (simplificado - solo items de cocina)
       const deletedItems = [];
       this.knownItemIds.forEach(itemId => {
         if (!currentItemIds.has(itemId)) {
@@ -119,7 +111,19 @@ class OrderItemPoller {
       }
       
     } catch (error) {
-      // Error en polling - continuar silenciosamente
+      // Manejo específico para ERR_NETWORK_CHANGED
+      if (error.message?.includes('Network connection changed')) {
+        console.warn('OrderItemPoller: Network changed, pausing polling for 5 seconds');
+        this.stopPolling();
+        setTimeout(() => {
+          if (!this.isPolling) {
+            this.startPolling();
+          }
+        }, 5000);
+        return;
+      }
+      
+      // Error en polling - continuar silenciosamente para otros errores
     }
   }
 

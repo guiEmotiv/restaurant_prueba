@@ -53,13 +53,31 @@ detect_changes() {
         return
     fi
     
-    # Frontend changes
+    # Frontend changes (including build artifacts check)
     if git diff --name-only "$previous_commit" HEAD | grep -E '^frontend/' >/dev/null 2>&1; then
         HAS_FRONTEND_CHANGES=true
         info "📱 Cambios en frontend detectados"
         git diff --name-only "$previous_commit" HEAD | grep -E '^frontend/' | head -3 | while read -r file; do
             echo "   • $file"
         done
+    fi
+    
+    # Also check if local build exists but might not match server
+    if [ -d "frontend/dist" ] && [ ! "$HAS_FRONTEND_CHANGES" = true ]; then
+        # Check if server has matching index.html
+        local local_index_hash=""
+        local server_index_hash=""
+        
+        if [ -f "frontend/dist/index.html" ]; then
+            local_index_hash=$(sha256sum "frontend/dist/index.html" 2>/dev/null | cut -d' ' -f1)
+        fi
+        
+        server_index_hash=$(ssh -i "$EC2_KEY" "$EC2_HOST" "cd $EC2_PATH/frontend/dist && sha256sum index.html 2>/dev/null | cut -d' ' -f1" 2>/dev/null || echo "none")
+        
+        if [ "$local_index_hash" != "$server_index_hash" ] && [ -n "$local_index_hash" ]; then
+            HAS_FRONTEND_CHANGES=true
+            info "📱 Frontend desincronizado detectado - forzando actualización"
+        fi
     fi
     
     # Backend changes

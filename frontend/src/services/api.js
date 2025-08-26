@@ -203,6 +203,12 @@ export const apiService = {
         error.response?.status >= 500
       );
       
+      // ERR_NETWORK_CHANGED específico - no reintentar inmediatamente
+      if (error.code === 'ERR_NETWORK_CHANGED') {
+        logger.warn(`Network changed error on ${endpoint} - stopping retries to prevent infinite loop`);
+        throw new Error(`Network connection changed. Please refresh the page.`);
+      }
+      
       if (retries > 0 && isNetworkError) {
         logger.warn(`Network error on ${endpoint}, retrying... (${retries} left)`);
         await new Promise(resolve => setTimeout(resolve, 1000 + (3 - retries) * 500)); // Progressive backoff
@@ -412,6 +418,12 @@ export const apiService = {
           error.message?.includes('Network Error') ||
           error.response?.status >= 500
         );
+        
+        // ERR_NETWORK_CHANGED específico - no reintentar
+        if (error.code === 'ERR_NETWORK_CHANGED') {
+          logger.warn(`Network changed error on recipes - stopping retries to prevent infinite loop`);
+          throw new Error(`Network connection changed. Please refresh the page.`);
+        }
         
         if (retries > 0 && isNetworkError) {
           logger.warn(`Network error on recipes API, retrying... (${retries} left)`);
