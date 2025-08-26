@@ -129,6 +129,7 @@ const Kitchen = () => {
     item: null,
     newStatus: null
   });
+  const [, forceUpdate] = useState({}); // Para forzar re-renders
   const { showSuccess, showError } = useToast();
   const { userRole } = useAuth();
 
@@ -160,11 +161,17 @@ const Kitchen = () => {
       setAudioReady(notificationService.isAudioReady());
     }, 1000);
     
+    // Actualizar los tiempos transcurridos cada segundo
+    const timeUpdateInterval = setInterval(() => {
+      forceUpdate({});
+    }, 1000);
+    
     return () => {
       // Detener polling al salir de la vista
       orderItemPoller.stopPolling();
       orderItemPoller.setUpdateCallback(null);
       clearInterval(audioCheckInterval);
+      clearInterval(timeUpdateInterval);
     };
   }, [userRole, loadKitchenBoard]);
 
@@ -354,22 +361,11 @@ const Kitchen = () => {
 
   // ⚡ OPTIMIZADO: Cache más eficiente con WeakMap
   const timeStatusCache = useMemo(() => new WeakMap(), []);
-  const lastUpdateTime = useMemo(() => Math.floor(Date.now() / 1000), [kitchenBoard]);
   
   const getTimeStatus = useCallback((item) => {
-    const cacheKey = `${item.id}-${item.status}-${item.preparing_at || ''}-${lastUpdateTime}`;
-    
-    // Usar objeto como key para WeakMap
-    let cacheItem = timeStatusCache.get(item);
-    if (cacheItem && cacheItem.key === cacheKey) {
-      return cacheItem.value;
-    }
-    
-    const result = calculateTimeStatus(item);
-    timeStatusCache.set(item, { key: cacheKey, value: result });
-    
-    return result;
-  }, [timeStatusCache, lastUpdateTime]);
+    // No usar cache para que se actualice cada segundo
+    return calculateTimeStatus(item);
+  }, []);
 
   const calculateTimeStatus = useCallback((item) => {
     const now = Date.now();
