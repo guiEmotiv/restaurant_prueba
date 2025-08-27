@@ -50,8 +50,10 @@ jobs:
       if: github.event.inputs.action == 'deploy' || github.event.inputs.action == ''
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        VITE_AWS_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
+        VITE_AWS_COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID }}
       run: |
-        # Build frontend
+        # Build frontend with Cognito credentials
         cd frontend
         npm ci --production=false
         NODE_OPTIONS='--max-old-space-size=4096' npm run build
