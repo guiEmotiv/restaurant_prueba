@@ -16,6 +16,7 @@ on:
           - cleanup     # Clean Docker resources
           - ssl         # Setup SSL certificates
           - debug       # Debug deployment issues
+          - fix         # Fix deployment problems
 
 env:
   AWS_REGION: us-west-2
@@ -206,6 +207,13 @@ jobs:
             echo ""
             echo "🌐 Network check:"
             curl -v http://localhost:8000/api/v1/health/ || echo "Health endpoint not accessible"
+            ;;
+            
+          "fix")
+            echo "🔧 Running deployment fix..."
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/fix-deployment.sh -o fix-deployment.sh
+            chmod +x fix-deployment.sh
+            sudo ./fix-deployment.sh
             ;;
         esac
         EOF
