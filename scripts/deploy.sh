@@ -105,12 +105,20 @@ ENVEOF
         ls -la backups/ | tail -3
         ;;
         
+    ultimate-fix)
+        log "🔥 Running ultimate fix..."
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/ultimate-fix.sh -o ultimate-fix.sh
+        chmod +x ultimate-fix.sh
+        ./ultimate-fix.sh
+        ;;
+        
     *)
-        echo "Usage: $0 {deploy|check|logs|backup}"
-        echo "  deploy - Deploy latest version"
-        echo "  check  - Health check"
-        echo "  logs   - Show logs"  
-        echo "  backup - Backup database"
+        echo "Usage: $0 {deploy|check|logs|backup|ultimate-fix}"
+        echo "  deploy       - Deploy latest version"
+        echo "  check        - Health check"
+        echo "  logs         - Show logs"  
+        echo "  backup       - Backup database"
+        echo "  ultimate-fix - Nuclear option - rebuild everything"
         exit 1
         ;;
 esac
