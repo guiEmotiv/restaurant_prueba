@@ -1,8 +1,8 @@
-# Restaurant Web - Deployment Guide
+# 🚀 Restaurant Web - Deployment Guide
 
-## 🚀 GitHub Actions CI/CD Setup
+## 📋 Overview
 
-This project uses GitHub Actions for automated deployment to AWS EC2 instances.
+This project uses automated CI/CD with GitHub Actions for deployment to AWS EC2. Every push to `main` triggers an automatic deployment with email notifications and version tagging.
 
 ### 📋 Architecture Overview
 
@@ -50,6 +50,13 @@ DJANGO_SECRET_KEY         # Django secret key for production
 ### Domain Configuration (Optional)
 ```bash
 DOMAIN_NAME               # Your domain name (e.g., restaurant.com)
+```
+
+### Email Notification Configuration
+```bash
+EMAIL_USERNAME            # Gmail address for sending notifications
+EMAIL_PASSWORD            # Gmail App Password (not regular password)
+NOTIFICATION_EMAIL        # Email address to receive deployment notifications
 ```
 
 ## 📦 ECR Repository Setup
@@ -104,30 +111,86 @@ If you need to deploy manually:
 
 ## 🔄 Deployment Workflows
 
-### Development Deployment
-- **Trigger:** Push to `dev` branch
-- **Target:** Development EC2 instance
-- **Process:**
-  1. Run tests
-  2. Build Docker image
-  3. Push to ECR
-  4. Deploy to dev EC2
-  5. Run migrations
-  6. Health check
+### Automatic Deployment (Every Push to Main)
 
-### Production Deployment
-- **Trigger:** Push to `main` branch or create tag `v*`
-- **Target:** Production EC2 instance
-- **Process:**
-  1. Run comprehensive tests
-  2. Build Docker image
-  3. Push to ECR
-  4. **Manual approval required**
-  5. Deploy to prod EC2
-  6. Database backup
-  7. Run migrations
-  8. Health check
-  9. Rollback on failure
+```bash
+# Make changes
+git add .
+git commit -m "feat: add new feature"
+git push origin main
+
+# Automatic process:
+# 1. Run tests (backend + frontend)
+# 2. Build Docker image
+# 3. Push to ECR
+# 4. Deploy to EC2
+# 5. Database backup
+# 6. Run migrations
+# 7. Health check
+# 8. Create deployment tag
+# 9. Send email notification
+```
+
+### Release Deployment (Version Tags)
+
+```bash
+# For major releases
+git tag -a v2.0.0 -m "Major release: New ordering system"
+git push origin v2.0.0
+
+# This triggers the same process but with release version
+```
+
+## 🏷️ Version Management
+
+### Automatic Version Tags
+
+Every successful deployment creates a Git tag automatically:
+
+```bash
+# Format for automatic deployments
+deploy-prod-20240827-143022-abc1234
+
+# Format for release versions
+v1.0.0
+v2.1.3
+```
+
+### Viewing Deployment History
+
+```bash
+# List all deployment tags
+git tag -l "deploy-*"
+
+# List all release versions
+git tag -l "v*"
+
+# View details of a specific deployment
+git show deploy-prod-20240827-143022-abc1234
+```
+
+## 📧 Email Notifications
+
+### Setting up Gmail App Password
+
+1. Go to [Google Account Settings](https://myaccount.google.com/)
+2. Security → 2-Step Verification (must be enabled)
+3. App passwords → Create new app password
+4. Use this password as `EMAIL_PASSWORD` secret
+
+### Notification Contents
+
+**Success Email includes:**
+- ✅ Deployment version
+- 🔗 Production URL
+- 📊 Deployment details
+- 🚀 Docker image information
+- 👤 Who triggered the deployment
+
+**Failure Email includes:**
+- ❌ Error indication
+- 🔍 Link to workflow logs
+- 🛠️ Quick troubleshooting commands
 
 ## 🌿 Branch Strategy
 

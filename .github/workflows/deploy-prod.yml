@@ -111,11 +111,15 @@ jobs:
       run: |
         if [[ $GITHUB_REF == refs/tags/v* ]]; then
           VERSION=${GITHUB_REF#refs/tags/v}
+          IS_RELEASE=true
         else
           VERSION="prod-$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
+          IS_RELEASE=false
         fi
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "IS_RELEASE=$IS_RELEASE" >> $GITHUB_OUTPUT
         echo "Building version: $VERSION"
+        echo "Is release: $IS_RELEASE"
 
     - name: Build and tag Docker image
       env:
@@ -133,6 +137,7 @@ jobs:
     outputs:
       image-version: ${{ steps.version.outputs.VERSION }}
       ecr-registry: ${{ steps.login-ecr.outputs.registry }}
+      is-release: ${{ steps.version.outputs.IS_RELEASE }}
 
   deploy:
     needs: build
@@ -253,23 +258,129 @@ jobs:
         exit 1
         DEPLOY
 
-  notify:
-    needs: [test, build, deploy]
+  tag-release:
+    needs: [build, deploy]
     runs-on: ubuntu-latest
-    name: Notify Deployment Status
+    name: Create Git Tag
+    if: needs.deploy.result == 'success' && needs.build.outputs.is-release != 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Create deployment tag
+      run: |
+        TAG_NAME="deploy-${{ needs.build.outputs.image-version }}"
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        # Create annotated tag
+        git tag -a "$TAG_NAME" -m "Deployment: ${{ needs.build.outputs.image-version }}
+        
+        Deployed at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+        Commit: ${{ github.sha }}
+        Actor: ${{ github.actor }}
+        
+        🚀 Automatic deployment tag"
+        
+        # Push tag
+        git push origin "$TAG_NAME"
+        echo "✅ Created tag: $TAG_NAME"
+
+  notify:
+    needs: [test, build, deploy, tag-release]
+    runs-on: ubuntu-latest
+    name: Send Notifications
     if: always()
     
     steps:
-    - name: Notify success
+    - name: Send email notification on success
       if: needs.deploy.result == 'success'
-      run: |
-        echo "✅ PROD deployment completed successfully!"
-        echo "🌐 Version ${{ needs.build.outputs.image-version }} deployed"
-        echo "🔗 Available at: https://${{ secrets.DOMAIN_NAME }}"
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: '✅ Deployment Success - Restaurant Web ${{ needs.build.outputs.image-version }}'
+        to: ${{ secrets.NOTIFICATION_EMAIL }}
+        from: GitHub Actions <${{ secrets.EMAIL_USERNAME }}>
+        html_body: |
+          <h2>🎉 Deployment Successful!</h2>
+          
+          <p><strong>Version:</strong> ${{ needs.build.outputs.image-version }}</p>
+          <p><strong>Environment:</strong> Production</p>
+          <p><strong>URL:</strong> <a href="https://${{ secrets.DOMAIN_NAME }}">https://${{ secrets.DOMAIN_NAME }}</a></p>
+          <p><strong>Deployed by:</strong> ${{ github.actor }}</p>
+          <p><strong>Commit:</strong> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ github.sha }}</a></p>
+          
+          <h3>📊 Deployment Details</h3>
+          <ul>
+            <li>Build Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)</li>
+            <li>Docker Image: ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}</li>
+            <li>Branch: ${{ github.ref_name }}</li>
+            <li>Workflow Run: <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Details</a></li>
+          </ul>
+          
+          <h3>🔄 Next Steps</h3>
+          <ul>
+            <li>Verify the deployment at <a href="https://${{ secrets.DOMAIN_NAME }}">production site</a></li>
+            <li>Check application logs if needed</li>
+            <li>Monitor system health</li>
+          </ul>
+          
+          <hr>
+          <p><em>This is an automated deployment notification from Restaurant Web CI/CD pipeline.</em></p>
         
-    - name: Notify failure  
-      if: needs.deploy.result == 'failure'
+    - name: Send email notification on failure
+      if: needs.deploy.result == 'failure' 
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: '❌ Deployment Failed - Restaurant Web'
+        to: ${{ secrets.NOTIFICATION_EMAIL }}
+        from: GitHub Actions <${{ secrets.EMAIL_USERNAME }}>
+        html_body: |
+          <h2>⚠️ Deployment Failed!</h2>
+          
+          <p><strong>Environment:</strong> Production</p>
+          <p><strong>Failed at:</strong> $(date -u +%Y-%m-%dT%H:%M:%SZ)</p>
+          <p><strong>Attempted by:</strong> ${{ github.actor }}</p>
+          <p><strong>Commit:</strong> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ github.sha }}</a></p>
+          
+          <h3>🔍 Action Required</h3>
+          <ul>
+            <li><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">Check workflow logs</a></li>
+            <li>Review the error details</li>
+            <li>Consider manual rollback if needed</li>
+            <li>Contact the development team</li>
+          </ul>
+          
+          <h3>🛠️ Quick Actions</h3>
+          <ul>
+            <li>SSH to server: <code>ssh ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }}</code></li>
+            <li>Check logs: <code>cd /opt/restaurant-web && docker-compose logs --tail=100</code></li>
+            <li>Rollback: Check backups in <code>/opt/restaurant-web/backups/</code></li>
+          </ul>
+          
+          <hr>
+          <p><em>This is an automated failure notification. Please investigate immediately.</em></p>
+    
+    - name: Console notification
+      if: always()
       run: |
-        echo "❌ PROD deployment failed!"
-        echo "Check the logs and consider manual rollback if needed"
-        exit 1
+        if [[ "${{ needs.deploy.result }}" == "success" ]]; then
+          echo "✅ PROD deployment completed successfully!"
+          echo "🌐 Version ${{ needs.build.outputs.image-version }} deployed"
+          echo "🔗 Available at: https://${{ secrets.DOMAIN_NAME }}"
+          echo "📧 Email notification sent to ${{ secrets.NOTIFICATION_EMAIL }}"
+        else
+          echo "❌ PROD deployment failed!"
+          echo "📧 Failure notification sent to ${{ secrets.NOTIFICATION_EMAIL }}"
+          echo "Check the logs and consider manual rollback if needed"
+        fi
