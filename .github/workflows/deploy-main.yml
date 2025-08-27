@@ -1,0 +1,341 @@
+name: Deploy Restaurant Web
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**' 
+      - 'nginx/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+  workflow_dispatch:
+    inputs:
+      deployment_type:
+        description: 'Deployment strategy'
+        type: choice
+        default: 'smart'
+        options:
+          - smart      # Auto-detect changes (RECOMMENDED)
+          - full       # Full deployment
+          - quick      # Skip tests
+      force_full_deploy:
+        description: 'Force full deployment ignoring smart detection'
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: restaurant-web
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    name: Analyze Changes
+    outputs:
+      backend-changed: ${{ steps.changes.outputs.backend }}
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      nginx-changed: ${{ steps.changes.outputs.nginx }}
+      docker-changed: ${{ steps.changes.outputs.docker }}
+      should-build: ${{ steps.decide.outputs.should-build }}
+      deployment-strategy: ${{ steps.strategy.outputs.strategy }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+
+    - name: Detect file changes
+      id: changes
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "backend=true" >> $GITHUB_OUTPUT
+          echo "frontend=true" >> $GITHUB_OUTPUT  
+          echo "nginx=false" >> $GITHUB_OUTPUT
+          echo "docker=false" >> $GITHUB_OUTPUT
+        else
+          echo "backend=$(git diff --name-only HEAD~1 HEAD | grep -q '^backend/' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "frontend=$(git diff --name-only HEAD~1 HEAD | grep -q '^frontend/' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "nginx=$(git diff --name-only HEAD~1 HEAD | grep -q '^nginx/' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "docker=$(git diff --name-only HEAD~1 HEAD | grep -qE '^(Dockerfile|docker-compose)' && echo true || echo false)" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Decide build necessity
+      id: decide
+      run: |
+        FORCE="${{ github.event.inputs.force_full_deploy }}"
+        DEPLOY_TYPE="${{ github.event.inputs.deployment_type }}"
+        
+        if [[ "$FORCE" == "true" || "$DEPLOY_TYPE" == "full" || "$DEPLOY_TYPE" == "quick" || "${{ steps.changes.outputs.backend }}" == "true" || "${{ steps.changes.outputs.frontend }}" == "true" || "${{ steps.changes.outputs.docker }}" == "true" ]]; then
+          echo "should-build=true" >> $GITHUB_OUTPUT
+          echo "🔨 Build required"
+        else
+          echo "should-build=false" >> $GITHUB_OUTPUT  
+          echo "⚡ Config-only deployment"
+        fi
+
+    - name: Determine deployment strategy
+      id: strategy
+      run: |
+        DEPLOY_TYPE="${{ github.event.inputs.deployment_type || 'smart' }}"
+        echo "strategy=$DEPLOY_TYPE" >> $GITHUB_OUTPUT
+        echo "🎯 Deployment strategy: $DEPLOY_TYPE"
+
+  test:
+    needs: analyze
+    runs-on: ubuntu-latest
+    name: Run Tests
+    if: needs.analyze.outputs.should-build == 'true' && github.event.inputs.deployment_type != 'quick'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run backend tests
+      run: |
+        cd backend
+        python manage.py test --keepdb
+        python manage.py check --deploy
+      env:
+        DJANGO_SETTINGS_MODULE: backend.settings_ec2
+        DATABASE_NAME: test_restaurant.sqlite3
+        USE_COGNITO_AUTH: True
+
+  build:
+    needs: [analyze, test]
+    runs-on: ubuntu-latest
+    name: Build Docker Image
+    if: always() && needs.analyze.outputs.should-build == 'true' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm ci --production=false
+        NODE_OPTIONS='--max-old-space-size=4096' npm run build
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and push Docker image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        VERSION: prod-$(date +%Y%m%d-%H%M%S)-${{ github.sha }}
+      run: |
+        # Cache-friendly build
+        docker build \
+          --cache-from $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION \
+          .
+        
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
+        
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_OUTPUT
+
+    outputs:
+      image-version: ${{ env.VERSION }}
+      ecr-registry: ${{ steps.login-ecr.outputs.registry }}
+
+  deploy:
+    needs: [analyze, build]
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    if: always() && (needs.analyze.outputs.should-build == 'false' || needs.build.result == 'success')
+    environment: production
+    
+    steps:
+    - name: Setup SSH Key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        known_hosts: unnecessary
+        
+    - name: Add EC2 to known hosts
+      run: ssh-keyscan -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Execute Deployment
+      env:
+        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
+        EC2_USER: ${{ secrets.EC2_USERNAME }}
+        ECR_REGISTRY: ${{ needs.build.outputs.ecr-registry || secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+        STRATEGY: ${{ needs.analyze.outputs.deployment-strategy }}
+        SHOULD_BUILD: ${{ needs.analyze.outputs.should-build }}
+      run: |
+        echo "🚀 Starting deployment with strategy: $STRATEGY"
+        
+        # Download smart deploy script from public repo
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/smart-deploy.sh > smart-deploy.sh
+        chmod +x smart-deploy.sh
+        
+        # Execute deployment on EC2
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'DEPLOY_EOF'
+        set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        
+        # Set deployment environment
+        export ECR_REGISTRY=${{ env.ECR_REGISTRY }}
+        export ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}
+        export DEPLOYMENT_STRATEGY=${{ env.STRATEGY }}
+        export SHOULD_BUILD=${{ env.SHOULD_BUILD }}
+        
+        cd /opt/restaurant-web || exit 1
+        
+        # Create environment file
+        cat > .env.ec2 << 'ENV_EOF'
+        AWS_REGION=${{ env.AWS_REGION }}
+        COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
+        COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
+        DATABASE_PATH=/opt/restaurant-web/data
+        DATABASE_NAME=restaurant_prod.sqlite3
+        DEBUG=False
+        USE_COGNITO_AUTH=True
+        ALLOWED_HOSTS=${{ secrets.EC2_PROD_HOST }},${{ secrets.DOMAIN_NAME }}
+        SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+        EC2_PUBLIC_IP=${{ secrets.EC2_PROD_HOST }}
+        ENV_EOF
+        
+        # Conditional operations based on strategy
+        case "$DEPLOYMENT_STRATEGY" in
+          "smart")
+            echo "🧠 Smart deployment - analyzing changes..."
+            # Download and run smart deploy script
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/smart-deploy.sh -o smart-deploy.sh
+            chmod +x smart-deploy.sh
+            ;;
+          "full"|"quick")
+            echo "🔄 Full deployment requested"
+            SHOULD_BUILD="true"
+            ;;
+        esac
+        
+        # Pre-deployment setup
+        mkdir -p data backups logs
+        
+        # Backup database if exists
+        if [ -f data/restaurant_prod.sqlite3 ]; then
+          cp data/restaurant_prod.sqlite3 "backups/backup-$(date +%Y%m%d-%H%M%S).sqlite3"
+          echo "✅ Database backed up"
+        fi
+        
+        # Quick cleanup
+        echo "🧹 Quick cleanup..."
+        docker system prune -f --volumes || true
+        
+        if [ "$SHOULD_BUILD" = "true" ]; then
+          # Login to ECR and pull new image
+          echo "🔐 ECR login and pulling new image..."
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REGISTRY
+          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          
+          # Extract frontend dist
+          echo "📦 Extracting frontend..."
+          docker create --name temp-extract $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker cp temp-extract:/app/frontend/dist ./frontend-dist || true
+          docker rm temp-extract
+        fi
+        
+        # Sync configurations from public repo
+        echo "📥 Syncing configurations..."
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker-compose.yml -o docker-compose.yml
+        mkdir -p nginx/conf.d
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/nginx/conf.d/default.conf -o nginx/conf.d/default.conf
+        
+        if [ "$SHOULD_BUILD" = "true" ]; then
+          # Update docker-compose with new image
+          sed -i "s|image: restaurant-web:latest|image: $ECR_REGISTRY/$ECR_REPOSITORY:latest|g" docker-compose.yml
+        fi
+        
+        # Deploy services
+        echo "🚀 Deploying services..."
+        docker-compose --profile production down --timeout 20 || true
+        docker-compose --profile production up -d
+        
+        # Health check
+        echo "🏥 Health check..."
+        sleep 30
+        
+        for i in {1..10}; do
+          if curl -f -s http://localhost:8000/api/v1/health/ >/dev/null 2>&1; then
+            echo "✅ Deployment successful!"
+            docker-compose --profile production ps
+            exit 0
+          fi
+          echo "⏳ Attempt $i/10..."
+          sleep 10
+        done
+        
+        echo "❌ Health check failed"
+        docker-compose --profile production logs --tail=50
+        exit 1
+        DEPLOY_EOF
+
+  summary:
+    needs: [analyze, build, deploy]
+    runs-on: ubuntu-latest
+    name: Deployment Summary
+    if: always()
+    
+    steps:
+    - name: Summary Report
+      run: |
+        echo "🎯 DEPLOYMENT SUMMARY"
+        echo "===================="
+        echo "Strategy: ${{ needs.analyze.outputs.deployment-strategy }}"
+        echo "Build required: ${{ needs.analyze.outputs.should-build }}"
+        echo "Backend changed: ${{ needs.analyze.outputs.backend-changed }}"
+        echo "Frontend changed: ${{ needs.analyze.outputs.frontend-changed }}"
+        echo "Nginx changed: ${{ needs.analyze.outputs.nginx-changed }}"
+        echo "Docker changed: ${{ needs.analyze.outputs.docker-changed }}"
+        echo "Deployed by: ${{ github.actor }}"
+        
+        if [[ "${{ needs.deploy.result }}" == "success" ]]; then
+          echo "✅ DEPLOYMENT SUCCESSFUL!"
+          if [[ "${{ needs.analyze.outputs.should-build }}" == "true" ]]; then
+            echo "Version: ${{ needs.build.outputs.image-version }}"
+          fi
+        else
+          echo "❌ DEPLOYMENT FAILED"
+          echo "Check logs above for details"
+          exit 1
+        fi
