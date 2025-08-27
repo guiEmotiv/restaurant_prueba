@@ -1,4 +1,4 @@
-name: Restaurant Web Deploy
+name: Deploy Restaurant Web
 
 on:
   push:
@@ -6,19 +6,14 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'Deployment action'
+        description: 'Action to perform'
         type: choice
         default: 'deploy'
         options:
-          - deploy      # Deploy application
-          - check       # Health check only
-          - backup      # Backup database only
-          - cleanup     # Clean Docker resources
-          - ssl         # Setup SSL certificates
-          - debug       # Debug deployment issues
-          - fix         # Fix deployment problems
-          - emergency   # Emergency local build
-          - activate-ssl # Activate SSL for domain
+          - deploy
+          - check
+          - logs
+          - backup
 
 env:
   AWS_REGION: us-west-2
@@ -27,42 +22,44 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy Restaurant Web
+    name: Deploy to EC2
     environment: production
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Configure AWS
-      if: github.event.inputs.action != 'check'
+    - name: Configure AWS credentials
+      if: github.event.inputs.action != 'check' && github.event.inputs.action != 'logs'
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Login to ECR
-      if: github.event.inputs.action == 'deploy' || github.event.inputs.action == ''
+    - name: Login to Amazon ECR
+      if: github.event.inputs.action != 'check' && github.event.inputs.action != 'logs'
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build and Push
+    - name: Build and push Docker image
       if: github.event.inputs.action == 'deploy' || github.event.inputs.action == ''
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
       run: |
         # Build frontend
-        cd frontend && npm ci && NODE_OPTIONS='--max-old-space-size=4096' npm run build && cd ..
+        cd frontend
+        npm ci --production=false
+        NODE_OPTIONS='--max-old-space-size=4096' npm run build
+        cd ..
         
         # Build and push Docker image
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-    - name: Execute on EC2
+    - name: Deploy to EC2
       env:
         ACTION: ${{ github.event.inputs.action || 'deploy' }}
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
       run: |
@@ -72,168 +69,15 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
         
-        # Execute on EC2
+        # Execute deploy script on EC2
         ssh $EC2_USER@$EC2_HOST << 'EOF'
-        set -e
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
-        # Create env file
-        cat > .env.ec2 << 'ENVEOF'
-        AWS_REGION=${{ env.AWS_REGION }}
-        COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
-        COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
-        DATABASE_PATH=/opt/restaurant-web/data
-        DATABASE_NAME=restaurant_prod.sqlite3
-        DEBUG=False
-        USE_COGNITO_AUTH=True
-        ALLOWED_HOSTS=${{ secrets.EC2_PROD_HOST }},${{ secrets.DOMAIN_NAME }}
-        SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-        ENVEOF
+        # Download latest deploy script
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/deploy.sh -o scripts/deploy.sh
+        chmod +x scripts/deploy.sh
         
-        case "${{ env.ACTION }}" in
-          "deploy")
-            # Backup database
-            mkdir -p data backups
-            [ -f data/restaurant_prod.sqlite3 ] && cp data/restaurant_prod.sqlite3 "backups/backup-$(date +%Y%m%d-%H%M%S).sqlite3"
-            
-            # Update and deploy
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
-            docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
-            
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker-compose.yml -o docker-compose.yml
-            sed -i "s|image: restaurant-web:latest|image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest|g" docker-compose.yml
-            
-            mkdir -p nginx/conf.d
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/nginx/conf.d/default.conf -o nginx/conf.d/default.conf
-            
-            docker-compose --profile production down --timeout 20 || true
-            docker-compose --profile production up -d
-            
-            # Health check with retries
-            echo "⏳ Waiting for services to start..."
-            sleep 20
-            
-            echo "🔍 Checking container status..."
-            docker-compose --profile production ps
-            
-            echo "🏥 Running health check with retries..."
-            for i in {1..6}; do
-              if curl -f -s http://localhost:8000/api/v1/health/; then
-                echo "✅ Health check passed on attempt $i!"
-                echo "✅ Deployment successful!"
-                docker-compose --profile production ps
-                break
-              else
-                if [ $i -eq 6 ]; then
-                  echo "❌ Health check failed after 6 attempts"
-                  echo ""
-                  echo "📊 Container status:"
-                  docker-compose --profile production ps
-                  echo ""
-                  echo "📜 Application logs:"
-                  docker-compose --profile production logs app --tail=100
-                  echo ""
-                  echo "🔍 Nginx logs:"
-                  docker-compose --profile production logs nginx --tail=50
-                  exit 1
-                else
-                  echo "⏳ Attempt $i failed, waiting 20s before retry..."
-                  sleep 20
-                fi
-              fi
-            done
-            ;;
-            
-          "check")
-            echo "🔍 Checking services..."
-            docker-compose --profile production ps
-            echo ""
-            echo "🏥 Health check..."
-            if curl -f -s http://localhost:8000/api/v1/health/; then
-              echo "✅ Health check passed!"
-            else
-              echo "❌ Health check failed"
-              echo ""
-              echo "📜 Recent logs:"
-              docker-compose --profile production logs --tail=30
-            fi
-            ;;
-            
-          "backup")
-            mkdir -p backups
-            [ -f data/restaurant_prod.sqlite3 ] && cp data/restaurant_prod.sqlite3 "backups/manual-backup-$(date +%Y%m%d-%H%M%S).sqlite3"
-            echo "✅ Backup completed"
-            ls -la backups/ | tail -5
-            ;;
-            
-          "cleanup")
-            docker system prune -af --volumes
-            echo "✅ Cleanup completed"
-            ;;
-            
-          "ssl")
-            echo "🔒 Setting up SSL..."
-            # Check if SSL is already configured
-            if [ -f data/certbot/conf/live/xn--elfogndedonsoto-zrb.com/fullchain.pem ]; then
-              echo "✅ SSL certificates already exist"
-              ls -la data/certbot/conf/live/xn--elfogndedonsoto-zrb.com/
-            else
-              echo "📥 Downloading SSL setup script..."
-              curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl.sh -o setup-ssl.sh
-              chmod +x setup-ssl.sh
-              ./setup-ssl.sh
-            fi
-            ;;
-            
-          "debug")
-            echo "🐛 Debug mode - checking deployment issues..."
-            echo ""
-            echo "📊 Docker info:"
-            docker info | grep -E "Server Version|Storage Driver|Logging Driver"
-            echo ""
-            echo "📦 Container status:"
-            docker-compose --profile production ps -a
-            echo ""
-            echo "🔍 Container inspect (app):"
-            docker-compose --profile production ps -q app | xargs -r docker inspect --format='{{.State.Status}} - {{.State.Health.Status}} - {{range .State.Health.Log}}{{.Output}}{{end}}'
-            echo ""
-            echo "📜 Last 50 lines of app logs:"
-            docker-compose --profile production logs app --tail=50
-            echo ""
-            echo "🔧 Environment check:"
-            docker-compose --profile production exec app env | grep -E "DATABASE|DEBUG|ALLOWED_HOSTS" || echo "Container not running"
-            echo ""
-            echo "💾 Database check:"
-            ls -la data/ || echo "No data directory"
-            echo ""
-            echo "🌐 Network check:"
-            curl -v http://localhost:8000/api/v1/health/ || echo "Health endpoint not accessible"
-            ;;
-            
-          "fix")
-            echo "🔧 Running complete deployment fix..."
-            # First ensure AWS CLI is configured
-            aws configure set region ${{ env.AWS_REGION }}
-            
-            # Download and run complete fix
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/complete-fix.sh -o complete-fix.sh
-            chmod +x complete-fix.sh
-            sudo -E ./complete-fix.sh
-            ;;
-            
-          "emergency")
-            echo "🚨 Running emergency local deployment..."
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/emergency-deploy.sh -o emergency-deploy.sh
-            chmod +x emergency-deploy.sh
-            sudo ./emergency-deploy.sh
-            ;;
-            
-          "activate-ssl")
-            echo "🔒 Activating SSL configuration..."
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/activate-ssl.sh -o activate-ssl.sh
-            chmod +x activate-ssl.sh
-            ./activate-ssl.sh
-            ;;
-        esac
+        # Run the action
+        ./scripts/deploy.sh ${{ env.ACTION }}
         EOF
