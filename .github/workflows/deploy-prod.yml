@@ -89,25 +89,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Debug secrets availability
-      run: |
-        echo "Checking secrets availability..."
-        echo "AWS_ACCESS_KEY_ID length: ${#AWS_ACCESS_KEY_ID}"
-        echo "AWS_SECRET_ACCESS_KEY length: ${#AWS_SECRET_ACCESS_KEY}"
-        if [ -z "$AWS_ACCESS_KEY_ID" ]; then
-          echo "❌ AWS_ACCESS_KEY_ID is empty or not set"
-        else
-          echo "✅ AWS_ACCESS_KEY_ID is available"
-        fi
-        if [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-          echo "❌ AWS_SECRET_ACCESS_KEY is empty or not set"
-        else
-          echo "✅ AWS_SECRET_ACCESS_KEY is available"
-        fi
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -173,44 +154,35 @@ jobs:
         envs: ECR_REGISTRY,ECR_REPOSITORY,VERSION,AWS_REGION
         script_stop: true
         script: |
-          # Backup current deployment
-          sudo mkdir -p /opt/restaurant-web/backups
-          BACKUP_DIR="/opt/restaurant-web/backups/backup-$(date +%Y%m%d-%H%M%S)"
+          # Ensure we're in the right directory
+          cd /opt/restaurant-web || exit 1
           
-          # Create deployment directory
-          sudo mkdir -p /opt/restaurant-web
-          cd /opt/restaurant-web
+          # Backup current deployment
+          mkdir -p backups
+          BACKUP_DIR="backups/backup-$(date +%Y%m%d-%H%M%S)"
           
           # Backup database if exists
           if [ -f data/restaurant_prod.sqlite3 ]; then
-            sudo mkdir -p $BACKUP_DIR
-            sudo cp data/restaurant_prod.sqlite3 $BACKUP_DIR/
+            mkdir -p $BACKUP_DIR
+            cp data/restaurant_prod.sqlite3 $BACKUP_DIR/
             echo "✅ Database backed up to $BACKUP_DIR"
           fi
           
-          # Update system
-          sudo yum update -y
-          
-          # Install Docker if not present
+          # Docker and AWS CLI should already be installed from setup script
+          # Verify they exist
           if ! command -v docker &> /dev/null; then
-            sudo yum install -y docker
-            sudo systemctl start docker
-            sudo systemctl enable docker
-            sudo usermod -a -G docker $USER
+            echo "❌ Docker not found. Please run setup script first."
+            exit 1
           fi
           
-          # Install AWS CLI if not present
           if ! command -v aws &> /dev/null; then
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip -o awscliv2.zip
-            sudo ./aws/install
-            rm -rf aws awscliv2.zip
+            echo "❌ AWS CLI not found. Please run setup script first."
+            exit 1
           fi
           
-          # Install docker-compose if not present
           if ! command -v docker-compose &> /dev/null; then
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
+            echo "❌ Docker Compose not found. Please run setup script first."
+            exit 1
           fi
           
           # Login to ECR
@@ -219,7 +191,7 @@ jobs:
           # Download environment files
           if [ ! -f .env.ec2 ]; then
             echo "Creating production .env.ec2 file"
-            sudo tee .env.ec2 > /dev/null <<EOF
+            cat > .env.ec2 <<EOF
           # AWS Cognito Configuration
           AWS_REGION=$AWS_REGION
           COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
@@ -252,9 +224,8 @@ jobs:
           docker-compose --profile production down --timeout 30 || true
           
           # Create necessary directories
-          sudo mkdir -p /opt/restaurant-web/data
-          sudo mkdir -p /opt/restaurant-web/nginx/conf.d
-          sudo chown -R $USER:$USER /opt/restaurant-web
+          mkdir -p /opt/restaurant-web/data
+          mkdir -p /opt/restaurant-web/nginx/conf.d
           
           # Move nginx config
           mv nginx-ssl.conf nginx/conf.d/ssl.conf
