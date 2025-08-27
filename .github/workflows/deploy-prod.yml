@@ -154,62 +154,104 @@ jobs:
       run: |
         ssh-keyscan -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
         
-    - name: Upload deployment scripts
-      env:
-        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
-        EC2_USER: ${{ secrets.EC2_USERNAME }}
-      run: |
-        echo "📤 Uploading deployment scripts..."
-        scp -o StrictHostKeyChecking=no scripts/deploy-with-env.py $EC2_USER@$EC2_HOST:/tmp/deploy-with-env.py
-        
     - name: Deploy to EC2 PROD
       env:
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
+        ECR_REGISTRY: ${{ needs.build.outputs.ecr-registry }}
+        VERSION: ${{ needs.build.outputs.image-version }}
       run: |
         echo "🚀 Starting production deployment..."
         
-        # Create JSON environment file to avoid shell escaping issues
-        cat > /tmp/deployment-env.json << 'JSON_ENV'
-        {
-          "ECR_REGISTRY": "${{ needs.build.outputs.ecr-registry }}",
-          "ECR_REPOSITORY": "${{ env.ECR_REPOSITORY }}",
-          "VERSION": "${{ needs.build.outputs.image-version }}",
-          "AWS_REGION": "${{ env.AWS_REGION }}",
-          "COGNITO_USER_POOL_ID": "${{ secrets.COGNITO_USER_POOL_ID }}",
-          "COGNITO_APP_CLIENT_ID": "${{ secrets.COGNITO_APP_CLIENT_ID }}",
-          "DJANGO_SECRET_KEY": "${{ secrets.DJANGO_SECRET_KEY }}",
-          "EC2_HOST": "${{ secrets.EC2_PROD_HOST }}",
-          "DOMAIN_NAME": "${{ secrets.DOMAIN_NAME }}",
-          "GITHUB_REPOSITORY": "${{ github.repository }}"
-        }
-        JSON_ENV
+        # Execute all commands directly on EC2
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'DEPLOY'
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
         
-        # Upload JSON environment file
-        scp -o StrictHostKeyChecking=no /tmp/deployment-env.json $EC2_USER@$EC2_HOST:/tmp/deployment-env.json
+        cd /opt/restaurant-web || exit 1
         
-        # Execute deployment using Python (more reliable than shell)
-        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'DEPLOY_COMMAND'
-          # Set proper PATH for non-interactive SSH
-          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
-          
-          set -e
-          
-          echo "Deployment environment:"
-          echo "Shell: $SHELL"
-          echo "PATH: $PATH"
-          echo "User: $(whoami)"
-          echo "Python: $(which python3 || which python)"
-          
-          # Make script executable
-          chmod +x /tmp/deploy-with-env.py
-          
-          # Execute deployment script
-          python3 /tmp/deploy-with-env.py || python /tmp/deploy-with-env.py
-          
-          # Cleanup
-          rm -f /tmp/deployment-env.json /tmp/deploy-with-env.py
-        DEPLOY_COMMAND
+        # Create directories
+        mkdir -p data backups logs
+        
+        # Backup database if exists
+        if [ -f data/restaurant_prod.sqlite3 ]; then
+          BACKUP_DIR="backups/backup-$(date +%Y%m%d-%H%M%S)"
+          mkdir -p "$BACKUP_DIR"
+          cp data/restaurant_prod.sqlite3 "$BACKUP_DIR/"
+          echo "✅ Database backed up to $BACKUP_DIR"
+        fi
+        
+        # Create .env.ec2 file directly
+        cat > .env.ec2 << 'ENVFILE'
+        AWS_REGION=${{ env.AWS_REGION }}
+        COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
+        COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
+        DATABASE_PATH=/opt/restaurant-web/data
+        DATABASE_NAME=restaurant_prod.sqlite3
+        DEBUG=False
+        USE_COGNITO_AUTH=True
+        ALLOWED_HOSTS=${{ secrets.EC2_PROD_HOST }},${{ secrets.DOMAIN_NAME }}
+        SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+        EC2_PUBLIC_IP=${{ secrets.EC2_PROD_HOST }}
+        ENVFILE
+        
+        # Login to ECR
+        echo "🔐 Logging into ECR..."
+        aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+        docker login --username AWS --password-stdin ${{ needs.build.outputs.ecr-registry }}
+        
+        # Pull latest image
+        echo "📥 Pulling Docker image..."
+        docker pull ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}
+        
+        # Download docker-compose.yml
+        echo "📥 Downloading docker-compose configuration..."
+        curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml -o docker-compose.yml
+        
+        # Update docker-compose.yml with the new image
+        sed -i "s|image: restaurant-web:.*|image: ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}|g" docker-compose.yml
+        
+        # Stop existing containers
+        echo "⏹️ Stopping existing services..."
+        docker-compose --profile production down --timeout 30 || true
+        
+        # Start services
+        echo "🚀 Starting production services..."
+        docker-compose --profile production up -d
+        
+        # Wait for initialization
+        echo "⏳ Waiting for services to initialize..."
+        sleep 45
+        
+        # Run migrations
+        echo "🗄️ Running database migrations..."
+        docker-compose exec -T app python manage.py migrate
+        
+        # Collect static files  
+        echo "📁 Collecting static files..."
+        docker-compose exec -T app python manage.py collectstatic --noinput
+        
+        # Health check
+        echo "🏥 Running health checks..."
+        for i in {1..5}; do
+          if curl -f -s http://localhost/api/v1/health/ > /dev/null 2>&1; then
+            echo "✅ Health check passed! Deployment successful!"
+            docker-compose --profile production ps
+            echo "🎉 Production deployment completed successfully!"
+            exit 0
+          else
+            echo "⏳ Health check attempt $i/5..."
+            sleep 15
+          fi
+        done
+        
+        echo "❌ Health check failed after 5 attempts"
+        echo "📊 Container status:"
+        docker-compose --profile production ps
+        echo "📋 Container logs:"
+        docker-compose --profile production logs --tail=50
+        exit 1
+        DEPLOY
 
   notify:
     needs: [test, build, deploy]
