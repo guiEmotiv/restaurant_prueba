@@ -106,13 +106,35 @@ jobs:
             docker-compose --profile production up -d
             
             # Health check
+            echo "⏳ Waiting for services to start..."
             sleep 30
-            curl -f -s http://localhost:8000/api/v1/health/ && echo "✅ Deployment successful!" || exit 1
+            
+            echo "🔍 Checking container status..."
+            docker-compose --profile production ps
+            
+            echo "🏥 Running health check..."
+            if curl -f -s http://localhost:8000/api/v1/health/; then
+              echo "✅ Deployment successful!"
+            else
+              echo "❌ Health check failed - showing logs..."
+              docker-compose --profile production logs --tail=50
+              exit 1
+            fi
             ;;
             
           "check")
-            curl -f -s http://localhost:8000/api/v1/health/ && echo "✅ Health check passed!" || echo "❌ Health check failed"
+            echo "🔍 Checking services..."
             docker-compose --profile production ps
+            echo ""
+            echo "🏥 Health check..."
+            if curl -f -s http://localhost:8000/api/v1/health/; then
+              echo "✅ Health check passed!"
+            else
+              echo "❌ Health check failed"
+              echo ""
+              echo "📜 Recent logs:"
+              docker-compose --profile production logs --tail=30
+            fi
             ;;
             
           "backup")
