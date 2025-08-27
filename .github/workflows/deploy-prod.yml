@@ -243,9 +243,60 @@ jobs:
         echo "📥 Pulling Docker image..."
         docker pull ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}
         
-        # Download docker-compose.yml
-        echo "📥 Downloading docker-compose configuration..."
-        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker-compose.yml -o docker-compose.yml
+        # Create docker-compose.yml file directly (private repo)
+        echo "📥 Creating docker-compose configuration..."
+        cat > docker-compose.yml << 'COMPOSE_EOF'
+version: '3.8'
+
+services:
+  app:
+    image: restaurant-web:latest
+    container_name: restaurant-web-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/opt/restaurant-web/data
+      - ./logs:/opt/restaurant-web/logs
+    environment:
+      - DATABASE_PATH=/opt/restaurant-web/data
+      - DATABASE_NAME=restaurant_prod.sqlite3
+    env_file:
+      - .env.ec2
+    restart: unless-stopped
+    profiles:
+      - production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nginx:
+    image: nginx:alpine
+    container_name: restaurant-web-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  restaurant_data:
+    driver: local
+  restaurant_logs:
+    driver: local
+
+networks:
+  default:
+    name: restaurant-network
+        COMPOSE_EOF
         
         # Update docker-compose.yml with the new image
         sed -i "s|image: restaurant-web:.*|image: ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}|g" docker-compose.yml
