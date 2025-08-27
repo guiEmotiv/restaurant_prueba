@@ -245,7 +245,7 @@ jobs:
         
         # Download docker-compose.yml
         echo "📥 Downloading docker-compose configuration..."
-        curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml -o docker-compose.yml
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker-compose.yml -o docker-compose.yml
         
         # Update docker-compose.yml with the new image
         sed -i "s|image: restaurant-web:.*|image: ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}|g" docker-compose.yml
