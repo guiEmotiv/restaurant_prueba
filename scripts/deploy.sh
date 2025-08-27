@@ -54,9 +54,10 @@ DJANGO_SETTINGS_MODULE=backend.settings_ec2
 ENVEOF
         fi
         
-        # Deploy
+        # Force complete restart
         docker-compose --profile production down --timeout 10 || true
-        docker-compose --profile production up -d
+        docker system prune -f || true
+        docker-compose --profile production up -d --force-recreate
         
         # Health check with retries
         log "⏳ Waiting for services..."
