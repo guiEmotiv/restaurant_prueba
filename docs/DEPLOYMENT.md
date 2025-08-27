@@ -52,12 +52,6 @@ DJANGO_SECRET_KEY         # Django secret key for production
 DOMAIN_NAME               # Your domain name (e.g., restaurant.com)
 ```
 
-### Email Notification Configuration
-```bash
-EMAIL_USERNAME            # Gmail address for sending notifications
-EMAIL_PASSWORD            # Gmail App Password (not regular password)
-NOTIFICATION_EMAIL        # Email address to receive deployment notifications
-```
 
 ## 📦 ECR Repository Setup
 
@@ -124,11 +118,11 @@ git push origin main
 # 2. Build Docker image
 # 3. Push to ECR
 # 4. Deploy to EC2
-# 5. Database backup
-# 6. Run migrations
-# 7. Health check
-# 8. Create deployment tag
-# 9. Send email notification
+# 5. Docker cleanup (old images/containers)
+# 6. Database backup (keep last 10)
+# 7. Run migrations
+# 8. Health check
+# 9. GitHub email notification (automatic)
 ```
 
 ### Release Deployment (Version Tags)
@@ -171,26 +165,20 @@ git show deploy-prod-20240827-143022-abc1234
 
 ## 📧 Email Notifications
 
-### Setting up Gmail App Password
+GitHub automatically envía notificaciones por email cuando:
+- ✅ **Deployment exitoso**: Notificación de éxito
+- ❌ **Deployment fallido**: Notificación de error con detalles
 
-1. Go to [Google Account Settings](https://myaccount.google.com/)
-2. Security → 2-Step Verification (must be enabled)
-3. App passwords → Create new app password
-4. Use this password as `EMAIL_PASSWORD` secret
+**No requiere configuración adicional** - GitHub usa tu email del perfil automáticamente.
 
-### Notification Contents
+## 🧹 Limpieza Automática
 
-**Success Email includes:**
-- ✅ Deployment version
-- 🔗 Production URL
-- 📊 Deployment details
-- 🚀 Docker image information
-- 👤 Who triggered the deployment
+Cada deployment ejecuta limpieza automática en EC2 para evitar acumulación:
 
-**Failure Email includes:**
-- ❌ Error indication
-- 🔍 Link to workflow logs
-- 🛠️ Quick troubleshooting commands
+- **Docker Images**: Elimina imágenes antigas (>24h)
+- **Docker Containers**: Limpia contenedores no utilizados
+- **Volumes**: Remueve volúmenes huérfanos
+- **Database Backups**: Mantiene solo los últimos 10 backups
 
 ## 🌿 Branch Strategy
 
