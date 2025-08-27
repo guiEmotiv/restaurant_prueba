@@ -18,6 +18,7 @@ on:
           - debug       # Debug deployment issues
           - fix         # Fix deployment problems
           - emergency   # Emergency local build
+          - activate-ssl # Activate SSL for domain
 
 env:
   AWS_REGION: us-west-2
@@ -226,6 +227,13 @@ jobs:
             curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/emergency-deploy.sh -o emergency-deploy.sh
             chmod +x emergency-deploy.sh
             sudo ./emergency-deploy.sh
+            ;;
+            
+          "activate-ssl")
+            echo "🔒 Activating SSL configuration..."
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/activate-ssl.sh -o activate-ssl.sh
+            chmod +x activate-ssl.sh
+            ./activate-ssl.sh
             ;;
         esac
         EOF
