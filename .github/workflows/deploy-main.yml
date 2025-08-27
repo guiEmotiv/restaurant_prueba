@@ -154,10 +154,14 @@ jobs:
       uses: aws-actions/amazon-ecr-login@v2
 
     - name: Build and push Docker image
+      id: build
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        VERSION: prod-$(date +%Y%m%d-%H%M%S)-${{ github.sha }}
       run: |
+        # Generate version
+        VERSION="prod-$(date +%Y%m%d-%H%M%S)-${{ github.sha }}"
+        echo "Building version: $VERSION"
+        
         # Cache-friendly build
         docker build \
           --cache-from $ECR_REGISTRY/$ECR_REPOSITORY:latest \
@@ -169,11 +173,11 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
         
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-        echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "ecr-registry=$ECR_REGISTRY" >> $GITHUB_OUTPUT
 
     outputs:
-      image-version: ${{ env.VERSION }}
+      image-version: ${{ steps.build.outputs.version }}
       ecr-registry: ${{ steps.login-ecr.outputs.registry }}
 
   deploy:

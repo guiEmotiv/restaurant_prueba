@@ -95,117 +95,25 @@ jobs:
         
         case "${{ env.OPERATION }}" in
           "inspect")
-            echo "🔍 DEEP ENVIRONMENT INSPECTION"
-            echo "=============================="
+            echo "🔍 COMPREHENSIVE EC2 INSPECTION"
+            echo "==============================="
             
-            # Download and run inspection script
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/deep-inspection-ec2.sh -o deep-inspection.sh
-            chmod +x deep-inspection.sh
-            ./deep-inspection.sh
-            rm -f deep-inspection.sh
-            
-            echo ""
-            echo "🏠 LOCAL vs EC2 COMPARISON"
-            echo "=========================="
-            echo "This inspection helps identify:"
-            echo "- Missing or extra files"
-            echo "- Configuration mismatches"  
-            echo "- Disk usage issues"
-            echo "- Service health status"
+            # Download and run consolidated inspection script
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/ec2-inspector.sh -o inspector.sh
+            chmod +x inspector.sh
+            ./inspector.sh ${{ env.ANALYSIS_LEVEL }}
+            rm -f inspector.sh
             ;;
             
-          "cleanup")
-            echo "🧹 ENVIRONMENT CLEANUP"
-            echo "====================="
+          "cleanup"|"deep-cleanup"|"fresh-setup"|"emergency")
+            echo "🔧 CONSOLIDATED MAINTENANCE: ${{ env.OPERATION }}"
+            echo "==============================================="
             
-            echo "📊 Before cleanup:"
-            df -h /
-            docker system df
-            
-            # Download and run cleanup script
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/cleanup-ec2-environment.sh -o cleanup.sh
-            chmod +x cleanup.sh
-            ./cleanup.sh
-            rm -f cleanup.sh
-            
-            echo ""
-            echo "📊 After cleanup:"
-            df -h /
-            docker system df
-            ;;
-            
-          "deep-cleanup")
-            echo "🚨 DEEP AGGRESSIVE CLEANUP"
-            echo "=========================="
-            echo "⚠️  This will remove ALL chaotic files (scripts, duplicates, etc.)"
-            echo "⚠️  Critical data (database, backups, logs) will be PRESERVED"
-            
-            echo "📊 Before deep cleanup:"
-            df -h /
-            ls -la
-            
-            # Download and run deep cleanup script
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/deep-cleanup-ec2.sh -o deep-cleanup.sh
-            chmod +x deep-cleanup.sh
-            ./deep-cleanup.sh
-            rm -f deep-cleanup.sh
-            
-            echo ""
-            echo "📊 After deep cleanup:"
-            df -h /
-            ls -la
-            ;;
-            
-          "fresh-setup")
-            echo "🚀 FRESH EC2 SETUP - HYBRID SMART"
-            echo "=================================="
-            echo "⚠️  This will COMPLETELY rebuild EC2 structure"
-            echo "✅ Critical data (database, backups, logs) will be PRESERVED"
-            echo "✅ Result: Pristine repo structure + your data"
-            echo "⚡ Most efficient approach (2-3 minutes)"
-            
-            echo "📊 Before fresh setup:"
-            df -h /
-            ls -la
-            
-            # Download and run fresh setup script
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/fresh-ec2-setup.sh -o fresh-setup.sh
-            chmod +x fresh-setup.sh
-            ./fresh-setup.sh
-            rm -f fresh-setup.sh
-            
-            echo ""
-            echo "📊 After fresh setup:"
-            df -h /
-            ls -la
-            
-            echo ""
-            echo "🔍 Verifying git functionality:"
-            git status
-            git log --oneline -5
-            ;;
-            
-          "emergency")
-            echo "🚨 EMERGENCY CLEANUP"
-            echo "==================="
-            echo "⚠️  This is an aggressive cleanup for critical disk space issues"
-            
-            echo "📊 Critical disk status:"
-            df -h /
-            
-            # Download and run emergency cleanup
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/emergency-cleanup.sh -o emergency.sh
-            chmod +x emergency.sh
-            ./emergency.sh
-            rm -f emergency.sh
-            
-            echo ""
-            echo "📊 Post-emergency status:"
-            df -h /
-            
-            # Try to restart services if they're down
-            echo "🔄 Attempting service restart..."
-            docker-compose --profile production up -d || true
+            # Download and run consolidated maintenance script
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/ec2-maintenance.sh -o maintenance.sh
+            chmod +x maintenance.sh
+            ./maintenance.sh ${{ env.OPERATION }} CONFIRM
+            rm -f maintenance.sh
             ;;
             
           "restart")
