@@ -1,0 +1,129 @@
+name: Restaurant Web Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Deployment action'
+        type: choice
+        default: 'deploy'
+        options:
+          - deploy      # Deploy application
+          - check       # Health check only
+          - backup      # Backup database only
+          - cleanup     # Clean Docker resources
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: restaurant-web
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Restaurant Web
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS
+      if: github.event.inputs.action != 'check'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to ECR
+      if: github.event.inputs.action == 'deploy' || github.event.inputs.action == ''
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and Push
+      if: github.event.inputs.action == 'deploy' || github.event.inputs.action == ''
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        # Build frontend
+        cd frontend && npm ci && NODE_OPTIONS='--max-old-space-size=4096' npm run build && cd ..
+        
+        # Build and push Docker image
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+    - name: Execute on EC2
+      env:
+        ACTION: ${{ github.event.inputs.action || 'deploy' }}
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
+        EC2_USER: ${{ secrets.EC2_USERNAME }}
+      run: |
+        # Setup SSH
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+        
+        # Execute on EC2
+        ssh $EC2_USER@$EC2_HOST << 'EOF'
+        set -e
+        cd /opt/restaurant-web
+        
+        # Create env file
+        cat > .env.ec2 << 'ENVEOF'
+        AWS_REGION=${{ env.AWS_REGION }}
+        COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
+        COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
+        DATABASE_PATH=/opt/restaurant-web/data
+        DATABASE_NAME=restaurant_prod.sqlite3
+        DEBUG=False
+        USE_COGNITO_AUTH=True
+        ALLOWED_HOSTS=${{ secrets.EC2_PROD_HOST }},${{ secrets.DOMAIN_NAME }}
+        SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        ENVEOF
+        
+        case "${{ env.ACTION }}" in
+          "deploy")
+            # Backup database
+            mkdir -p data backups
+            [ -f data/restaurant_prod.sqlite3 ] && cp data/restaurant_prod.sqlite3 "backups/backup-$(date +%Y%m%d-%H%M%S).sqlite3"
+            
+            # Update and deploy
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+            docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+            
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker-compose.yml -o docker-compose.yml
+            sed -i "s|image: restaurant-web:latest|image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest|g" docker-compose.yml
+            
+            mkdir -p nginx/conf.d
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/nginx/conf.d/default.conf -o nginx/conf.d/default.conf
+            
+            docker-compose --profile production down --timeout 20 || true
+            docker-compose --profile production up -d
+            
+            # Health check
+            sleep 30
+            curl -f -s http://localhost:8000/api/v1/health/ && echo "✅ Deployment successful!" || exit 1
+            ;;
+            
+          "check")
+            curl -f -s http://localhost:8000/api/v1/health/ && echo "✅ Health check passed!" || echo "❌ Health check failed"
+            docker-compose --profile production ps
+            ;;
+            
+          "backup")
+            mkdir -p backups
+            [ -f data/restaurant_prod.sqlite3 ] && cp data/restaurant_prod.sqlite3 "backups/manual-backup-$(date +%Y%m%d-%H%M%S).sqlite3"
+            echo "✅ Backup completed"
+            ls -la backups/ | tail -5
+            ;;
+            
+          "cleanup")
+            docker system prune -af --volumes
+            echo "✅ Cleanup completed"
+            ;;
+        esac
+        EOF
