@@ -141,100 +141,141 @@ jobs:
     environment: production  # Requires manual approval
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup SSH Key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        known_hosts: unnecessary
+        
+    - name: Add EC2 to known hosts
+      run: |
+        ssh-keyscan -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
+        
     - name: Deploy to EC2 PROD
-      uses: appleboy/ssh-action@v1.0.0
       env:
         ECR_REGISTRY: ${{ needs.build.outputs.ecr-registry }}
         VERSION: ${{ needs.build.outputs.image-version }}
-      with:
-        host: ${{ secrets.EC2_PROD_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        port: ${{ secrets.EC2_SSH_PORT || '22' }}
-        envs: ECR_REGISTRY,ECR_REPOSITORY,VERSION,AWS_REGION
-        script_stop: true
-        command_timeout: 15m
-        script: |
-          #!/bin/bash
-          set -e
-          
-          # Set up full PATH environment
-          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          
-          # Source profile to get full environment
-          source ~/.bashrc 2>/dev/null || true
-          source ~/.profile 2>/dev/null || true
-          echo "🚀 Starting production deployment..."
-          echo "PATH: $PATH"
-          echo "Working directory: $(pwd)"
-          
-          # Test basic commands
-          which mkdir || echo "mkdir not found"
-          which docker || echo "docker not found" 
-          which aws || echo "aws not found"
-          which docker-compose || echo "docker-compose not found"
-          
-          # Set up directories
-          cd /opt/restaurant-web || exit 1
-          /bin/mkdir -p data backups
-          
-          # Create backup
-          if [ -f data/restaurant_prod.sqlite3 ]; then
-            BACKUP_DIR="backups/backup-$(date +%Y%m%d-%H%M%S)"
-            /bin/mkdir -p $BACKUP_DIR
-            /bin/cp data/restaurant_prod.sqlite3 $BACKUP_DIR/
-            echo "✅ Database backed up"
+        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
+        EC2_USER: ${{ secrets.EC2_USERNAME }}
+        AWS_REGION: us-west-2
+        ECR_REPOSITORY: restaurant-web
+      run: |
+        echo "🚀 Starting production deployment to $EC2_HOST..."
+        
+        # Create deployment script
+        cat > deploy_script.sh << 'DEPLOY_SCRIPT'
+        #!/bin/bash
+        set -e
+        
+        echo "🚀 Production deployment started..."
+        echo "Working directory: $(pwd)"
+        echo "User: $(whoami)"
+        
+        # Navigate to application directory
+        cd /opt/restaurant-web || { echo "❌ App directory not found"; exit 1; }
+        
+        # Create directories
+        mkdir -p data backups logs
+        
+        # Create backup
+        if [ -f data/restaurant_prod.sqlite3 ]; then
+          BACKUP_DIR="backups/backup-$(date +%Y%m%d-%H%M%S)"
+          mkdir -p "$BACKUP_DIR"
+          cp data/restaurant_prod.sqlite3 "$BACKUP_DIR/"
+          echo "✅ Database backed up to $BACKUP_DIR"
+        fi
+        
+        # Login to ECR and pull image
+        echo "🔐 Logging into ECR..."
+        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+        
+        echo "📥 Pulling Docker image..."
+        docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
+        
+        # Create production environment file
+        echo "⚙️ Creating production environment..."
+        cat > .env.ec2 << ENV_EOF
+        AWS_REGION=$AWS_REGION
+        COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
+        COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
+        DATABASE_PATH=/opt/restaurant-web/data
+        DATABASE_NAME=restaurant_prod.sqlite3
+        DEBUG=False
+        USE_COGNITO_AUTH=True
+        ALLOWED_HOSTS=$EC2_HOST,$DOMAIN_NAME
+        SECRET_KEY=$DJANGO_SECRET_KEY
+        DOMAIN_NAME=$DOMAIN_NAME
+        EC2_PUBLIC_IP=$EC2_HOST
+        ENV_EOF
+        
+        # Download docker-compose
+        echo "📥 Downloading docker-compose configuration..."
+        curl -sSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/docker-compose.yml -o docker-compose.yml
+        
+        # Stop existing services
+        echo "⏹️ Stopping existing services..."
+        docker-compose --profile production down --timeout 30 || true
+        
+        # Update docker-compose to use new image
+        echo "🔄 Updating docker-compose configuration..."
+        ECR_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$VERSION"
+        sed -i "s|image: restaurant-web:.*|image: ${ECR_IMAGE}|g" docker-compose.yml
+        
+        # Start services
+        echo "🚀 Starting production services..."
+        docker-compose --profile production up -d
+        
+        # Wait for services to be ready
+        echo "⏳ Waiting for services to initialize..."
+        sleep 45
+        
+        # Run database migrations
+        echo "🗄️ Running database migrations..."
+        docker-compose exec -T app python manage.py migrate
+        
+        # Collect static files
+        echo "📁 Collecting static files..."
+        docker-compose exec -T app python manage.py collectstatic --noinput
+        
+        # Health check
+        echo "🏥 Running health checks..."
+        for i in {1..5}; do
+          if curl -f -s http://localhost/api/v1/health/ > /dev/null 2>&1; then
+            echo "✅ Health check passed! Deployment successful!"
+            docker-compose --profile production ps
+            echo "🎉 Production deployment completed successfully!"
+            exit 0
+          else
+            echo "⏳ Health check attempt $i/5..."
+            sleep 15
           fi
-          
-          # Login to ECR and pull image  
-          /usr/bin/aws ecr get-login-password --region $AWS_REGION | /usr/bin/docker login --username AWS --password-stdin $ECR_REGISTRY
-          /usr/bin/docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
-          
-          # Create production environment
-          /bin/cat > .env.ec2 <<EOF
-          AWS_REGION=$AWS_REGION
-          COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
-          COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
-          DATABASE_PATH=/opt/restaurant-web/data
-          DATABASE_NAME=restaurant_prod.sqlite3
-          DEBUG=False
-          USE_COGNITO_AUTH=True
-          ALLOWED_HOSTS=${{ secrets.EC2_PROD_HOST }},${{ secrets.DOMAIN_NAME || 'localhost' }}
-          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-          DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
-          EC2_PUBLIC_IP=${{ secrets.EC2_PROD_HOST }}
-          EOF
-          
-          # Download docker-compose
-          /usr/bin/curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml -o docker-compose.yml
-          
-          # Stop existing services
-          docker-compose --profile production down --timeout 30 || true
-          
-          # Update docker-compose to use new image  
-          ECR_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$VERSION"
-          /bin/sed -i "s|restaurant-web:.*|${ECR_IMAGE}|g" docker-compose.yml
-          
-          # Start services
-          docker-compose --profile production up -d
-          
-          # Wait and run migrations
-          /bin/sleep 30
-          docker-compose exec -T app python manage.py migrate
-          docker-compose exec -T app python manage.py collectstatic --noinput
-          
-          # Health check
-          for i in {1..5}; do
-            if /usr/bin/curl -f http://localhost/api/v1/health/ > /dev/null 2>&1; then
-              echo "✅ Deployment successful!"
-              break
-            else
-              echo "⏳ Health check $i/5..."
-              /bin/sleep 10
-            fi
-          done
-          
-          echo "🎉 Production deployment completed!"
+        done
+        
+        echo "❌ Health check failed after 5 attempts"
+        echo "📊 Container status:"
+        docker-compose --profile production ps
+        docker-compose --profile production logs --tail=50
+        exit 1
+        DEPLOY_SCRIPT
+        
+        # Upload and execute deployment script on EC2
+        scp -o StrictHostKeyChecking=no deploy_script.sh $EC2_USER@$EC2_HOST:/tmp/
+        
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST \
+          "ECR_REGISTRY='$ECR_REGISTRY' \
+           ECR_REPOSITORY='$ECR_REPOSITORY' \
+           VERSION='$VERSION' \
+           AWS_REGION='$AWS_REGION' \
+           COGNITO_USER_POOL_ID='${{ secrets.COGNITO_USER_POOL_ID }}' \
+           COGNITO_APP_CLIENT_ID='${{ secrets.COGNITO_APP_CLIENT_ID }}' \
+           DJANGO_SECRET_KEY='${{ secrets.DJANGO_SECRET_KEY }}' \
+           EC2_HOST='$EC2_HOST' \
+           DOMAIN_NAME='${{ secrets.DOMAIN_NAME || 'localhost' }}' \
+           GITHUB_REPOSITORY='${{ github.repository }}' \
+           chmod +x /tmp/deploy_script.sh && /tmp/deploy_script.sh"
 
   notify:
     needs: [test, build, deploy]
