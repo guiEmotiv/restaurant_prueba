@@ -288,12 +288,13 @@ jobs:
         
         # Execute deployment on EC2
         echo "🚀 Executing deployment on EC2..."
+        DOMAIN_NAME="${{ secrets.DOMAIN_NAME }}"
         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST \
           "chmod +x /tmp/env_setup.sh && /tmp/env_setup.sh \
            '$ECR_REGISTRY' '$ECR_REPOSITORY' '$VERSION' '$AWS_REGION' \
            '${{ secrets.COGNITO_USER_POOL_ID }}' '${{ secrets.COGNITO_APP_CLIENT_ID }}' \
            '${{ secrets.DJANGO_SECRET_KEY }}' '$EC2_HOST' \
-           '${{ secrets.DOMAIN_NAME }}' '${{ github.repository }}'"
+           '${DOMAIN_NAME:-localhost}' '${{ github.repository }}'"
 
   notify:
     needs: [test, build, deploy]
