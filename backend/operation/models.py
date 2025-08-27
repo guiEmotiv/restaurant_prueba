@@ -236,8 +236,22 @@ class OrderItem(models.Model):
         return self.status == 'CREATED'
 
     def update_status(self, new_status):
-        """Actualiza el estado del item"""
-        # Validar transiciones válidas
+        """Actualiza el estado del item - IDEMPOTENTE para múltiples usuarios"""
+        print(f"DEBUG: OrderItem {self.id} update_status called: {self.status} -> {new_status}")
+        
+        # CRITICAL: Refresh from DB to get latest state (prevent race conditions)
+        self.refresh_from_db()
+        print(f"DEBUG: After refresh_from_db: {self.status} -> {new_status}")
+        
+        # ARQUITECTURA IDEMPOTENTE: Si ya está en el estado deseado, es un éxito
+        if self.status == new_status:
+            print(f"DEBUG: Item already in {new_status} state - idempotent success")
+            # Invalidar cache aunque no haya cambio real (para sincronizar vistas)
+            from django.core.cache import cache
+            cache.delete('kitchen_board_data')
+            return  # Éxito idempotente - no hay error
+        
+        # Validar transiciones válidas solo si hay un cambio real
         valid_transitions = {
             'CREATED': ['PREPARING'],
             'PREPARING': ['SERVED'],
@@ -245,8 +259,12 @@ class OrderItem(models.Model):
             'PAID': []
         }
         
+        print(f"DEBUG: Valid transitions for {self.status}: {valid_transitions.get(self.status, [])}")
+        
         if new_status not in valid_transitions.get(self.status, []):
-            raise ValidationError(f"No se puede cambiar de {self.status} a {new_status}")
+            error_msg = f"No se puede cambiar de {self.status} a {new_status}"
+            print(f"DEBUG: Validation error: {error_msg}")
+            raise ValidationError(error_msg)
         
         self.status = new_status
         now = timezone.now()
@@ -259,6 +277,11 @@ class OrderItem(models.Model):
             self.paid_at = now
         
         self.save()
+        
+        # CRITICAL: Invalidate kitchen_board cache whenever status changes
+        from django.core.cache import cache
+        cache.delete('kitchen_board_data')
+        print(f"DEBUG: Cache invalidated after status change to {new_status}")
         
         # Si el item fue servido, verificar si toda la orden está completa
         if new_status == 'SERVED':

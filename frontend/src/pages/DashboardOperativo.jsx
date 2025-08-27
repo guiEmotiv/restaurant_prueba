@@ -9,13 +9,18 @@ import {
   CreditCard,
   TrendingUp,
   Clock,
-  XCircle
+  XCircle,
+  Store,
+  Truck,
+  FileText
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { getPeruDate, formatCurrency, STATUS_NAMES, STATUS_COLORS, PAYMENT_METHOD_NAMES, PAYMENT_METHOD_COLORS, getCategoryColor, getRankingColor } from '../utils/dashboardUtils';
 import LoadingSpinner from '../components/LoadingSpinner';
 import CustomDatePicker from '../components/CustomDatePicker';
 import UnsolRecipesPieChart from '../components/UnsolRecipesPieChart';
+import TopDishesBarChart from '../components/TopDishesBarChart';
+import DeliveryRecipesPieChart from '../components/DeliveryRecipesPieChart';
 
 
 const DashboardOperativo = () => {
@@ -34,7 +39,6 @@ const DashboardOperativo = () => {
       setDashboardData(data);
 
     } catch (error) {
-      console.error('Error al cargar dashboard operativo:', error);
       setError(`Error al cargar los datos del dashboard: ${error.message}`);
     } finally {
       setLoading(false);
@@ -58,9 +62,6 @@ const DashboardOperativo = () => {
       
       await apiService.dashboardOperativo.downloadExcel(selectedDate);
       
-      // Feedback positivo (opcional - el archivo se descarga automáticamente)
-      // setTimeout(() => alert('✅ Excel descargado exitosamente'), 500);
-      
     } catch (error) {
       // Mensaje de error más específico
       if (error.response?.status === 404) {
@@ -82,11 +83,12 @@ const DashboardOperativo = () => {
   const derivedData = useMemo(() => {
     if (!dashboardData) return null;
     
-    const { summary, category_breakdown, top_dishes, waiter_performance, payment_methods, item_status_breakdown } = dashboardData;
+    const { summary, category_breakdown, delivery_category_breakdown, top_dishes, waiter_performance, payment_methods, item_status_breakdown } = dashboardData;
     
     return {
       summary,
       category_breakdown: category_breakdown || [],
+      delivery_category_breakdown: delivery_category_breakdown || [],
       top_dishes: top_dishes || [],
       waiter_performance: waiter_performance || [],
       payment_methods: payment_methods || [],
@@ -108,7 +110,7 @@ const DashboardOperativo = () => {
     );
   }
 
-  const { summary, category_breakdown, top_dishes, waiter_performance, payment_methods, item_status_breakdown, unsold_recipes } = derivedData;
+  const { summary, category_breakdown, delivery_category_breakdown, top_dishes, waiter_performance, payment_methods, item_status_breakdown, unsold_recipes } = derivedData;
 
   return (
     <div className="min-h-screen bg-gray-50 -m-4 sm:-m-6 p-4 sm:p-6">
@@ -137,13 +139,26 @@ const DashboardOperativo = () => {
           </div>
           
           {/* Métricas de órdenes PAID del día */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Ingresos Totales</p>
                   <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.total_revenue)}</p>
-                  <p className="text-xs text-gray-500">órdenes pagadas</p>
+                  <div className="mt-2 space-y-1 text-xs">
+                    <div className="flex items-center text-gray-600">
+                      <div className="w-4 flex justify-center">
+                        <Store className="h-3 w-3" />
+                      </div>
+                      <span className="ml-2 flex-1">{formatCurrency(summary.restaurant_revenue || 0)} ({summary.total_revenue > 0 ? Math.round((summary.restaurant_revenue / summary.total_revenue) * 100) : 0}%)</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <div className="w-4 flex justify-center">
+                        <Truck className="h-3 w-3" />
+                      </div>
+                      <span className="ml-2 flex-1">{formatCurrency(summary.delivery_revenue || 0)} ({summary.total_revenue > 0 ? Math.round((summary.delivery_revenue / summary.total_revenue) * 100) : 0}%)</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="p-3 bg-green-100 rounded-lg">
                   <DollarSign className="h-6 w-6 text-green-600" />
@@ -154,12 +169,37 @@ const DashboardOperativo = () => {
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Ventas Realizadas</p>
-                  <p className="text-2xl font-bold text-gray-900">{summary.total_orders}</p>
-                  <p className="text-xs text-gray-500">órdenes PAID</p>
+                  <p className="text-sm font-medium text-gray-600">Items Vendidos</p>
+                  <p className="text-2xl font-bold text-gray-900">{(summary.restaurant_items || 0) + (summary.delivery_items || 0)}</p>
+                  <div className="mt-2 space-y-1 text-xs">
+                    <div className="flex items-center text-gray-600">
+                      <div className="w-4 flex justify-center">
+                        <Store className="h-3 w-3" />
+                      </div>
+                      <span className="ml-2 flex-1">{summary.restaurant_items || 0} ({((summary.restaurant_items || 0) + (summary.delivery_items || 0)) > 0 ? Math.round(((summary.restaurant_items || 0) / ((summary.restaurant_items || 0) + (summary.delivery_items || 0))) * 100) : 0}%)</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <div className="w-4 flex justify-center">
+                        <Truck className="h-3 w-3" />
+                      </div>
+                      <span className="ml-2 flex-1">{summary.delivery_items || 0} ({((summary.restaurant_items || 0) + (summary.delivery_items || 0)) > 0 ? Math.round(((summary.delivery_items || 0) / ((summary.restaurant_items || 0) + (summary.delivery_items || 0))) * 100) : 0}%)</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-lg">
                   <ShoppingCart className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-teal-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Número de Pedidos</p>
+                  <p className="text-2xl font-bold text-gray-900">{summary.total_orders || 0}</p>
+                </div>
+                <div className="p-3 bg-teal-100 rounded-lg">
+                  <FileText className="h-6 w-6 text-teal-600" />
                 </div>
               </div>
             </div>
@@ -169,7 +209,6 @@ const DashboardOperativo = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Ticket Promedio</p>
                   <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.average_ticket)}</p>
-                  <p className="text-xs text-gray-500">por venta PAID</p>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-lg">
                   <Users className="h-6 w-6 text-purple-600" />
@@ -182,9 +221,12 @@ const DashboardOperativo = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Tiempo Promedio</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {summary.average_service_time ? `${Math.round(summary.average_service_time)}` : '0'}
+                    {summary.average_service_time ? (
+                      summary.average_service_time >= 60 
+                        ? `${Math.floor(summary.average_service_time / 60)}h ${Math.round(summary.average_service_time % 60)}m`
+                        : `${Math.round(summary.average_service_time)} min`
+                    ) : '0 min'}
                   </p>
-                  <p className="text-xs text-gray-500">minutos</p>
                 </div>
                 <div className="p-3 bg-orange-100 rounded-lg">
                   <Clock className="h-6 w-6 text-orange-600" />
@@ -194,85 +236,14 @@ const DashboardOperativo = () => {
           </div>
         </div>
 
-        {/* Análisis por categorías y top platos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Categorías */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <PieChart className="h-6 w-6 text-blue-500" />
-              Ingresos por Categoría
-            </h2>
-            
-            <div className="space-y-4">
-              {category_breakdown.map((category, index) => {
-                const bgColor = getCategoryColor(index);
-                
-                return (
-                  <div key={index}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-4 h-4 rounded ${bgColor}`}></div>
-                        <span className="font-medium text-gray-900">{category.category}</span>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-gray-900">{formatCurrency(category.revenue)}</p>
-                        <p className="text-sm text-gray-500">{Math.round(category.percentage)}%</p>
-                      </div>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
-                        className={`${bgColor} h-3 rounded-full transition-all duration-500`}
-                        style={{ width: `${category.percentage}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
-              
-              {category_breakdown.length === 0 && (
-                <div className="text-center text-gray-500 py-8">
-                  <PieChart className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                  <p>Sin datos de categorías para esta fecha</p>
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Top platos */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Award className="h-6 w-6 text-yellow-500" />
-              Productos Más Vendidos
-            </h2>
-            
-            <div className="space-y-3 max-h-80 overflow-y-auto">
-              {top_dishes.map((dish, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm ${getRankingColor(index)}`}>
-                      {index + 1}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{dish.name}</p>
-                      <p className="text-sm text-gray-500">{dish.category} • {dish.quantity} vendidos</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-gray-900">{formatCurrency(dish.revenue)}</p>
-                    <p className="text-xs text-gray-500">{formatCurrency(dish.unit_price)} c/u</p>
-                  </div>
-                </div>
-              ))}
-              
-              {top_dishes.length === 0 && (
-                <div className="text-center text-gray-500 py-8">
-                  <Award className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                  <p>Sin datos de productos para esta fecha</p>
-                </div>
-              )}
-            </div>
-          </div>
+        {/* Análisis de ventas y recetas */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Ventas por Categoría - Gráfico de barras */}
+          <TopDishesBarChart top_dishes={top_dishes} category_breakdown={category_breakdown} />
+
+          {/* Recetas no vendidas - Gráfica de Pie */}
+          <UnsolRecipesPieChart unsold_recipes={unsold_recipes} summary={summary} />
         </div>
 
         {/* Performance financiera */}
@@ -328,8 +299,8 @@ const DashboardOperativo = () => {
             </div>
           </div>
 
-          {/* Recetas no vendidas - Gráfica de Pie */}
-          <UnsolRecipesPieChart unsold_recipes={unsold_recipes} />
+          {/* Categorías Delivery - Gráfica de Pie */}
+          <DeliveryRecipesPieChart delivery_category_breakdown={delivery_category_breakdown} />
         </div>
 
         {/* Estado de Items y Métodos de pago */}

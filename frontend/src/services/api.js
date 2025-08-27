@@ -64,6 +64,23 @@ window.testApiAuth = async () => {
   }
 };
 
+// Add global debugging function to test dashboard API
+window.testDashboardApi = async () => {
+  try {
+    console.log('🔍 Testing dashboard API...');
+    const response = await api.get('/dashboard-operativo/report/');
+    console.log('✅ Dashboard API Response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Dashboard API Error:', error);
+    return { 
+      error: error.message,
+      status: error.response?.status,
+      data: error.response?.data 
+    };
+  }
+};
+
 
 // Get CSRF token function
 const getCSRFToken = async () => {
@@ -581,74 +598,6 @@ export const apiService = {
     },
   },
 
-  // Dashboard endpoints
-  dashboard: {
-    getReport: async (date = null, period = null) => {
-      let url = '/dashboard/report/';
-      const params = [];
-      
-      if (date) {
-        params.push(`date=${date}`);
-      }
-      
-      if (period) {
-        params.push(`period=${period}`);
-      }
-      
-      if (params.length > 0) {
-        url += `?${params.join('&')}`;
-      }
-      
-      const response = await api.get(url);
-      return response.data;
-    },
-    downloadExcel: async (date = null) => {
-      const url = date ? `/dashboard/export_excel/?date=${date}` : '/dashboard/export_excel/';
-      
-      const response = await api.get(url, {
-        responseType: 'blob',
-        timeout: 30000 // 30 segundos para Excel pesado
-      });
-      
-      // Verificar que la respuesta es un blob válido
-      if (response.data.size === 0) {
-        throw new Error('Archivo Excel vacío recibido del servidor');
-      }
-      
-      // Detectar el tipo de archivo por el content-type
-      const contentType = response.headers['content-type'] || '';
-      const isExcel = contentType.includes('spreadsheet') || contentType.includes('excel');
-      const isCsv = contentType.includes('csv') || contentType.includes('text');
-      
-      // Crear blob con el tipo correcto
-      const blob = new Blob([response.data], {
-        type: isExcel ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv'
-      });
-      
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      
-      // Nombre más descriptivo con fecha legible
-      const dateStr = date || new Date().toISOString().split('T')[0];
-      const [year, month, day] = dateStr.split('-');
-      const extension = isExcel ? 'xlsx' : 'csv';
-      link.download = `Dashboard_Ventas_${day}-${month}-${year}.${extension}`;
-      
-      // Asegurar que el link se descarga incluso en navegadores restrictivos
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      
-      // Cleanup más robusto
-      setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(downloadUrl);
-      }, 100);
-      
-      return response;
-    }
-  },
 
   // Dashboard Financiero endpoints - Vista optimizada con BD view
   dashboardFinanciero: {

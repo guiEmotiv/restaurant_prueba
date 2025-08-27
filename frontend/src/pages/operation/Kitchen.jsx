@@ -36,7 +36,7 @@ setInterval(() => {
 }, 300000); // 5 minutos
 
 // 🚀 OPTIMIZACIÓN: OrderItemCard ultra-eficiente con memoización profunda
-const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
+const OrderItemCard = memo(({ item, timeStatus, handleCardClick, isProcessing = false }) => {
   // Cache del tiempo formateado para evitar recálculos
   const formattedTime = item.formattedTime || getCachedTime(item.created_at, 'formatted');
   
@@ -46,7 +46,7 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
   return (
     <div
       onClick={onCardClick}
-      className={`rounded-lg p-2 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md transform hover:scale-105 active:scale-95 ${timeStatus.borderColor} ${timeStatus.bgColor} relative`}
+      className={`rounded-lg p-2 shadow-sm border transition-all duration-200 ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md transform hover:scale-105 active:scale-95'} ${timeStatus.borderColor} ${timeStatus.bgColor} relative`}
     >
       {/* Barra de progreso de tiempo */}
       <div className="mb-1">
@@ -126,7 +126,8 @@ const OrderItemCard = memo(({ item, timeStatus, handleCardClick }) => {
          prevProps.timeStatus.status === nextProps.timeStatus.status &&
          prevProps.timeStatus.progress === nextProps.timeStatus.progress &&
          prevProps.timeStatus.displayTime === nextProps.timeStatus.displayTime &&
-         prevProps.timeStatus.itemStatus === nextProps.timeStatus.itemStatus;
+         prevProps.timeStatus.itemStatus === nextProps.timeStatus.itemStatus &&
+         prevProps.isProcessing === nextProps.isProcessing;
 });
 
 // Constantes fuera del componente para evitar recreaciones
@@ -163,6 +164,7 @@ const Kitchen = () => {
   });
   // 🔧 SOLUCIÓN: Estado para forzar re-renders estable
   const [timeUpdateTrigger, setTimeUpdateTrigger] = useState(0);
+  const [processingItems, setProcessingItems] = useState(new Set()); // Track items being processed
   const { showSuccess, showError } = useToast();
   const { userRole } = useAuth();
 
@@ -321,7 +323,7 @@ const Kitchen = () => {
     });
   }, [kitchenBoard]);
 
-  // 🚀 OPTIMIZACIÓN: confirmStatusChange con useCallback
+  // 🚀 OPTIMIZACIÓN: confirmStatusChange con useCallback - MANEJO IDEMPOTENTE
   const confirmStatusChange = useCallback(async () => {
     const { item, newStatus } = confirmModal;
     
@@ -330,15 +332,57 @@ const Kitchen = () => {
       'SERVED': 'Item marcado como servido'
     };
 
+    // Marcar item como en proceso
+    setProcessingItems(prev => new Set([...prev, item.id]));
+
     try {
-      await apiService.orderItems.updateStatus(item.id, newStatus);
-      await loadKitchenBoard();
-      
-      showSuccess(successMessages[newStatus] || 'Estado actualizado', 500);
+      // Actualización optimista: cerrar modal inmediatamente para UX fluida
       closeConfirmModal();
+      
+      console.log('Updating order item status:', {
+        itemId: item.id,
+        currentStatus: item.status,
+        newStatus: newStatus,
+        payload: { status: newStatus }
+      });
+      
+      await apiService.orderItems.updateStatus(item.id, newStatus);
+      
+      // Siempre consideramos exitoso (incluyendo operaciones idempotentes)
+      showSuccess(successMessages[newStatus] || 'Estado actualizado', 500);
+      
+      // Recargar el tablero después de un breve delay para evitar conflictos
+      setTimeout(() => {
+        loadKitchenBoard();
+      }, 300);
+      
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message;
-      showError('Error al actualizar el estado: ' + errorMessage, 500);
+      // Solo mostrar error si es un problema real (no idempotente)
+      if (error.response?.status !== 200) {
+        console.error('Error updating order item status:', {
+          itemId: item.id,
+          currentStatus: item.status,
+          newStatus: newStatus,
+          errorResponse: error.response?.data,
+          errorStatus: error.response?.status
+        });
+        
+        // Simplificar mensaje de error para usuario
+        if (error.response?.data?.error?.includes('SERVED a SERVED')) {
+          // Es una operación idempotente - no mostrar error
+          showSuccess('Item ya está servido', 500);
+          loadKitchenBoard();
+        } else {
+          showError('Error al actualizar. Por favor intente de nuevo.', 500);
+        }
+      }
+    } finally {
+      // Siempre quitar el item del procesamiento
+      setProcessingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(item.id);
+        return newSet;
+      });
     }
   }, [confirmModal, loadKitchenBoard, showSuccess, closeConfirmModal, showError]);
 
@@ -346,6 +390,11 @@ const Kitchen = () => {
   const handleCardClick = useCallback((e, item) => {
     // Prevenir propagación inmediatamente
     e?.stopPropagation();
+    
+    // Si el item está siendo procesado, ignorar click
+    if (processingItems.has(item.id)) {
+      return;
+    }
     
     // 🔊 Audio en background - no bloquear UI
     ensureAudioReady();
@@ -357,7 +406,7 @@ const Kitchen = () => {
     if (nextStatus) {
       openConfirmModal(item, nextStatus);
     }
-  }, [ensureAudioReady, openConfirmModal]);
+  }, [ensureAudioReady, openConfirmModal, processingItems]);
 
   // Función removida - no se usa en el código
 
@@ -739,6 +788,7 @@ const Kitchen = () => {
                       item={item}
                       timeStatus={getTimeStatus(item)}
                       handleCardClick={handleCardClick}
+                      isProcessing={processingItems.has(item.id)}
                     />
                   ))}
 
@@ -775,6 +825,7 @@ const Kitchen = () => {
                         item={item}
                         timeStatus={getTimeStatus(item)}
                         handleCardClick={handleCardClick}
+                        isProcessing={processingItems.has(item.id)}
                       />
                     ))}
                   </div>

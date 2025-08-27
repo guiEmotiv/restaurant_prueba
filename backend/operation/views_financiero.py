@@ -14,9 +14,9 @@ from inventory.models import Recipe
 class DashboardFinancieroViewSet(viewsets.ViewSet):
     """
     Vista específica para Dashboard Financiero
-    Enfocada en análisis financiero y de ventas con filtros inteligentes de período
+    AHORA USA dashboard_operativo_view para estandarización completa del sistema
     """
-    permission_classes = [AllowAny]  # Acceso completo en desarrollo
+    # Use default authentication from settings (Cognito if enabled)
     
     @action(detail=False, methods=['get'])
     def report(self, request):
@@ -136,108 +136,139 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
     
     def _query_dashboard_view(self, period_info):
         """
-        Consulta directa a la vista de BD dashboard_financiero_view para máximo rendimiento
+        USA dashboard_operativo_view para estandarización completa del sistema
+        Filtrada por período para análisis financiero
         """
         from django.db import connection
         from decimal import Decimal
         from collections import defaultdict
         
-        # Usar Django ORM para consultar datos filtrados por período
-        order_filter = Q(status='PAID')
+        cursor = connection.cursor()
+        
+        # Construir filtro de fechas para el período
+        date_filter = ""
+        params = []
         
         if period_info['start_date'] and period_info['end_date']:
-            # Filtrar por rango de fechas
-            order_filter &= Q(
-                paid_at__date__gte=period_info['start_date'],
-                paid_at__date__lte=period_info['end_date']
-            )
+            date_filter = "WHERE operational_date BETWEEN %s AND %s AND order_status = 'PAID'"
+            params = [period_info['start_date'], period_info['end_date']]
+        else:
+            date_filter = "WHERE order_status = 'PAID'"
         
-        # Obtener órdenes filtradas
-        orders = Order.objects.filter(order_filter).select_related('table')
+        # CONSULTA ÚNICA A dashboard_operativo_view - INCLUIR total_with_container para consistencia
+        cursor.execute(f"""
+            SELECT 
+                order_id, order_total, order_status, waiter, operational_date,
+                item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
+                recipe_name, category_name, category_id,
+                payment_method, payment_amount
+            FROM dashboard_operativo_view
+            {date_filter}
+            ORDER BY operational_date DESC, order_id, item_id
+        """, params)
         
-        # Calcular métricas básicas
-        total_orders = orders.count()
-        total_revenue = orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+        all_data = cursor.fetchall()
+        cursor.close()
         
-        # Obtener items de las órdenes
-        order_items = OrderItem.objects.filter(order__in=orders).select_related('recipe')
-        total_items = order_items.count()
-        
-        # Calcular promedio
-        average_ticket = total_revenue / total_orders if total_orders > 0 else Decimal('0')
-        
-        # Agrupar por categorías (simulado)
-        category_stats = {}
-        dish_stats = {}
-        daily_sales = {}
-        
-        for order in orders:
-            # Usar fecha en zona horaria de Perú (UTC-5)
-            if order.paid_at:
-                peru_datetime = order.paid_at - timedelta(hours=5)
-                order_date = peru_datetime.date().isoformat()
-            else:
-                peru_datetime = order.created_at - timedelta(hours=5)
-                order_date = peru_datetime.date().isoformat()
-            
-            if order_date not in daily_sales:
-                daily_sales[order_date] = {
-                    'orders': 0,
-                    'revenue': Decimal('0'),
-                    'items': 0
+        if not all_data:
+            # Retorno vacío para período sin datos
+            return {
+                'summary': {
+                    'total_orders': 0,
+                    'total_revenue': 0.0,
+                    'average_ticket': 0.0,
+                    'total_items': 0
+                },
+                'category_breakdown': [],
+                'top_dishes': [],
+                'payment_methods': [],
+                'sales_by_day': [],
+                'revenue_trends': {
+                    'daily_average': 0,
+                    'daily_maximum': 0
+                },
+                'production_trends': {
+                    'daily_average': 0,
+                    'daily_maximum': 0
                 }
-            
-            daily_sales[order_date]['orders'] += 1
-            daily_sales[order_date]['revenue'] += order.total_amount or Decimal('0')
-            
-            # Contar items por orden
-            order_item_count = order.orderitem_set.count()
-            daily_sales[order_date]['items'] += order_item_count
+            }
         
-        # Agrupar por categorías Y por día
-        category_stats = {}
-        dish_stats = {}
-        daily_category_stats = {}  # Nuevo: stats por día y categoría
+        # Inicializar estructuras de datos
+        paid_orders = set()
+        paid_orders_totals = {}
+        category_stats = defaultdict(lambda: {'revenue': Decimal('0'), 'quantity': 0})
+        dish_stats = defaultdict(lambda: {'category': '', 'quantity': 0, 'revenue': Decimal('0'), 'unit_price': Decimal('0')})
+        payment_stats = defaultdict(lambda: {'amount': Decimal('0'), 'count': 0})
+        daily_sales = defaultdict(lambda: {'orders': 0, 'revenue': Decimal('0'), 'items': 0})
+        daily_category_stats = defaultdict(lambda: defaultdict(lambda: {'revenue': Decimal('0'), 'quantity': 0}))
         
-        for item in order_items:
-            if item.recipe:
-                # Usar fecha en zona horaria de Perú (UTC-5)
-                if item.order.paid_at:
-                    peru_datetime = item.order.paid_at - timedelta(hours=5)
-                    order_date = peru_datetime.date().isoformat()
-                else:
-                    peru_datetime = item.order.created_at - timedelta(hours=5)
-                    order_date = peru_datetime.date().isoformat()
-                category_name = getattr(item.recipe.group, 'name', 'Sin Categoría') if hasattr(item.recipe, 'group') and item.recipe.group else 'Sin Categoría'
+        # PROCESAR DATOS DE dashboard_operativo_view - INCLUIR total_with_container para consistencia
+        for row in all_data:
+            (order_id, order_total, order_status, waiter, operational_date,
+             item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
+             recipe_name, category_name, category_id,
+             payment_method, payment_amount) = row
+            
+            # Solo órdenes PAID
+            if order_status == 'PAID' and item_id:
+                paid_orders.add(order_id)
                 
-                # Stats globales por categoría
-                if category_name not in category_stats:
-                    category_stats[category_name] = {'revenue': Decimal('0'), 'quantity': 0}
+                if order_id not in paid_orders_totals:
+                    # Calcular el total real con containers para esta orden
+                    order_real_total = Decimal('0')
+                    for check_row in all_data:
+                        if check_row[0] == order_id and check_row[2] == 'PAID' and check_row[5] is not None:  # order_id, order_status, item_id
+                            order_real_total += Decimal(str(check_row[9] or 0))  # total_with_container
+                    
+                    paid_orders_totals[order_id] = order_real_total
+                    # Agregar a daily_sales una sola vez por orden - USAR total real con containers
+                    date_str = str(operational_date)
+                    daily_sales[date_str]['orders'] += 1
+                    daily_sales[date_str]['revenue'] += order_real_total
                 
-                category_stats[category_name]['revenue'] += item.total_price or Decimal('0')
-                category_stats[category_name]['quantity'] += 1
+                # Stats por categoría - USAR total_with_container para consistencia
+                if category_name and recipe_name:
+                    category = category_name or 'Sin Categoría'
+                    category_stats[category]['revenue'] += Decimal(str(total_with_container or 0))
+                    category_stats[category]['quantity'] += quantity or 0
+                    
+                    # Stats por día y categoría
+                    date_str = str(operational_date)
+                    daily_category_stats[date_str][category]['revenue'] += Decimal(str(total_with_container or 0))
+                    daily_category_stats[date_str][category]['quantity'] += quantity or 0
                 
-                # Stats por día y categoría
-                if order_date not in daily_category_stats:
-                    daily_category_stats[order_date] = {}
+                # Stats por receta (top dishes) - USAR total_with_container para consistencia
+                if recipe_name:
+                    dish_stats[recipe_name]['category'] = category_name or 'Sin Categoría'
+                    dish_stats[recipe_name]['quantity'] += quantity or 0
+                    dish_stats[recipe_name]['revenue'] += Decimal(str(total_with_container or 0))
+                    dish_stats[recipe_name]['unit_price'] = Decimal(str(unit_price or 0))
                 
-                if category_name not in daily_category_stats[order_date]:
-                    daily_category_stats[order_date][category_name] = {'revenue': Decimal('0'), 'quantity': 0}
+                # Stats de pagos - USAR total de la orden con contenedores para consistencia
+                if payment_method and payment_amount and order_id not in [p['order_id'] for p in payment_stats[payment_method].get('processed_orders', [])]:
+                    # Usar el total_with_container de todos los items de la orden para este método de pago
+                    order_total_with_container = Decimal('0')
+                    for check_row in all_data:
+                        if check_row[0] == order_id and check_row[2] == 'PAID' and check_row[5] is not None:  # order_id, order_status, item_id
+                            order_total_with_container += Decimal(str(check_row[9] or 0))  # total_with_container
+                    
+                    payment_stats[payment_method]['amount'] += order_total_with_container
+                    payment_stats[payment_method]['count'] += 1
+                    
+                    # Marcar orden como procesada para este método de pago
+                    if 'processed_orders' not in payment_stats[payment_method]:
+                        payment_stats[payment_method]['processed_orders'] = []
+                    payment_stats[payment_method]['processed_orders'].append({'order_id': order_id})
                 
-                daily_category_stats[order_date][category_name]['revenue'] += item.total_price or Decimal('0')
-                daily_category_stats[order_date][category_name]['quantity'] += 1
-                
-                # Stats por plato (top 10)
-                if item.recipe.name not in dish_stats:
-                    dish_stats[item.recipe.name] = {
-                        'category': category_name,
-                        'quantity': 0,
-                        'revenue': Decimal('0'),
-                        'unit_price': item.unit_price or Decimal('0')
-                    }
-                
-                dish_stats[item.recipe.name]['quantity'] += 1
-                dish_stats[item.recipe.name]['revenue'] += item.total_price or Decimal('0')
+                # Items por día
+                date_str = str(operational_date)
+                daily_sales[date_str]['items'] += quantity or 0
+        
+        # Calcular métricas principales
+        total_orders = len(paid_orders)
+        total_revenue = sum(paid_orders_totals.values())
+        average_ticket = total_revenue / total_orders if total_orders > 0 else Decimal('0')
+        total_items = len([row for row in all_data if row[2] == 'PAID' and row[5] is not None])
         
         # Formatear category_breakdown
         total_category_revenue = sum(cat['revenue'] for cat in category_stats.values())
@@ -301,7 +332,7 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
             },
             'category_breakdown': category_breakdown,
             'top_dishes': top_dishes,
-            'payment_methods': [],  # Simplificado por ahora
+            'payment_methods': self._format_payment_methods(payment_stats),
             'sales_by_day': sales_by_day,
             'revenue_trends': {
                 'daily_average': revenue_average,
@@ -320,3 +351,23 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
                 }
             }
         }
+    
+    def _format_payment_methods(self, payment_stats):
+        """
+        Formatea los payment methods limpiando processed_orders y calculando percentages
+        """
+        total_payment_amount = sum(stat['amount'] for stat in payment_stats.values())
+        payment_methods = []
+        
+        for method, stats in payment_stats.items():
+            percentage = (stats['amount'] / total_payment_amount * 100) if total_payment_amount > 0 else 0
+            # Limpiar stats para el frontend (remover processed_orders)
+            clean_stats = {k: v for k, v in stats.items() if k != 'processed_orders'}
+            payment_methods.append({
+                'method': method,
+                'amount': float(clean_stats['amount']),
+                'percentage': float(percentage),
+                'transaction_count': clean_stats['count']
+            })
+        
+        return payment_methods

@@ -36,6 +36,8 @@ COGNITO_APP_CLIENT_ID = os.getenv("COGNITO_APP_CLIENT_ID", "")
 # Set COGNITO_ENABLED for the middleware
 COGNITO_ENABLED = USE_COGNITO_AUTH
 
+# Rate limiting moved to Nginx - no longer handled by Django
+
 # Validate required Cognito settings only if authentication is enabled
 if USE_COGNITO_AUTH:
     if not COGNITO_USER_POOL_ID:
@@ -257,4 +259,68 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API completa para la gestión de restaurantes",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+}
+
+# ──────────────────────────────────────────────────────────────
+# Rate Limiting Configuration
+# ──────────────────────────────────────────────────────────────
+
+# Cache configuration for rate limiting
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'rate-limiting',
+        'OPTIONS': {
+            'MAX_ENTRIES': 10000,
+        }
+    }
+}
+
+# Rate limiting settings
+RATE_LIMITING = {
+    'ENABLED': os.getenv('RATE_LIMITING_ENABLED', 'True').lower() == 'true',
+    'REDIS_URL': os.getenv('REDIS_URL', None),  # Optional Redis backend
+    'LOG_VIOLATIONS': True,
+    'STRICT_MODE': os.getenv('RATE_LIMITING_STRICT', 'False').lower() == 'true',
+}
+
+# Logging configuration for rate limiting
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'data' / 'logs' / 'rate_limiting.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'WARNING',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'rate_limiting': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': True,
+        },
+    },
 }

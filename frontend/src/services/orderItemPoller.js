@@ -8,7 +8,8 @@ class OrderItemPoller {
     this.pollInterval = null;
     this.knownItems = new Set();
     this.knownItemIds = new Set(); // Para rastrear IDs y detectar eliminaciones reales
-    this.intervalMs = 3000; // Polling cada 3 segundos para reducir carga de red
+    this.allKnownItemIds = new Set(); // Para rastrear TODOS los items que han existido (incluidos SERVED)
+    this.intervalMs = 2000; // Polling cada 2 segundos para mejor sincronización multi-usuario
     this.isKitchenView = false;
     this.updateCallback = null;
   }
@@ -36,10 +37,13 @@ class OrderItemPoller {
       this.knownItems.clear();
       this.knownItemIds.clear();
       
+      // Inicializar también el conjunto de todos los items conocidos
+      // Para evitar sonidos al inicio, agregar todos los items actuales como conocidos
       kitchenBoard.forEach(recipe => {
         recipe.items?.forEach(item => {
           this.knownItems.add(`${item.id}-${item.created_at}`);
           this.knownItemIds.add(item.id);
+          this.allKnownItemIds.add(item.id); // Agregar a todos los conocidos
         });
       });
       
@@ -71,22 +75,43 @@ class OrderItemPoller {
           currentItems.add(itemKey);
           currentItemIds.add(item.id);
           
+          // Agregar a todos los items conocidos
+          this.allKnownItemIds.add(item.id);
+          
           if (!this.knownItems.has(itemKey)) {
             newItems.push({ recipe_name: item.recipe_name, itemKey });
           }
         });
       });
       
-      // Detectar items eliminados (simplificado - solo items de cocina)
-      const deletedItems = [];
+      // MEJORADO: Solo considerar como "eliminado" si un item desapareció del kitchen board
+      // Y además no existe en la API cuando lo consultamos directamente
+      const potentiallyDeletedItems = [];
       this.knownItemIds.forEach(itemId => {
         if (!currentItemIds.has(itemId)) {
-          deletedItems.push(itemId);
+          potentiallyDeletedItems.push(itemId);
         }
       });
       
+      // Verificar si los items "desaparecidos" fueron realmente eliminados o solo cambiaron de estado
+      const reallyDeletedItems = [];
+      for (const itemId of potentiallyDeletedItems) {
+        try {
+          // Intentar obtener el item directamente de la API
+          await apiService.orderItems.getById(itemId);
+          // Si llegamos aquí, el item existe pero cambió de estado (ej: SERVED)
+          // NO reproducir sonido de eliminación
+        } catch (error) {
+          // Si da error 404, el item fue realmente eliminado
+          if (error.response && error.response.status === 404) {
+            reallyDeletedItems.push(itemId);
+          }
+          // Para otros errores, asumir que el item existe pero no es accesible
+        }
+      }
+      
       // Detectar cambios
-      const hasChanges = newItems.length > 0 || deletedItems.length > 0 || 
+      const hasChanges = newItems.length > 0 || potentiallyDeletedItems.length > 0 || 
                         this.knownItems.size !== currentItems.size;
       
       // Actualizar items conocidos
@@ -100,12 +125,12 @@ class OrderItemPoller {
       
       // Reproducir sonidos solo si está en vista de cocina y audio está activo
       if (this.isKitchenView && this.canNotify()) {
-        // Sonido cuando se crean nuevos items
+        // Sonido cuando se crean nuevos items (solo items verdaderamente nuevos)
         if (newItems.length > 0) {
           notificationService.playNotification('itemCreated');
         }
-        // Sonido cuando se eliminan items del pedido (eliminación real, no cambio de estado)
-        if (deletedItems.length > 0) {
+        // Sonido SOLO cuando se eliminan items del pedido (eliminación real, no cambio de estado)
+        if (reallyDeletedItems.length > 0) {
           notificationService.playNotification('itemDeleted');
         }
       }

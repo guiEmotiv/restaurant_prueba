@@ -16,7 +16,7 @@ const getCategoryColorHex = (index) => {
   return colorMap[bgClass] || '#6b7280'; // gray-500 como fallback
 };
 
-const UnsolRecipesPieChart = ({ unsold_recipes }) => {
+const UnsolRecipesPieChart = ({ unsold_recipes, summary }) => {
   const [hoveredSegment, setHoveredSegment] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   
@@ -65,6 +65,26 @@ const UnsolRecipesPieChart = ({ unsold_recipes }) => {
   }, []);
   
   if (total === 0) {
+    // Si no hay órdenes pagadas, no podemos comparar
+    const hasPaidOrders = summary && summary.total_orders > 0;
+    
+    if (!hasPaidOrders) {
+      return (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <XCircle className="h-5 w-5 text-gray-500" />
+            Recetas No Vendidas
+          </h3>
+          <div className="text-center text-gray-500 py-8">
+            <XCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-lg font-medium">Sin datos</p>
+            <p className="text-sm">No hay órdenes para esta fecha</p>
+          </div>
+        </div>
+      );
+    }
+    
+    // Si hay órdenes pagadas pero no hay recetas no vendidas = todas vendidas
     return (
       <div className="bg-white rounded-xl shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -115,7 +135,7 @@ const UnsolRecipesPieChart = ({ unsold_recipes }) => {
                     <div key={index} className="flex flex-col items-center justify-end h-full" style={{ width: `${100 / groupedData.length}%`, maxWidth: '120px' }}>
                       {/* Bar */}
                       <div 
-                        className="w-full max-w-16 rounded-t transition-all duration-300 hover:opacity-80 flex items-end justify-center cursor-pointer"
+                        className="w-full max-w-16 rounded-t transition-all duration-300 hover:opacity-80 flex items-center justify-center cursor-pointer"
                         style={{ 
                           height: `${absoluteHeight}px`,
                           backgroundColor: category.color,
@@ -126,7 +146,7 @@ const UnsolRecipesPieChart = ({ unsold_recipes }) => {
                       >
                         {/* Value label inside bar */}
                         {absoluteHeight > 20 && (
-                          <span className="text-xs font-bold text-white mb-2 drop-shadow-sm">
+                          <span className="text-xs font-bold text-white drop-shadow-sm">
                             {category.count}
                           </span>
                         )}

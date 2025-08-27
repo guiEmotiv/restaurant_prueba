@@ -244,7 +244,7 @@ const PaymentHistory = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                      {formatCurrency(order.total_amount)}
+                      {formatCurrency(order.grand_total || order.total_amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
                       {formatDate(order.paid_at || order.created_at)}
@@ -300,7 +300,7 @@ const PaymentHistory = () => {
                       </div>
                       <div>
                         <dt className="font-medium text-gray-500">Total</dt>
-                        <dd className="text-base font-bold text-gray-900">{formatCurrency(order.total_amount)}</dd>
+                        <dd className="text-base font-bold text-gray-900">{formatCurrency(order.grand_total || order.total_amount)}</dd>
                       </div>
                     </div>
                     
@@ -382,7 +382,7 @@ const PaymentHistory = () => {
                             </div>
                           </div>
                           <div className="text-sm font-semibold text-gray-900">
-                            S/ {item.total_price}
+                            S/ {item.total_with_container || item.total_price}
                           </div>
                         </div>
                       )) || []}
@@ -393,7 +393,11 @@ const PaymentHistory = () => {
                   <div className="border-t pt-4">
                     <div className="flex justify-between items-center text-lg font-bold">
                       <span>Total:</span>
-                      <span>{formatCurrency(selectedOrderDetail.total_amount)}</span>
+                      <span>{formatCurrency(
+                        selectedOrderDetail.items?.reduce((sum, item) => 
+                          sum + parseFloat(item.total_with_container || item.total_price || 0), 0
+                        ) || parseFloat(selectedOrderDetail.total_amount)
+                      )}</span>
                     </div>
                   </div>
                 </div>

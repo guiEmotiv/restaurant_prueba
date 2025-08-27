@@ -1,43 +1,40 @@
 /**
  * Logger centralizado para la aplicación
- * PRODUCTION SAFE: All console statements removed for security
+ * CLEAN MODE: Minimal logging for production-like experience
  */
-
-// No-op function to maintain API compatibility while preventing console output
-const noop = () => {};
 
 export const logger = {
   /**
-   * Errores críticos - disabled for production security
+   * Errores críticos - solo errores importantes
    */
-  error: noop,
+  error: (...args) => console.error('[ERROR]', ...args),
 
   /**
-   * Advertencias - disabled for production security  
+   * Advertencias - disabled for clean console
    */
-  warn: noop,
+  warn: (...args) => {}, // console.warn('[WARN]', ...args),
 
   /**
-   * Información general - disabled for production security
+   * Información general - disabled for clean console
    */
-  info: noop,
+  info: (...args) => {}, // console.info('[INFO]', ...args),
 
   /**
-   * Debug detallado - disabled for production security
+   * Debug detallado - disabled for clean console
    */
-  debug: noop,
+  debug: (...args) => {}, // console.debug('[DEBUG]', ...args),
 
   /**
-   * Para APIs y requests - disabled for production security
+   * Para APIs y requests - disabled for clean console  
    */
-  api: noop,
+  api: (...args) => {}, // console.log('[API]', ...args),
 
   /**
-   * Para timing de performance - disabled for production security
+   * Para timing de performance - disabled for clean console
    */
-  time: noop,
+  time: (label) => {}, // console.time(label),
 
-  timeEnd: noop
+  timeEnd: (label) => {} // console.timeEnd(label)
 };
 
 // Export default para compatibilidad

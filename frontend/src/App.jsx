@@ -109,6 +109,11 @@ const AppContent = () => {
               <Kitchen />
             </RoleProtectedRoute>
           } />
+          <Route path="/kitchen-legacy" element={
+            <RoleProtectedRoute requiredPermission="canViewKitchen">
+              <Kitchen />
+            </RoleProtectedRoute>
+          } />
           <Route path="/operations" element={
             <RoleProtectedRoute requiredPermission="canManageOrders">
               <TableOrderEcommerce />

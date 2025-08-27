@@ -118,19 +118,76 @@ def order_updates_stream(request):
 @require_http_methods(["GET"])
 def kitchen_updates_stream(request):
     """
-    Stream SSE específico para la vista de cocina
+    Stream SSE específico para la vista de cocina con datos en tiempo real
     """
     
-    def kitchen_event_stream():
-        """Generador de eventos SSE para kitchen"""
-        try:
-            # Mensaje inicial
-            yield "event: connected\ndata: {\"view\": \"kitchen\"}\n\n"
+    def get_kitchen_board_data():
+        """Query optimizada para kitchen board"""
+        from .models import OrderItem
+        
+        cache_key = 'kitchen_board_sse_data'
+        data = cache.get(cache_key)
+        
+        if not data:
+            # Query optimizada con prefetch y select_related
+            order_items = OrderItem.objects.filter(
+                status__in=['CREATED', 'PREPARING'],
+                order__status='CREATED'
+            ).select_related(
+                'recipe__group', 
+                'order__table__zone'
+            ).values(
+                'id', 'status', 'created_at', 'preparing_at', 'notes',
+                'recipe__name', 'recipe__preparation_time', 
+                'recipe__group__name', 'recipe__group__id',
+                'order__id', 'order__table__table_number', 
+                'order__table__zone__name', 'order__waiter', 
+                'is_takeaway'
+            ).order_by('created_at')[:100]  # Limitar a 100 items
             
+            # Formatear datos para frontend
+            data = []
+            for item in order_items:
+                data.append({
+                    'id': item['id'],
+                    'status': item['status'],
+                    'created_at': item['created_at'].isoformat(),
+                    'preparing_at': item['preparing_at'].isoformat() if item['preparing_at'] else None,
+                    'notes': item['notes'] or '',
+                    'recipe_name': item['recipe__name'],
+                    'recipe_preparation_time': item['recipe__preparation_time'],
+                    'recipe_group_name': item['recipe__group__name'] or 'Sin Grupo',
+                    'recipe_group_id': item['recipe__group__id'],
+                    'order_id': item['order__id'],
+                    'order_table': item['order__table__table_number'],
+                    'order_zone': item['order__table__zone__name'],
+                    'waiter_name': item['order__waiter'] or 'Sin mesero',
+                    'is_takeaway': item['is_takeaway']
+                })
+            
+            # Cache por 10 segundos
+            cache.set(cache_key, data, 10)
+            
+        return data
+    
+    def kitchen_event_stream():
+        """Generador de eventos SSE para kitchen con datos"""
+        try:
+            # Enviar datos iniciales
+            initial_data = get_kitchen_board_data()
+            yield f"event: kitchen_data\ndata: {json.dumps(initial_data)}\n\n"
+            
+            last_data_check = time.time()
             last_heartbeat = time.time()
             
             while True:
                 current_time = time.time()
+                
+                # Comprobar datos cada 2 segundos
+                if current_time - last_data_check >= 2:
+                    kitchen_data = get_kitchen_board_data()
+                    yield f"event: kitchen_data\ndata: {json.dumps(kitchen_data)}\n\n"
+                    last_data_check = current_time
                 
                 # Heartbeat cada 30 segundos
                 if current_time - last_heartbeat > 30:
@@ -169,6 +226,11 @@ def setup_signals():
     def orderitem_updated(sender, instance, created, **kwargs):
         """Signal que se ejecuta cuando se actualiza un OrderItem"""
         
+        # Invalidar cache de kitchen board
+        cache.delete('kitchen_board_sse_data')
+        cache.delete('kitchen_board_data')
+        cache.delete('kitchen_view_orders')
+        
         # Datos del evento
         event_data = {
             'type': 'order_item_updated',
@@ -187,6 +249,11 @@ def setup_signals():
     @receiver(post_save, sender=Order)
     def order_updated(sender, instance, created, **kwargs):
         """Signal que se ejecuta cuando se actualiza una Order"""
+        
+        # Invalidar cache de kitchen board
+        cache.delete('kitchen_board_sse_data')
+        cache.delete('kitchen_board_data')
+        cache.delete('kitchen_view_orders')
         
         event_data = {
             'type': 'order_updated',

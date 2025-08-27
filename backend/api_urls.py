@@ -21,7 +21,6 @@ from operation.views import (
     OrderViewSet, OrderItemViewSet, PaymentViewSet, ContainerSaleViewSet
     # OrderItemIngredientViewSet removed - functionality deprecated
 )
-from operation.views_dashboard import DashboardViewSet
 from operation.views_financiero import DashboardFinancieroViewSet
 from operation.views_operativo import DashboardOperativoViewSet
 from operation.sse_views import order_updates_stream, kitchen_updates_stream
@@ -47,7 +46,6 @@ router.register(r'order-items', OrderItemViewSet, basename='orderitem')
 # router.register(r'order-item-ingredients', OrderItemIngredientViewSet, basename='orderitemingredient')  # Removed - functionality deprecated
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'container-sales', ContainerSaleViewSet, basename='containersale')
-router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 router.register(r'dashboard-financiero', DashboardFinancieroViewSet, basename='dashboard-financiero')
 router.register(r'dashboard-operativo', DashboardOperativoViewSet, basename='dashboard-operativo')
 

@@ -4,12 +4,15 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from django.utils import timezone
 from django.db import transaction
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from backend.cognito_permissions import (
     CognitoAdminOnlyPermission, 
     CognitoWaiterAndAdminPermission, 
     CognitoOrderStatusPermission,
     CognitoPaymentPermission
 )
+# Rate limiting moved to Nginx - no longer using Django decorators
 from .models import Order, OrderItem, Payment, PaymentItem, ContainerSale
 from .serializers import (
     OrderSerializer, OrderDetailSerializer, OrderCreateSerializer,
@@ -156,18 +159,37 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def kitchen(self, request):
         """Vista para la cocina - órdenes activas con items pendientes"""
+        # Cache por 5 segundos
+        cache_key = 'kitchen_view_orders'
+        cached_data = cache.get(cache_key)
+        
+        if cached_data is not None:
+            return Response(cached_data)
+        
         # Solo órdenes CREATED (no canceladas/pagadas) que tienen items CREATED
         orders = Order.objects.filter(
             status='CREATED',
             orderitem__status='CREATED'
-        ).distinct().order_by('created_at')
+        ).select_related('table__zone').prefetch_related(
+            'orderitem_set__recipe__group'
+        ).distinct().order_by('created_at')[:50]  # Limitar resultados
         
         serializer = OrderDetailSerializer(orders, many=True)
-        return Response(serializer.data)
+        data = serializer.data
+        
+        # Cache por 5 segundos
+        cache.set(cache_key, data, 5)
+        return Response(data)
     
     @action(detail=False, methods=['get'])
     def kitchen_board(self, request):
         """Vista de tablero de cocina - cada OrderItem individual como entrada separada"""
+        # Cache por 2 segundos para mejor sincronización multi-usuario
+        cache_key = 'kitchen_board_data'
+        cached_data = cache.get(cache_key)
+        
+        if cached_data is not None:
+            return Response(cached_data)
         from django.db.models import Q
         
         # Obtener todos los order items que están pendientes (CREATED y PREPARING)
@@ -223,6 +245,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             x['items'][0]['created_at']  # Luego por tiempo de creación (más antiguos primero)
         ))
         
+        # Cache por 2 segundos para mejor sincronización multi-usuario
+        cache.set(cache_key, result, 2)
         return Response(result)
     
     @action(detail=True, methods=['post'])
@@ -418,6 +442,9 @@ class OrderItemViewSet(viewsets.ModelViewSet):
         order_item = self.get_object()
         new_status = request.data.get('status')
         
+        print(f"DEBUG: Updating order item {pk} from {order_item.status} to {new_status}")
+        print(f"DEBUG: Request data: {request.data}")
+        
         if not new_status:
             return Response(
                 {'error': 'Se requiere el status'},
@@ -426,6 +453,10 @@ class OrderItemViewSet(viewsets.ModelViewSet):
         
         try:
             order_item.update_status(new_status)
+            
+            # CRITICAL: Invalidate kitchen_board cache immediately after status update
+            cache.delete('kitchen_board_data')
+            
             serializer = OrderItemSerializer(order_item)
             return Response(serializer.data)
         except Exception as e:
