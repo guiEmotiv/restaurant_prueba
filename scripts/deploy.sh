@@ -130,14 +130,22 @@ ENVEOF
         ./setup-ssl-simple.sh
         ;;
         
+    activate-ssl)
+        log "🔒 Activating REAL SSL..."
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/activate-real-ssl.sh -o activate-real-ssl.sh
+        chmod +x activate-real-ssl.sh
+        ./activate-real-ssl.sh
+        ;;
+        
     *)
-        echo "Usage: $0 {deploy|check|logs|backup|ultimate-fix|setup-ssl}"
+        echo "Usage: $0 {deploy|check|logs|backup|ultimate-fix|setup-ssl|activate-ssl}"
         echo "  deploy       - Deploy latest version"
         echo "  check        - Health check"
         echo "  logs         - Show logs"  
         echo "  backup       - Backup database"
         echo "  ultimate-fix - Nuclear option - rebuild everything"
-        echo "  setup-ssl    - Configure SSL with Let's Encrypt"
+        echo "  setup-ssl    - Configure SSL with self-signed certificates"
+        echo "  activate-ssl - Activate REAL Let's Encrypt SSL certificates"
         exit 1
         ;;
 esac

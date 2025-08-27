@@ -16,6 +16,7 @@ on:
           - backup
           - ultimate-fix
           - setup-ssl
+          - activate-ssl
 
 env:
   AWS_REGION: us-west-2
@@ -84,6 +85,10 @@ jobs:
           curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl-simple.sh -o scripts/setup-ssl-simple.sh
           chmod +x scripts/setup-ssl-simple.sh
           ./scripts/setup-ssl-simple.sh
+        elif [ "${{ env.ACTION }}" = "activate-ssl" ]; then
+          curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/activate-real-ssl.sh -o scripts/activate-real-ssl.sh
+          chmod +x scripts/activate-real-ssl.sh
+          ./scripts/activate-real-ssl.sh
         else
           ./scripts/deploy.sh ${{ env.ACTION }}
         fi
