@@ -243,6 +243,12 @@ jobs:
         echo "📥 Pulling Docker image..."
         docker pull ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}
         
+        # Extract frontend files from Docker image
+        echo "📥 Extracting frontend files..."
+        docker create --name temp-container ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}
+        docker cp temp-container:/app/frontend/dist ./frontend-dist
+        docker rm temp-container
+        
         # Create docker-compose.yml file directly (private repo)
         echo "📥 Creating docker-compose configuration..."
         cat > docker-compose.yml << 'EOF'
@@ -281,6 +287,7 @@ jobs:
             volumes:
               - ./nginx/conf.d:/etc/nginx/conf.d:ro
               - ./nginx/ssl:/etc/nginx/ssl:ro
+              - ./frontend-dist:/var/www/html:ro
             depends_on:
               - app
             restart: unless-stopped
