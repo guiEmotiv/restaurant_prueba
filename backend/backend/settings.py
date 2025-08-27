@@ -265,26 +265,19 @@ SPECTACULAR_SETTINGS = {
 # Rate Limiting Configuration
 # ──────────────────────────────────────────────────────────────
 
-# Cache configuration for rate limiting
+# NO RATE LIMITING - AWS Cognito handles authentication, unlimited requests
+# Cache configuration for Django sessions only
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'rate-limiting',
+        'LOCATION': 'default-cache',
         'OPTIONS': {
-            'MAX_ENTRIES': 10000,
+            'MAX_ENTRIES': 1000,
         }
     }
 }
 
-# Rate limiting settings
-RATE_LIMITING = {
-    'ENABLED': os.getenv('RATE_LIMITING_ENABLED', 'True').lower() == 'true',
-    'REDIS_URL': os.getenv('REDIS_URL', None),  # Optional Redis backend
-    'LOG_VIOLATIONS': True,
-    'STRICT_MODE': os.getenv('RATE_LIMITING_STRICT', 'False').lower() == 'true',
-}
-
-# Logging configuration for rate limiting
+# Logging configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -302,7 +295,7 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'data' / 'logs' / 'rate_limiting.log',
+            'filename': BASE_DIR / 'data' / 'logs' / 'django.log',
             'formatter': 'verbose',
         },
         'console': {
@@ -312,11 +305,6 @@ LOGGING = {
         },
     },
     'loggers': {
-        'rate_limiting': {
-            'handlers': ['file', 'console'],
-            'level': 'INFO',
-            'propagate': True,
-        },
         'django': {
             'handlers': ['file'],
             'level': 'WARNING',

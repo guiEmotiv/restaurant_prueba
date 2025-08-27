@@ -110,7 +110,8 @@ update_nginx_ssl_config() {
     log "⚙️ Updating nginx SSL configuration..."
     
     cat > ./nginx/conf.d/default.conf << 'EOF'
-# Professional Restaurant Web SSL Configuration
+# Professional Restaurant Web SSL Configuration  
+# NO RATE LIMITING - AWS Cognito handles authentication, unlimited requests
 # Optimized for performance and security
 
 # HTTP server (redirect to HTTPS)
@@ -134,7 +135,7 @@ server {
     }
 }
 
-# HTTPS server - Production optimized
+# HTTPS server - Production optimized WITHOUT rate limiting
 server {
     listen 443 ssl http2;
     server_name www.xn--elfogndedonsoto-zrb.com;
