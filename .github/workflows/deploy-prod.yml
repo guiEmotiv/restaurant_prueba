@@ -293,7 +293,7 @@ jobs:
            '$ECR_REGISTRY' '$ECR_REPOSITORY' '$VERSION' '$AWS_REGION' \
            '${{ secrets.COGNITO_USER_POOL_ID }}' '${{ secrets.COGNITO_APP_CLIENT_ID }}' \
            '${{ secrets.DJANGO_SECRET_KEY }}' '$EC2_HOST' \
-           '${{ secrets.DOMAIN_NAME || 'localhost' }}' '${{ github.repository }}'"
+           '${{ secrets.DOMAIN_NAME }}' '${{ github.repository }}'"
 
   notify:
     needs: [test, build, deploy]
@@ -307,7 +307,7 @@ jobs:
       run: |
         echo "✅ PROD deployment completed successfully!"
         echo "🌐 Version ${{ needs.build.outputs.image-version }} deployed"
-        echo "🔗 Available at: https://${{ secrets.DOMAIN_NAME || secrets.EC2_PROD_HOST }}"
+        echo "🔗 Available at: https://${{ secrets.DOMAIN_NAME }}"
         
     - name: Notify failure  
       if: needs.deploy.result == 'failure'
