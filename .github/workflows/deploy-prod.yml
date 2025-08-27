@@ -154,142 +154,56 @@ jobs:
       run: |
         ssh-keyscan -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
         
-    - name: Deploy to EC2 PROD
+    - name: Upload deployment script
       env:
-        ECR_REGISTRY: ${{ needs.build.outputs.ecr-registry }}
-        VERSION: ${{ needs.build.outputs.image-version }}
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
-        AWS_REGION: us-west-2
-        ECR_REPOSITORY: restaurant-web
       run: |
-        echo "🚀 Starting production deployment to $EC2_HOST..."
+        echo "📤 Uploading deployment script..."
+        scp -o StrictHostKeyChecking=no scripts/deploy-production.sh $EC2_USER@$EC2_HOST:/tmp/deploy-production.sh
         
-        # Create deployment script
-        cat > deploy_script.sh << 'DEPLOY_SCRIPT'
-        #!/bin/bash
-        set -e
+    - name: Deploy to EC2 PROD
+      env:
+        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
+        EC2_USER: ${{ secrets.EC2_USERNAME }}
+      run: |
+        echo "🚀 Starting production deployment..."
         
-        echo "🚀 Production deployment started..."
-        echo "Working directory: $(pwd)"
-        echo "User: $(whoami)"
+        # Create environment file with proper escaping
+        cat > /tmp/deployment.env << 'DEPLOYMENT_ENV'
+        ECR_REGISTRY=${{ needs.build.outputs.ecr-registry }}
+        ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}
+        VERSION=${{ needs.build.outputs.image-version }}
+        AWS_REGION=${{ env.AWS_REGION }}
+        COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
+        COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
+        DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        EC2_HOST=${{ secrets.EC2_PROD_HOST }}
+        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+        GITHUB_REPOSITORY=${{ github.repository }}
+        DEPLOYMENT_ENV
         
-        # Navigate to application directory
-        cd /opt/restaurant-web || { echo "❌ App directory not found"; exit 1; }
+        # Upload environment file
+        scp -o StrictHostKeyChecking=no /tmp/deployment.env $EC2_USER@$EC2_HOST:/tmp/deployment.env
         
-        # Create directories
-        mkdir -p data backups logs
+        # Execute deployment with environment file
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST 'bash -s' << 'REMOTE_SCRIPT'
+        set -euo pipefail
         
-        # Create backup
-        if [ -f data/restaurant_prod.sqlite3 ]; then
-          BACKUP_DIR="backups/backup-$(date +%Y%m%d-%H%M%S)"
-          mkdir -p "$BACKUP_DIR"
-          cp data/restaurant_prod.sqlite3 "$BACKUP_DIR/"
-          echo "✅ Database backed up to $BACKUP_DIR"
-        fi
+        # Load environment variables from file
+        set -a
+        source /tmp/deployment.env
+        set +a
         
-        # Login to ECR and pull image
-        echo "🔐 Logging into ECR..."
-        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-        
-        echo "📥 Pulling Docker image..."
-        docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
-        
-        # Create production environment file
-        echo "⚙️ Creating production environment..."
-        cat > .env.ec2 << ENV_EOF
-        AWS_REGION=$AWS_REGION
-        COGNITO_USER_POOL_ID=$COGNITO_USER_POOL_ID
-        COGNITO_APP_CLIENT_ID=$COGNITO_APP_CLIENT_ID
-        DATABASE_PATH=/opt/restaurant-web/data
-        DATABASE_NAME=restaurant_prod.sqlite3
-        DEBUG=False
-        USE_COGNITO_AUTH=True
-        ALLOWED_HOSTS=$EC2_HOST,$DOMAIN_NAME
-        SECRET_KEY=$DJANGO_SECRET_KEY
-        DOMAIN_NAME=$DOMAIN_NAME
-        EC2_PUBLIC_IP=$EC2_HOST
-        ENV_EOF
-        
-        # Download docker-compose
-        echo "📥 Downloading docker-compose configuration..."
-        curl -sSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/docker-compose.yml -o docker-compose.yml
-        
-        # Stop existing services
-        echo "⏹️ Stopping existing services..."
-        docker-compose --profile production down --timeout 30 || true
-        
-        # Update docker-compose to use new image
-        echo "🔄 Updating docker-compose configuration..."
-        ECR_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$VERSION"
-        sed -i "s|image: restaurant-web:.*|image: ${ECR_IMAGE}|g" docker-compose.yml
-        
-        # Start services
-        echo "🚀 Starting production services..."
-        docker-compose --profile production up -d
-        
-        # Wait for services to be ready
-        echo "⏳ Waiting for services to initialize..."
-        sleep 45
-        
-        # Run database migrations
-        echo "🗄️ Running database migrations..."
-        docker-compose exec -T app python manage.py migrate
-        
-        # Collect static files
-        echo "📁 Collecting static files..."
-        docker-compose exec -T app python manage.py collectstatic --noinput
-        
-        # Health check
-        echo "🏥 Running health checks..."
-        for i in {1..5}; do
-          if curl -f -s http://localhost/api/v1/health/ > /dev/null 2>&1; then
-            echo "✅ Health check passed! Deployment successful!"
-            docker-compose --profile production ps
-            echo "🎉 Production deployment completed successfully!"
-            exit 0
-          else
-            echo "⏳ Health check attempt $i/5..."
-            sleep 15
-          fi
-        done
-        
-        echo "❌ Health check failed after 5 attempts"
-        echo "📊 Container status:"
-        docker-compose --profile production ps
-        docker-compose --profile production logs --tail=50
-        exit 1
-        DEPLOY_SCRIPT
-        
-        # Upload deployment script to EC2
-        echo "📤 Uploading deployment script to EC2..."
-        scp -o StrictHostKeyChecking=no deploy_script.sh $EC2_USER@$EC2_HOST:/tmp/deploy_script.sh
-        
-        # Execute deployment on EC2
-        echo "🚀 Executing deployment on EC2..."
-        
-        # Create a file with environment variables to avoid shell expansion issues
-        cat > env_vars.sh << 'ENV_VARS'
-        export ECR_REGISTRY="${{ needs.build.outputs.ecr-registry }}"
-        export ECR_REPOSITORY="${{ env.ECR_REPOSITORY }}"
-        export VERSION="${{ needs.build.outputs.image-version }}"
-        export AWS_REGION="${{ env.AWS_REGION }}"
-        export COGNITO_USER_POOL_ID="${{ secrets.COGNITO_USER_POOL_ID }}"
-        export COGNITO_APP_CLIENT_ID="${{ secrets.COGNITO_APP_CLIENT_ID }}"
-        export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-        export EC2_HOST="${{ secrets.EC2_PROD_HOST }}"
-        export DOMAIN_NAME="${{ secrets.DOMAIN_NAME }}"
-        export GITHUB_REPOSITORY="${{ github.repository }}"
-        ENV_VARS
-        
-        # Upload env vars file
-        scp -o StrictHostKeyChecking=no env_vars.sh $EC2_USER@$EC2_HOST:/tmp/env_vars.sh
+        # Make deployment script executable
+        chmod +x /tmp/deploy-production.sh
         
         # Execute deployment
-        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST \
-          "chmod +x /tmp/env_vars.sh /tmp/deploy_script.sh && \
-           source /tmp/env_vars.sh && \
-           /tmp/deploy_script.sh"
+        /tmp/deploy-production.sh
+        
+        # Cleanup
+        rm -f /tmp/deployment.env /tmp/deploy-production.sh
+        REMOTE_SCRIPT
 
   notify:
     needs: [test, build, deploy]
