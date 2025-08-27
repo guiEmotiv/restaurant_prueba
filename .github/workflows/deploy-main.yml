@@ -201,7 +201,7 @@ jobs:
       env:
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
-        ECR_REGISTRY: ${{ needs.build.outputs.ecr-registry || secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+        ECR_REGISTRY: ${{ format('{0}.dkr.ecr.{1}.amazonaws.com', secrets.AWS_ACCOUNT_ID, env.AWS_REGION) }}
         STRATEGY: ${{ needs.analyze.outputs.deployment-strategy }}
         SHOULD_BUILD: ${{ needs.analyze.outputs.should-build }}
       run: |
