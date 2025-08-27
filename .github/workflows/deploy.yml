@@ -17,6 +17,7 @@ on:
           - ssl         # Setup SSL certificates
           - debug       # Debug deployment issues
           - fix         # Fix deployment problems
+          - emergency   # Emergency local build
 
 env:
   AWS_REGION: us-west-2
@@ -218,6 +219,13 @@ jobs:
             curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/complete-fix.sh -o complete-fix.sh
             chmod +x complete-fix.sh
             sudo -E ./complete-fix.sh
+            ;;
+            
+          "emergency")
+            echo "🚨 Running emergency local deployment..."
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/emergency-deploy.sh -o emergency-deploy.sh
+            chmod +x emergency-deploy.sh
+            sudo ./emergency-deploy.sh
             ;;
         esac
         EOF
