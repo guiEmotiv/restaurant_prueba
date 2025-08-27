@@ -70,6 +70,7 @@ jobs:
         # Execute on EC2
         ssh $EC2_USER@$EC2_HOST << 'EOF'
         set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
         # Create env file
