@@ -9,7 +9,9 @@ on:
         type: choice
         options:
           - inspect          # Deep environment inspection
-          - cleanup          # Environment cleanup
+          - cleanup          # Environment cleanup  
+          - deep-cleanup     # AGGRESSIVE cleanup (removes chaotic files)
+          - fresh-setup      # HYBRID: Complete rebuild with data preservation (RECOMMENDED)
           - emergency        # Emergency cleanup (disk space)
           - restart          # Restart services
           - health-check     # Health check only
@@ -47,7 +49,7 @@ jobs:
         echo "operation=$OPERATION" >> $GITHUB_OUTPUT
         
         # Check if destructive operations need confirmation
-        if [[ "$OPERATION" == "cleanup" || "$OPERATION" == "emergency" ]]; then
+        if [[ "$OPERATION" == "cleanup" || "$OPERATION" == "deep-cleanup" || "$OPERATION" == "fresh-setup" || "$OPERATION" == "emergency" ]]; then
           if [ "$CONFIRM" != "CONFIRM" ]; then
             echo "❌ Destructive operation '$OPERATION' requires confirmation"
             echo "Please set confirm input to 'CONFIRM'"
@@ -130,6 +132,57 @@ jobs:
             echo "📊 After cleanup:"
             df -h /
             docker system df
+            ;;
+            
+          "deep-cleanup")
+            echo "🚨 DEEP AGGRESSIVE CLEANUP"
+            echo "=========================="
+            echo "⚠️  This will remove ALL chaotic files (scripts, duplicates, etc.)"
+            echo "⚠️  Critical data (database, backups, logs) will be PRESERVED"
+            
+            echo "📊 Before deep cleanup:"
+            df -h /
+            ls -la
+            
+            # Download and run deep cleanup script
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/deep-cleanup-ec2.sh -o deep-cleanup.sh
+            chmod +x deep-cleanup.sh
+            ./deep-cleanup.sh
+            rm -f deep-cleanup.sh
+            
+            echo ""
+            echo "📊 After deep cleanup:"
+            df -h /
+            ls -la
+            ;;
+            
+          "fresh-setup")
+            echo "🚀 FRESH EC2 SETUP - HYBRID SMART"
+            echo "=================================="
+            echo "⚠️  This will COMPLETELY rebuild EC2 structure"
+            echo "✅ Critical data (database, backups, logs) will be PRESERVED"
+            echo "✅ Result: Pristine repo structure + your data"
+            echo "⚡ Most efficient approach (2-3 minutes)"
+            
+            echo "📊 Before fresh setup:"
+            df -h /
+            ls -la
+            
+            # Download and run fresh setup script
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/fresh-ec2-setup.sh -o fresh-setup.sh
+            chmod +x fresh-setup.sh
+            ./fresh-setup.sh
+            rm -f fresh-setup.sh
+            
+            echo ""
+            echo "📊 After fresh setup:"
+            df -h /
+            ls -la
+            
+            echo ""
+            echo "🔍 Verifying git functionality:"
+            git status
+            git log --oneline -5
             ;;
             
           "emergency")
