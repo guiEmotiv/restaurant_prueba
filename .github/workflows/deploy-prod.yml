@@ -265,36 +265,31 @@ jobs:
         echo "📤 Uploading deployment script to EC2..."
         scp -o StrictHostKeyChecking=no deploy_script.sh $EC2_USER@$EC2_HOST:/tmp/deploy_script.sh
         
-        # Create environment setup script
-        cat > env_setup.sh << 'ENV_SETUP'
-        #!/bin/bash
-        export ECR_REGISTRY="$1"
-        export ECR_REPOSITORY="$2" 
-        export VERSION="$3"
-        export AWS_REGION="$4"
-        export COGNITO_USER_POOL_ID="$5"
-        export COGNITO_APP_CLIENT_ID="$6"
-        export DJANGO_SECRET_KEY="$7"
-        export EC2_HOST="$8"
-        export DOMAIN_NAME="$9"
-        export GITHUB_REPOSITORY="${10}"
-        
-        chmod +x /tmp/deploy_script.sh
-        /tmp/deploy_script.sh
-        ENV_SETUP
-        
-        # Upload environment setup
-        scp -o StrictHostKeyChecking=no env_setup.sh $EC2_USER@$EC2_HOST:/tmp/env_setup.sh
-        
         # Execute deployment on EC2
         echo "🚀 Executing deployment on EC2..."
-        DOMAIN_NAME="${{ secrets.DOMAIN_NAME }}"
+        
+        # Create a file with environment variables to avoid shell expansion issues
+        cat > env_vars.sh << 'ENV_VARS'
+        export ECR_REGISTRY="${{ needs.build.outputs.ecr-registry }}"
+        export ECR_REPOSITORY="${{ env.ECR_REPOSITORY }}"
+        export VERSION="${{ needs.build.outputs.image-version }}"
+        export AWS_REGION="${{ env.AWS_REGION }}"
+        export COGNITO_USER_POOL_ID="${{ secrets.COGNITO_USER_POOL_ID }}"
+        export COGNITO_APP_CLIENT_ID="${{ secrets.COGNITO_APP_CLIENT_ID }}"
+        export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
+        export EC2_HOST="${{ secrets.EC2_PROD_HOST }}"
+        export DOMAIN_NAME="${{ secrets.DOMAIN_NAME }}"
+        export GITHUB_REPOSITORY="${{ github.repository }}"
+        ENV_VARS
+        
+        # Upload env vars file
+        scp -o StrictHostKeyChecking=no env_vars.sh $EC2_USER@$EC2_HOST:/tmp/env_vars.sh
+        
+        # Execute deployment
         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST \
-          "chmod +x /tmp/env_setup.sh && /tmp/env_setup.sh \
-           '$ECR_REGISTRY' '$ECR_REPOSITORY' '$VERSION' '$AWS_REGION' \
-           '${{ secrets.COGNITO_USER_POOL_ID }}' '${{ secrets.COGNITO_APP_CLIENT_ID }}' \
-           '${{ secrets.DJANGO_SECRET_KEY }}' '$EC2_HOST' \
-           '${DOMAIN_NAME:-localhost}' '${{ github.repository }}'"
+          "chmod +x /tmp/env_vars.sh /tmp/deploy_script.sh && \
+           source /tmp/env_vars.sh && \
+           /tmp/deploy_script.sh"
 
   notify:
     needs: [test, build, deploy]
