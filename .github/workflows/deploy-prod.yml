@@ -324,25 +324,43 @@ jobs:
         echo "📁 Collecting static files..."
         docker-compose exec -T app python manage.py collectstatic --noinput
         
-        # Health check
+        # Health check with detailed debugging
         echo "🏥 Running health checks..."
+        echo "📊 Container status before health checks:"
+        docker-compose --profile production ps
+        
+        echo "🔍 Testing direct app connection (port 8000)..."
+        curl -v http://localhost:8000/api/v1/health/ || echo "Direct app connection failed"
+        
+        echo "🔍 Testing nginx connection (port 80)..."
+        curl -v http://localhost/api/v1/health/ || echo "Nginx connection failed"
+        
+        echo "📋 Recent container logs:"
+        docker-compose --profile production logs --tail=30
+        
         for i in {1..5}; do
-          if curl -f -s http://localhost/api/v1/health/ > /dev/null 2>&1; then
-            echo "✅ Health check passed! Deployment successful!"
+          echo "⏳ Health check attempt $i/5..."
+          if curl -f -s http://localhost:8000/api/v1/health/ > /dev/null 2>&1; then
+            echo "✅ Health check passed on direct app port! Deployment successful!"
+            docker-compose --profile production ps
+            echo "🎉 Production deployment completed successfully!"
+            exit 0
+          elif curl -f -s http://localhost/api/v1/health/ > /dev/null 2>&1; then
+            echo "✅ Health check passed via nginx! Deployment successful!"
             docker-compose --profile production ps
             echo "🎉 Production deployment completed successfully!"
             exit 0
           else
-            echo "⏳ Health check attempt $i/5..."
+            echo "❌ Both direct and nginx health checks failed on attempt $i"
             sleep 15
           fi
         done
         
         echo "❌ Health check failed after 5 attempts"
-        echo "📊 Container status:"
+        echo "📊 Final container status:"
         docker-compose --profile production ps
-        echo "📋 Container logs:"
-        docker-compose --profile production logs --tail=50
+        echo "📋 Final container logs:"
+        docker-compose --profile production logs --tail=100
         exit 1
         DEPLOY
 
