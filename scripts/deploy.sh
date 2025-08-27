@@ -37,9 +37,22 @@ case "$ACTION" in
         # Pull latest image
         docker pull 721063839441.dkr.ecr.us-west-2.amazonaws.com/restaurant-web:latest
         
-        # Ensure database exists
+        # Setup environment
         mkdir -p data
         [ ! -f data/restaurant_prod.sqlite3 ] && touch data/restaurant_prod.sqlite3
+        
+        # Create environment file if not exists
+        if [ ! -f .env.ec2 ]; then
+            cat > .env.ec2 << 'ENVEOF'
+SECRET_KEY=django-prod-key-change-this
+DEBUG=False
+USE_COGNITO_AUTH=False
+ALLOWED_HOSTS=*
+DATABASE_PATH=/opt/restaurant-web/data
+DATABASE_NAME=restaurant_prod.sqlite3
+DJANGO_SETTINGS_MODULE=backend.settings_ec2
+ENVEOF
+        fi
         
         # Deploy
         docker-compose --profile production down --timeout 10 || true
