@@ -211,8 +211,9 @@ jobs:
           # Stop existing services
           docker-compose --profile production down --timeout 30 || true
           
-          # Update docker-compose to use new image
-          /bin/sed -i "s|restaurant-web:.*|$ECR_REGISTRY/$ECR_REPOSITORY:$VERSION|g" docker-compose.yml
+          # Update docker-compose to use new image  
+          ECR_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$VERSION"
+          /bin/sed -i "s|restaurant-web:.*|${ECR_IMAGE}|g" docker-compose.yml
           
           # Start services
           docker-compose --profile production up -d
