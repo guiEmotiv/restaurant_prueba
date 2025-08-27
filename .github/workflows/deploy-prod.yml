@@ -261,21 +261,39 @@ jobs:
         exit 1
         DEPLOY_SCRIPT
         
-        # Upload and execute deployment script on EC2
-        scp -o StrictHostKeyChecking=no deploy_script.sh $EC2_USER@$EC2_HOST:/tmp/
+        # Upload deployment script to EC2
+        echo "📤 Uploading deployment script to EC2..."
+        scp -o StrictHostKeyChecking=no deploy_script.sh $EC2_USER@$EC2_HOST:/tmp/deploy_script.sh
         
+        # Create environment setup script
+        cat > env_setup.sh << 'ENV_SETUP'
+        #!/bin/bash
+        export ECR_REGISTRY="$1"
+        export ECR_REPOSITORY="$2" 
+        export VERSION="$3"
+        export AWS_REGION="$4"
+        export COGNITO_USER_POOL_ID="$5"
+        export COGNITO_APP_CLIENT_ID="$6"
+        export DJANGO_SECRET_KEY="$7"
+        export EC2_HOST="$8"
+        export DOMAIN_NAME="$9"
+        export GITHUB_REPOSITORY="${10}"
+        
+        chmod +x /tmp/deploy_script.sh
+        /tmp/deploy_script.sh
+        ENV_SETUP
+        
+        # Upload environment setup
+        scp -o StrictHostKeyChecking=no env_setup.sh $EC2_USER@$EC2_HOST:/tmp/env_setup.sh
+        
+        # Execute deployment on EC2
+        echo "🚀 Executing deployment on EC2..."
         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST \
-          "ECR_REGISTRY='$ECR_REGISTRY' \
-           ECR_REPOSITORY='$ECR_REPOSITORY' \
-           VERSION='$VERSION' \
-           AWS_REGION='$AWS_REGION' \
-           COGNITO_USER_POOL_ID='${{ secrets.COGNITO_USER_POOL_ID }}' \
-           COGNITO_APP_CLIENT_ID='${{ secrets.COGNITO_APP_CLIENT_ID }}' \
-           DJANGO_SECRET_KEY='${{ secrets.DJANGO_SECRET_KEY }}' \
-           EC2_HOST='$EC2_HOST' \
-           DOMAIN_NAME='${{ secrets.DOMAIN_NAME || 'localhost' }}' \
-           GITHUB_REPOSITORY='${{ github.repository }}' \
-           chmod +x /tmp/deploy_script.sh && /tmp/deploy_script.sh"
+          "chmod +x /tmp/env_setup.sh && /tmp/env_setup.sh \
+           '$ECR_REGISTRY' '$ECR_REPOSITORY' '$VERSION' '$AWS_REGION' \
+           '${{ secrets.COGNITO_USER_POOL_ID }}' '${{ secrets.COGNITO_APP_CLIENT_ID }}' \
+           '${{ secrets.DJANGO_SECRET_KEY }}' '$EC2_HOST' \
+           '${{ secrets.DOMAIN_NAME || 'localhost' }}' '${{ github.repository }}'"
 
   notify:
     needs: [test, build, deploy]
