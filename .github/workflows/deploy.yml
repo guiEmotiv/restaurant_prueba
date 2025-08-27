@@ -210,10 +210,14 @@ jobs:
             ;;
             
           "fix")
-            echo "🔧 Running deployment fix..."
-            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/fix-deployment.sh -o fix-deployment.sh
-            chmod +x fix-deployment.sh
-            sudo ./fix-deployment.sh
+            echo "🔧 Running complete deployment fix..."
+            # First ensure AWS CLI is configured
+            aws configure set region ${{ env.AWS_REGION }}
+            
+            # Download and run complete fix
+            curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/complete-fix.sh -o complete-fix.sh
+            chmod +x complete-fix.sh
+            sudo -E ./complete-fix.sh
             ;;
         esac
         EOF
