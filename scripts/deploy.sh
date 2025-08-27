@@ -45,13 +45,26 @@ case "$ACTION" in
         docker-compose --profile production down --timeout 10 || true
         docker-compose --profile production up -d
         
-        # Health check
+        # Health check with retries
+        log "⏳ Waiting for services..."
         sleep 20
-        if curl -sf http://localhost:8000/api/v1/health/; then
-            log "✅ Deploy successful!"
-        else
-            err "❌ Deploy failed"
-        fi
+        
+        for i in {1..6}; do
+            if curl -sf http://localhost:8000/api/v1/health/; then
+                log "✅ Deploy successful!"
+                docker-compose --profile production ps
+                exit 0
+            fi
+            log "Health check $i/6 failed, waiting..."
+            sleep 10
+        done
+        
+        log "❌ Health check failed after 6 attempts"
+        log "Container status:"
+        docker-compose --profile production ps
+        log "App logs:"
+        docker-compose --profile production logs app --tail=30
+        exit 1
         ;;
         
     check)
