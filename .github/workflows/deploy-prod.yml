@@ -186,24 +186,27 @@ jobs:
         # Upload environment file
         scp -o StrictHostKeyChecking=no /tmp/deployment.env $EC2_USER@$EC2_HOST:/tmp/deployment.env
         
-        # Execute deployment with environment file
-        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST 'bash -s' << 'REMOTE_SCRIPT'
-        set -euo pipefail
-        
-        # Load environment variables from file
-        set -a
-        source /tmp/deployment.env
-        set +a
-        
-        # Make deployment script executable
-        chmod +x /tmp/deploy-production.sh
-        
-        # Execute deployment
-        /tmp/deploy-production.sh
-        
-        # Cleanup
-        rm -f /tmp/deployment.env /tmp/deploy-production.sh
-        REMOTE_SCRIPT
+        # Execute deployment - using sh for compatibility
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST '/bin/sh -c "
+          set -e
+          
+          # Debug environment
+          echo \"Shell: \$SHELL\"
+          echo \"PATH: \$PATH\"
+          which bash || echo \"bash not found in PATH\"
+          
+          # Load environment variables
+          . /tmp/deployment.env
+          
+          # Make script executable
+          chmod +x /tmp/deploy-production.sh
+          
+          # Execute with sh for now
+          /bin/sh /tmp/deploy-production.sh
+          
+          # Cleanup
+          rm -f /tmp/deployment.env /tmp/deploy-production.sh
+        "'
 
   notify:
     needs: [test, build, deploy]

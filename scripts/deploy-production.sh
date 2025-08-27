@@ -1,5 +1,5 @@
-#!/bin/bash
-set -euo pipefail
+#!/bin/sh
+set -e
 
 # Production Deployment Script
 # This script runs ON THE EC2 INSTANCE after environment variables are set
@@ -9,19 +9,11 @@ echo "Working directory: $(pwd)"
 echo "User: $(whoami)"
 
 # Validate required environment variables
-REQUIRED_VARS=(
-    "ECR_REGISTRY"
-    "ECR_REPOSITORY" 
-    "VERSION"
-    "AWS_REGION"
-    "COGNITO_USER_POOL_ID"
-    "COGNITO_APP_CLIENT_ID"
-    "DJANGO_SECRET_KEY"
-    "EC2_HOST"
-)
+REQUIRED_VARS="ECR_REGISTRY ECR_REPOSITORY VERSION AWS_REGION COGNITO_USER_POOL_ID COGNITO_APP_CLIENT_ID DJANGO_SECRET_KEY EC2_HOST"
 
-for var in "${REQUIRED_VARS[@]}"; do
-    if [ -z "${!var:-}" ]; then
+for var in $REQUIRED_VARS; do
+    eval "value=\$$var"
+    if [ -z "$value" ]; then
         echo "❌ Error: Required environment variable $var is not set"
         exit 1
     fi
