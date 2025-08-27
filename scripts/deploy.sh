@@ -125,9 +125,9 @@ ENVEOF
         
     setup-ssl)
         log "🔒 Setting up SSL..."
-        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl.sh -o setup-ssl.sh
-        chmod +x setup-ssl.sh
-        ./setup-ssl.sh
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl-simple.sh -o setup-ssl-simple.sh
+        chmod +x setup-ssl-simple.sh
+        ./setup-ssl-simple.sh
         ;;
         
     *)

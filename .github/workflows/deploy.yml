@@ -81,9 +81,9 @@ jobs:
         chmod +x scripts/deploy.sh
         
         if [ "${{ env.ACTION }}" = "setup-ssl" ]; then
-          curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl.sh -o scripts/setup-ssl.sh
-          chmod +x scripts/setup-ssl.sh
-          ./scripts/setup-ssl.sh
+          curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl-simple.sh -o scripts/setup-ssl-simple.sh
+          chmod +x scripts/setup-ssl-simple.sh
+          ./scripts/setup-ssl-simple.sh
         else
           ./scripts/deploy.sh ${{ env.ACTION }}
         fi
