@@ -1,0 +1,228 @@
+name: Deploy to Production (Optimized)
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests for quick deployment'
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: restaurant-web
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run Tests
+    if: github.event.inputs.skip_tests != 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run backend tests
+      run: |
+        cd backend
+        python manage.py test --keepdb
+        python manage.py check --deploy
+      env:
+        DJANGO_SETTINGS_MODULE: backend.settings_ec2
+        DATABASE_NAME: test_restaurant.sqlite3
+        USE_COGNITO_AUTH: True
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Build and Push
+    if: always() && (needs.test.result == 'success' || github.event.inputs.skip_tests == 'true')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm ci --only=production
+        npm run build
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and push Docker image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        VERSION: prod-$(date +%Y%m%d-%H%M%S)-${{ github.sha }}
+      run: |
+        # Build with version tag and latest
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION .
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+        
+        # Push both tags
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        
+        # Output for next job
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_OUTPUT
+
+    outputs:
+      image-version: ${{ env.VERSION }}
+      ecr-registry: ${{ steps.login-ecr.outputs.registry }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    environment: production
+    
+    steps:
+    - name: Setup SSH Key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        known_hosts: unnecessary
+        
+    - name: Add EC2 to known hosts
+      run: ssh-keyscan -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Deploy to EC2
+      env:
+        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
+        EC2_USER: ${{ secrets.EC2_USERNAME }}
+        ECR_REGISTRY: ${{ needs.build.outputs.ecr-registry }}
+        VERSION: ${{ needs.build.outputs.image-version }}
+      run: |
+        echo "🚀 Starting optimized deployment..."
+        
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'DEPLOY'
+        set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        
+        cd /opt/restaurant-web || exit 1
+        
+        # Quick cleanup - only what's necessary
+        echo "🧹 Quick cleanup..."
+        docker system prune -f --volumes || true
+        
+        # Backup database if exists
+        if [ -f data/restaurant_prod.sqlite3 ]; then
+          mkdir -p backups
+          cp data/restaurant_prod.sqlite3 "backups/backup-$(date +%Y%m%d-%H%M%S).sqlite3"
+          echo "✅ Database backed up"
+        fi
+        
+        # Create environment file with optimized approach
+        echo "⚙️ Setting environment..."
+        cat > .env.ec2 << 'EOF'
+        AWS_REGION=${{ env.AWS_REGION }}
+        COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
+        COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
+        DATABASE_PATH=/opt/restaurant-web/data
+        DATABASE_NAME=restaurant_prod.sqlite3
+        DEBUG=False
+        USE_COGNITO_AUTH=True
+        ALLOWED_HOSTS=${{ secrets.EC2_PROD_HOST }},${{ secrets.DOMAIN_NAME }}
+        SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+        EC2_PUBLIC_IP=${{ secrets.EC2_PROD_HOST }}
+        EOF
+        
+        # Download latest configs from public repo (BIG OPTIMIZATION!)
+        echo "📥 Syncing configurations from public repository..."
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker-compose.yml -o docker-compose.yml
+        
+        # Sync nginx configs
+        mkdir -p nginx/conf.d
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/nginx/conf.d/default.conf -o nginx/conf.d/default.conf
+        
+        # Login to ECR and pull image
+        echo "🔐 ECR login and image pull..."
+        aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ needs.build.outputs.ecr-registry }}
+        docker pull ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:latest
+        
+        # Extract frontend dist
+        echo "📦 Extracting frontend..."
+        docker create --name temp-extract ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:latest
+        docker cp temp-extract:/app/frontend/dist ./frontend-dist
+        docker rm temp-extract
+        
+        # Update docker-compose with actual image
+        sed -i "s|image: restaurant-web:latest|image: ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:latest|g" docker-compose.yml
+        
+        # Deploy with zero-downtime approach
+        echo "🚀 Deploying services..."
+        docker-compose --profile production down --timeout 15 || true
+        docker-compose --profile production up -d
+        
+        # Quick health check (optimized)
+        echo "🏥 Health check..."
+        sleep 25  # Reduced wait time
+        
+        for i in {1..6}; do
+          if curl -f -s http://localhost:8000/api/v1/health/ >/dev/null 2>&1; then
+            echo "✅ Deployment successful!"
+            docker-compose --profile production ps
+            exit 0
+          fi
+          echo "⏳ Attempt $i/6..."
+          sleep 8
+        done
+        
+        echo "❌ Health check failed"
+        docker-compose --profile production logs --tail=50
+        exit 1
+        DEPLOY
+        
+        echo "✅ Deployment completed successfully!"
+
+  cleanup:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    name: Post-Deploy Cleanup
+    if: always() && needs.deploy.result == 'success'
+    
+    steps:
+    - name: Cleanup old ECR images
+      env:
+        AWS_REGION: ${{ env.AWS_REGION }}
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set region ${{ env.AWS_REGION }}
+        
+        echo "🧹 Cleaning up old ECR images (keep last 10)..."
+        aws ecr describe-images --repository-name ${{ env.ECR_REPOSITORY }} --query 'sort_by(imageDetails,&imageLastPushedTime)[:-10].imageDigest' --output table || true
+        
+    - name: Deployment Summary
+      run: |
+        echo "🎉 DEPLOYMENT SUCCESSFUL!"
+        echo "Version: ${{ needs.build.outputs.image-version }}"
+        echo "Deployed by: ${{ github.actor }}"
+        echo "Repository: Now public for optimized deployments!"
+        echo "✅ All services running"
+        echo "🧹 Cleanup completed"

@@ -243,73 +243,23 @@ jobs:
         echo "📥 Pulling Docker image..."
         docker pull ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}
         
+        # Download docker-compose.yml from public repository (OPTIMIZED)
+        echo "📥 Downloading docker-compose.yml from public repository..."
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker-compose.yml -o docker-compose.yml
+        
+        # Download nginx configuration (PUBLIC REPO OPTIMIZATION)
+        echo "📥 Syncing nginx configuration..."
+        rm -rf nginx && mkdir -p nginx/conf.d
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/nginx/conf.d/default.conf -o nginx/conf.d/default.conf
+        
         # Extract frontend files from Docker image
         echo "📥 Extracting frontend files..."
         docker create --name temp-container ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}
         docker cp temp-container:/app/frontend/dist ./frontend-dist
         docker rm temp-container
         
-        # Create docker-compose.yml file directly (private repo)
-        echo "📥 Creating docker-compose configuration..."
-        cat > docker-compose.yml << 'EOF'
-        version: '3.8'
-        
-        services:
-          app:
-            image: restaurant-web:latest
-            container_name: restaurant-web-app
-            ports:
-              - "8000:8000"
-            volumes:
-              - ./data:/opt/restaurant-web/data
-              - ./logs:/opt/restaurant-web/logs
-            environment:
-              - DATABASE_PATH=/opt/restaurant-web/data
-              - DATABASE_NAME=restaurant_prod.sqlite3
-            env_file:
-              - .env.ec2
-            restart: unless-stopped
-            profiles:
-              - production
-            healthcheck:
-              test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
-              interval: 30s
-              timeout: 10s
-              retries: 3
-              start_period: 40s
-        
-          nginx:
-            image: nginx:alpine
-            container_name: restaurant-web-nginx
-            ports:
-              - "80:80"
-              - "443:443"
-            volumes:
-              - ./nginx/conf.d:/etc/nginx/conf.d:ro
-              - ./nginx/ssl:/etc/nginx/ssl:ro
-              - ./frontend-dist:/var/www/html:ro
-            depends_on:
-              - app
-            restart: unless-stopped
-            profiles:
-              - production
-        
-        volumes:
-          restaurant_data:
-            driver: local
-          restaurant_logs:
-            driver: local
-        
-        networks:
-          default:
-            name: restaurant-network
-        EOF
-        
-        # Fix indentation in docker-compose.yml
-        sed -i 's/^        //' docker-compose.yml
-        
         # Update docker-compose.yml with the new image
-        sed -i "s|image: restaurant-web:.*|image: ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}|g" docker-compose.yml
+        sed -i "s|image: restaurant-web:latest|image: ${{ needs.build.outputs.ecr-registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-version }}|g" docker-compose.yml
         
         # Stop existing containers
         echo "⏹️ Stopping existing services..."
@@ -319,9 +269,9 @@ jobs:
         echo "🚀 Starting production services..."
         docker-compose --profile production up -d
         
-        # Wait for initialization
+        # Wait for initialization (OPTIMIZED: reduced time)
         echo "⏳ Waiting for services to initialize..."
-        sleep 45
+        sleep 30
         
         # Run migrations
         echo "🗄️ Running database migrations..."
@@ -345,8 +295,9 @@ jobs:
         echo "📋 Recent container logs:"
         docker-compose --profile production logs --tail=30
         
-        for i in {1..5}; do
-          echo "⏳ Health check attempt $i/5..."
+        # OPTIMIZED: Faster health checks with shorter intervals
+        for i in {1..8}; do
+          echo "⏳ Health check attempt $i/8..."
           if curl -f -s http://localhost:8000/api/v1/health/ > /dev/null 2>&1; then
             echo "✅ Health check passed on direct app port! Deployment successful!"
             docker-compose --profile production ps
@@ -359,11 +310,11 @@ jobs:
             exit 0
           else
             echo "❌ Both direct and nginx health checks failed on attempt $i"
-            sleep 15
+            sleep 10
           fi
         done
         
-        echo "❌ Health check failed after 5 attempts"
+        echo "❌ Health check failed after 8 attempts"
         echo "📊 Final container status:"
         docker-compose --profile production ps
         echo "📋 Final container logs:"
