@@ -186,14 +186,17 @@ jobs:
         # Upload environment file
         scp -o StrictHostKeyChecking=no /tmp/deployment.env $EC2_USER@$EC2_HOST:/tmp/deployment.env
         
-        # Execute deployment - using sh for compatibility
-        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST '/bin/sh -c "
+        # Execute deployment with proper PATH
+        ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'DEPLOY_COMMAND'
+          # Set proper PATH for non-interactive SSH
+          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+          
           set -e
           
-          # Debug environment
-          echo \"Shell: \$SHELL\"
-          echo \"PATH: \$PATH\"
-          which bash || echo \"bash not found in PATH\"
+          echo "Deployment environment:"
+          echo "Shell: $SHELL"
+          echo "PATH: $PATH"
+          echo "User: $(whoami)"
           
           # Load environment variables
           . /tmp/deployment.env
@@ -201,12 +204,12 @@ jobs:
           # Make script executable
           chmod +x /tmp/deploy-production.sh
           
-          # Execute with sh for now
+          # Execute deployment script
           /bin/sh /tmp/deploy-production.sh
           
           # Cleanup
           rm -f /tmp/deployment.env /tmp/deploy-production.sh
-        "'
+        DEPLOY_COMMAND
 
   notify:
     needs: [test, build, deploy]

@@ -4,9 +4,13 @@ set -e
 # Production Deployment Script
 # This script runs ON THE EC2 INSTANCE after environment variables are set
 
+# Set proper PATH for non-interactive SSH sessions
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+
 echo "🚀 Production deployment started..."
-echo "Working directory: $(pwd)"
-echo "User: $(whoami)"
+echo "Working directory: $(/bin/pwd)"
+echo "User: $(/usr/bin/whoami)"
+echo "PATH: $PATH"
 
 # Validate required environment variables
 REQUIRED_VARS="ECR_REGISTRY ECR_REPOSITORY VERSION AWS_REGION COGNITO_USER_POOL_ID COGNITO_APP_CLIENT_ID DJANGO_SECRET_KEY EC2_HOST"

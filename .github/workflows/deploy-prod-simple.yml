@@ -30,10 +30,14 @@ jobs:
       run: |
         echo "🚀 Direct deployment to EC2..."
         
-        # Single SSH command with all the deployment logic
+        # Single SSH command with PATH fix
         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
+        # Fix PATH for non-interactive SSH
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
+        
         echo "=== Starting Deployment ==="
         echo "Current shell: $SHELL"
+        echo "PATH: $PATH"
         echo "Current user: $(whoami)"
         echo "Current directory: $(pwd)"
         
@@ -52,6 +56,10 @@ jobs:
         # Check AWS CLI
         echo "=== AWS CLI check ==="
         aws --version || echo "AWS CLI not found"
+        
+        # Check if we can access ECR
+        echo "=== ECR Access check ==="
+        aws ecr describe-repositories --region us-west-2 || echo "Cannot access ECR"
         
         echo "=== Deployment test completed ==="
         EOF
