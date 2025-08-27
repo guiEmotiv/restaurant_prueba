@@ -1,4 +1,4 @@
-name: Deploy Restaurant Web
+name: Professional Restaurant Web Deployment
 
 on:
   push:
@@ -6,97 +6,213 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'Action to perform'
+        description: 'Deployment Action'
         type: choice
         default: 'deploy'
         options:
           - deploy
-          - check
+          - status
           - logs
           - backup
-          - ultimate-fix
-          - setup-ssl
-          - activate-ssl
-          - fix-https
+          - restart
+          - ssl-install
+          - ssl-renew
+          - ssl-test
 
 env:
   AWS_REGION: us-west-2
   ECR_REPOSITORY: restaurant-web
 
 jobs:
-  deploy:
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # INTELLIGENT CHANGE DETECTION
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  
+  analyze-changes:
     runs-on: ubuntu-latest
-    name: Deploy to EC2
-    environment: production
-    
+    name: Analyze Changes
+    outputs:
+      needs-build: ${{ steps.changes.outputs.needs-build }}
+      changes: ${{ steps.changes.outputs.changes }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+        
+    - name: Detect changes
+      id: changes
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "needs-build=true" >> $GITHUB_OUTPUT
+          echo "changes=frontend backend infrastructure" >> $GITHUB_OUTPUT
+          echo "🔧 Manual dispatch - building all components"
+          exit 0
+        fi
+        
+        # Get changed files
+        changes=$(git diff --name-only HEAD~1 HEAD || echo "")
+        components=""
+        
+        # Analyze changes
+        if echo "$changes" | grep -qE "^(frontend/|package\.json)"; then
+          components="$components frontend"
+          echo "🎨 Frontend changes detected"
+        fi
+        
+        if echo "$changes" | grep -qE "^(backend/|requirements\.txt)"; then
+          components="$components backend"
+          echo "🔧 Backend changes detected"
+        fi
+        
+        if echo "$changes" | grep -qE "^(docker-compose|Dockerfile|nginx/|\.github/)"; then
+          components="$components infrastructure"
+          echo "🏗️ Infrastructure changes detected"
+        fi
+        
+        # Output results
+        if [ -n "$components" ]; then
+          echo "needs-build=true" >> $GITHUB_OUTPUT
+          echo "changes=$components" >> $GITHUB_OUTPUT
+          echo "📦 Components to deploy:$components"
+        else
+          echo "needs-build=false" >> $GITHUB_OUTPUT
+          echo "changes=" >> $GITHUB_OUTPUT
+          echo "⏭️ No significant changes detected, skipping build"
+        fi
 
-    - name: Configure AWS credentials
-      if: github.event.inputs.action != 'check' && github.event.inputs.action != 'logs'
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # OPTIMIZED BUILD AND DEPLOY
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  
+  deploy:
+    needs: analyze-changes
+    runs-on: ubuntu-latest
+    name: Professional Deployment
+    environment: production
+    if: needs.analyze-changes.outputs.needs-build == 'true' || github.event.inputs.action != ''
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: 🔐 Configure AWS Credentials
+      if: |
+        (github.event.inputs.action == 'deploy' || github.event.inputs.action == '' || 
+         needs.analyze-changes.outputs.needs-build == 'true') &&
+        !contains(github.event.inputs.action, 'ssl-') &&
+        github.event.inputs.action != 'status' &&
+        github.event.inputs.action != 'logs'
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Login to Amazon ECR
-      if: github.event.inputs.action != 'check' && github.event.inputs.action != 'logs'
+    - name: 🚢 Login to Amazon ECR
+      if: |
+        (github.event.inputs.action == 'deploy' || github.event.inputs.action == '' || 
+         needs.analyze-changes.outputs.needs-build == 'true') &&
+        !contains(github.event.inputs.action, 'ssl-') &&
+        github.event.inputs.action != 'status' &&
+        github.event.inputs.action != 'logs'
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build and push Docker image
-      if: github.event.inputs.action == 'deploy' || github.event.inputs.action == ''
+    - name: 🏗️ Intelligent Build and Push
+      if: |
+        (github.event.inputs.action == 'deploy' || github.event.inputs.action == '' || 
+         needs.analyze-changes.outputs.needs-build == 'true') &&
+        github.event.inputs.action != 'status' &&
+        github.event.inputs.action != 'logs' &&
+        !contains(github.event.inputs.action, 'ssl-')
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         VITE_AWS_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
         VITE_AWS_COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID }}
+        CHANGES: ${{ needs.analyze-changes.outputs.changes || 'frontend backend infrastructure' }}
       run: |
-        # Build frontend with Cognito credentials
-        cd frontend
-        npm ci --production=false
-        NODE_OPTIONS='--max-old-space-size=4096' npm run build
-        cd ..
+        echo "🔍 Building components: $CHANGES"
+        
+        # Conditional frontend build (only if frontend changed)
+        if echo "$CHANGES" | grep -q "frontend" || [ "${{ github.event.inputs.action }}" = "deploy" ] || [ "${{ github.event.inputs.action }}" = "" ]; then
+          echo "🎨 Building frontend with optimized settings..."
+          cd frontend
+          
+          # Use npm ci for faster, reliable installs
+          npm ci --prefer-offline --no-audit
+          
+          # Memory-optimized build with Cognito credentials
+          NODE_OPTIONS='--max-old-space-size=6144' npm run build
+          cd ..
+          
+          echo "✅ Frontend build completed"
+        else
+          echo "⏭️ Skipping frontend build (no changes detected)"
+        fi
         
         # Build and push Docker image
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+        echo "🚢 Building and pushing Docker image..."
+        docker build \
+          --cache-from $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+          --build-arg BUILDKIT_INLINE_CACHE=1 .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        echo "✅ Docker image pushed successfully"
 
-    - name: Deploy to EC2
+    - name: 🚀 Professional EC2 Deployment
       env:
         ACTION: ${{ github.event.inputs.action || 'deploy' }}
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
       run: |
-        # Setup SSH
+        echo "🔐 Setting up secure SSH connection..."
         mkdir -p ~/.ssh
         echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
         
-        # Execute deploy script on EC2
-        ssh $EC2_USER@$EC2_HOST << 'EOF'
+        echo "📡 Executing professional deployment on EC2..."
+        ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 $EC2_USER@$EC2_HOST << 'DEPLOY_EOF'
+        set -e
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
-        # Download latest scripts
-        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/deploy.sh -o scripts/deploy.sh
-        chmod +x scripts/deploy.sh
+        echo "📥 Downloading latest professional scripts..."
+        # Download professional deployment system
+        curl -sSL --max-time 30 \
+          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/production-deploy.sh \
+          -o scripts/production-deploy.sh
+        chmod +x scripts/production-deploy.sh
         
-        if [ "${{ env.ACTION }}" = "setup-ssl" ]; then
-          curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl-simple.sh -o scripts/setup-ssl-simple.sh
-          chmod +x scripts/setup-ssl-simple.sh
-          ./scripts/setup-ssl-simple.sh
-        elif [ "${{ env.ACTION }}" = "activate-ssl" ]; then
-          curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/activate-real-ssl.sh -o scripts/activate-real-ssl.sh
-          chmod +x scripts/activate-real-ssl.sh
-          ./scripts/activate-real-ssl.sh
-        elif [ "${{ env.ACTION }}" = "fix-https" ]; then
-          curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/fix-https.sh -o scripts/fix-https.sh
-          chmod +x scripts/fix-https.sh
-          ./scripts/fix-https.sh
-        else
-          ./scripts/deploy.sh ${{ env.ACTION }}
-        fi
-        EOF
+        # Download SSL management system
+        curl -sSL --max-time 30 \
+          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/ssl-manager.sh \
+          -o scripts/ssl-manager.sh
+        chmod +x scripts/ssl-manager.sh
+        
+        # Execute appropriate action
+        case "${{ env.ACTION }}" in
+          "ssl-install"|"ssl-renew"|"ssl-test")
+            SSL_ACTION=${1#ssl-}
+            ./scripts/ssl-manager.sh $SSL_ACTION
+            ;;
+          *)
+            ./scripts/production-deploy.sh ${{ env.ACTION }}
+            ;;
+        esac
+        DEPLOY_EOF
+        
+        echo "✅ Professional deployment completed successfully"
+
+    - name: 📊 Deployment Summary
+      if: always()
+      run: |
+        echo "## 🌟 Professional Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Action:** ${{ env.ACTION || 'deploy' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Changes Detected:** ${{ needs.analyze-changes.outputs.changes || 'manual deployment' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🔗 **Live Site:** https://www.xn--elfogndedonsoto-zrb.com/" >> $GITHUB_STEP_SUMMARY

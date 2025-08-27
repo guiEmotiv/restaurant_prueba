@@ -1,7 +1,7 @@
 #!/bin/bash
-# Ultra-simple deployment script
+# Legacy Deployment Script - Redirects to Professional System
+# This script exists for backward compatibility
 # Usage: ./scripts/deploy.sh [action]
-# Actions: deploy, check, logs, backup
 
 set -e
 
@@ -9,19 +9,21 @@ ACTION=${1:-deploy}
 
 # Colors
 G='\033[0;32m' # Green
-R='\033[0;31m' # Red  
 Y='\033[1;33m' # Yellow
 NC='\033[0m'   # No Color
 
 log() { echo -e "${G}[$(date +'%H:%M:%S')]${NC} $1"; }
-err() { echo -e "${R}[ERROR]${NC} $1" >&2; exit 1; }
+warn() { echo -e "${Y}[LEGACY]${NC} $1"; }
 
-# Check if on EC2
-if [ ! -d "/opt/restaurant-web" ]; then
-    log "Running locally - triggering GitHub Actions..."
-    command -v gh >/dev/null || err "GitHub CLI not installed"
-    gh workflow run deploy.yml -f action="$ACTION"
-    exit 0
+# Redirect to professional deployment system
+warn "This is a legacy script. Redirecting to professional deployment system..."
+
+if [ -f "$(dirname "$0")/production-deploy.sh" ]; then
+    log "🚀 Using professional deployment system"
+    exec "$(dirname "$0")/production-deploy.sh" "$ACTION"
+else
+    # Fallback for backward compatibility
+    warn "Professional script not found, running legacy deployment..."
 fi
 
 # On EC2
@@ -46,7 +48,10 @@ case "$ACTION" in
             cat > .env.ec2 << 'ENVEOF'
 SECRET_KEY=django-prod-key-change-this
 DEBUG=False
-USE_COGNITO_AUTH=False
+USE_COGNITO_AUTH=True
+COGNITO_USER_POOL_ID=TBD
+COGNITO_APP_CLIENT_ID=TBD
+AWS_REGION=us-west-2
 ALLOWED_HOSTS=*
 DATABASE_PATH=/opt/restaurant-web/data
 DATABASE_NAME=restaurant_prod.sqlite3
