@@ -137,8 +137,15 @@ ENVEOF
         ./activate-real-ssl.sh
         ;;
         
+    fix-https)
+        log "🔧 Fixing HTTPS configuration..."
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/fix-https.sh -o fix-https.sh
+        chmod +x fix-https.sh
+        ./fix-https.sh
+        ;;
+        
     *)
-        echo "Usage: $0 {deploy|check|logs|backup|ultimate-fix|setup-ssl|activate-ssl}"
+        echo "Usage: $0 {deploy|check|logs|backup|ultimate-fix|setup-ssl|activate-ssl|fix-https}"
         echo "  deploy       - Deploy latest version"
         echo "  check        - Health check"
         echo "  logs         - Show logs"  
@@ -146,6 +153,7 @@ ENVEOF
         echo "  ultimate-fix - Nuclear option - rebuild everything"
         echo "  setup-ssl    - Configure SSL with self-signed certificates"
         echo "  activate-ssl - Activate REAL Let's Encrypt SSL certificates"
+        echo "  fix-https    - Diagnostic and fix HTTPS issues"
         exit 1
         ;;
 esac
