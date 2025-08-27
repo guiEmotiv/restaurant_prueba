@@ -54,10 +54,21 @@ DJANGO_SETTINGS_MODULE=backend.settings_ec2
 ENVEOF
         fi
         
-        # Force complete restart
-        docker-compose --profile production down --timeout 10 || true
-        docker system prune -f || true
-        docker-compose --profile production up -d --force-recreate
+        # DEEP CLEANUP ALWAYS
+        log "🧹 Deep cleanup on every deploy..."
+        docker-compose --profile production down --volumes --remove-orphans --timeout 5 || true
+        docker system prune -af --volumes || true
+        docker network prune -f || true
+        
+        # Remove old containers if any
+        docker ps -aq | xargs -r docker rm -f 2>/dev/null || true
+        
+        # Clean old logs
+        rm -rf logs/* || true
+        mkdir -p logs
+        
+        log "🚀 Starting fresh containers..."
+        docker-compose --profile production up -d --force-recreate --remove-orphans
         
         # Health check with retries
         log "⏳ Waiting for services..."

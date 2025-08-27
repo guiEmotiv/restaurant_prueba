@@ -6,9 +6,19 @@ cd /opt/restaurant-web
 
 echo "🔥 ULTIMATE FIX - Complete rebuild"
 
-# 1. Stop everything
-docker-compose --profile production down --volumes --remove-orphans || true
-docker system prune -af || true
+# 1. DEEP CLEANUP - Nuclear option
+echo "🧹 DEEP CLEANUP - Removing everything..."
+docker-compose --profile production down --volumes --remove-orphans --timeout 5 || true
+docker stop $(docker ps -aq) 2>/dev/null || true
+docker rm $(docker ps -aq) 2>/dev/null || true
+docker rmi $(docker images -q) --force 2>/dev/null || true
+docker system prune -af --volumes || true
+docker network prune -f || true
+docker volume prune -f || true
+
+# Clean old files
+rm -rf logs/* || true
+rm -rf .env.ec2.old || true
 
 # 2. Ensure proper environment
 cat > .env.ec2 << 'EOF'
