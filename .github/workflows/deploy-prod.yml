@@ -153,27 +153,44 @@ jobs:
         port: ${{ secrets.EC2_SSH_PORT || '22' }}
         envs: ECR_REGISTRY,ECR_REPOSITORY,VERSION,AWS_REGION
         script_stop: true
+        command_timeout: 15m
         script: |
+          #!/bin/bash
+          set -e
+          
+          # Set up full PATH environment
+          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          
+          # Source profile to get full environment
+          source ~/.bashrc 2>/dev/null || true
+          source ~/.profile 2>/dev/null || true
           echo "🚀 Starting production deployment..."
+          echo "PATH: $PATH"
+          echo "Working directory: $(pwd)"
+          
+          # Test basic commands
+          which mkdir || echo "mkdir not found"
+          which docker || echo "docker not found" 
+          which aws || echo "aws not found"
           
           # Set up directories
           cd /opt/restaurant-web || exit 1
-          mkdir -p data backups
+          /bin/mkdir -p data backups
           
           # Create backup
           if [ -f data/restaurant_prod.sqlite3 ]; then
             BACKUP_DIR="backups/backup-$(date +%Y%m%d-%H%M%S)"
-            mkdir -p $BACKUP_DIR
-            cp data/restaurant_prod.sqlite3 $BACKUP_DIR/
+            /bin/mkdir -p $BACKUP_DIR
+            /bin/cp data/restaurant_prod.sqlite3 $BACKUP_DIR/
             echo "✅ Database backed up"
           fi
           
           # Login to ECR and pull image
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
+          /usr/local/bin/aws ecr get-login-password --region $AWS_REGION | /usr/bin/docker login --username AWS --password-stdin $ECR_REGISTRY
+          /usr/bin/docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
           
           # Create production environment
-          cat > .env.ec2 <<EOF
+          /bin/cat > .env.ec2 <<EOF
           AWS_REGION=$AWS_REGION
           COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
           COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
@@ -188,30 +205,30 @@ jobs:
           EOF
           
           # Download docker-compose
-          curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml -o docker-compose.yml
+          /usr/bin/curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml -o docker-compose.yml
           
           # Stop existing services
-          docker-compose --profile production down --timeout 30 || true
+          /usr/local/bin/docker-compose --profile production down --timeout 30 || true
           
           # Update docker-compose to use new image
-          sed -i "s|restaurant-web:.*|$ECR_REGISTRY/$ECR_REPOSITORY:$VERSION|g" docker-compose.yml
+          /bin/sed -i "s|restaurant-web:.*|$ECR_REGISTRY/$ECR_REPOSITORY:$VERSION|g" docker-compose.yml
           
           # Start services
-          docker-compose --profile production up -d
+          /usr/local/bin/docker-compose --profile production up -d
           
           # Wait and run migrations
-          sleep 30
-          docker-compose exec -T app python manage.py migrate
-          docker-compose exec -T app python manage.py collectstatic --noinput
+          /bin/sleep 30
+          /usr/local/bin/docker-compose exec -T app python manage.py migrate
+          /usr/local/bin/docker-compose exec -T app python manage.py collectstatic --noinput
           
           # Health check
           for i in {1..5}; do
-            if curl -f http://localhost/api/v1/health/ > /dev/null 2>&1; then
+            if /usr/bin/curl -f http://localhost/api/v1/health/ > /dev/null 2>&1; then
               echo "✅ Deployment successful!"
               break
             else
               echo "⏳ Health check $i/5..."
-              sleep 10
+              /bin/sleep 10
             fi
           done
           
