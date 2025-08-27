@@ -156,17 +156,27 @@ jobs:
         script: |
           echo "🚀 Starting deployment to production..."
           
-          # Use deploy script if available
-          if [ -f /opt/restaurant-web/scripts/deploy-ec2.sh ]; then
-            echo "Using existing deployment script"
-            cd /opt/restaurant-web
+          # Set up environment
+          export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+          cd /opt/restaurant-web || { echo "❌ Directory not found"; exit 1; }
+          
+          # Download deployment script if not exists
+          if [ ! -f scripts/deploy-ec2.sh ]; then
+            echo "📥 Downloading deployment script..."
+            mkdir -p scripts
+            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/deploy-ec2.sh -o scripts/deploy-ec2.sh
             chmod +x scripts/deploy-ec2.sh
-            bash scripts/deploy-ec2.sh -e prod -f
-            exit $?
           fi
           
-          echo "❌ Deploy script not found. Please ensure setup was completed."
-          exit 1
+          # Run deployment with environment variables
+          export ECR_REGISTRY="$ECR_REGISTRY"
+          export ECR_REPOSITORY="$ECR_REPOSITORY" 
+          export IMAGE_TAG="$VERSION"
+          export AWS_REGION="$AWS_REGION"
+          
+          # Execute deployment
+          echo "🚀 Running deployment script..."
+          bash scripts/deploy-ec2.sh -e prod -f
 
   notify:
     needs: [test, build, deploy]
