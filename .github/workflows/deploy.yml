@@ -14,6 +14,7 @@ on:
           - check       # Health check only
           - backup      # Backup database only
           - cleanup     # Clean Docker resources
+          - ssl         # Setup SSL certificates
 
 env:
   AWS_REGION: us-west-2
@@ -147,6 +148,20 @@ jobs:
           "cleanup")
             docker system prune -af --volumes
             echo "✅ Cleanup completed"
+            ;;
+            
+          "ssl")
+            echo "🔒 Setting up SSL..."
+            # Check if SSL is already configured
+            if [ -f data/certbot/conf/live/xn--elfogndedonsoto-zrb.com/fullchain.pem ]; then
+              echo "✅ SSL certificates already exist"
+              ls -la data/certbot/conf/live/xn--elfogndedonsoto-zrb.com/
+            else
+              echo "📥 Downloading SSL setup script..."
+              curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl.sh -o setup-ssl.sh
+              chmod +x setup-ssl.sh
+              ./setup-ssl.sh
+            fi
             ;;
         esac
         EOF
