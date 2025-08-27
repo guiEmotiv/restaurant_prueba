@@ -15,6 +15,7 @@ on:
           - logs
           - backup
           - ultimate-fix
+          - setup-ssl
 
 env:
   AWS_REGION: us-west-2
@@ -75,10 +76,15 @@ jobs:
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
-        # Download latest deploy script
+        # Download latest scripts
         curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/deploy.sh -o scripts/deploy.sh
         chmod +x scripts/deploy.sh
         
-        # Run the action
-        ./scripts/deploy.sh ${{ env.ACTION }}
+        if [ "${{ env.ACTION }}" = "setup-ssl" ]; then
+          curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl.sh -o scripts/setup-ssl.sh
+          chmod +x scripts/setup-ssl.sh
+          ./scripts/setup-ssl.sh
+        else
+          ./scripts/deploy.sh ${{ env.ACTION }}
+        fi
         EOF

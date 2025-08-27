@@ -123,13 +123,21 @@ ENVEOF
         ./ultimate-fix.sh
         ;;
         
+    setup-ssl)
+        log "🔒 Setting up SSL..."
+        curl -sSL https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/setup-ssl.sh -o setup-ssl.sh
+        chmod +x setup-ssl.sh
+        ./setup-ssl.sh
+        ;;
+        
     *)
-        echo "Usage: $0 {deploy|check|logs|backup|ultimate-fix}"
+        echo "Usage: $0 {deploy|check|logs|backup|ultimate-fix|setup-ssl}"
         echo "  deploy       - Deploy latest version"
         echo "  check        - Health check"
         echo "  logs         - Show logs"  
         echo "  backup       - Backup database"
         echo "  ultimate-fix - Nuclear option - rebuild everything"
+        echo "  setup-ssl    - Configure SSL with Let's Encrypt"
         exit 1
         ;;
 esac

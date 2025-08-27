@@ -22,7 +22,7 @@ def get_csrf_token(request):
 def index_view(request):
     """Serve React index.html for production"""
     try:
-        with open(settings.BASE_DIR / 'frontend_static' / 'index.html', 'r') as f:
+        with open(settings.BASE_DIR / 'frontend' / 'dist' / 'index.html', 'r') as f:
             response = HttpResponse(f.read(), content_type='text/html')
             # Add anti-cache headers for production
             response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -33,8 +33,8 @@ def index_view(request):
         return HttpResponse('Frontend not built yet. Build the React app first.', status=404)
 
 def serve_frontend_asset(request, path):
-    """Serve frontend assets (CSS, JS, etc.) - we know they're in staticfiles/assets"""
-    static_asset_path = settings.STATIC_ROOT / 'assets' / path
+    """Serve frontend assets (CSS, JS, etc.) from frontend/dist/assets"""
+    static_asset_path = settings.BASE_DIR / 'frontend' / 'dist' / 'assets' / path
     if static_asset_path.exists() and static_asset_path.is_file():
         content_type, _ = mimetypes.guess_type(str(static_asset_path))
         return FileResponse(open(static_asset_path, 'rb'), content_type=content_type)
@@ -42,16 +42,11 @@ def serve_frontend_asset(request, path):
     raise Http404(f"Asset not found at {static_asset_path}: {path}")
 
 def serve_vite_svg(request):
-    """Serve vite.svg - try multiple locations"""
-    # Try frontend_static first
-    svg_path = settings.BASE_DIR / 'frontend_static' / 'vite.svg'
+    """Serve vite.svg from frontend dist"""
+    # Try frontend/dist first
+    svg_path = settings.BASE_DIR / 'frontend' / 'dist' / 'vite.svg'
     if svg_path.exists():
         return FileResponse(open(svg_path, 'rb'), content_type='image/svg+xml')
-    
-    # Try staticfiles
-    static_svg_path = settings.STATIC_ROOT / 'vite.svg'
-    if static_svg_path.exists():
-        return FileResponse(open(static_svg_path, 'rb'), content_type='image/svg+xml')
     
     raise Http404("vite.svg not found")
 
