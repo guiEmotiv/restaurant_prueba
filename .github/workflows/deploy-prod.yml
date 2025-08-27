@@ -154,13 +154,13 @@ jobs:
       run: |
         ssh-keyscan -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
         
-    - name: Upload deployment script
+    - name: Upload deployment scripts
       env:
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
       run: |
-        echo "📤 Uploading deployment script..."
-        scp -o StrictHostKeyChecking=no scripts/deploy-production.sh $EC2_USER@$EC2_HOST:/tmp/deploy-production.sh
+        echo "📤 Uploading deployment scripts..."
+        scp -o StrictHostKeyChecking=no scripts/deploy-with-env.py $EC2_USER@$EC2_HOST:/tmp/deploy-with-env.py
         
     - name: Deploy to EC2 PROD
       env:
@@ -169,24 +169,26 @@ jobs:
       run: |
         echo "🚀 Starting production deployment..."
         
-        # Create environment file with proper escaping
-        cat > /tmp/deployment.env << 'DEPLOYMENT_ENV'
-        ECR_REGISTRY=${{ needs.build.outputs.ecr-registry }}
-        ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}
-        VERSION=${{ needs.build.outputs.image-version }}
-        AWS_REGION=${{ env.AWS_REGION }}
-        COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
-        COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
-        DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-        EC2_HOST=${{ secrets.EC2_PROD_HOST }}
-        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
-        GITHUB_REPOSITORY=${{ github.repository }}
-        DEPLOYMENT_ENV
+        # Create JSON environment file to avoid shell escaping issues
+        cat > /tmp/deployment-env.json << 'JSON_ENV'
+        {
+          "ECR_REGISTRY": "${{ needs.build.outputs.ecr-registry }}",
+          "ECR_REPOSITORY": "${{ env.ECR_REPOSITORY }}",
+          "VERSION": "${{ needs.build.outputs.image-version }}",
+          "AWS_REGION": "${{ env.AWS_REGION }}",
+          "COGNITO_USER_POOL_ID": "${{ secrets.COGNITO_USER_POOL_ID }}",
+          "COGNITO_APP_CLIENT_ID": "${{ secrets.COGNITO_APP_CLIENT_ID }}",
+          "DJANGO_SECRET_KEY": "${{ secrets.DJANGO_SECRET_KEY }}",
+          "EC2_HOST": "${{ secrets.EC2_PROD_HOST }}",
+          "DOMAIN_NAME": "${{ secrets.DOMAIN_NAME }}",
+          "GITHUB_REPOSITORY": "${{ github.repository }}"
+        }
+        JSON_ENV
         
-        # Upload environment file
-        scp -o StrictHostKeyChecking=no /tmp/deployment.env $EC2_USER@$EC2_HOST:/tmp/deployment.env
+        # Upload JSON environment file
+        scp -o StrictHostKeyChecking=no /tmp/deployment-env.json $EC2_USER@$EC2_HOST:/tmp/deployment-env.json
         
-        # Execute deployment with proper PATH
+        # Execute deployment using Python (more reliable than shell)
         ssh -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'DEPLOY_COMMAND'
           # Set proper PATH for non-interactive SSH
           export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"
@@ -197,18 +199,16 @@ jobs:
           echo "Shell: $SHELL"
           echo "PATH: $PATH"
           echo "User: $(whoami)"
-          
-          # Load environment variables
-          . /tmp/deployment.env
+          echo "Python: $(which python3 || which python)"
           
           # Make script executable
-          chmod +x /tmp/deploy-production.sh
+          chmod +x /tmp/deploy-with-env.py
           
           # Execute deployment script
-          /bin/sh /tmp/deploy-production.sh
+          python3 /tmp/deploy-with-env.py || python /tmp/deploy-with-env.py
           
           # Cleanup
-          rm -f /tmp/deployment.env /tmp/deploy-production.sh
+          rm -f /tmp/deployment-env.json /tmp/deploy-with-env.py
         DEPLOY_COMMAND
 
   notify:
