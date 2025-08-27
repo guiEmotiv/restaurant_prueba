@@ -177,18 +177,39 @@ jobs:
         # Create directories
         mkdir -p data backups logs
         
-        # Docker cleanup to prevent disk space issues
-        echo "🧹 Cleaning up old Docker resources..."
-        docker system prune -f --volumes || echo "Docker cleanup failed, continuing..."
-        docker image prune -a -f --filter "until=24h" || echo "Image cleanup failed, continuing..."
+        # Aggressive Docker cleanup to prevent disk space issues
+        echo "🧹 Aggressive Docker cleanup (EC2 disk space critical)..."
         
-        # Clean old backups (keep only last 10)
-        echo "🧹 Cleaning old backups..."
+        # Stop and remove ALL containers except the ones we're about to start
+        docker stop $(docker ps -aq) 2>/dev/null || true
+        docker container prune -f || true
+        
+        # Remove ALL unused images (aggressive cleanup for small disk)
+        docker image prune -a -f || true
+        
+        # Complete system cleanup
+        docker system prune -a -f --volumes || true
+        
+        # Clean system logs (keep only 1 day due to space constraints)
+        echo "🧹 Cleaning system logs..."
+        sudo journalctl --vacuum-time=1d || true
+        
+        # Clean old backups (keep only last 5 due to space constraints)
+        echo "🧹 Cleaning old backups (keep only 5)..."
         if [ -d backups ]; then
           cd backups
-          ls -t backup-* 2>/dev/null | tail -n +11 | xargs -r rm -rf
+          ls -t backup-* 2>/dev/null | tail -n +6 | xargs -r rm -rf
           cd ..
         fi
+        
+        # Clean temp files
+        echo "🧹 Cleaning temp files..."
+        rm -rf /tmp/docker-* 2>/dev/null || true
+        sudo apt-get clean || true
+        
+        # Show disk space after cleanup
+        echo "💾 Disk space after cleanup:"
+        df -h /
         
         # Backup database if exists
         if [ -f data/restaurant_prod.sqlite3 ]; then
