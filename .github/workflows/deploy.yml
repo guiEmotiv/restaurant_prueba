@@ -210,6 +210,9 @@ jobs:
         echo "DATABASE_NAME=restaurant.prod.sqlite3" >> .env.ec2
         echo "DJANGO_SETTINGS_MODULE=backend.backend.settings.prod" >> .env.ec2
         
+        # Remove any existing docker-compose.prod.yml and recreate
+        rm -f docker/docker-compose.prod.yml
+        
         # Create docker-compose.prod.yml dynamically
         echo "services:" > docker/docker-compose.prod.yml
         echo "  app:" >> docker/docker-compose.prod.yml
@@ -258,6 +261,12 @@ jobs:
         echo "networks:" >> docker/docker-compose.prod.yml
         echo "  default:" >> docker/docker-compose.prod.yml
         echo "    name: restaurant-network" >> docker/docker-compose.prod.yml
+        
+        # Debug: Show what we created
+        echo "🔍 Debug: Contents of docker-compose.prod.yml:"
+        cat docker/docker-compose.prod.yml
+        echo "🔍 Debug: Contents of .env.ec2:"
+        cat .env.ec2
           
         # Download nginx config
         mkdir -p docker/nginx/conf.d
