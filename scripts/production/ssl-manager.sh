@@ -240,7 +240,7 @@ request_ssl_certificate() {
     log "🔒 Requesting SSL certificate for: $domains"
     
     # Stop nginx temporarily for standalone validation
-    docker-compose --profile production stop nginx || true
+    docker-compose -f docker/docker-compose.prod.yml --profile production stop nginx || true
     
     # Request certificate
     sudo certbot certonly \
@@ -267,7 +267,7 @@ setup_auto_renewal() {
     cat > /tmp/ssl-renewal.sh << 'EOF'
 #!/bin/bash
 # Automatic SSL certificate renewal
-/usr/bin/certbot renew --quiet && docker-compose -f /opt/restaurant-web/docker-compose.yml --profile production restart nginx
+/usr/bin/certbot renew --quiet && docker-compose -f /opt/restaurant-web/docker/docker-compose.prod.yml --profile production restart nginx
 EOF
     
     sudo mv /tmp/ssl-renewal.sh /opt/ssl-renewal.sh
@@ -287,7 +287,7 @@ test_ssl_configuration() {
     
     # Start services with SSL config
     update_nginx_ssl_config
-    docker-compose --profile production up -d --force-recreate
+    docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate
     
     # Wait for services to start
     sleep 15
@@ -297,7 +297,7 @@ test_ssl_configuration() {
         log "✅ Internal HTTPS working"
     else
         warn "❌ Internal HTTPS test failed"
-        docker-compose --profile production logs nginx --tail=10
+        docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
         return 1
     fi
     
@@ -344,7 +344,7 @@ main() {
         "renew")
             log "🔄 Renewing SSL certificate..."
             sudo certbot renew
-            docker-compose --profile production restart nginx
+            docker-compose -f docker/docker-compose.prod.yml --profile production restart nginx
             test_ssl_configuration
             ;;
             
@@ -355,7 +355,7 @@ main() {
         "fix")
             log "🔧 Fixing SSL configuration..."
             update_nginx_ssl_config
-            docker-compose --profile production restart nginx
+            docker-compose -f docker/docker-compose.prod.yml --profile production restart nginx
             test_ssl_configuration
             ;;
             

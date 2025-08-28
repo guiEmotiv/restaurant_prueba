@@ -65,7 +65,7 @@ jobs:
           echo "🔧 Backend changes detected"
         fi
         
-        if echo "$changes" | grep -qE "^(docker-compose|Dockerfile|nginx/|\.github/)"; then
+        if echo "$changes" | grep -qE "^(docker/|Dockerfile|\.github/)"; then
           components="$components infrastructure"
           echo "🏗️ Infrastructure changes detected"
         fi
@@ -156,7 +156,8 @@ jobs:
         docker build \
           --cache-from $ECR_REGISTRY/$ECR_REPOSITORY:latest \
           -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-          --build-arg BUILDKIT_INLINE_CACHE=1 .
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          -f Dockerfile.prod .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         echo "✅ Docker image pushed successfully"
 

@@ -77,13 +77,13 @@ detect_changes() {
     fi
     
     # Infrastructure changes
-    if echo "$changes" | grep -qE "^(docker-compose|Dockerfile|nginx/)"; then
+    if echo "$changes" | grep -qE "^(docker/|Dockerfile)"; then
         components="$components infrastructure"
         log "🏗️ Infrastructure changes detected"
     fi
     
     # SSL/Security changes
-    if echo "$changes" | grep -qE "^(scripts/.*ssl|nginx/.*conf)"; then
+    if echo "$changes" | grep -qE "^(scripts/.*ssl|docker/nginx/.*conf)"; then
         components="$components ssl"
         log "🔒 SSL/Security changes detected"
     fi
@@ -183,11 +183,11 @@ execute_deployment() {
     # Intelligent container management
     if echo "$components" | grep -q "infrastructure"; then
         log "🧹 Deep infrastructure cleanup..."
-        docker-compose --profile production down --volumes --remove-orphans --timeout 10 || true
+        docker-compose -f docker/docker-compose.prod.yml --profile production down --volumes --remove-orphans --timeout 10 || true
         docker system prune -af --volumes || true
     else
         log "🔄 Graceful service restart..."
-        docker-compose --profile production down --timeout 10 || true
+        docker-compose -f docker/docker-compose.prod.yml --profile production down --timeout 10 || true
     fi
     
     # Pull latest image (only if needed)
@@ -198,14 +198,14 @@ execute_deployment() {
     
     # Start services
     log "▶️ Starting production services..."
-    docker-compose --profile production up -d --force-recreate --remove-orphans
+    docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate --remove-orphans
     
     # Optimized health check
     health_check 12 5
     
     # Display final status
     log "📊 Final deployment status:"
-    docker-compose --profile production ps
+    docker-compose -f docker/docker-compose.prod.yml --profile production ps
     
     log "✅ Deployment completed successfully!"
 }
@@ -244,7 +244,7 @@ main() {
                     
                 "status"|"check")
                     log "🏥 System health check..."
-                    docker-compose --profile production ps
+                    docker-compose -f docker/docker-compose.prod.yml --profile production ps
                     if health_check 3 2; then
                         log "✅ All systems operational"
                     else
@@ -255,7 +255,7 @@ main() {
                 "logs")
                     local service=${2:-app}
                     log "📜 Displaying logs for service: $service"
-                    docker-compose --profile production logs $service --tail=50 -f
+                    docker-compose -f docker/docker-compose.prod.yml --profile production logs $service --tail=50 -f
                     ;;
                     
                 "backup")
@@ -272,7 +272,7 @@ main() {
                     
                 "restart")
                     log "🔄 Restarting services..."
-                    docker-compose --profile production restart
+                    docker-compose -f docker/docker-compose.prod.yml --profile production restart
                     health_check 6 5
                     ;;
                     

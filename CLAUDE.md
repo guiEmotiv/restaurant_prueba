@@ -10,8 +10,9 @@ This is a restaurant management system with a Django REST API backend and React/
 - `backend/` - Django REST API with apps: `config`, `inventory`, `operation`
 - `frontend/` - React SPA with Vite, TailwindCSS, AWS Amplify integration
 - `data/` - SQLite databases (dev/prod) and backups
-- `nginx/` - Production reverse proxy configuration
-- `prod/` - Production deployment scripts
+- `docker/` - Docker configurations (Compose files, Nginx)
+- `scripts/` - Development and production deployment scripts
+- `deploy/` - Deployment keys and configurations
 
 **Key Models:**
 - `inventory`: Group, Ingredient, Recipe (menu management)
@@ -50,11 +51,11 @@ python manage.py migrate
 
 **Docker Development:**
 ```bash
-# Backend only (frontend runs natively)
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d app
+# Backend only (frontend runs natively) 
+docker-compose -f docker/docker-compose.prod.yml -f docker/docker-compose.local.yml up -d app
 
 # Full production stack  
-docker-compose --profile production up -d
+docker-compose -f docker/docker-compose.prod.yml --profile production up -d
 ```
 
 ## Deployment
