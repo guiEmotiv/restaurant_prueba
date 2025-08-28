@@ -205,7 +205,7 @@ jobs:
         echo "COGNITO_USER_POOL_ID=will-be-set-by-secrets" >> .env.ec2
         echo "COGNITO_APP_CLIENT_ID=will-be-set-by-secrets" >> .env.ec2
         echo "AWS_REGION=us-west-2" >> .env.ec2
-        echo "ALLOWED_HOSTS=xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com,44.248.47.186" >> .env.ec2
+        echo "ALLOWED_HOSTS=localhost,127.0.0.1,xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com,44.248.47.186" >> .env.ec2
         echo "DATABASE_PATH=/opt/restaurant-web/data" >> .env.ec2
         echo "DATABASE_NAME=restaurant.prod.sqlite3" >> .env.ec2
         
