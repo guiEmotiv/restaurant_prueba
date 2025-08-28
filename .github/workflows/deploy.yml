@@ -395,7 +395,7 @@ jobs:
           docker network ls
           docker network inspect restaurant-network || echo "Network not found"
           echo "🚦 Service status check complete"
-VERIFY_EOF
+          VERIFY_EOF
         else
           echo "❌ Deployment failed with SSH error"
           exit 1
