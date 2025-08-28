@@ -281,8 +281,11 @@ jobs:
         echo "📥 Pulling latest Docker image..."
         docker pull \$ECR_REGISTRY/\$ECR_REPOSITORY:latest
         
-        echo "🛑 Stopping existing containers..."
+        echo "🛑 Stopping and removing existing containers..."
         docker-compose -f docker/docker-compose.prod.yml --profile production down --timeout 10 || true
+        
+        # Force remove any lingering containers
+        docker rm -f restaurant-web-app restaurant-web-nginx 2>/dev/null || true
         
         echo "▶️ Starting production services..."
         docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate --remove-orphans
