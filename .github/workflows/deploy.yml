@@ -164,6 +164,11 @@ jobs:
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
+        # Set ECR variables from GitHub Actions context
+        export ECR_REGISTRY="$ECR_REGISTRY"
+        export ECR_REPOSITORY="$ECR_REPOSITORY" 
+        export ACTION="$ACTION"
+        
         echo "🚀 Executing direct deployment without external scripts..."
         echo "🔍 Debug: ECR_REGISTRY=\$ECR_REGISTRY"
         echo "🔍 Debug: ECR_REPOSITORY=\$ECR_REPOSITORY"
@@ -189,14 +194,6 @@ jobs:
           https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker/nginx/conf.d/default.conf \
           -o docker/nginx/conf.d/default.conf
           
-        # Set environment variables for deployment
-        export ECR_REGISTRY="$ECR_REGISTRY"
-        export ECR_REPOSITORY="$ECR_REPOSITORY"
-        
-        echo "🔍 Debug Variables:"
-        echo "  ECR_REGISTRY=$ECR_REGISTRY"
-        echo "  ECR_REPOSITORY=$ECR_REPOSITORY"
-        
         # Execute deployment directly
         echo "🔐 Logging into ECR..."
         aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin \$ECR_REGISTRY
