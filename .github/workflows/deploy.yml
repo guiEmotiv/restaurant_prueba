@@ -197,10 +197,8 @@ jobs:
         # Create necessary directory structure
         mkdir -p docker data logs
         
-        # Create docker-compose.prod.yml dynamically (secure approach)
-        cat > docker/docker-compose.prod.yml << 'COMPOSE_EOF'
-# Production docker-compose
-
+        # Create docker-compose.prod.yml dynamically
+        cat > docker/docker-compose.prod.yml << EOF
 services:
   app:
     image: \${ECR_REGISTRY}/restaurant-web:latest
@@ -224,7 +222,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-
   nginx:
     image: nginx:alpine
     container_name: restaurant-web-nginx
@@ -241,17 +238,15 @@ services:
     restart: unless-stopped
     profiles:
       - production
-
 volumes:
   restaurant_data:
     driver: local
   restaurant_logs:
     driver: local
-
 networks:
   default:
     name: restaurant-network
-COMPOSE_EOF
+EOF
           
         # Download nginx config
         mkdir -p docker/nginx/conf.d
