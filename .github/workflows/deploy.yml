@@ -243,7 +243,7 @@ jobs:
         echo "      - '80:80'" >> docker/docker-compose.prod.yml
         echo "      - '443:443'" >> docker/docker-compose.prod.yml
         echo "    volumes:" >> docker/docker-compose.prod.yml
-        echo "      - ./nginx/conf.d:/etc/nginx/conf.d:ro" >> docker/docker-compose.prod.yml
+        echo "      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro" >> docker/docker-compose.prod.yml
         echo "      - ./nginx/ssl:/etc/nginx/ssl:ro" >> docker/docker-compose.prod.yml
         echo "      - ./data/certbot/www:/var/www/certbot:ro" >> docker/docker-compose.prod.yml
         echo "      - ./data/certbot/conf:/etc/letsencrypt:ro" >> docker/docker-compose.prod.yml
@@ -267,15 +267,23 @@ jobs:
         echo "🔍 Debug: Contents of .env.ec2:"
         cat .env.ec2
           
-        # Create ultra-simple nginx config (LINE BY LINE APPROACH)
+        # Create complete nginx config with proper server_name
         mkdir -p docker/nginx/conf.d
         echo "server {" > docker/nginx/conf.d/default.conf
         echo "    listen 80;" >> docker/nginx/conf.d/default.conf
+        echo "    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;" >> docker/nginx/conf.d/default.conf
         echo "    location / {" >> docker/nginx/conf.d/default.conf
         echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
+        echo "        proxy_set_header X-Real-IP \\\$remote_addr;" >> docker/nginx/conf.d/default.conf
+        echo "        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;" >> docker/nginx/conf.d/default.conf
+        echo "        proxy_set_header X-Forwarded-Proto \\\$scheme;" >> docker/nginx/conf.d/default.conf
         echo "    }" >> docker/nginx/conf.d/default.conf
         echo "}" >> docker/nginx/conf.d/default.conf
+        
+        # Debug: Show nginx configuration
+        echo "🔍 Debug: Contents of nginx config:"
+        cat docker/nginx/conf.d/default.conf
           
         # Execute deployment directly
         echo "🔐 Logging into ECR..."
