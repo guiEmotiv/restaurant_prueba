@@ -112,21 +112,14 @@ jobs:
 
     - name: 🚢 Login to Amazon ECR
       if: |
-        (github.event.inputs.action == 'deploy' || github.event.inputs.action == '' || 
-         needs.analyze-changes.outputs.needs-build == 'true') &&
-        !contains(github.event.inputs.action, 'ssl-') &&
-        github.event.inputs.action != 'status' &&
-        github.event.inputs.action != 'logs'
+        needs.analyze-changes.outputs.needs-build == 'true' || 
+        github.event.inputs.action == 'deploy' || 
+        github.event.inputs.action == ''
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
     - name: 🏗️ Intelligent Build and Push
-      if: |
-        (github.event.inputs.action == 'deploy' || github.event.inputs.action == '' || 
-         needs.analyze-changes.outputs.needs-build == 'true') &&
-        github.event.inputs.action != 'status' &&
-        github.event.inputs.action != 'logs' &&
-        !contains(github.event.inputs.action, 'ssl-')
+      if: steps.login-ecr.conclusion == 'success'
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         VITE_AWS_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
@@ -163,12 +156,12 @@ jobs:
         echo "✅ Docker image pushed successfully"
 
     - name: 🚀 Professional EC2 Deployment
-      if: success()
+      if: steps.login-ecr.conclusion == 'success'
       env:
         ACTION: ${{ github.event.inputs.action || 'deploy' }}
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry || env.ECR_REGISTRY }}
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
       run: |
         echo "🔐 Setting up secure SSH connection..."
@@ -186,6 +179,13 @@ jobs:
         echo "🚀 Executing direct deployment without external scripts..."
         echo "🔍 Debug: ECR_REGISTRY=\$ECR_REGISTRY"
         echo "🔍 Debug: ECR_REPOSITORY=\$ECR_REPOSITORY"
+        echo "🔍 Debug: ACTION=\$ACTION"
+        
+        # Validate required variables
+        if [ -z "\$ECR_REGISTRY" ]; then
+          echo "❌ ERROR: ECR_REGISTRY is empty"
+          exit 1
+        fi
         
         # Create necessary directory structure
         mkdir -p docker data logs
@@ -204,6 +204,10 @@ jobs:
         # Set environment variables for deployment
         export ECR_REGISTRY="$ECR_REGISTRY"
         export ECR_REPOSITORY="$ECR_REPOSITORY"
+        
+        echo "🔍 Debug Variables:"
+        echo "  ECR_REGISTRY=$ECR_REGISTRY"
+        echo "  ECR_REPOSITORY=$ECR_REPOSITORY"
         
         # Execute deployment directly
         echo "🔐 Logging into ECR..."

@@ -155,7 +155,7 @@ AWS_REGION=us-west-2
 ALLOWED_HOSTS=xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com,44.248.47.186
 DATABASE_PATH=/opt/restaurant-web/data
 DATABASE_NAME=restaurant_prod.sqlite3
-DJANGO_SETTINGS_MODULE=backend.settings_ec2
+DJANGO_SETTINGS_MODULE=backend.backend.settings.prod
 EOF
         log "✅ Environment file created"
     else
