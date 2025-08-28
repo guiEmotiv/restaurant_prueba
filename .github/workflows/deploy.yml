@@ -163,10 +163,13 @@ jobs:
         echo "✅ Docker image pushed successfully"
 
     - name: 🚀 Professional EC2 Deployment
+      if: success()
       env:
         ACTION: ${{ github.event.inputs.action || 'deploy' }}
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry || env.ECR_REGISTRY }}
+        ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
       run: |
         echo "🔐 Setting up secure SSH connection..."
         mkdir -p ~/.ssh
@@ -181,6 +184,8 @@ jobs:
         cd /opt/restaurant-web
         
         echo "🚀 Executing direct deployment without external scripts..."
+        echo "🔍 Debug: ECR_REGISTRY=\$ECR_REGISTRY"
+        echo "🔍 Debug: ECR_REPOSITORY=\$ECR_REPOSITORY"
         
         # Create necessary directory structure
         mkdir -p docker data logs
@@ -197,8 +202,8 @@ jobs:
           -o docker/nginx/conf.d/default.conf
           
         # Set environment variables for deployment
-        export ECR_REGISTRY=${{ env.ECR_REGISTRY }}
-        export ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}
+        export ECR_REGISTRY="$ECR_REGISTRY"
+        export ECR_REPOSITORY="$ECR_REPOSITORY"
         
         # Execute deployment directly
         echo "🔐 Logging into ECR..."
