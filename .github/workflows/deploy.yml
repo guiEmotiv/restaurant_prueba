@@ -271,8 +271,8 @@ jobs:
         # Create complete nginx config with proper server_name
         mkdir -p docker/nginx/conf.d
         echo "server {" > docker/nginx/conf.d/default.conf
-        echo "    listen 80;" >> docker/nginx/conf.d/default.conf
-        echo "    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;" >> docker/nginx/conf.d/default.conf
+        echo "    listen 80 default_server;" >> docker/nginx/conf.d/default.conf
+        echo "    server_name _;" >> docker/nginx/conf.d/default.conf
         echo "    location / {" >> docker/nginx/conf.d/default.conf
         echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
@@ -282,21 +282,7 @@ jobs:
         echo "        proxy_connect_timeout 60s;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_send_timeout 60s;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_read_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "    }" >> docker/nginx/conf.d/default.conf
-        echo "}" >> docker/nginx/conf.d/default.conf
-        echo "" >> docker/nginx/conf.d/default.conf
-        echo "# Catch-all server block" >> docker/nginx/conf.d/default.conf
-        echo "server {" >> docker/nginx/conf.d/default.conf
-        echo "    listen 80 default_server;" >> docker/nginx/conf.d/default.conf
-        echo "    server_name _;" >> docker/nginx/conf.d/default.conf
-        echo "    location / {" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Real-IP \\\$remote_addr;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_connect_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_send_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_read_timeout 60s;" >> docker/nginx/conf.d/default.conf
+        echo "        proxy_buffering off;" >> docker/nginx/conf.d/default.conf
         echo "    }" >> docker/nginx/conf.d/default.conf
         echo "}" >> docker/nginx/conf.d/default.conf
         
