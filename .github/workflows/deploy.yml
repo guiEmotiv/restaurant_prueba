@@ -208,7 +208,6 @@ jobs:
         echo "ALLOWED_HOSTS=xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com,44.248.47.186" >> .env.ec2
         echo "DATABASE_PATH=/opt/restaurant-web/data" >> .env.ec2
         echo "DATABASE_NAME=restaurant.prod.sqlite3" >> .env.ec2
-        echo "DJANGO_SETTINGS_MODULE=backend.backend.settings.prod" >> .env.ec2
         
         # Remove any existing docker-compose.prod.yml and recreate
         rm -f docker/docker-compose.prod.yml
