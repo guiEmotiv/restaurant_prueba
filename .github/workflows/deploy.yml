@@ -267,11 +267,51 @@ jobs:
         echo "🔍 Debug: Contents of .env.ec2:"
         cat .env.ec2
           
-        # Download nginx config
+        # Create nginx config inline (no external dependency)
         mkdir -p docker/nginx/conf.d
-        curl -sSL --max-time 30 \
-          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker/nginx/conf.d/default.conf \
-          -o docker/nginx/conf.d/default.conf
+        cat > docker/nginx/conf.d/default.conf << 'NGINX_EOF'
+# Restaurant Web Production Config
+server {
+    listen 80;
+    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com _;
+
+    # Let's Encrypt challenge
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # API and backend routes
+    location /api/ { 
+        proxy_pass http://app:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+    
+    location /admin/ { 
+        proxy_pass http://app:8000;
+        proxy_set_header Host \$host;
+    }
+    
+    location /static/ { proxy_pass http://app:8000; }
+    location /media/ { proxy_pass http://app:8000; }
+    
+    # Import endpoints
+    location ~ ^/import-(units|zones|tables|containers|groups|ingredients|recipes)/\$ {
+        proxy_pass http://app:8000;
+        proxy_set_header Host \$host;
+        client_max_body_size 10M;
+    }
+
+    # Frontend - proxy to Django for everything else
+    location / {
+        proxy_pass http://app:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+}
+NGINX_EOF
           
         # Execute deployment directly
         echo "🔐 Logging into ECR..."
@@ -293,18 +333,40 @@ jobs:
         sleep 15
         
         for i in {1..6}; do
+          echo "🔍 Health check attempt $i/6..."
+          docker-compose -f docker/docker-compose.prod.yml --profile production ps
+          
           # Check if containers are running and healthy
           if docker-compose -f docker/docker-compose.prod.yml --profile production ps | grep -q "Up.*healthy"; then
-            # Verify with nginx proxy (port 80, not 8000)
-            if curl -sf http://localhost/api/v1/health/ --connect-timeout 5 --max-time 10; then
-              echo "✅ Deployment successful!"
-              docker-compose -f docker/docker-compose.prod.yml --profile production ps
-              exit 0
+            echo "✅ Django container is healthy"
+            
+            # Check if nginx is running
+            if docker-compose -f docker/docker-compose.prod.yml --profile production ps nginx | grep -q "Up"; then
+              echo "✅ Nginx container is running"
+              
+              # Test direct Django health first
+              if curl -sf http://localhost:8000/api/v1/health/ --connect-timeout 5 --max-time 10; then
+                echo "✅ Django health check works directly"
+                
+                # Test via nginx proxy
+                if curl -sf http://localhost/api/v1/health/ --connect-timeout 5 --max-time 10; then
+                  echo "✅ Deployment successful!"
+                  docker-compose -f docker/docker-compose.prod.yml --profile production ps
+                  exit 0
+                else
+                  echo "❌ Nginx proxy not working - checking nginx logs"
+                  docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
+                fi
+              else
+                echo "❌ Django not responding on port 8000"
+                docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=10
+              fi
             else
-              echo "⚠️ Container healthy but API not responding via nginx on port 80"
+              echo "❌ Nginx container not running"
+              docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
             fi
           else
-            echo "⚠️ Container not healthy yet"
+            echo "⚠️ Django container not healthy yet"
           fi
           echo "Health check $i/6 failed, waiting..."
           sleep 10
