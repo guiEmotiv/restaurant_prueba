@@ -267,9 +267,9 @@ jobs:
         echo "🔍 Debug: Contents of .env.ec2:"
         cat .env.ec2
           
-        # Create nginx config inline (YAML-safe approach)
+        # Create nginx config with printf for exact control
         mkdir -p docker/nginx/conf.d
-        echo 'server { listen 80; server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com _; location /.well-known/acme-challenge/ { root /var/www/certbot; } location /api/ { proxy_pass http://app:8000; proxy_set_header Host \\$host; proxy_set_header X-Real-IP \\$remote_addr; proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for; } location /admin/ { proxy_pass http://app:8000; proxy_set_header Host \\$host; } location /static/ { proxy_pass http://app:8000; } location /media/ { proxy_pass http://app:8000; } location ~ ^/import-(units|zones|tables|containers|groups|ingredients|recipes)/\\$$ { proxy_pass http://app:8000; proxy_set_header Host \\$host; client_max_body_size 10M; } location / { proxy_pass http://app:8000; proxy_set_header Host \\$host; proxy_set_header X-Real-IP \\$remote_addr; proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for; } }' > docker/nginx/conf.d/default.conf
+        printf 'server {\\n  listen 80;\\n  server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com _;\\n  location /.well-known/acme-challenge/ { root /var/www/certbot; }\\n  location /api/ {\\n    proxy_pass http://app:8000;\\n    proxy_set_header Host \\$host;\\n    proxy_set_header X-Real-IP \\$remote_addr;\\n    proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;\\n  }\\n  location /admin/ { proxy_pass http://app:8000; proxy_set_header Host \\$host; }\\n  location /static/ { proxy_pass http://app:8000; }\\n  location /media/ { proxy_pass http://app:8000; }\\n  location / {\\n    proxy_pass http://app:8000;\\n    proxy_set_header Host \\$host;\\n    proxy_set_header X-Real-IP \\$remote_addr;\\n    proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;\\n  }\\n}\\n' > docker/nginx/conf.d/default.conf
           
         # Execute deployment directly
         echo "🔐 Logging into ECR..."
