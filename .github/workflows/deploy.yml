@@ -388,7 +388,7 @@ jobs:
           fi
         done
         
-        if [ "$HEALTH_CHECK_SUCCESS" != "true" ]; then
+        if [ "\\$HEALTH_CHECK_SUCCESS" != "true" ]; then
           echo "❌ Health check failed after 6 attempts"
           docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=20
           docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
