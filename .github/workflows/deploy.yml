@@ -269,49 +269,36 @@ jobs:
           
         # Create nginx config inline (no external dependency)
         mkdir -p docker/nginx/conf.d
-        cat > docker/nginx/conf.d/default.conf << 'NGINX_EOF'
-# Restaurant Web Production Config
-server {
-    listen 80;
-    server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com _;
-
-    # Let's Encrypt challenge
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    # API and backend routes
-    location /api/ { 
-        proxy_pass http://app:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    }
-    
-    location /admin/ { 
-        proxy_pass http://app:8000;
-        proxy_set_header Host \$host;
-    }
-    
-    location /static/ { proxy_pass http://app:8000; }
-    location /media/ { proxy_pass http://app:8000; }
-    
-    # Import endpoints
-    location ~ ^/import-(units|zones|tables|containers|groups|ingredients|recipes)/\$ {
-        proxy_pass http://app:8000;
-        proxy_set_header Host \$host;
-        client_max_body_size 10M;
-    }
-
-    # Frontend - proxy to Django for everything else
-    location / {
-        proxy_pass http://app:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    }
-}
-NGINX_EOF
+        cat > docker/nginx/conf.d/default.conf << 'EOF'
+        server {
+            listen 80;
+            server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com _;
+            location /.well-known/acme-challenge/ { root /var/www/certbot; }
+            location /api/ { 
+                proxy_pass http://app:8000;
+                proxy_set_header Host \\$host;
+                proxy_set_header X-Real-IP \\$remote_addr;
+                proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+            }
+            location /admin/ { 
+                proxy_pass http://app:8000;
+                proxy_set_header Host \\$host;
+            }
+            location /static/ { proxy_pass http://app:8000; }
+            location /media/ { proxy_pass http://app:8000; }
+            location ~ ^/import-(units|zones|tables|containers|groups|ingredients|recipes)/\\$ {
+                proxy_pass http://app:8000;
+                proxy_set_header Host \\$host;
+                client_max_body_size 10M;
+            }
+            location / {
+                proxy_pass http://app:8000;
+                proxy_set_header Host \\$host;
+                proxy_set_header X-Real-IP \\$remote_addr;
+                proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+            }
+        }
+        EOF
           
         # Execute deployment directly
         echo "🔐 Logging into ECR..."
