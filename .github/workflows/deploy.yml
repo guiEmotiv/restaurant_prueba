@@ -316,7 +316,7 @@ jobs:
         
         HEALTH_CHECK_SUCCESS=false
         for i in {1..6}; do
-          echo "🔍 Health check attempt $i/6..."
+          echo "🔍 Health check attempt \\$i/6..."
           docker-compose -f docker/docker-compose.prod.yml --profile production ps
           
           # Check if containers are running and healthy
@@ -332,6 +332,8 @@ jobs:
                 echo "✅ Django health check works directly"
                 
                 # Test via nginx proxy
+                echo "🧪 Testing nginx proxy configuration..."
+                curl -v http://localhost/api/v1/health/ --connect-timeout 5 --max-time 10 || echo "❌ Detailed curl output above"
                 if curl -sf http://localhost/api/v1/health/ --connect-timeout 5 --max-time 10; then
                   echo "✅ Deployment successful!"
                   docker-compose -f docker/docker-compose.prod.yml --profile production ps
@@ -355,8 +357,8 @@ jobs:
           fi
           
           # Only wait if not the last attempt
-          if [ $i -lt 6 ]; then
-            echo "Health check $i/6 failed, waiting 10s..."
+          if [ \\$i -lt 6 ]; then
+            echo "Health check \\$i/6 failed, waiting 10s..."
             sleep 10
           fi
         done
