@@ -293,10 +293,18 @@ jobs:
         sleep 15
         
         for i in {1..6}; do
-          if curl -sf http://localhost:8000/api/v1/health/; then
-            echo "✅ Deployment successful!"
-            docker-compose -f docker/docker-compose.prod.yml --profile production ps
-            exit 0
+          # Check if containers are running and healthy
+          if docker-compose -f docker/docker-compose.prod.yml --profile production ps | grep -q "Up.*healthy"; then
+            # Verify with nginx proxy (port 80, not 8000)
+            if curl -sf http://localhost/api/v1/health/ --connect-timeout 5 --max-time 10; then
+              echo "✅ Deployment successful!"
+              docker-compose -f docker/docker-compose.prod.yml --profile production ps
+              exit 0
+            else
+              echo "⚠️ Container healthy but API not responding via nginx on port 80"
+            fi
+          else
+            echo "⚠️ Container not healthy yet"
           fi
           echo "Health check $i/6 failed, waiting..."
           sleep 10
