@@ -267,9 +267,15 @@ jobs:
         echo "🔍 Debug: Contents of .env.ec2:"
         cat .env.ec2
           
-        # Create nginx config with printf for exact control
+        # Create ultra-simple nginx config (LINE BY LINE APPROACH)
         mkdir -p docker/nginx/conf.d
-        printf 'server {\\n  listen 80;\\n  server_name xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com _;\\n  location /.well-known/acme-challenge/ { root /var/www/certbot; }\\n  location /api/ {\\n    proxy_pass http://app:8000;\\n    proxy_set_header Host \\$host;\\n    proxy_set_header X-Real-IP \\$remote_addr;\\n    proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;\\n  }\\n  location /admin/ { proxy_pass http://app:8000; proxy_set_header Host \\$host; }\\n  location /static/ { proxy_pass http://app:8000; }\\n  location /media/ { proxy_pass http://app:8000; }\\n  location / {\\n    proxy_pass http://app:8000;\\n    proxy_set_header Host \\$host;\\n    proxy_set_header X-Real-IP \\$remote_addr;\\n    proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;\\n  }\\n}\\n' > docker/nginx/conf.d/default.conf
+        echo "server {" > docker/nginx/conf.d/default.conf
+        echo "    listen 80;" >> docker/nginx/conf.d/default.conf
+        echo "    location / {" >> docker/nginx/conf.d/default.conf
+        echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
+        echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
+        echo "    }" >> docker/nginx/conf.d/default.conf
+        echo "}" >> docker/nginx/conf.d/default.conf
           
         # Execute deployment directly
         echo "🔐 Logging into ECR..."
