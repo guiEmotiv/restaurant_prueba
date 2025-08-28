@@ -259,8 +259,8 @@ jobs:
         echo "  restaurant_logs:" >> docker/docker-compose.prod.yml
         echo "    driver: local" >> docker/docker-compose.prod.yml
         echo "networks:" >> docker/docker-compose.prod.yml
-        echo "  default:" >> docker/docker-compose.prod.yml
-        echo "    name: restaurant-network" >> docker/docker-compose.prod.yml
+        echo "  restaurant-network:" >> docker/docker-compose.prod.yml
+        echo "    driver: bridge" >> docker/docker-compose.prod.yml
         
         # Debug: Show what we created
         echo "🔍 Debug: Contents of docker-compose.prod.yml:"
