@@ -21,6 +21,7 @@ on:
 
 env:
   AWS_REGION: us-west-2
+  ECR_REGISTRY: 721063839441.dkr.ecr.us-west-2.amazonaws.com
   ECR_REPOSITORY: restaurant-web
 
 jobs:
@@ -174,7 +175,7 @@ jobs:
         ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
         
         echo "📡 Executing professional deployment on EC2..."
-        ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 $EC2_USER@$EC2_HOST << 'DEPLOY_EOF'
+        ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 $EC2_USER@$EC2_HOST << DEPLOY_EOF
         set -e
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
@@ -195,12 +196,16 @@ jobs:
           https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker/nginx/conf.d/default.conf \
           -o docker/nginx/conf.d/default.conf
           
+        # Set environment variables for deployment
+        export ECR_REGISTRY=${{ env.ECR_REGISTRY }}
+        export ECR_REPOSITORY=${{ env.ECR_REPOSITORY }}
+        
         # Execute deployment directly
         echo "🔐 Logging into ECR..."
-        aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 721063839441.dkr.ecr.us-west-2.amazonaws.com
+        aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin \$ECR_REGISTRY
         
         echo "📥 Pulling latest Docker image..."
-        docker pull 721063839441.dkr.ecr.us-west-2.amazonaws.com/restaurant-web:latest
+        docker pull \$ECR_REGISTRY/\$ECR_REPOSITORY:latest
         
         echo "🛑 Stopping existing containers..."
         docker-compose -f docker/docker-compose.prod.yml --profile production down --timeout 10 || true
