@@ -179,32 +179,51 @@ jobs:
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
-        echo "📥 Downloading latest professional scripts..."
-        # Create directory structure
-        mkdir -p scripts/production
+        echo "🚀 Executing direct deployment without external scripts..."
         
-        # Download professional deployment system
+        # Create necessary directory structure
+        mkdir -p docker data logs
+        
+        # Download docker-compose.prod.yml directly
         curl -sSL --max-time 30 \
-          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/production/production-deploy.sh \
-          -o scripts/production/production-deploy.sh
-        chmod +x scripts/production/production-deploy.sh
-        
-        # Download SSL management system
+          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker/docker-compose.prod.yml \
+          -o docker/docker-compose.prod.yml
+          
+        # Download nginx config
+        mkdir -p docker/nginx/conf.d
         curl -sSL --max-time 30 \
-          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/production/ssl-manager.sh \
-          -o scripts/production/ssl-manager.sh
-        chmod +x scripts/production/ssl-manager.sh
+          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/docker/nginx/conf.d/default.conf \
+          -o docker/nginx/conf.d/default.conf
+          
+        # Execute deployment directly
+        echo "🔐 Logging into ECR..."
+        aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 721063839441.dkr.ecr.us-west-2.amazonaws.com
         
-        # Execute appropriate action
-        case "${{ env.ACTION }}" in
-          "ssl-install"|"ssl-renew"|"ssl-test")
-            SSL_ACTION=${1#ssl-}
-            ./scripts/production/ssl-manager.sh $SSL_ACTION
-            ;;
-          *)
-            ./scripts/production/production-deploy.sh ${{ env.ACTION }}
-            ;;
-        esac
+        echo "📥 Pulling latest Docker image..."
+        docker pull 721063839441.dkr.ecr.us-west-2.amazonaws.com/restaurant-web:latest
+        
+        echo "🛑 Stopping existing containers..."
+        docker-compose -f docker/docker-compose.prod.yml --profile production down --timeout 10 || true
+        
+        echo "▶️ Starting production services..."
+        docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate --remove-orphans
+        
+        echo "⏳ Health check..."
+        sleep 15
+        
+        for i in {1..6}; do
+          if curl -sf http://localhost:8000/api/v1/health/; then
+            echo "✅ Deployment successful!"
+            docker-compose -f docker/docker-compose.prod.yml --profile production ps
+            exit 0
+          fi
+          echo "Health check $i/6 failed, waiting..."
+          sleep 10
+        done
+        
+        echo "❌ Health check failed"
+        docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=20
+        exit 1
         DEPLOY_EOF
         
         echo "✅ Professional deployment completed successfully"
