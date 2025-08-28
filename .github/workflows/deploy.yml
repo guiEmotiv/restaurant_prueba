@@ -227,7 +227,7 @@ jobs:
         echo "      - DATABASE_PATH=/opt/restaurant-web/data" >> docker/docker-compose.prod.yml
         echo "      - DATABASE_NAME=restaurant.prod.sqlite3" >> docker/docker-compose.prod.yml
         echo "    env_file:" >> docker/docker-compose.prod.yml
-        echo "      - .env.ec2" >> docker/docker-compose.prod.yml
+        echo "      - /opt/restaurant-web/.env.ec2" >> docker/docker-compose.prod.yml
         echo "    restart: unless-stopped" >> docker/docker-compose.prod.yml
         echo "    profiles:" >> docker/docker-compose.prod.yml
         echo "      - production" >> docker/docker-compose.prod.yml
