@@ -197,6 +197,19 @@ jobs:
         # Create necessary directory structure
         mkdir -p docker data logs
         
+        # Create production environment file
+        echo "# Restaurant Web Production Configuration" > .env.ec2
+        echo "SECRET_KEY=prod-secret-key-change-in-production" >> .env.ec2
+        echo "DEBUG=False" >> .env.ec2
+        echo "USE_COGNITO_AUTH=True" >> .env.ec2
+        echo "COGNITO_USER_POOL_ID=will-be-set-by-secrets" >> .env.ec2
+        echo "COGNITO_APP_CLIENT_ID=will-be-set-by-secrets" >> .env.ec2
+        echo "AWS_REGION=us-west-2" >> .env.ec2
+        echo "ALLOWED_HOSTS=xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com,44.248.47.186" >> .env.ec2
+        echo "DATABASE_PATH=/opt/restaurant-web/data" >> .env.ec2
+        echo "DATABASE_NAME=restaurant.prod.sqlite3" >> .env.ec2
+        echo "DJANGO_SETTINGS_MODULE=backend.backend.settings.prod" >> .env.ec2
+        
         # Create docker-compose.prod.yml dynamically
         echo "services:" > docker/docker-compose.prod.yml
         echo "  app:" >> docker/docker-compose.prod.yml
