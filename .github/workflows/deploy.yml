@@ -244,9 +244,6 @@ jobs:
         echo "      - '443:443'" >> docker/docker-compose.prod.yml
         echo "    volumes:" >> docker/docker-compose.prod.yml
         echo "      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro" >> docker/docker-compose.prod.yml
-        echo "      - ./nginx/ssl:/etc/nginx/ssl:ro" >> docker/docker-compose.prod.yml
-        echo "      - ./data/certbot/www:/var/www/certbot:ro" >> docker/docker-compose.prod.yml
-        echo "      - ./data/certbot/conf:/etc/letsencrypt:ro" >> docker/docker-compose.prod.yml
         echo "    depends_on:" >> docker/docker-compose.prod.yml
         echo "      - app" >> docker/docker-compose.prod.yml
         echo "    restart: unless-stopped" >> docker/docker-compose.prod.yml
@@ -317,6 +314,7 @@ jobs:
         echo "⏳ Health check..."
         sleep 15
         
+        HEALTH_CHECK_SUCCESS=false
         for i in {1..6}; do
           echo "🔍 Health check attempt $i/6..."
           docker-compose -f docker/docker-compose.prod.yml --profile production ps
@@ -338,6 +336,8 @@ jobs:
                   echo "✅ Deployment successful!"
                   docker-compose -f docker/docker-compose.prod.yml --profile production ps
                   echo "DEPLOYMENT_SUCCESS=true"
+                  HEALTH_CHECK_SUCCESS=true
+                  break
                 else
                   echo "❌ Nginx proxy not working - checking nginx logs"
                   docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
@@ -353,13 +353,20 @@ jobs:
           else
             echo "⚠️ Django container not healthy yet"
           fi
-          echo "Health check $i/6 failed, waiting..."
-          sleep 10
+          
+          # Only wait if not the last attempt
+          if [ $i -lt 6 ]; then
+            echo "Health check $i/6 failed, waiting 10s..."
+            sleep 10
+          fi
         done
         
-        echo "❌ Health check failed"
-        docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=20
-        echo "DEPLOYMENT_SUCCESS=false"
+        if [ "\\$HEALTH_CHECK_SUCCESS" != "true" ]; then
+          echo "❌ Health check failed after 6 attempts"
+          docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=20
+          docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
+          echo "DEPLOYMENT_SUCCESS=false"
+        fi
         DEPLOY_EOF
         
         # Check deployment result
@@ -374,12 +381,20 @@ jobs:
           echo "🔍 Final container status check:"
           ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 $EC2_USER@$EC2_HOST << 'VERIFY_EOF'
           cd /opt/restaurant-web
+          echo "🐳 Container Status:"
           docker-compose -f docker/docker-compose.prod.yml --profile production ps
-          echo "📊 Container logs if any issues:"
-          docker-compose -f docker/docker-compose.prod.yml --profile production logs --tail=20
-          echo "🔍 Testing nginx response:"
-          curl -I http://localhost/ || echo "❌ Nginx not responding"
-          curl -I http://localhost:8000/api/v1/health/ || echo "❌ Django not responding"
+          echo "📊 Recent container logs:"
+          docker-compose -f docker/docker-compose.prod.yml --profile production logs --tail=30
+          echo "🌐 Network connectivity tests:"
+          echo "Testing localhost connections:"
+          curl -I http://localhost/ || echo "❌ Nginx localhost not responding"
+          curl -I http://localhost:8000/api/v1/health/ || echo "❌ Django localhost not responding"
+          echo "🔍 System network status:"
+          netstat -tulpn | grep ":80\|:8000" || echo "No services on ports 80/8000"
+          echo "📋 Docker network info:"
+          docker network ls
+          docker network inspect restaurant-network || echo "Network not found"
+          echo "🚦 Service status check complete"
 VERIFY_EOF
         else
           echo "❌ Deployment failed with SSH error"
