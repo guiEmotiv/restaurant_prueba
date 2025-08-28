@@ -1,8 +1,24 @@
 # 🌟 Professional Restaurant Web Scripts
 
-This directory contains enterprise-grade scripts for both **local development** and **production deployment** of the Restaurant Web application.
+This directory contains enterprise-grade scripts organized by environment and purpose for the Restaurant Web application.
 
-## 🏠 **LOCAL DEVELOPMENT SCRIPTS**
+## 📁 **DIRECTORY STRUCTURE**
+
+```
+scripts/
+├── 📁 local/               # Local development scripts
+│   ├── local-dev.sh       # Professional environment manager
+│   ├── start-backend.sh   # Django backend starter
+│   └── start-frontend.sh  # React frontend starter
+│
+├── 📁 production/          # Production deployment scripts  
+│   ├── production-deploy.sh  # Professional deployment system
+│   └── ssl-manager.sh        # SSL certificate management
+│
+└── deploy.sh              # Legacy compatibility wrapper
+```
+
+## 🏠 **LOCAL DEVELOPMENT SCRIPTS** (`scripts/local/`)
 
 ### 🚀 `local-dev.sh`
 **Professional Local Development Environment Manager**
@@ -13,11 +29,11 @@ This directory contains enterprise-grade scripts for both **local development** 
 
 ```bash
 # Full environment control
-./scripts/local-dev.sh start    # Start both backend and frontend
-./scripts/local-dev.sh stop     # Stop all services  
-./scripts/local-dev.sh restart  # Restart all services
-./scripts/local-dev.sh status   # Check status of services
-./scripts/local-dev.sh logs     # View development logs
+./scripts/local/local-dev.sh start    # Start both backend and frontend
+./scripts/local/local-dev.sh stop     # Stop all services  
+./scripts/local/local-dev.sh restart  # Restart all services
+./scripts/local/local-dev.sh status   # Check status of services
+./scripts/local/local-dev.sh logs     # View development logs
 ```
 
 ### 🔧 `start-backend.sh`
@@ -27,7 +43,7 @@ This directory contains enterprise-grade scripts for both **local development** 
 - Starts Django development server on port 8000
 
 ```bash
-./scripts/start-backend.sh
+./scripts/local/start-backend.sh
 # Backend: http://localhost:8000
 # Admin: http://localhost:8000/admin/
 # API Docs: http://localhost:8000/api/v1/docs/
@@ -40,22 +56,11 @@ This directory contains enterprise-grade scripts for both **local development** 
 - Connects to backend automatically
 
 ```bash
-./scripts/start-frontend.sh
+./scripts/local/start-frontend.sh
 # Frontend: http://localhost:5173
 ```
 
-### ⚡ `../start-dev.sh` (Root Level)
-**Ultra-Simple One-Click Starter**
-- Opens both backend and frontend in separate terminals
-- Cross-platform support (macOS, Linux)
-- Perfect for quick development startup
-
-```bash
-./start-dev.sh
-# Opens 2 terminals automatically
-```
-
-## 📋 Production Deployment Scripts Overview
+## 🌐 **PRODUCTION DEPLOYMENT SCRIPTS** (`scripts/production/`)
 
 ### 🚀 `production-deploy.sh`
 **Professional Production Deployment System**
@@ -66,19 +71,19 @@ This directory contains enterprise-grade scripts for both **local development** 
 
 ```bash
 # Smart deployment with change detection
-./scripts/production-deploy.sh deploy
+./scripts/production/production-deploy.sh deploy
 
 # System status check
-./scripts/production-deploy.sh status
+./scripts/production/production-deploy.sh status
 
 # View service logs
-./scripts/production-deploy.sh logs [service]
+./scripts/production/production-deploy.sh logs [service]
 
 # Create database backup
-./scripts/production-deploy.sh backup
+./scripts/production/production-deploy.sh backup
 
 # Restart services
-./scripts/production-deploy.sh restart
+./scripts/production/production-deploy.sh restart
 ```
 
 ### 🔒 `ssl-manager.sh`
@@ -90,28 +95,60 @@ This directory contains enterprise-grade scripts for both **local development** 
 
 ```bash
 # Check SSL certificate status
-./scripts/ssl-manager.sh status
+./scripts/production/ssl-manager.sh status
 
 # Install new SSL certificate
-./scripts/ssl-manager.sh install
+./scripts/production/ssl-manager.sh install
 
 # Renew existing certificate
-./scripts/ssl-manager.sh renew
+./scripts/production/ssl-manager.sh renew
 
 # Test SSL configuration
-./scripts/ssl-manager.sh test
+./scripts/production/ssl-manager.sh test
 
 # Fix SSL issues
-./scripts/ssl-manager.sh fix
+./scripts/production/ssl-manager.sh fix
 ```
 
-### ⚙️ `deploy.sh` (Legacy)
-**Backward Compatibility Script**
-- Redirects to professional deployment system
-- Maintains compatibility with existing workflows
-- Automatic fallback for emergency situations
+## 🚀 **QUICK START GUIDE**
 
-## 🌟 Key Features
+### 🏃‍♂️ **Fastest Way to Start Development**
+```bash
+# Option 1: One-click startup from project root (Recommended)
+./start-dev.sh
+
+# Option 2: Professional environment manager
+./scripts/local/local-dev.sh start
+
+# Option 3: Manual startup (2 separate terminals)
+./scripts/local/start-backend.sh    # Terminal 1
+./scripts/local/start-frontend.sh   # Terminal 2
+```
+
+### 🔧 **Common Development Tasks**
+```bash
+# Check if services are running
+./scripts/local/local-dev.sh status
+
+# View development logs
+./scripts/local/local-dev.sh logs
+
+# Restart after code changes
+./scripts/local/local-dev.sh restart
+
+# Stop all services
+./scripts/local/local-dev.sh stop
+```
+
+### 📱 **Access Your Application**
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **Frontend** | http://localhost:5173 | Main application |
+| **Backend API** | http://localhost:8000/api/v1/ | REST API |
+| **Admin Panel** | http://localhost:8000/admin/ | Django admin |
+| **API Docs** | http://localhost:8000/api/v1/docs/ | Swagger documentation |
+
+## 🌟 **KEY FEATURES**
 
 ### ⚡ **Performance Optimizations**
 - **Intelligent Change Detection**: Only builds/deploys changed components
@@ -131,7 +168,7 @@ This directory contains enterprise-grade scripts for both **local development** 
 - **Environment Detection**: Automatic local vs EC2 handling
 - **Action Validation**: Input validation and error prevention
 
-## 🚀 GitHub Actions Integration
+## 🚀 **GitHub Actions Integration**
 
 The scripts integrate seamlessly with the professional GitHub Actions workflow:
 
@@ -151,7 +188,7 @@ The scripts integrate seamlessly with the professional GitHub Actions workflow:
 - `ssl-renew` - SSL certificate renewal
 - `ssl-test` - SSL configuration testing
 
-## 📈 Performance Improvements
+## 📈 **Performance Improvements**
 
 | Feature | Before | After | Improvement |
 |---------|--------|-------|-------------|
@@ -159,44 +196,6 @@ The scripts integrate seamlessly with the professional GitHub Actions workflow:
 | Deployment | Full rebuild | Smart rebuild | **70% faster** |
 | SSL Setup | Manual | Automated | **95% time saved** |
 | Error Recovery | Manual debugging | Auto-diagnostics | **90% faster** |
-
-## 🚀 **QUICK START GUIDE**
-
-### 🏃‍♂️ **Fastest Way to Start Development**
-```bash
-# Option 1: One-click startup (Recommended)
-./start-dev.sh
-
-# Option 2: Professional environment manager
-./scripts/local-dev.sh start
-
-# Option 3: Manual startup (2 separate terminals)
-./scripts/start-backend.sh    # Terminal 1
-./scripts/start-frontend.sh   # Terminal 2
-```
-
-### 🔧 **Common Development Tasks**
-```bash
-# Check if services are running
-./scripts/local-dev.sh status
-
-# View development logs
-./scripts/local-dev.sh logs
-
-# Restart after code changes
-./scripts/local-dev.sh restart
-
-# Stop all services
-./scripts/local-dev.sh stop
-```
-
-### 📱 **Access Your Application**
-| Service | URL | Purpose |
-|---------|-----|---------|
-| **Frontend** | http://localhost:5173 | Main application |
-| **Backend API** | http://localhost:8000/api/v1/ | REST API |
-| **Admin Panel** | http://localhost:8000/admin/ | Django admin |
-| **API Docs** | http://localhost:8000/api/v1/docs/ | Swagger documentation |
 
 ## 🔧 Production Usage Examples
 
@@ -227,7 +226,7 @@ gh workflow run deploy.yml -f action=status
 gh workflow run deploy.yml -f action=logs
 ```
 
-## 🏆 Professional Standards
+## 🏆 **Professional Standards**
 
 These scripts follow enterprise-grade standards:
 
@@ -238,27 +237,33 @@ These scripts follow enterprise-grade standards:
 - ✅ **Performance**: Optimized for speed and resource efficiency
 - ✅ **Maintainability**: Modular design with clear separation of concerns
 
-## 🆘 Troubleshooting
+## 🆘 **Troubleshooting**
 
 ### Common Issues
 
-1. **SSL Certificate Issues**
+1. **Port Already in Use**
    ```bash
-   ./scripts/ssl-manager.sh fix
+   ./scripts/local/local-dev.sh stop
+   # or manually: lsof -ti:8000 | xargs kill
    ```
 
 2. **Deployment Failures**
    ```bash
-   ./scripts/production-deploy.sh status
-   ./scripts/production-deploy.sh logs
+   ./scripts/production/production-deploy.sh status
+   ./scripts/production/production-deploy.sh logs
    ```
 
-3. **Service Recovery**
+3. **SSL Certificate Issues**
    ```bash
-   ./scripts/production-deploy.sh restart
+   ./scripts/production/ssl-manager.sh fix
+   ```
+
+4. **Service Recovery**
+   ```bash
+   ./scripts/production/production-deploy.sh restart
    ```
 
 ---
 
-**🌟 Professional Restaurant Web Deployment System**  
-*Engineered for reliability, optimized for performance*
+**🌟 Professional Restaurant Web Script System**  
+*Organized for clarity, engineered for reliability, optimized for performance*

@@ -12,42 +12,42 @@ if [ ! -d "backend" ] || [ ! -d "frontend" ]; then
 fi
 
 # Make scripts executable
-chmod +x scripts/start-backend.sh
-chmod +x scripts/start-frontend.sh
+chmod +x scripts/local/start-backend.sh
+chmod +x scripts/local/start-frontend.sh
 
 # Try different terminal emulators based on OS
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS
     echo "🔧 Starting Backend (Django)..."
-    osascript -e 'tell app "Terminal" to do script "cd \"'$(pwd)'\" && ./scripts/start-backend.sh"'
+    osascript -e 'tell app "Terminal" to do script "cd \"'$(pwd)'\" && ./scripts/local/start-backend.sh"'
     
     sleep 2
     
     echo "🎨 Starting Frontend (React)..."
-    osascript -e 'tell app "Terminal" to do script "cd \"'$(pwd)'\" && ./scripts/start-frontend.sh"'
+    osascript -e 'tell app "Terminal" to do script "cd \"'$(pwd)'\" && ./scripts/local/start-frontend.sh"'
     
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     # Linux
     if command -v gnome-terminal >/dev/null 2>&1; then
-        gnome-terminal -- bash -c "cd $(pwd) && ./scripts/start-backend.sh; exec bash"
-        gnome-terminal -- bash -c "cd $(pwd) && ./scripts/start-frontend.sh; exec bash"
+        gnome-terminal -- bash -c "cd $(pwd) && ./scripts/local/start-backend.sh; exec bash"
+        gnome-terminal -- bash -c "cd $(pwd) && ./scripts/local/start-frontend.sh; exec bash"
     elif command -v konsole >/dev/null 2>&1; then
-        konsole -e bash -c "cd $(pwd) && ./scripts/start-backend.sh; exec bash" &
-        konsole -e bash -c "cd $(pwd) && ./scripts/start-frontend.sh; exec bash" &
+        konsole -e bash -c "cd $(pwd) && ./scripts/local/start-backend.sh; exec bash" &
+        konsole -e bash -c "cd $(pwd) && ./scripts/local/start-frontend.sh; exec bash" &
     elif command -v xterm >/dev/null 2>&1; then
-        xterm -e bash -c "cd $(pwd) && ./scripts/start-backend.sh; exec bash" &
-        xterm -e bash -c "cd $(pwd) && ./scripts/start-frontend.sh; exec bash" &
+        xterm -e bash -c "cd $(pwd) && ./scripts/local/start-backend.sh; exec bash" &
+        xterm -e bash -c "cd $(pwd) && ./scripts/local/start-frontend.sh; exec bash" &
     else
         echo "⚠️  No suitable terminal found. Please run manually:"
-        echo "   Terminal 1: ./scripts/start-backend.sh"
-        echo "   Terminal 2: ./scripts/start-frontend.sh"
+        echo "   Terminal 1: ./scripts/local/start-backend.sh"
+        echo "   Terminal 2: ./scripts/local/start-frontend.sh"
         exit 1
     fi
 else
     # Windows/Other
     echo "⚠️  Auto-start not supported on this OS. Please run manually:"
-    echo "   Terminal 1: ./scripts/start-backend.sh"
-    echo "   Terminal 2: ./scripts/start-frontend.sh"
+    echo "   Terminal 1: ./scripts/local/start-backend.sh"
+    echo "   Terminal 2: ./scripts/local/start-frontend.sh"
     exit 1
 fi
 

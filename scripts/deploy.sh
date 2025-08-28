@@ -18,12 +18,12 @@ warn() { echo -e "${Y}[LEGACY]${NC} $1"; }
 # Redirect to professional deployment system
 warn "This is a legacy script. Redirecting to professional deployment system..."
 
-if [ -f "$(dirname "$0")/production-deploy.sh" ]; then
+if [ -f "$(dirname "$0")/production/production-deploy.sh" ]; then
     log "🚀 Using professional deployment system"
-    exec "$(dirname "$0")/production-deploy.sh" "$ACTION"
+    exec "$(dirname "$0")/production/production-deploy.sh" "$ACTION"
 else
     # Fallback for backward compatibility
-    warn "Professional script not found, running legacy deployment..."
+    warn "Professional script not found in new location, running legacy deployment..."
 fi
 
 # On EC2
