@@ -280,10 +280,23 @@ jobs:
         echo "        proxy_set_header X-Forwarded-Proto \\\$scheme;" >> docker/nginx/conf.d/default.conf
         echo "    }" >> docker/nginx/conf.d/default.conf
         echo "}" >> docker/nginx/conf.d/default.conf
+        echo "" >> docker/nginx/conf.d/default.conf
+        echo "# Catch-all server block" >> docker/nginx/conf.d/default.conf
+        echo "server {" >> docker/nginx/conf.d/default.conf
+        echo "    listen 80 default_server;" >> docker/nginx/conf.d/default.conf
+        echo "    server_name _;" >> docker/nginx/conf.d/default.conf
+        echo "    location / {" >> docker/nginx/conf.d/default.conf
+        echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
+        echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
+        echo "    }" >> docker/nginx/conf.d/default.conf
+        echo "}" >> docker/nginx/conf.d/default.conf
         
         # Debug: Show nginx configuration
         echo "🔍 Debug: Contents of nginx config:"
         cat docker/nginx/conf.d/default.conf
+        echo "🔍 Debug: Nginx directory structure:"
+        ls -la docker/nginx/
+        ls -la docker/nginx/conf.d/ || echo "No conf.d directory"
           
         # Execute deployment directly
         echo "🔐 Logging into ECR..."
@@ -353,6 +366,21 @@ jobs:
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
           echo "✅ Professional deployment completed successfully"
+          
+          # Final verification after 30 seconds
+          echo "⏳ Waiting 30 seconds before final verification..."
+          sleep 30
+          
+          echo "🔍 Final container status check:"
+          ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 $EC2_USER@$EC2_HOST << 'VERIFY_EOF'
+          cd /opt/restaurant-web
+          docker-compose -f docker/docker-compose.prod.yml --profile production ps
+          echo "📊 Container logs if any issues:"
+          docker-compose -f docker/docker-compose.prod.yml --profile production logs --tail=20
+          echo "🔍 Testing nginx response:"
+          curl -I http://localhost/ || echo "❌ Nginx not responding"
+          curl -I http://localhost:8000/api/v1/health/ || echo "❌ Django not responding"
+VERIFY_EOF
         else
           echo "❌ Deployment failed with SSH error"
           exit 1
