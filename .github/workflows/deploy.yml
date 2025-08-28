@@ -180,26 +180,29 @@ jobs:
         cd /opt/restaurant-web
         
         echo "📥 Downloading latest professional scripts..."
+        # Create directory structure
+        mkdir -p scripts/production
+        
         # Download professional deployment system
         curl -sSL --max-time 30 \
           https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/production/production-deploy.sh \
-          -o scripts/production-deploy.sh
-        chmod +x scripts/production-deploy.sh
+          -o scripts/production/production-deploy.sh
+        chmod +x scripts/production/production-deploy.sh
         
         # Download SSL management system
         curl -sSL --max-time 30 \
           https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/production/ssl-manager.sh \
-          -o scripts/ssl-manager.sh
-        chmod +x scripts/ssl-manager.sh
+          -o scripts/production/ssl-manager.sh
+        chmod +x scripts/production/ssl-manager.sh
         
         # Execute appropriate action
         case "${{ env.ACTION }}" in
           "ssl-install"|"ssl-renew"|"ssl-test")
             SSL_ACTION=${1#ssl-}
-            ./scripts/ssl-manager.sh $SSL_ACTION
+            ./scripts/production/ssl-manager.sh $SSL_ACTION
             ;;
           *)
-            ./scripts/production-deploy.sh ${{ env.ACTION }}
+            ./scripts/production/production-deploy.sh ${{ env.ACTION }}
             ;;
         esac
         DEPLOY_EOF
