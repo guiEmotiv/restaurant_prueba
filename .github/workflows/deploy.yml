@@ -316,7 +316,7 @@ jobs:
                 if curl -sf http://localhost/api/v1/health/ --connect-timeout 5 --max-time 10; then
                   echo "✅ Deployment successful!"
                   docker-compose -f docker/docker-compose.prod.yml --profile production ps
-                  exit 0
+                  echo "DEPLOYMENT_SUCCESS=true"
                 else
                   echo "❌ Nginx proxy not working - checking nginx logs"
                   docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
@@ -338,10 +338,17 @@ jobs:
         
         echo "❌ Health check failed"
         docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=20
-        exit 1
+        echo "DEPLOYMENT_SUCCESS=false"
         DEPLOY_EOF
         
-        echo "✅ Professional deployment completed successfully"
+        # Check deployment result
+        RESULT=$?
+        if [ $RESULT -eq 0 ]; then
+          echo "✅ Professional deployment completed successfully"
+        else
+          echo "❌ Deployment failed with SSH error"
+          exit 1
+        fi
 
     - name: 📊 Deployment Summary
       if: always()
