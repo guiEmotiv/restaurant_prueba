@@ -327,7 +327,7 @@ jobs:
         sleep 15
         
         HEALTH_CHECK_SUCCESS=false
-        for i in {1..6}; do
+        for i in 1 2 3 4 5 6; do
           echo "🔍 Health check attempt $i/6..."
           docker-compose -f docker/docker-compose.prod.yml --profile production ps
           
