@@ -105,8 +105,11 @@ class OrderItemPoller {
           // Si da error 404, el item fue realmente eliminado
           if (error.response && error.response.status === 404) {
             reallyDeletedItems.push(itemId);
+            // IMPORTANTE: Remover de allKnownItemIds para evitar futuros 404
+            this.allKnownItemIds.delete(itemId);
           }
-          // Para otros errores, asumir que el item existe pero no es accesible
+          // Para otros errores (500, red, etc), asumir que el item existe pero no es accesible
+          // NO agregar a reallyDeletedItems para evitar sonidos incorrectos
         }
       }
       

@@ -1,8 +1,61 @@
-# 🌟 Professional Restaurant Web Deployment Scripts
+# 🌟 Professional Restaurant Web Scripts
 
-This directory contains enterprise-grade deployment and management scripts for the Restaurant Web application.
+This directory contains enterprise-grade scripts for both **local development** and **production deployment** of the Restaurant Web application.
 
-## 📋 Scripts Overview
+## 🏠 **LOCAL DEVELOPMENT SCRIPTS**
+
+### 🚀 `local-dev.sh`
+**Professional Local Development Environment Manager**
+- Complete environment management with process control
+- Background service management with PID tracking
+- Health checks and status monitoring
+- Professional logging and error handling
+
+```bash
+# Full environment control
+./scripts/local-dev.sh start    # Start both backend and frontend
+./scripts/local-dev.sh stop     # Stop all services  
+./scripts/local-dev.sh restart  # Restart all services
+./scripts/local-dev.sh status   # Check status of services
+./scripts/local-dev.sh logs     # View development logs
+```
+
+### 🔧 `start-backend.sh`
+**Quick Django Backend Starter**
+- Sets up virtual environment automatically
+- Installs dependencies and runs migrations
+- Starts Django development server on port 8000
+
+```bash
+./scripts/start-backend.sh
+# Backend: http://localhost:8000
+# Admin: http://localhost:8000/admin/
+# API Docs: http://localhost:8000/api/v1/docs/
+```
+
+### 🎨 `start-frontend.sh`
+**Quick React Frontend Starter**
+- Installs Node.js dependencies automatically
+- Starts Vite development server on port 5173
+- Connects to backend automatically
+
+```bash
+./scripts/start-frontend.sh
+# Frontend: http://localhost:5173
+```
+
+### ⚡ `../start-dev.sh` (Root Level)
+**Ultra-Simple One-Click Starter**
+- Opens both backend and frontend in separate terminals
+- Cross-platform support (macOS, Linux)
+- Perfect for quick development startup
+
+```bash
+./start-dev.sh
+# Opens 2 terminals automatically
+```
+
+## 📋 Production Deployment Scripts Overview
 
 ### 🚀 `production-deploy.sh`
 **Professional Production Deployment System**
@@ -107,7 +160,45 @@ The scripts integrate seamlessly with the professional GitHub Actions workflow:
 | SSL Setup | Manual | Automated | **95% time saved** |
 | Error Recovery | Manual debugging | Auto-diagnostics | **90% faster** |
 
-## 🔧 Usage Examples
+## 🚀 **QUICK START GUIDE**
+
+### 🏃‍♂️ **Fastest Way to Start Development**
+```bash
+# Option 1: One-click startup (Recommended)
+./start-dev.sh
+
+# Option 2: Professional environment manager
+./scripts/local-dev.sh start
+
+# Option 3: Manual startup (2 separate terminals)
+./scripts/start-backend.sh    # Terminal 1
+./scripts/start-frontend.sh   # Terminal 2
+```
+
+### 🔧 **Common Development Tasks**
+```bash
+# Check if services are running
+./scripts/local-dev.sh status
+
+# View development logs
+./scripts/local-dev.sh logs
+
+# Restart after code changes
+./scripts/local-dev.sh restart
+
+# Stop all services
+./scripts/local-dev.sh stop
+```
+
+### 📱 **Access Your Application**
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **Frontend** | http://localhost:5173 | Main application |
+| **Backend API** | http://localhost:8000/api/v1/ | REST API |
+| **Admin Panel** | http://localhost:8000/admin/ | Django admin |
+| **API Docs** | http://localhost:8000/api/v1/docs/ | Swagger documentation |
+
+## 🔧 Production Usage Examples
 
 ### Standard Deployment
 ```bash
