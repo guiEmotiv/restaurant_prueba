@@ -158,27 +158,41 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
         
+        echo "📡 Creating secure deployment payload with JSON..."
+        DEPLOYMENT_DATA=$(jq -n \
+          --arg ecr_registry "$ECR_REGISTRY" \
+          --arg ecr_repository "$ECR_REPOSITORY" \
+          --arg action "$ACTION" \
+          '{
+            ecr_registry: $ecr_registry,
+            ecr_repository: $ecr_repository,
+            action: $action
+          }')
+        
         echo "📡 Executing professional deployment on EC2..."
         ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 $EC2_USER@$EC2_HOST << DEPLOY_EOF
         set -e
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
-        # Set ECR variables from GitHub Actions context
-        export ECR_REGISTRY="$ECR_REGISTRY"
-        export ECR_REPOSITORY="$ECR_REPOSITORY" 
-        export ACTION="$ACTION"
+        # Extract variables safely from JSON payload (secure against special characters)
+        DEPLOYMENT_JSON='$DEPLOYMENT_DATA'
+        export ECR_REGISTRY=\$(echo "\$DEPLOYMENT_JSON" | jq -r '.ecr_registry')
+        export ECR_REPOSITORY=\$(echo "\$DEPLOYMENT_JSON" | jq -r '.ecr_repository')
+        export ACTION=\$(echo "\$DEPLOYMENT_JSON" | jq -r '.action')
         
         echo "🚀 Executing direct deployment without external scripts..."
-        echo "🔍 Debug: ECR_REGISTRY=\$ECR_REGISTRY"
-        echo "🔍 Debug: ECR_REPOSITORY=\$ECR_REPOSITORY"
-        echo "🔍 Debug: ACTION=\$ACTION"
         
-        # Validate required variables
-        if [ -z "\$ECR_REGISTRY" ]; then
-          echo "❌ ERROR: ECR_REGISTRY is empty"
+        # Validate JSON extraction was successful
+        if [ "\$ECR_REGISTRY" = "null" ] || [ -z "\$ECR_REGISTRY" ]; then
+          echo "❌ ERROR: Failed to extract ECR_REGISTRY from JSON payload"
+          echo "Raw JSON: \$DEPLOYMENT_JSON"
           exit 1
         fi
+        
+        echo "🔍 Debug: ECR_REGISTRY=\$ECR_REGISTRY"
+        echo "🔍 Debug: ECR_REPOSITORY=\$ECR_REPOSITORY" 
+        echo "🔍 Debug: ACTION=\$ACTION"
         
         # Create necessary directory structure
         mkdir -p docker data logs
