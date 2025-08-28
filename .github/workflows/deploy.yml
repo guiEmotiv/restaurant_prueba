@@ -182,13 +182,13 @@ jobs:
         echo "📥 Downloading latest professional scripts..."
         # Download professional deployment system
         curl -sSL --max-time 30 \
-          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/production-deploy.sh \
+          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/production/production-deploy.sh \
           -o scripts/production-deploy.sh
         chmod +x scripts/production-deploy.sh
         
         # Download SSL management system
         curl -sSL --max-time 30 \
-          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/ssl-manager.sh \
+          https://raw.githubusercontent.com/guiEmotiv/restaurant-web/main/scripts/production/ssl-manager.sh \
           -o scripts/ssl-manager.sh
         chmod +x scripts/ssl-manager.sh
         
