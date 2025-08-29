@@ -155,7 +155,7 @@ NGINX_MAIN_EOF
 cat > docker/nginx/conf.d/default.conf << NGINX_CONF_EOF
 server {
     listen 80 default_server;
-    server_name _ xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com elfogóndedonsoto.com www.elfogóndedonsoto.com;
+    server_name _ *.elfogóndedonsoto.com *.xn--elfogndedonsoto-zrb.com elfogóndedonsoto.com www.elfogóndedonsoto.com xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
 
     # API requests to Django backend
     location /api/ {
