@@ -53,14 +53,13 @@ else
 fi
 
 # Run migrations with strict validation
-echo "🔄 Running migrations with validation..."
-if ! /usr/bin/docker-compose -f docker/docker-compose.prod.yml run --rm app python manage.py migrate --check; then
-    echo "❌ Migration validation failed - deployment aborted"
+echo "🔄 Running migrations..."
+if ! /usr/bin/docker-compose -f docker/docker-compose.prod.yml run --rm app python manage.py migrate; then
+    echo "❌ Migration failed - deployment aborted"
     exit 1
 fi
 
-echo "✅ Migration validation passed, applying migrations..."
-/usr/bin/docker-compose -f docker/docker-compose.prod.yml run --rm app python manage.py migrate
+echo "✅ Migrations applied successfully"
 
 # Deploy with validation
 echo "🚀 Deploying..."
