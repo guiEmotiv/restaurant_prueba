@@ -217,10 +217,11 @@ jobs:
         ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
       run: |        
         echo "📦 Uploading deployment scripts..."
+        scp -o ConnectTimeout=30 scripts/production-deploy.sh $EC2_USER@$EC2_HOST:/tmp/
         scp -o ConnectTimeout=30 scripts/simple-deploy.sh $EC2_USER@$EC2_HOST:/tmp/
         scp -o ConnectTimeout=30 scripts/auto-cleanup.sh $EC2_USER@$EC2_HOST:/tmp/
         
-        echo "🚀 Executing deployment on EC2..."
+        echo "🚀 Executing enterprise-grade deployment on EC2..."
         ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 -o StrictHostKeyChecking=yes $EC2_USER@$EC2_HOST << DEPLOY_EOF
         set -e
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -230,12 +231,13 @@ jobs:
         cd /opt/restaurant-web
         
         # Copy deployment scripts
+        /bin/cp /tmp/production-deploy.sh ./scripts/
         /bin/cp /tmp/simple-deploy.sh ./scripts/
         /bin/cp /tmp/auto-cleanup.sh ./scripts/
-        /bin/chmod +x scripts/simple-deploy.sh scripts/auto-cleanup.sh
+        /bin/chmod +x scripts/*.sh
         
-        # Execute simple deployment
-        ./scripts/simple-deploy.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"
+        # Execute production deployment
+        ./scripts/production-deploy.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"
         DEPLOY_EOF
         
         # Check deployment result
@@ -258,23 +260,32 @@ jobs:
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         
         # Test critical API endpoints
-        echo "Testing dashboard operativo API..."
-        if ! /usr/bin/curl -f -s http://localhost/api/v1/dashboard-operativo/report/?date=2025-08-29 > /dev/null; then
-            echo "❌ Dashboard operativo API failed"
+        echo "🔍 Testing dashboard operativo API..."
+        RESPONSE=\$(/usr/bin/curl -s -w "\n%{http_code}" http://localhost/api/v1/dashboard-operativo/report/?date=2025-08-29)
+        HTTP_CODE=\$(echo "\$RESPONSE" | tail -n 1)
+        if [ "\$HTTP_CODE" != "200" ]; then
+            echo "❌ Dashboard operativo API failed (HTTP \$HTTP_CODE)"
             exit 1
         fi
+        echo "✅ Dashboard operativo API working (HTTP 200)"
         
-        echo "Testing dashboard financiero API..."
-        if ! /usr/bin/curl -f -s http://localhost/api/v1/dashboard-financiero/report/?date=2025-08-29&period=month > /dev/null; then
-            echo "❌ Dashboard financiero API failed"
+        echo "🔍 Testing dashboard financiero API..."
+        RESPONSE=\$(/usr/bin/curl -s -w "\n%{http_code}" "http://localhost/api/v1/dashboard-financiero/report/?date=2025-08-29&period=month")
+        HTTP_CODE=\$(echo "\$RESPONSE" | tail -n 1)
+        if [ "\$HTTP_CODE" != "200" ]; then
+            echo "❌ Dashboard financiero API failed (HTTP \$HTTP_CODE)"
             exit 1
         fi
+        echo "✅ Dashboard financiero API working (HTTP 200)"
         
-        echo "Testing kitchen board API..."  
-        if ! /usr/bin/curl -f -s http://localhost/api/v1/orders/kitchen_board/ > /dev/null; then
-            echo "❌ Kitchen board API failed"
+        echo "🔍 Testing kitchen board API..."  
+        RESPONSE=\$(/usr/bin/curl -s -w "\n%{http_code}" http://localhost/api/v1/orders/kitchen_board/)
+        HTTP_CODE=\$(echo "\$RESPONSE" | tail -n 1)
+        if [ "\$HTTP_CODE" != "200" ]; then
+            echo "❌ Kitchen board API failed (HTTP \$HTTP_CODE)"
             exit 1
         fi
+        echo "✅ Kitchen board API working (HTTP 200)"
         
         echo "✅ All critical APIs validated successfully"
         VALIDATE_EOF

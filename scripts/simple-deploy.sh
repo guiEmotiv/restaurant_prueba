@@ -79,19 +79,31 @@ if ! /usr/bin/docker ps | /bin/grep restaurant-web-app; then
 fi
 
 # Test critical APIs
-if ! /usr/bin/curl -f -s http://localhost/api/v1/dashboard-operativo/report/?date=2025-08-29; then
-    echo "❌ Dashboard operativo API failed"
+echo "🔍 Testing dashboard operativo API..."
+RESPONSE=$(/usr/bin/curl -s -w "\n%{http_code}" http://localhost/api/v1/dashboard-operativo/report/?date=2025-08-29)
+HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+if [ "$HTTP_CODE" != "200" ]; then
+    echo "❌ Dashboard operativo API failed (HTTP $HTTP_CODE)"
     exit 1
 fi
+echo "✅ Dashboard operativo API working (HTTP 200)"
 
-if ! /usr/bin/curl -f -s http://localhost/api/v1/dashboard-financiero/report/?date=2025-08-29&period=month; then
-    echo "❌ Dashboard financiero API failed"
+echo "🔍 Testing dashboard financiero API..."
+RESPONSE=$(/usr/bin/curl -s -w "\n%{http_code}" "http://localhost/api/v1/dashboard-financiero/report/?date=2025-08-29&period=month")
+HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+if [ "$HTTP_CODE" != "200" ]; then
+    echo "❌ Dashboard financiero API failed (HTTP $HTTP_CODE)"
     exit 1
 fi
+echo "✅ Dashboard financiero API working (HTTP 200)"
 
-if ! /usr/bin/curl -f -s http://localhost/api/v1/orders/kitchen_board/; then
-    echo "❌ Kitchen board API failed" 
+echo "🔍 Testing kitchen board API..."
+RESPONSE=$(/usr/bin/curl -s -w "\n%{http_code}" http://localhost/api/v1/orders/kitchen_board/)
+HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+if [ "$HTTP_CODE" != "200" ]; then
+    echo "❌ Kitchen board API failed (HTTP $HTTP_CODE)"
     exit 1
 fi
+echo "✅ Kitchen board API working (HTTP 200)"
 
 echo "✅ Deployment completed and validated!"
