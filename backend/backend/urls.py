@@ -995,7 +995,9 @@ urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 # Also serve assets directly from static
 urlpatterns += static('/assets/', document_root=settings.STATIC_ROOT / 'assets')
 
-# Serve React app only for root and specific frontend routes (after API routes)
+# Serve React app for root and SPA fallback routes (after API routes)
 urlpatterns += [
-    path('', index_view, name='frontend_index'),  # Root only
+    path('', index_view, name='frontend_index'),  # Root
+    # SPA fallback for React Router - catch all non-API routes
+    re_path(r'^(?!api/|admin/|assets/|static/|media/|import-|csrf/).*$', index_view, name='spa_fallback'),
 ]
