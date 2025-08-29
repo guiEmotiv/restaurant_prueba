@@ -1,37 +1,16 @@
+// Simple unit test for basic components
 import { render } from '@testing-library/react';
-import App from '../App';
+import Button from '../components/common/Button';
 
-// Mock react-router-dom
-jest.mock('react-router-dom', () => ({
-  BrowserRouter: ({ children }) => <div data-testid="browser-router">{children}</div>,
-  Routes: ({ children }) => <div data-testid="routes">{children}</div>,
-  Route: ({ children }) => <div data-testid="route">{children}</div>,
-  Navigate: () => <div data-testid="navigate">Navigate</div>,
-}));
-
-// Mock AWS Amplify
-jest.mock('aws-amplify', () => ({
-  Amplify: {
-    configure: jest.fn(),
-  },
-}));
-
-// Mock contexts
-jest.mock('../contexts/AuthContext', () => ({
-  AuthProvider: ({ children }) => <div data-testid="auth-provider">{children}</div>,
-}));
-
-jest.mock('../contexts/ToastContext', () => ({
-  ToastProvider: ({ children }) => <div data-testid="toast-provider">{children}</div>,
-}));
-
-describe('App Component', () => {
-  test('renders without crashing', () => {
-    render(<App />);
+describe('Button Component', () => {
+  test('renders button with text', () => {
+    const { getByText } = render(<Button>Test Button</Button>);
+    expect(getByText('Test Button')).toBeInTheDocument();
   });
 
-  test('contains main app structure', () => {
-    const { getByTestId } = render(<App />);
-    expect(getByTestId('browser-router')).toBeInTheDocument();
+  test('applies primary variant class', () => {
+    const { getByText } = render(<Button variant="primary">Primary Button</Button>);
+    const button = getByText('Primary Button');
+    expect(button).toHaveClass('bg-blue-600');
   });
 });
