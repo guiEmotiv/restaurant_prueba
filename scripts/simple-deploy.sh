@@ -27,7 +27,7 @@ fi
 
 # Login to ECR and pull latest image with validation
 echo "🔐 Logging into ECR..."
-if ! /usr/local/bin/aws ecr get-login-password --region us-west-2 | /usr/bin/docker login --username AWS --password-stdin "$ECR_REGISTRY"; then
+if ! /usr/bin/aws ecr get-login-password --region us-west-2 | /usr/bin/docker login --username AWS --password-stdin "$ECR_REGISTRY"; then
     echo "❌ ECR login failed - deployment aborted"
     exit 1
 fi
