@@ -73,6 +73,11 @@ case "$ACTION" in
     bash ./advanced-diagnosis.sh
     exit 0
     ;;
+  "fix-ssl")
+    echo "🔧 Fixing SSL Configuration..."
+    bash ./fix-ssl.sh
+    exit 0
+    ;;
 esac
 
 # Create directory structure
