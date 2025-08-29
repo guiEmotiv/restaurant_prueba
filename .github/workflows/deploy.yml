@@ -221,6 +221,29 @@ jobs:
         scp -o ConnectTimeout=30 scripts/simple-deploy.sh $EC2_USER@$EC2_HOST:/tmp/
         scp -o ConnectTimeout=30 scripts/auto-cleanup.sh $EC2_USER@$EC2_HOST:/tmp/
         
+        echo "📝 Creating .env.ec2 from GitHub secrets..."
+        cat > /tmp/.env.ec2 << 'ENV_EOF'
+        # EC2 Production Environment Variables
+        
+        # Django Settings
+        DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        DEBUG=False
+        ALLOWED_HOSTS=44.248.47.186,xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com
+        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+        
+        # Database Configuration
+        DATABASE_NAME=restaurant.prod.sqlite3
+        DATABASE_PATH=/opt/restaurant-web/data
+        
+        # AWS Cognito Authentication
+        USE_COGNITO_AUTH=True
+        AWS_REGION=us-west-2
+        COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
+        COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
+        ENV_EOF
+        
+        scp -o ConnectTimeout=30 /tmp/.env.ec2 $EC2_USER@$EC2_HOST:/tmp/
+        
         echo "🚀 Executing enterprise-grade deployment on EC2..."
         ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 -o StrictHostKeyChecking=yes $EC2_USER@$EC2_HOST << DEPLOY_EOF
         set -e
@@ -235,6 +258,9 @@ jobs:
         /bin/cp /tmp/simple-deploy.sh ./scripts/
         /bin/cp /tmp/auto-cleanup.sh ./scripts/
         /bin/chmod +x scripts/*.sh
+        
+        # Copy .env.ec2 with correct configuration
+        /bin/cp /tmp/.env.ec2 .env.ec2
         
         # Execute production deployment
         ./scripts/production-deploy.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"
