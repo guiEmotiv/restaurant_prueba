@@ -23,6 +23,7 @@ on:
           - restart
           - check-security
           - diagnose
+          - advanced-diagnose
       skip_tests:
         description: 'Skip tests (emergency deploy)'
         type: boolean
@@ -195,6 +196,7 @@ jobs:
         scp -o ConnectTimeout=30 scripts/deploy-ec2.sh $EC2_USER@$EC2_HOST:/tmp/
         scp -o ConnectTimeout=30 check-security-groups.sh $EC2_USER@$EC2_HOST:/tmp/
         scp -o ConnectTimeout=30 diagnose-network.sh $EC2_USER@$EC2_HOST:/tmp/
+        scp -o ConnectTimeout=30 advanced-diagnosis.sh $EC2_USER@$EC2_HOST:/tmp/
         
         echo "🚀 Executing optimized deployment on EC2..."
         ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 -o StrictHostKeyChecking=yes $EC2_USER@$EC2_HOST << DEPLOY_EOF
@@ -206,9 +208,11 @@ jobs:
         cp /tmp/deploy-ec2.sh ./
         cp /tmp/check-security-groups.sh ./
         cp /tmp/diagnose-network.sh ./
+        cp /tmp/advanced-diagnosis.sh ./
         chmod +x deploy-ec2.sh
         chmod +x check-security-groups.sh
         chmod +x diagnose-network.sh
+        chmod +x advanced-diagnosis.sh
         ./deploy-ec2.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"
         DEPLOY_EOF
         

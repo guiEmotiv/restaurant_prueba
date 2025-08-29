@@ -68,6 +68,11 @@ case "$ACTION" in
     bash ./diagnose-network.sh
     exit 0
     ;;
+  "advanced-diagnose")
+    echo "🔍 Running Advanced Network Diagnostics..."
+    bash ./advanced-diagnosis.sh
+    exit 0
+    ;;
 esac
 
 # Create directory structure
