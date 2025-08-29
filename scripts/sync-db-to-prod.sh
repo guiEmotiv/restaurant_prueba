@@ -96,6 +96,12 @@ confirm_sync() {
     echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}⚠️  WARNING: This will REPLACE the production database!${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    
+    if [[ "$FORCE_MODE" == true ]]; then
+        echo -e "${YELLOW}Force mode enabled - proceeding without confirmation${NC}"
+        return 0
+    fi
+    
     echo ""
     read -p "Are you sure you want to sync local database to production? (yes/NO): " confirm
     
@@ -111,20 +117,21 @@ create_prod_backup() {
     
     ssh -i "$SSH_KEY" "$EC2_USER@$EC2_HOST" << EOF
         set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
         # Create backup directory if not exists
-        mkdir -p data/backups/prod
+        /bin/mkdir -p data/backups/prod
         
         # Check if production DB exists
         if [[ -f "$PROD_DB_PATH" ]]; then
             # Create backup
-            cp "$PROD_DB_PATH" "data/backups/prod/backup_before_sync_${TIMESTAMP}.sqlite3"
+            /bin/cp "$PROD_DB_PATH" "data/backups/prod/backup_before_sync_${TIMESTAMP}.sqlite3"
             echo "Backup created: backup_before_sync_${TIMESTAMP}.sqlite3"
             
             # Keep only last 10 backups
             cd data/backups/prod
-            ls -t backup_*.sqlite3 2>/dev/null | tail -n +11 | xargs -r rm
+            /bin/ls -t backup_*.sqlite3 2>/dev/null | tail -n +11 | /usr/bin/xargs -r rm
         else
             echo "No production database to backup"
         fi
@@ -160,22 +167,23 @@ deploy_database() {
     
     ssh -i "$SSH_KEY" "$EC2_USER@$EC2_HOST" << EOF
         set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
         # Stop services
         echo "Stopping services..."
-        docker-compose -f docker/docker-compose.prod.yml --profile production down || true
+        /usr/bin/docker-compose -f docker/docker-compose.prod.yml --profile production down || true
         
         # Deploy new database
         echo "Deploying new database..."
-        mkdir -p data
-        mv "/tmp/${PROD_DB}_upload" "$PROD_DB_PATH"
+        /bin/mkdir -p data
+        /bin/mv "/tmp/${PROD_DB}_upload" "$PROD_DB_PATH"
         
         # Set permissions
-        chmod 644 "$PROD_DB_PATH"
+        /bin/chmod 644 "$PROD_DB_PATH"
         
         # Verify database
-        if sqlite3 "$PROD_DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" &>/dev/null; then
+        if /usr/bin/sqlite3 "$PROD_DB_PATH" "SELECT COUNT(*) FROM sqlite_master WHERE type='table';" &>/dev/null; then
             echo "Database verified successfully"
         else
             echo "ERROR: Database verification failed"
@@ -184,7 +192,7 @@ deploy_database() {
         
         # Restart services
         echo "Restarting services..."
-        docker-compose -f docker/docker-compose.prod.yml --profile production up -d
+        /usr/bin/docker-compose -f docker/docker-compose.prod.yml --profile production up -d
         
         # Wait for services
         sleep 10
@@ -201,7 +209,7 @@ validate_deployment() {
     
     # Check container health
     log_info "Checking container health..."
-    local container_status=$(ssh -i "$SSH_KEY" "$EC2_USER@$EC2_HOST" "docker ps --filter 'name=restaurant-web-app' --format '{{.Status}}'")
+    local container_status=$(ssh -i "$SSH_KEY" "$EC2_USER@$EC2_HOST" "/usr/bin/docker ps --filter 'name=restaurant-web-app' --format '{{.Status}}'")
     
     if [[ "$container_status" == *"healthy"* ]] || [[ "$container_status" == *"Up"* ]]; then
         log_success "Container is healthy"
@@ -242,20 +250,21 @@ rollback() {
     
     ssh -i "$SSH_KEY" "$EC2_USER@$EC2_HOST" << EOF
         set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
         # Stop services
-        docker-compose -f docker/docker-compose.prod.yml --profile production down || true
+        /usr/bin/docker-compose -f docker/docker-compose.prod.yml --profile production down || true
         
         # Find latest backup
-        latest_backup=\$(ls -t data/backups/prod/backup_before_sync_*.sqlite3 2>/dev/null | head -1)
+        latest_backup=\$(/bin/ls -t data/backups/prod/backup_before_sync_*.sqlite3 2>/dev/null | head -1)
         
         if [[ -n "\$latest_backup" ]]; then
             echo "Restoring from: \$latest_backup"
-            cp "\$latest_backup" "$PROD_DB_PATH"
+            /bin/cp "\$latest_backup" "$PROD_DB_PATH"
             
             # Restart services
-            docker-compose -f docker/docker-compose.prod.yml --profile production up -d
+            /usr/bin/docker-compose -f docker/docker-compose.prod.yml --profile production up -d
             
             echo "Rollback completed"
         else
@@ -302,10 +311,11 @@ main() {
 }
 
 # Handle script arguments
+FORCE_MODE=false
 case "${1:-}" in
     "--force"|"-f")
         log_warning "Force mode enabled - skipping confirmation"
-        confirm="yes"
+        FORCE_MODE=true
         ;;
     "--help"|"-h")
         echo "Usage: $0 [--force|-f] [--help|-h]"
