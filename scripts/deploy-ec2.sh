@@ -21,19 +21,19 @@ echo "🎯 Action: $ACTION"
 
 # Create backup before deployment
 echo "💾 Creating pre-deployment backup..."
-BACKUP_DIR="/opt/backups/$(date +%Y%m%d_%H%M%S)"
+BACKUP_DIR="./backups/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 cp -r data/ "$BACKUP_DIR/" 2>/dev/null || echo "No data directory to backup"
-docker-compose -f docker/docker-compose.prod.yml --profile production ps > "$BACKUP_DIR/containers_before.txt" 2>/dev/null || true
+sudo docker-compose -f docker/docker-compose.prod.yml --profile production ps > "$BACKUP_DIR/containers_before.txt" 2>/dev/null || true
 
 # Function for rollback
 rollback() {
   echo "🔄 Initiating rollback..."
   if [ -d "$BACKUP_DIR" ]; then
     echo "📦 Restoring previous state..."
-    docker-compose -f docker/docker-compose.prod.yml --profile production down --timeout 10
+    sudo docker-compose -f docker/docker-compose.prod.yml --profile production down --timeout 10
     cp -r "$BACKUP_DIR/data/" ./ 2>/dev/null || echo "No data to restore"
-    docker-compose -f docker/docker-compose.prod.yml --profile production up -d
+    sudo docker-compose -f docker/docker-compose.prod.yml --profile production up -d
     echo "✅ Rollback completed"
   else
     echo "❌ No backup found for rollback"
@@ -47,15 +47,15 @@ case "$ACTION" in
     exit 0
     ;;
   "status")
-    docker-compose -f docker/docker-compose.prod.yml --profile production ps
+    sudo docker-compose -f docker/docker-compose.prod.yml --profile production ps
     exit 0
     ;;
   "logs")
-    docker-compose -f docker/docker-compose.prod.yml --profile production logs --tail=50
+    sudo docker-compose -f docker/docker-compose.prod.yml --profile production logs --tail=50
     exit 0
     ;;
   "restart")
-    docker-compose -f docker/docker-compose.prod.yml --profile production restart
+    sudo docker-compose -f docker/docker-compose.prod.yml --profile production restart
     exit 0
     ;;
 esac
@@ -200,19 +200,19 @@ server {
 NGINX_CONF_EOF
 
 echo "🔐 Logging into ECR..."
-aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
 echo "📥 Pulling latest Docker image..."
-docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+sudo docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
 echo "🛑 Stopping existing containers gracefully..."
-docker-compose -f docker/docker-compose.prod.yml --profile production down --timeout 15 || true
+sudo docker-compose -f docker/docker-compose.prod.yml --profile production down --timeout 15 || true
 
 # Force cleanup
-docker rm -f restaurant-web-app restaurant-web-nginx 2>/dev/null || true
+sudo docker rm -f restaurant-web-app restaurant-web-nginx 2>/dev/null || true
 
 echo "▶️ Starting production services..."
-docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate --remove-orphans
+sudo docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate --remove-orphans
 
 echo "⏳ Health check..."
 sleep 15
@@ -221,13 +221,13 @@ HEALTH_CHECK_SUCCESS=false
 for i in 1 2 3 4 5; do
   echo "🔍 Health check attempt $i/5..."
   
-  if docker-compose -f docker/docker-compose.prod.yml --profile production ps app | grep -q "Up"; then
+  if sudo docker-compose -f docker/docker-compose.prod.yml --profile production ps app | grep -q "Up"; then
     echo "✅ Django container is running"
     
     if curl -sf http://localhost:8000/api/v1/health/ --connect-timeout 5 --max-time 10; then
       echo "✅ Django API working - Core functionality OK"
       
-      if docker-compose -f docker/docker-compose.prod.yml --profile production ps nginx | grep -q "Up"; then
+      if sudo docker-compose -f docker/docker-compose.prod.yml --profile production ps nginx | grep -q "Up"; then
         echo "✅ Nginx container is running"
         
         if curl -sf http://localhost/api/v1/health/ --connect-timeout 3 --max-time 8 >/dev/null 2>&1; then
@@ -242,7 +242,7 @@ for i in 1 2 3 4 5; do
       break
     else
       echo "⚠️ Django API not ready, waiting..."
-      docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=3
+      sudo docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=3
     fi
   else
     echo "⚠️ Django container not running yet"
@@ -256,12 +256,12 @@ done
 
 if [ "$HEALTH_CHECK_SUCCESS" != "true" ]; then
   echo "❌ Health check failed after 5 attempts"
-  docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=20
-  docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
+  sudo docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=20
+  sudo docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
   echo "🔄 Performing automatic rollback..."
   rollback
   exit 1
 fi
 
 echo "✅ Deployment completed successfully"
-echo "BACKUP_DIR=$BACKUP_DIR" > /tmp/last_deployment.env
+echo "BACKUP_DIR=$BACKUP_DIR" > ./last_deployment.env
