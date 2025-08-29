@@ -14,11 +14,33 @@ case "$ACTION" in
   "restart") sudo docker restart app nginx; exit 0 ;;
 esac
 
-# Clean up disk space before deployment
-echo "🧹 Cleaning disk space..."
-sudo docker system prune -af || true
+# Aggressive disk cleanup before deployment
+echo "🧹 Aggressively cleaning disk space..."
+df -h
+
+# Stop and remove all containers
+sudo docker stop $(sudo docker ps -aq) 2>/dev/null || true
+sudo docker rm $(sudo docker ps -aq) 2>/dev/null || true
+
+# Remove all unused images, networks, volumes
+sudo docker system prune -af --volumes || true
+sudo docker image prune -af || true
+sudo docker volume prune -f || true
+sudo docker network prune -f || true
+
+# Clean APT cache
 sudo apt autoremove -y || true
 sudo apt autoclean || true
+sudo apt clean || true
+
+# Clean log files
+sudo find /var/log -type f -name "*.log" -exec truncate -s 0 {} \; 2>/dev/null || true
+sudo journalctl --vacuum-time=1d || true
+
+# Remove any orphaned files
+sudo find /tmp -type f -atime +1 -delete 2>/dev/null || true
+
+echo "📊 Disk usage after cleanup:"
 df -h
 
 mkdir -p data
