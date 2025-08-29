@@ -230,10 +230,10 @@ jobs:
         export AWS_DEFAULT_REGION="us-west-2"
         
         # Export all secrets as environment variables for Docker Compose
-        export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-        export DOMAIN_NAME="${{ secrets.DOMAIN_NAME }}"
-        export COGNITO_USER_POOL_ID="${{ secrets.COGNITO_USER_POOL_ID }}"
-        export COGNITO_APP_CLIENT_ID="${{ secrets.COGNITO_APP_CLIENT_ID }}"
+        export DJANGO_SECRET_KEY='${{ secrets.DJANGO_SECRET_KEY }}'
+        export DOMAIN_NAME='${{ secrets.DOMAIN_NAME }}'
+        export COGNITO_USER_POOL_ID='${{ secrets.COGNITO_USER_POOL_ID }}'
+        export COGNITO_APP_CLIENT_ID='${{ secrets.COGNITO_APP_CLIENT_ID }}'
         
         cd /opt/restaurant-web
         
