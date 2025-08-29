@@ -21,8 +21,10 @@ def get_csrf_token(request):
 
 def index_view(request):
     """Serve React index.html for production"""
+    import os
     try:
-        with open(settings.BASE_DIR / 'frontend' / 'dist' / 'index.html', 'r') as f:
+        frontend_path = settings.BASE_DIR / 'frontend' / 'dist' / 'index.html'
+        with open(frontend_path, 'r') as f:
             response = HttpResponse(f.read(), content_type='text/html')
             # Add anti-cache headers for production
             response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -30,7 +32,17 @@ def index_view(request):
             response['Expires'] = '0'
             return response
     except FileNotFoundError:
-        return HttpResponse('Frontend not built yet. Build the React app first.', status=404)
+        # Debug: Show what paths exist
+        debug_info = f"""
+        Frontend not found. Debug info:
+        BASE_DIR: {settings.BASE_DIR}
+        Looking for: {frontend_path}
+        Frontend dir exists: {os.path.exists(settings.BASE_DIR / 'frontend')}
+        Frontend dist exists: {os.path.exists(settings.BASE_DIR / 'frontend' / 'dist')}
+        Files in frontend/: {os.listdir(settings.BASE_DIR / 'frontend') if os.path.exists(settings.BASE_DIR / 'frontend') else 'Directory not found'}
+        Files in frontend/dist/: {os.listdir(settings.BASE_DIR / 'frontend' / 'dist') if os.path.exists(settings.BASE_DIR / 'frontend' / 'dist') else 'Directory not found'}
+        """
+        return HttpResponse(debug_info, content_type='text/plain', status=404)
 
 def serve_frontend_asset(request, path):
     """Serve frontend assets (CSS, JS, etc.) from frontend/dist/assets"""
