@@ -1,8 +1,14 @@
-name: Professional Restaurant Web Deployment
+name: Restaurant Web Deployment
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'docker/**'
+      - 'Dockerfile*'
+      - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       action:
@@ -11,25 +17,35 @@ on:
         default: 'deploy'
         options:
           - deploy
+          - rollback
           - status
           - logs
-          - backup
           - restart
-          - ssl-install
-          - ssl-renew
-          - ssl-test
+      skip_tests:
+        description: 'Skip tests (emergency deploy)'
+        type: boolean
+        default: false
 
 env:
   AWS_REGION: us-west-2
   ECR_REGISTRY: 721063839441.dkr.ecr.us-west-2.amazonaws.com
   ECR_REPOSITORY: restaurant-web
+  NODE_OPTIONS: '--max-old-space-size=4096'
+  DOCKER_BUILDKIT: 1
 
 jobs:
+  # Run tests first (can be skipped for emergency deploys)
+  test:
+    uses: ./.github/workflows/test.yml
+    with:
+      skip_tests: ${{ github.event.inputs.skip_tests == 'true' }}
+
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # INTELLIGENT CHANGE DETECTION
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   
   analyze-changes:
+    needs: test
     runs-on: ubuntu-latest
     name: Analyze Changes
     outputs:
@@ -87,15 +103,23 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   
   deploy:
-    needs: analyze-changes
+    needs: [test, analyze-changes]
     runs-on: ubuntu-latest
-    name: Professional Deployment
+    name: Production Deployment
     environment: production
-    if: needs.analyze-changes.outputs.needs-build == 'true' || github.event.inputs.action != ''
+    if: (needs.analyze-changes.outputs.needs-build == 'true' || github.event.inputs.action != '') && (success() || github.event.inputs.skip_tests == 'true')
     
     steps:
     - name: 📥 Checkout Repository
       uses: actions/checkout@v4
+    
+    - name: 💾 Setup Node.js with caching
+      if: contains(needs.analyze-changes.outputs.changes, 'frontend') || github.event.inputs.action == 'deploy' || github.event.inputs.action == ''
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
 
     - name: 🔐 Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -122,11 +146,11 @@ jobs:
           echo "🎨 Building frontend with optimized settings..."
           cd frontend
           
-          # Use npm ci for faster, reliable installs
+          # Optimized npm install with caching
           npm ci --prefer-offline --no-audit
           
-          # Memory-optimized build with Cognito credentials
-          NODE_OPTIONS='--max-old-space-size=6144' npm run build
+          # Production build with optimized memory
+          npm run build
           cd ..
           
           echo "✅ Frontend build completed"
@@ -134,17 +158,22 @@ jobs:
           echo "⏭️ Skipping frontend build (no changes detected)"
         fi
         
-        # Build and push Docker image
-        echo "🚢 Building and pushing Docker image..."
-        docker build \
-          --cache-from $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-          -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-          --build-arg BUILDKIT_INLINE_CACHE=1 \
-          -f Dockerfile.prod .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        echo "✅ Docker image pushed successfully"
+        # Build and push Docker image with advanced caching
+        echo "🚢 Building Docker image with multi-stage caching..."
+        
+        # Multi-layer caching strategy
+        docker buildx create --use --driver docker-container || true
+        docker buildx build \
+          --platform linux/amd64 \
+          --cache-from type=registry,ref=$ECR_REGISTRY/$ECR_REPOSITORY:cache \
+          --cache-to type=registry,ref=$ECR_REGISTRY/$ECR_REPOSITORY:cache,mode=max \
+          --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+          --tag $ECR_REGISTRY/$ECR_REPOSITORY:$(git rev-parse --short HEAD) \
+          --push \
+          --file Dockerfile.prod .
+        echo "✅ Docker image built and pushed with optimized caching"
 
-    - name: 🚀 Professional EC2 Deployment
+    - name: 🚀 Secure EC2 Deployment
       env:
         ACTION: ${{ github.event.inputs.action || 'deploy' }}
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
@@ -154,318 +183,33 @@ jobs:
       run: |
         echo "🔐 Setting up secure SSH connection..."
         mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
         echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+        chmod 644 ~/.ssh/known_hosts
         
-        echo "📡 Creating secure deployment payload with JSON..."
-        DEPLOYMENT_DATA=$(jq -n \
-          --arg ecr_registry "$ECR_REGISTRY" \
-          --arg ecr_repository "$ECR_REPOSITORY" \
-          --arg action "$ACTION" \
-          '{
-            ecr_registry: $ecr_registry,
-            ecr_repository: $ecr_repository,
-            action: $action
-          }')
+        echo "📦 Uploading deployment script..."
+        scp -o ConnectTimeout=30 scripts/deploy-ec2.sh $EC2_USER@$EC2_HOST:/tmp/
         
-        echo "📡 Executing professional deployment on EC2..."
-        ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 $EC2_USER@$EC2_HOST << DEPLOY_EOF
+        echo "🚀 Executing optimized deployment on EC2..."
+        ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 -o StrictHostKeyChecking=yes $EC2_USER@$EC2_HOST << DEPLOY_EOF
         set -e
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
-        # Extract variables safely from JSON payload (secure against special characters)
-        DEPLOYMENT_JSON='$DEPLOYMENT_DATA'
-        export ECR_REGISTRY=\$(echo "\$DEPLOYMENT_JSON" | jq -r '.ecr_registry')
-        export ECR_REPOSITORY=\$(echo "\$DEPLOYMENT_JSON" | jq -r '.ecr_repository')
-        export ACTION=\$(echo "\$DEPLOYMENT_JSON" | jq -r '.action')
-        
-        echo "🚀 Executing direct deployment without external scripts..."
-        
-        # Validate JSON extraction was successful
-        if [ "\$ECR_REGISTRY" = "null" ] || [ -z "\$ECR_REGISTRY" ]; then
-          echo "❌ ERROR: Failed to extract ECR_REGISTRY from JSON payload"
-          echo "Raw JSON: \$DEPLOYMENT_JSON"
-          exit 1
-        fi
-        
-        echo "🔍 Debug: ECR_REGISTRY=\$ECR_REGISTRY"
-        echo "🔍 Debug: ECR_REPOSITORY=\$ECR_REPOSITORY" 
-        echo "🔍 Debug: ACTION=\$ACTION"
-        
-        # Create necessary directory structure
-        mkdir -p docker data logs
-        
-        # Create production environment file
-        echo "# Restaurant Web Production Configuration" > .env.ec2
-        echo "SECRET_KEY=prod-secret-key-change-in-production" >> .env.ec2
-        echo "DEBUG=False" >> .env.ec2
-        echo "USE_COGNITO_AUTH=True" >> .env.ec2
-        echo "COGNITO_USER_POOL_ID=will-be-set-by-secrets" >> .env.ec2
-        echo "COGNITO_APP_CLIENT_ID=will-be-set-by-secrets" >> .env.ec2
-        echo "AWS_REGION=us-west-2" >> .env.ec2
-        echo "ALLOWED_HOSTS=localhost,127.0.0.1,app,restaurant-web-app,xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com,44.248.47.186" >> .env.ec2
-        echo "DATABASE_PATH=/opt/restaurant-web/data" >> .env.ec2
-        echo "DATABASE_NAME=restaurant.prod.sqlite3" >> .env.ec2
-        
-        # Remove any existing docker-compose.prod.yml and recreate
-        rm -f docker/docker-compose.prod.yml
-        
-        # Create docker-compose.prod.yml dynamically
-        echo "services:" > docker/docker-compose.prod.yml
-        echo "  app:" >> docker/docker-compose.prod.yml
-        echo "    image: \${ECR_REGISTRY}/restaurant-web:latest" >> docker/docker-compose.prod.yml
-        echo "    container_name: restaurant-web-app" >> docker/docker-compose.prod.yml
-        echo "    ports:" >> docker/docker-compose.prod.yml
-        echo "      - '8000:8000'" >> docker/docker-compose.prod.yml
-        echo "    volumes:" >> docker/docker-compose.prod.yml
-        echo "      - ./data:/opt/restaurant-web/data" >> docker/docker-compose.prod.yml
-        echo "      - ./logs:/opt/restaurant-web/logs" >> docker/docker-compose.prod.yml
-        echo "    environment:" >> docker/docker-compose.prod.yml
-        echo "      - DATABASE_PATH=/opt/restaurant-web/data" >> docker/docker-compose.prod.yml
-        echo "      - DATABASE_NAME=restaurant.prod.sqlite3" >> docker/docker-compose.prod.yml
-        echo "    env_file:" >> docker/docker-compose.prod.yml
-        echo "      - /opt/restaurant-web/.env.ec2" >> docker/docker-compose.prod.yml
-        echo "    restart: unless-stopped" >> docker/docker-compose.prod.yml
-        echo "    profiles:" >> docker/docker-compose.prod.yml
-        echo "      - production" >> docker/docker-compose.prod.yml
-        echo "    networks:" >> docker/docker-compose.prod.yml
-        echo "      - restaurant-network" >> docker/docker-compose.prod.yml
-        echo "    healthcheck:" >> docker/docker-compose.prod.yml
-        echo "      test: ['CMD', 'curl', '-f', 'http://localhost:8000/api/v1/health/']" >> docker/docker-compose.prod.yml
-        echo "      interval: 30s" >> docker/docker-compose.prod.yml
-        echo "      timeout: 10s" >> docker/docker-compose.prod.yml
-        echo "      retries: 5" >> docker/docker-compose.prod.yml
-        echo "      start_period: 60s" >> docker/docker-compose.prod.yml
-        echo "  nginx:" >> docker/docker-compose.prod.yml
-        echo "    image: nginx:alpine" >> docker/docker-compose.prod.yml
-        echo "    container_name: restaurant-web-nginx" >> docker/docker-compose.prod.yml
-        echo "    ports:" >> docker/docker-compose.prod.yml
-        echo "      - '80:80'" >> docker/docker-compose.prod.yml
-        echo "      - '443:443'" >> docker/docker-compose.prod.yml
-        echo "    volumes:" >> docker/docker-compose.prod.yml
-        echo "      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro" >> docker/docker-compose.prod.yml
-        echo "      - ./nginx/conf.d:/etc/nginx/conf.d:ro" >> docker/docker-compose.prod.yml
-        echo "    depends_on:" >> docker/docker-compose.prod.yml
-        echo "      - app" >> docker/docker-compose.prod.yml
-        echo "    restart: unless-stopped" >> docker/docker-compose.prod.yml
-        echo "    profiles:" >> docker/docker-compose.prod.yml
-        echo "      - production" >> docker/docker-compose.prod.yml
-        echo "    networks:" >> docker/docker-compose.prod.yml
-        echo "      - restaurant-network" >> docker/docker-compose.prod.yml
-        echo "volumes:" >> docker/docker-compose.prod.yml
-        echo "  restaurant_data:" >> docker/docker-compose.prod.yml
-        echo "    driver: local" >> docker/docker-compose.prod.yml
-        echo "  restaurant_logs:" >> docker/docker-compose.prod.yml
-        echo "    driver: local" >> docker/docker-compose.prod.yml
-        echo "networks:" >> docker/docker-compose.prod.yml
-        echo "  restaurant-network:" >> docker/docker-compose.prod.yml
-        echo "    driver: bridge" >> docker/docker-compose.prod.yml
-        
-        # Debug: Show what we created
-        echo "🔍 Debug: Contents of docker-compose.prod.yml:"
-        cat docker/docker-compose.prod.yml
-        echo "🔍 Debug: Contents of .env.ec2:"
-        cat .env.ec2
-          
-        # Create complete nginx config with proper server_name
-        mkdir -p docker/nginx/conf.d
-        # First, create main nginx.conf
-        echo "user nginx;" > docker/nginx/nginx.conf
-        echo "worker_processes auto;" >> docker/nginx/nginx.conf
-        echo "error_log /var/log/nginx/error.log warn;" >> docker/nginx/nginx.conf
-        echo "pid /var/run/nginx.pid;" >> docker/nginx/nginx.conf
-        echo "" >> docker/nginx/nginx.conf
-        echo "events {" >> docker/nginx/nginx.conf
-        echo "    worker_connections 1024;" >> docker/nginx/nginx.conf
-        echo "}" >> docker/nginx/nginx.conf
-        echo "" >> docker/nginx/nginx.conf
-        echo "http {" >> docker/nginx/nginx.conf
-        echo "    include /etc/nginx/mime.types;" >> docker/nginx/nginx.conf
-        echo "    default_type application/octet-stream;" >> docker/nginx/nginx.conf
-        echo "    sendfile on;" >> docker/nginx/nginx.conf
-        echo "    keepalive_timeout 65;" >> docker/nginx/nginx.conf
-        echo "    include /etc/nginx/conf.d/*.conf;" >> docker/nginx/nginx.conf
-        echo "}" >> docker/nginx/nginx.conf
-        
-        # Now create the server configuration
-        echo "server {" > docker/nginx/conf.d/default.conf
-        echo "    listen 80 default_server;" >> docker/nginx/conf.d/default.conf
-        echo "    server_name _;" >> docker/nginx/conf.d/default.conf
-        echo "" >> docker/nginx/conf.d/default.conf
-        echo "    # API requests to Django backend" >> docker/nginx/conf.d/default.conf
-        echo "    location /api/ {" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Real-IP \\\$remote_addr;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Forwarded-Proto \\\$scheme;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_connect_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_send_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_read_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_buffering off;" >> docker/nginx/conf.d/default.conf
-        echo "    }" >> docker/nginx/conf.d/default.conf
-        echo "" >> docker/nginx/conf.d/default.conf
-        echo "    # Admin and static Django files" >> docker/nginx/conf.d/default.conf
-        echo "    location /admin/ {" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Real-IP \\\$remote_addr;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;" >> docker/nginx/conf.d/default.conf
-        echo "    }" >> docker/nginx/conf.d/default.conf
-        echo "" >> docker/nginx/conf.d/default.conf
-        echo "    location /static/ {" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
-        echo "    }" >> docker/nginx/conf.d/default.conf
-        echo "" >> docker/nginx/conf.d/default.conf
-        echo "    # Frontend SPA - AGGRESSIVE React Router support" >> docker/nginx/conf.d/default.conf
-        echo "    location / {" >> docker/nginx/conf.d/default.conf
-        echo "        # ALWAYS proxy to Django - let Django handle ALL routing decisions" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Real-IP \\\$remote_addr;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Forwarded-Proto \\\$scheme;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_connect_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_send_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_read_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "        # Disable nginx error handling - Django handles everything" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_intercept_errors off;" >> docker/nginx/conf.d/default.conf
-        echo "    }" >> docker/nginx/conf.d/default.conf
-        echo "}" >> docker/nginx/conf.d/default.conf
-        
-        # Debug: Show nginx configuration
-        echo "🔍 Debug: Contents of main nginx.conf:"
-        cat docker/nginx/nginx.conf
-        echo "🔍 Debug: Contents of nginx server config:"
-        cat docker/nginx/conf.d/default.conf
-        echo "🔍 Debug: Nginx directory structure:"
-        ls -la docker/nginx/
-        ls -la docker/nginx/conf.d/ || echo "No conf.d directory"
-          
-        # Execute deployment directly
-        echo "🔐 Logging into ECR..."
-        aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin \$ECR_REGISTRY
-        
-        echo "📥 Pulling latest Docker image..."
-        docker pull \$ECR_REGISTRY/\$ECR_REPOSITORY:latest
-        
-        echo "🛑 Stopping and removing existing containers..."
-        docker-compose -f docker/docker-compose.prod.yml --profile production down --timeout 10 || true
-        
-        # Force remove any lingering containers
-        docker rm -f restaurant-web-app restaurant-web-nginx 2>/dev/null || true
-        
-        echo "▶️ Starting production services..."
-        docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate --remove-orphans
-        
-        echo "⏳ Health check (optimized for production)..."
-        sleep 20
-        
-        HEALTH_CHECK_SUCCESS=false
-        for i in 1 2 3 4 5 6; do
-          echo "🔍 Health check attempt \$i/6..."
-          docker-compose -f docker/docker-compose.prod.yml --profile production ps
-          
-          # Optimized health check - focus on essential functionality
-          CONTAINERS_UP=true
-          
-          # Check if Django container is running (relaxed check)
-          if docker-compose -f docker/docker-compose.prod.yml --profile production ps app | grep -q "Up"; then
-            echo "✅ Django container is running"
-            
-            # Test direct Django API (primary success criterion)
-            if curl -sf http://localhost:8000/api/v1/health/ --connect-timeout 3 --max-time 8; then
-              echo "✅ Django API working - CORE FUNCTIONALITY OK"
-              
-              # Check nginx status (secondary check)
-              if docker-compose -f docker/docker-compose.prod.yml --profile production ps nginx | grep -q "Up"; then
-                echo "✅ Nginx container is running"
-                
-                # Test nginx proxy (nice to have, not critical)
-                if curl -sf http://localhost/api/v1/health/ --connect-timeout 2 --max-time 5 >/dev/null 2>&1; then
-                  echo "✅ Perfect! Nginx proxy also working"
-                else
-                  echo "⚠️ Nginx proxy needs optimization (but core API works)"
-                fi
-              fi
-              
-              # DEPLOYMENT SUCCESS - Django API confirmed working
-              echo "🎉 DEPLOYMENT SUCCESSFUL - Core services confirmed!"
-              docker-compose -f docker/docker-compose.prod.yml --profile production ps
-              echo "DEPLOYMENT_SUCCESS=true"
-              HEALTH_CHECK_SUCCESS=true
-              break
-              
-            else
-              echo "⚠️ Django API not ready yet, waiting..."
-              docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=3
-            fi
-          else
-            echo "⚠️ Django container not running yet"
-            CONTAINERS_UP=false
-          fi
-          
-          if ! docker-compose -f docker/docker-compose.prod.yml --profile production ps nginx | grep -q "Up"; then
-            echo "⚠️ Nginx container not running yet"
-            CONTAINERS_UP=false
-          fi
-          
-          if [ "\\$CONTAINERS_UP" = "false" ]; then
-            echo "Containers still starting up..."
-            docker-compose -f docker/docker-compose.prod.yml --profile production logs --tail=2
-          fi
-          
-          # Only wait if not the last attempt
-          if [ \$i -lt 6 ]; then
-            if [ "\\$CONTAINERS_UP" = "true" ]; then
-              echo "Containers up but API not ready, waiting 8s..."
-              sleep 8
-            else
-              echo "Health check \$i/6 - containers starting, waiting 12s..."
-              sleep 12
-            fi
-          fi
-        done
-        
-        if [ "\\$HEALTH_CHECK_SUCCESS" != "true" ]; then
-          echo "❌ Health check failed after 6 attempts"
-          docker-compose -f docker/docker-compose.prod.yml --profile production logs app --tail=20
-          docker-compose -f docker/docker-compose.prod.yml --profile production logs nginx --tail=10
-          echo "DEPLOYMENT_SUCCESS=false"
-        fi
+        # Copy and execute deployment script
+        cp /tmp/deploy-ec2.sh ./
+        chmod +x deploy-ec2.sh
+        ./deploy-ec2.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"
         DEPLOY_EOF
         
         # Check deployment result
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
-          echo "✅ Professional deployment completed successfully"
-          
-          # Final verification after 30 seconds
-          echo "⏳ Waiting 30 seconds before final verification..."
-          sleep 30
-          
-          echo "🔍 Final container status check:"
-          ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 $EC2_USER@$EC2_HOST << 'VERIFY_EOF'
-          cd /opt/restaurant-web
-          echo "🐳 Container Status:"
-          docker-compose -f docker/docker-compose.prod.yml --profile production ps
-          echo "📊 Recent container logs:"
-          docker-compose -f docker/docker-compose.prod.yml --profile production logs --tail=30
-          echo "🌐 Network connectivity tests:"
-          echo "Testing localhost connections:"
-          curl -I http://localhost/ || echo "❌ Nginx localhost not responding"
-          curl -I http://localhost:8000/api/v1/health/ || echo "❌ Django localhost not responding"
-          echo "🔍 System network status:"
-          netstat -tulpn | grep ":80\|:8000" || echo "No services on ports 80/8000"
-          echo "📋 Docker network info:"
-          docker network ls
-          docker network inspect restaurant-network || echo "Network not found"
-          echo "🚦 Service status check complete"
-          VERIFY_EOF
+          echo "✅ Deployment completed successfully"
         else
-          echo "❌ Deployment failed with SSH error"
+          echo "❌ Deployment failed"
           exit 1
         fi
 
