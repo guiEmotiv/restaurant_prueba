@@ -1,4 +1,4 @@
-# Fix table names in dashboard_operativo_view
+# Fix dashboard_operativo_view with correct table names
 
 from django.db import migrations
 
@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('operation', '0033_fix_container_price_column'),
+        ('operation', '0035_safe_cleanup_deprecated_tables'),
     ]
 
     operations = [

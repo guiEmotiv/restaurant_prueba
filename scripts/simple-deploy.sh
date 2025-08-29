@@ -85,6 +85,11 @@ if ! /usr/bin/curl -f -s http://localhost/api/v1/dashboard-operativo/report/?dat
     exit 1
 fi
 
+if ! /usr/bin/curl -f -s http://localhost/api/v1/dashboard-financiero/report/?date=2025-08-29&period=month; then
+    echo "❌ Dashboard financiero API failed"
+    exit 1
+fi
+
 if ! /usr/bin/curl -f -s http://localhost/api/v1/orders/kitchen_board/; then
     echo "❌ Kitchen board API failed" 
     exit 1

@@ -264,6 +264,12 @@ jobs:
             exit 1
         fi
         
+        echo "Testing dashboard financiero API..."
+        if ! /usr/bin/curl -f -s http://localhost/api/v1/dashboard-financiero/report/?date=2025-08-29&period=month > /dev/null; then
+            echo "❌ Dashboard financiero API failed"
+            exit 1
+        fi
+        
         echo "Testing kitchen board API..."  
         if ! /usr/bin/curl -f -s http://localhost/api/v1/orders/kitchen_board/ > /dev/null; then
             echo "❌ Kitchen board API failed"
