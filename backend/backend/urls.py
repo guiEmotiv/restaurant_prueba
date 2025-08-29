@@ -985,6 +985,8 @@ urlpatterns = [
     # Serve frontend assets - MUST come before the catch-all route
     re_path(r'^assets/(?P<path>.*)$', serve_frontend_asset, name='frontend_assets'),
     path('vite.svg', serve_vite_svg, name='vite_svg'),
+    # TEST ROUTE - Direct React app serving
+    path('test-react-app/', index_view, name='test_react_app'),
     # Include API routes with explicit api/v1/ prefix
     path('api/v1/', include('api_urls')),
 ]
