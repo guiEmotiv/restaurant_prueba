@@ -44,8 +44,10 @@ const retryNetworkRequest = async (requestFunc, maxRetries = 2) => {
     } catch (error) {
       // Handle network change errors
       if (error.code === 'ERR_NETWORK' || 
+          error.code === 'ERR_INTERNET_DISCONNECTED' ||
           error.message?.includes('Network Error') ||
-          error.message?.includes('ERR_NETWORK_CHANGED')) {
+          error.message?.includes('ERR_NETWORK_CHANGED') ||
+          error.message?.includes('ERR_INTERNET_DISCONNECTED')) {
         
         if (attempt < maxRetries) {
           // Wait before retry (exponential backoff)
@@ -241,14 +243,16 @@ export const apiService = {
       const isNetworkError = (
         error.code === 'NETWORK_ERROR' || 
         error.code === 'ERR_NETWORK_CHANGED' ||
+        error.code === 'ERR_INTERNET_DISCONNECTED' ||
         error.message?.includes('Network Error') ||
+        error.message?.includes('ERR_INTERNET_DISCONNECTED') ||
         error.response?.status >= 500
       );
       
-      // ERR_NETWORK_CHANGED específico - no reintentar inmediatamente
-      if (error.code === 'ERR_NETWORK_CHANGED') {
-        logger.warn(`Network changed error on ${endpoint} - stopping retries to prevent infinite loop`);
-        throw new Error(`Network connection changed. Please refresh the page.`);
+      // Errores específicos de conexión - manejar silenciosamente para polling
+      if (error.code === 'ERR_NETWORK_CHANGED' || error.code === 'ERR_INTERNET_DISCONNECTED') {
+        logger.warn(`${error.code} error on ${endpoint} - silent fail for polling`);
+        throw new Error('NETWORK_ERROR_SILENT');
       }
       
       if (retries > 0 && isNetworkError) {
@@ -461,10 +465,10 @@ export const apiService = {
           error.response?.status >= 500
         );
         
-        // ERR_NETWORK_CHANGED específico - no reintentar
-        if (error.code === 'ERR_NETWORK_CHANGED') {
-          logger.warn(`Network changed error on recipes - stopping retries to prevent infinite loop`);
-          throw new Error(`Network connection changed. Please refresh the page.`);
+        // Errores específicos de conexión - manejar silenciosamente  
+        if (error.code === 'ERR_NETWORK_CHANGED' || error.code === 'ERR_INTERNET_DISCONNECTED') {
+          logger.warn(`${error.code} error on recipes - silent fail for polling`);
+          throw new Error('NETWORK_ERROR_SILENT');
         }
         
         if (retries > 0 && isNetworkError) {

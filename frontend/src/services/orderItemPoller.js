@@ -12,6 +12,30 @@ class OrderItemPoller {
     this.intervalMs = 2000; // Polling cada 2 segundos para mejor sincronización multi-usuario
     this.isKitchenView = false;
     this.updateCallback = null;
+    this.consecutiveErrors = 0;
+    this.maxConsecutiveErrors = 3;
+    this.backoffMs = 5000; // Tiempo base para backoff
+    
+    // Detector de estado de conexión
+    this.setupNetworkDetection();
+  }
+
+  // Configurar detección de estado de red
+  setupNetworkDetection() {
+    if (typeof navigator !== 'undefined' && 'onLine' in navigator) {
+      window.addEventListener('online', () => {
+        console.log('OrderItemPoller: Connection restored, resuming polling');
+        if (!this.isPolling && this.isKitchenView) {
+          this.consecutiveErrors = 0;
+          this.startPolling();
+        }
+      });
+      
+      window.addEventListener('offline', () => {
+        console.log('OrderItemPoller: Connection lost, pausing polling');
+        this.stopPolling();
+      });
+    }
   }
 
   // Configurar vista de cocina
@@ -48,9 +72,11 @@ class OrderItemPoller {
       });
       
     } catch (error) {
-      // Manejo específico para ERR_NETWORK_CHANGED
-      if (error.message?.includes('Network connection changed')) {
-        console.warn('OrderItemPoller: Network changed during initialization');
+      // Manejo específico para errores de red/internet
+      if (error.message?.includes('Network connection changed') || 
+          error.message?.includes('NETWORK_ERROR_SILENT') ||
+          error.code === 'ERR_INTERNET_DISCONNECTED') {
+        console.warn('OrderItemPoller: Network issue during initialization');
         return;
       }
       
@@ -60,6 +86,12 @@ class OrderItemPoller {
 
   // Detectar cambios en order items usando kitchen board
   async checkForNewOrderItems() {
+    // Verificar estado de conexión antes de hacer la llamada
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      // No hacer polling si está offline
+      return;
+    }
+    
     try {
       // Solo usar kitchen board para reducir llamadas API
       const kitchenBoard = await apiService.orders.getKitchenBoard();
@@ -121,6 +153,9 @@ class OrderItemPoller {
       this.knownItems = currentItems;
       this.knownItemIds = currentItemIds;
       
+      // Reset contador de errores en polling exitoso
+      this.consecutiveErrors = 0;
+      
       // Si hay cambios, actualizar la vista
       if (hasChanges && this.updateCallback) {
         this.updateCallback();
@@ -139,15 +174,45 @@ class OrderItemPoller {
       }
       
     } catch (error) {
-      // Manejo específico para ERR_NETWORK_CHANGED
-      if (error.message?.includes('Network connection changed')) {
-        console.warn('OrderItemPoller: Network changed, pausing polling for 5 seconds');
+      // Incrementar contador de errores consecutivos
+      this.consecutiveErrors++;
+      
+      // Manejo específico para errores de conexión a internet
+      if (error.message?.includes('Network connection changed') ||
+          error.message?.includes('NETWORK_ERROR_SILENT') ||
+          error.code === 'ERR_INTERNET_DISCONNECTED' ||
+          error.code === 'ERR_NETWORK_CHANGED') {
+        
+        // No mostrar error en console si el navegador detecta que está offline
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          // Silencioso cuando está offline según el navegador
+          this.stopPolling();
+          return;
+        }
+        
+        console.warn(`OrderItemPoller: ${error.code || 'Network error'}, pausing polling`);
         this.stopPolling();
+        
+        // Backoff progresivo basado en errores consecutivos
+        const pauseTime = Math.min(this.backoffMs * Math.pow(2, this.consecutiveErrors - 1), 60000);
         setTimeout(() => {
-          if (!this.isPolling) {
+          if (!this.isPolling && this.isKitchenView) {
             this.startPolling();
           }
-        }, 5000);
+        }, pauseTime);
+        return;
+      }
+      
+      // Para otros errores, usar backoff más conservador
+      if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
+        console.warn(`OrderItemPoller: Too many consecutive errors (${this.consecutiveErrors}), pausing polling`);
+        this.stopPolling();
+        setTimeout(() => {
+          this.consecutiveErrors = 0;
+          if (!this.isPolling && this.isKitchenView) {
+            this.startPolling();
+          }
+        }, 30000); // 30 segundos de pausa para errores persistentes
         return;
       }
       
