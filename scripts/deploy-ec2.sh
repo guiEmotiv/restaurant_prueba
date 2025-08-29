@@ -72,7 +72,7 @@ USE_COGNITO_AUTH=True
 COGNITO_USER_POOL_ID=will-be-set-by-secrets
 COGNITO_APP_CLIENT_ID=will-be-set-by-secrets
 AWS_REGION=us-west-2
-ALLOWED_HOSTS=localhost,127.0.0.1,app,restaurant-web-app,xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com,44.248.47.186
+ALLOWED_HOSTS=localhost,127.0.0.1,app,restaurant-web-app,xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com,elfogóndedonsoto.com,www.elfogóndedonsoto.com,44.248.47.186
 DATABASE_PATH=/opt/restaurant-web/data
 DATABASE_NAME=restaurant.prod.sqlite3
 ENV_EOF
@@ -155,7 +155,7 @@ NGINX_MAIN_EOF
 cat > docker/nginx/conf.d/default.conf << NGINX_CONF_EOF
 server {
     listen 80 default_server;
-    server_name _;
+    server_name _ xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com elfogóndedonsoto.com www.elfogóndedonsoto.com;
 
     # API requests to Django backend
     location /api/ {
