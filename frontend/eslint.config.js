@@ -34,6 +34,7 @@ export default defineConfig([
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'no-useless-catch': 'warn',
       'react-hooks/exhaustive-deps': 'warn',
+      'react-refresh/only-export-components': 'warn',
     },
   },
   {
