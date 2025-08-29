@@ -173,9 +173,8 @@ jobs:
           --file Dockerfile.prod .
         echo "✅ Docker image built and pushed with optimized caching"
 
-    - name: 🚀 Secure EC2 Deployment
+    - name: 🧪 Migration Validation
       env:
-        ACTION: ${{ github.event.inputs.action || 'deploy' }}
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -189,27 +188,54 @@ jobs:
         ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
         chmod 644 ~/.ssh/known_hosts
         
-        echo "📦 Uploading deployment script..."
-        scp -o ConnectTimeout=30 scripts/deploy-ec2.sh $EC2_USER@$EC2_HOST:/tmp/
+        echo "📦 Uploading migration validator..."
+        scp -o ConnectTimeout=30 scripts/migration-validator.sh $EC2_USER@$EC2_HOST:/tmp/
         
-        echo "🚀 Executing optimized deployment on EC2..."
+        echo "🔬 Validating migrations..."
+        MIGRATION_STRATEGY=$(ssh -o ConnectTimeout=30 $EC2_USER@$EC2_HOST << VALIDATE_EOF
+        set -e
+        cd /opt/restaurant-web
+        chmod +x /tmp/migration-validator.sh
+        /tmp/migration-validator.sh "$ECR_REGISTRY" "$ECR_REPOSITORY"
+        VALIDATE_EOF
+        )
+        
+        echo "MIGRATION_STRATEGY=$MIGRATION_STRATEGY" >> $GITHUB_ENV
+        echo "📋 Migration strategy: $MIGRATION_STRATEGY"
+
+    - name: 🚀 Smart EC2 Deployment
+      env:
+        ACTION: ${{ github.event.inputs.action || 'deploy' }}
+        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
+        EC2_USER: ${{ secrets.EC2_USERNAME }}
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+      run: |        
+        echo "📦 Uploading smart deployment scripts..."
+        scp -o ConnectTimeout=30 scripts/smart-deploy.sh $EC2_USER@$EC2_HOST:/tmp/
+        scp -o ConnectTimeout=30 scripts/emergency-cleanup.sh $EC2_USER@$EC2_HOST:/tmp/
+        
+        echo "🚀 Executing smart deployment on EC2..."
         ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 -o StrictHostKeyChecking=yes $EC2_USER@$EC2_HOST << DEPLOY_EOF
         set -e
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
         
-        # Copy and execute deployment script
-        cp /tmp/deploy-ec2.sh ./
-        chmod +x deploy-ec2.sh
-        ./deploy-ec2.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"
+        # Copy deployment scripts
+        cp /tmp/smart-deploy.sh ./scripts/
+        cp /tmp/emergency-cleanup.sh ./scripts/
+        chmod +x scripts/smart-deploy.sh scripts/emergency-cleanup.sh
+        
+        # Execute smart deployment
+        ./scripts/smart-deploy.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"
         DEPLOY_EOF
         
         # Check deployment result
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
-          echo "✅ Deployment completed successfully"
+          echo "✅ Smart deployment completed successfully"
         else
-          echo "❌ Deployment failed"
+          echo "❌ Smart deployment failed"
           exit 1
         fi
 
