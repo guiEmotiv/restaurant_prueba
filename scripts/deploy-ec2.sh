@@ -153,16 +153,17 @@ http {
 }
 NGINX_MAIN_EOF
 
-cat > docker/nginx/conf.d/default.conf << NGINX_CONF_EOF
+# Create temporary nginx config for Let's Encrypt challenge
+cat > docker/nginx/conf.d/default.conf << NGINX_TEMP_EOF
 server {
     listen 80 default_server;
-    listen 443 ssl default_server;
-    server_name _ *.elfogóndedonsoto.com *.xn--elfogndedonsoto-zrb.com elfogóndedonsoto.com www.elfogóndedonsoto.com xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+    server_name ${DOMAIN} www.${DOMAIN};
     
-    # Self-signed SSL certificate (temporary)
-    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
-    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
-
+    # Let's Encrypt challenge
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
     # API requests to Django backend
     location /api/ {
         proxy_pass http://app:8000;
@@ -170,13 +171,9 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-        proxy_buffering off;
     }
 
-    # Admin and static Django files
+    # Admin and static Django files  
     location /admin/ {
         proxy_pass http://app:8000;
         proxy_set_header Host \$host;
@@ -188,22 +185,71 @@ server {
         proxy_pass http://app:8000;
     }
 
-    # Frontend SPA - AGGRESSIVE React Router support
+    # Frontend SPA - React Router support
     location / {
-        # ALWAYS proxy to Django - let Django handle ALL routing decisions
         proxy_pass http://app:8000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-        # Disable nginx error handling - Django handles everything
         proxy_intercept_errors off;
     }
 }
-NGINX_CONF_EOF
+NGINX_TEMP_EOF
+
+# Update docker-compose to include certbot volume
+cat > docker/docker-compose.prod.yml << COMPOSE_TEMP_EOF
+services:
+  app:
+    image: ${ECR_REGISTRY}/restaurant-web:latest
+    container_name: restaurant-web-app
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./data:/opt/restaurant-web/data
+      - ./logs:/opt/restaurant-web/logs
+    environment:
+      - DATABASE_PATH=/opt/restaurant-web/data
+      - DATABASE_NAME=restaurant.prod.sqlite3
+    env_file:
+      - /opt/restaurant-web/.env.ec2
+    restart: unless-stopped
+    profiles:
+      - production
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/api/v1/health/']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+  nginx:
+    image: nginx:alpine
+    container_name: restaurant-web-nginx
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    profiles:
+      - production
+    networks:
+      - restaurant-network
+volumes:
+  restaurant_data:
+    driver: local
+  restaurant_logs:
+    driver: local
+networks:
+  restaurant-network:
+    driver: bridge
+COMPOSE_TEMP_EOF
 
 echo "🔐 Logging into ECR..."
 aws ecr get-login-password --region us-west-2 | sudo docker login --username AWS --password-stdin "$ECR_REGISTRY"
@@ -217,11 +263,11 @@ sudo docker-compose -f docker/docker-compose.prod.yml --profile production down 
 # Force cleanup
 sudo docker rm -f restaurant-web-app restaurant-web-nginx 2>/dev/null || true
 
-echo "▶️ Starting production services..."
+echo "▶️ Starting production services for certificate generation..."
 sudo docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate --remove-orphans
 
-echo "⏳ Health check..."
-sleep 15
+echo "⏳ Waiting for services to be ready..."
+sleep 20
 
 HEALTH_CHECK_SUCCESS=false
 for i in 1 2 3 4 5; do
@@ -286,16 +332,46 @@ fi
 echo "🛑 Stopping nginx for certificate generation..."
 sudo docker-compose -f docker/docker-compose.prod.yml --profile production stop nginx
 
-# Generate Let's Encrypt certificate
-echo "🔐 Generating Let's Encrypt certificate..."
-sudo certbot certonly --standalone --non-interactive --agree-tos \
-    --email admin@${DOMAIN} \
-    -d ${DOMAIN} -d www.${DOMAIN} || echo "⚠️ Certificate generation failed, using self-signed"
+# Skip Let's Encrypt for punycode domain - use proper self-signed certificate
+echo "🔐 Generating proper SSL certificate for ${DOMAIN}..."
+mkdir -p ssl
 
-# Update nginx configuration with Let's Encrypt certificates
-if [ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
-    echo "✅ Let's Encrypt certificate found, updating nginx..."
-    cat > docker/nginx/conf.d/default.conf << NGINX_SSL_EOF
+# Generate a proper self-signed certificate with correct domain
+cat > ssl/openssl.conf << SSL_CONFIG_EOF
+[req]
+default_bits = 2048
+prompt = no
+default_md = sha256
+distinguished_name = dn
+x509_extensions = v3_req
+
+[dn]
+C=US
+ST=State
+L=City
+O=Restaurant
+CN=${DOMAIN}
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${DOMAIN}
+DNS.2 = www.${DOMAIN}
+DNS.3 = *.${DOMAIN}
+SSL_CONFIG_EOF
+
+# Generate certificate
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout ssl/server.key \
+    -out ssl/server.crt \
+    -config ssl/openssl.conf
+
+echo "✅ SSL certificate generated for ${DOMAIN}"
+
+# Always configure nginx with generated certificate
+echo "✅ Configuring nginx with SSL certificate..."
+cat > docker/nginx/conf.d/default.conf << NGINX_SSL_EOF
 server {
     listen 80;
     server_name ${DOMAIN} www.${DOMAIN};
@@ -306,8 +382,8 @@ server {
     listen 443 ssl http2;
     server_name ${DOMAIN} www.${DOMAIN};
 
-    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_certificate /opt/restaurant-web/ssl/server.crt;
+    ssl_certificate_key /opt/restaurant-web/ssl/server.key;
     
     # SSL optimization
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -393,7 +469,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./ssl:/opt/restaurant-web/ssl:ro
     depends_on:
       - app
     restart: unless-stopped
@@ -411,18 +487,11 @@ networks:
     driver: bridge
 COMPOSE_SSL_EOF
 
-    echo "✅ Let's Encrypt certificate configured"
-else
-    echo "⚠️ Let's Encrypt failed, keeping self-signed certificate"
-fi
+# No need for else clause
 
 # Start services with SSL
 echo "🚀 Starting services with SSL certificate..."
 sudo docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate
-
-# Setup automatic certificate renewal
-echo "🔄 Setting up automatic certificate renewal..."
-(crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && docker-compose -f /opt/restaurant-web/docker/docker-compose.prod.yml --profile production restart nginx") | crontab -
 
 echo "✅ SSL Certificate deployment completed successfully"
 echo "BACKUP_DIR=$BACKUP_DIR" > ./last_deployment.env
