@@ -194,8 +194,9 @@ jobs:
         echo "🔬 Validating migrations..."
         MIGRATION_STRATEGY=$(ssh -o ConnectTimeout=30 $EC2_USER@$EC2_HOST << VALIDATE_EOF
         set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
-        chmod +x /tmp/migration-validator.sh
+        /bin/chmod +x /tmp/migration-validator.sh
         /tmp/migration-validator.sh "$ECR_REGISTRY" "$ECR_REPOSITORY"
         VALIDATE_EOF
         )
@@ -222,9 +223,9 @@ jobs:
         cd /opt/restaurant-web
         
         # Copy deployment scripts
-        cp /tmp/smart-deploy.sh ./scripts/
-        cp /tmp/emergency-cleanup.sh ./scripts/
-        chmod +x scripts/smart-deploy.sh scripts/emergency-cleanup.sh
+        /bin/cp /tmp/smart-deploy.sh ./scripts/
+        /bin/cp /tmp/emergency-cleanup.sh ./scripts/
+        /bin/chmod +x scripts/smart-deploy.sh scripts/emergency-cleanup.sh
         
         # Execute smart deployment
         ./scripts/smart-deploy.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"

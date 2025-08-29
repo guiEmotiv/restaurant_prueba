@@ -58,6 +58,7 @@ yarn-error.log*
 # React build
 frontend/build/
 frontend/dist/
+frontend/coverage/
 
 # IDEs
 .vscode/
@@ -176,3 +177,10 @@ tmp/
 .cache/
 .temp/
 restaurant-app-user_accessKeys.csv
+
+# Emergency and temporary deployment files
+emergency-*.sh
+*emergency*
+fix-migration.sql
+DEPLOYMENT.md
+WORKFLOW_OPTIMIZATIONS.md
