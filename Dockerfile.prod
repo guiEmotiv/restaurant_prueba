@@ -23,7 +23,8 @@ RUN mkdir -p /app/data /app/logs /app/staticfiles
 
 # Environment
 ENV PYTHONUNBUFFERED=1
-ENV DJANGO_SETTINGS_MODULE=backend.settings_prod
+ENV DJANGO_SETTINGS_MODULE=backend.settings
+ENV DJANGO_ENV=production
 
 # Create entrypoint script
 RUN echo '#!/bin/bash\n\
