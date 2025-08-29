@@ -287,6 +287,10 @@ jobs:
         fi
         echo "✅ Kitchen board API working (HTTP 200)"
         
+        # Trigger frontend cache refresh after successful deployment
+        echo "🔄 Triggering frontend cache refresh..."
+        /usr/bin/curl -s -X POST http://localhost/api/v1/force-refresh/ || echo "Cache refresh failed (non-critical)"
+        
         echo "✅ All critical APIs validated successfully"
         VALIDATE_EOF
 

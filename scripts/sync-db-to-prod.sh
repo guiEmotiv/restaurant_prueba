@@ -196,6 +196,10 @@ deploy_database() {
         
         # Wait for services
         sleep 10
+        
+        # Trigger frontend cache refresh
+        echo "Triggering frontend cache refresh..."
+        /usr/bin/curl -s -X POST http://localhost/api/v1/force-refresh/ || echo "Cache refresh failed (non-critical)"
 EOF
     
     log_success "Database deployed successfully"

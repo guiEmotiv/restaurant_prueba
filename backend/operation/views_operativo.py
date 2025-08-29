@@ -41,8 +41,8 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
             else:
                 selected_date = timezone.now().date()
             
-            # Usar fallback directo por problemas con la vista
-            operational_data = self._query_fallback_data(selected_date)
+            # Usar vista principal de dashboard
+            operational_data = self._query_dashboard_view(selected_date)
             
             # Agregar información de la fecha
             operational_data['date'] = selected_date.isoformat()
@@ -155,7 +155,7 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
             # Debug: Primero verificar que la vista existe y tiene datos
             cursor.execute("""
                 SELECT COUNT(*) FROM dashboard_operativo_view
-                WHERE operational_date = %s
+                WHERE date(created_at) = %s
             """, [selected_date])
             
             count_result = cursor.fetchone()
@@ -171,7 +171,7 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
                     recipe_name, category_name, category_id,
                     payment_method, payment_amount
                 FROM dashboard_operativo_view
-                WHERE operational_date = %s
+                WHERE date(created_at) = %s
                 ORDER BY order_id, item_id
             """, [selected_date])
             

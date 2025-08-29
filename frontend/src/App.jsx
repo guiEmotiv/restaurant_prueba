@@ -9,6 +9,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleProtectedRoute from './components/auth/RoleProtectedRoute';
 import RoleValidator from './components/auth/RoleValidator';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
+import DeploymentMonitor from './components/DeploymentMonitor';
 import DashboardOperativo from './pages/DashboardOperativo';
 import DashboardFinanciero from './pages/DashboardFinanciero';
 import Units from './pages/config/Units';
@@ -174,6 +175,7 @@ function App() {
       <ToastProvider>
         <AuthProvider>
           <Router>
+            <DeploymentMonitor />
             <LoginForm>
               <RoleValidator>
                 <AppContent />
