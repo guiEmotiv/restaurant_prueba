@@ -998,6 +998,6 @@ urlpatterns += static('/assets/', document_root=settings.STATIC_ROOT / 'assets')
 # Serve React app for root and SPA fallback routes (after API routes)
 urlpatterns += [
     path('', index_view, name='frontend_index'),  # Root
-    # SPA fallback for React Router - catch all non-API routes
-    re_path(r'^(?!api/|admin/|assets/|static/|media/|import-|csrf/).*$', index_view, name='spa_fallback'),
+    # SPA fallback for React Router - catch all non-API routes (more specific)
+    re_path(r'^(?!api/|admin/|assets/|static/|media/|import-|csrf/)[^/]+/?.*$', index_view, name='spa_fallback'),
 ]
