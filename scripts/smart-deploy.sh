@@ -34,6 +34,10 @@ success() {
 [ -z "$ECR_REGISTRY" ] && error "ECR_REGISTRY is required"
 [ -z "$ECR_REPOSITORY" ] && error "ECR_REPOSITORY is required"
 
+# ALWAYS run cleanup first on every deployment
+log "🧹 Running automatic cleanup..."
+/bin/bash ./scripts/auto-cleanup.sh || warn "Cleanup script failed, continuing..."
+
 # Quick actions
 case "$ACTION" in
     "status") 
