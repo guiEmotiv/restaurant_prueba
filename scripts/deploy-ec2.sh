@@ -147,6 +147,9 @@ sudo docker-compose -f docker/docker-compose.prod.yml --profile production down 
 echo "🚀 Starting services..."
 sudo docker-compose -f docker/docker-compose.prod.yml --profile production up -d
 
+echo "📊 Running database migrations to ensure views exist..."
+sudo docker exec restaurant-web-app python manage.py migrate --run-syncdb
+
 echo "🔐 Setting up SSL certificate..."
 sudo mkdir -p /var/www/certbot
 sudo docker-compose -f docker/docker-compose.prod.yml --profile ssl-setup up certbot --remove-orphans
