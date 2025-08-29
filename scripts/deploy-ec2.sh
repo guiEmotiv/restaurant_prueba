@@ -270,4 +270,159 @@ if [ "$HEALTH_CHECK_SUCCESS" != "true" ]; then
 fi
 
 echo "✅ Deployment completed successfully"
+
+# Configure Let's Encrypt SSL certificate
+echo "🔐 Configuring Let's Encrypt SSL certificate..."
+DOMAIN="xn--elfogndedonsoto-zrb.com"
+
+# Install certbot if not present
+if ! command -v certbot &> /dev/null; then
+    echo "📦 Installing certbot..."
+    sudo apt update
+    sudo apt install -y certbot
+fi
+
+# Stop nginx to allow certbot standalone
+echo "🛑 Stopping nginx for certificate generation..."
+sudo docker-compose -f docker/docker-compose.prod.yml --profile production stop nginx
+
+# Generate Let's Encrypt certificate
+echo "🔐 Generating Let's Encrypt certificate..."
+sudo certbot certonly --standalone --non-interactive --agree-tos \
+    --email admin@${DOMAIN} \
+    -d ${DOMAIN} -d www.${DOMAIN} || echo "⚠️ Certificate generation failed, using self-signed"
+
+# Update nginx configuration with Let's Encrypt certificates
+if [ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
+    echo "✅ Let's Encrypt certificate found, updating nginx..."
+    cat > docker/nginx/conf.d/default.conf << NGINX_SSL_EOF
+server {
+    listen 80;
+    server_name ${DOMAIN} www.${DOMAIN};
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN} www.${DOMAIN};
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    
+    # SSL optimization
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+
+    # API requests to Django backend
+    location /api/ {
+        proxy_pass http://app:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_buffering off;
+    }
+
+    # Admin and static Django files
+    location /admin/ {
+        proxy_pass http://app:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /static/ {
+        proxy_pass http://app:8000;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Frontend SPA - React Router support
+    location / {
+        proxy_pass http://app:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_intercept_errors off;
+    }
+}
+NGINX_SSL_EOF
+
+    # Update docker-compose to mount SSL certificates
+    cat > docker/docker-compose.prod.yml << COMPOSE_SSL_EOF
+services:
+  app:
+    image: ${ECR_REGISTRY}/restaurant-web:latest
+    container_name: restaurant-web-app
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./data:/opt/restaurant-web/data
+      - ./logs:/opt/restaurant-web/logs
+    environment:
+      - DATABASE_PATH=/opt/restaurant-web/data
+      - DATABASE_NAME=restaurant.prod.sqlite3
+    env_file:
+      - /opt/restaurant-web/.env.ec2
+    restart: unless-stopped
+    profiles:
+      - production
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/api/v1/health/']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+  nginx:
+    image: nginx:alpine
+    container_name: restaurant-web-nginx
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    profiles:
+      - production
+    networks:
+      - restaurant-network
+volumes:
+  restaurant_data:
+    driver: local
+  restaurant_logs:
+    driver: local
+networks:
+  restaurant-network:
+    driver: bridge
+COMPOSE_SSL_EOF
+
+    echo "✅ Let's Encrypt certificate configured"
+else
+    echo "⚠️ Let's Encrypt failed, keeping self-signed certificate"
+fi
+
+# Start services with SSL
+echo "🚀 Starting services with SSL certificate..."
+sudo docker-compose -f docker/docker-compose.prod.yml --profile production up -d --force-recreate
+
+# Setup automatic certificate renewal
+echo "🔄 Setting up automatic certificate renewal..."
+(crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && docker-compose -f /opt/restaurant-web/docker/docker-compose.prod.yml --profile production restart nginx") | crontab -
+
+echo "✅ SSL Certificate deployment completed successfully"
 echo "BACKUP_DIR=$BACKUP_DIR" > ./last_deployment.env
