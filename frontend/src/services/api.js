@@ -36,6 +36,31 @@ const api = axios.create({
   xsrfHeaderName: 'X-CSRFToken'
 });
 
+// Network error retry function
+const retryNetworkRequest = async (requestFunc, maxRetries = 2) => {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await requestFunc();
+    } catch (error) {
+      // Handle network change errors
+      if (error.code === 'ERR_NETWORK' || 
+          error.message?.includes('Network Error') ||
+          error.message?.includes('ERR_NETWORK_CHANGED')) {
+        
+        if (attempt < maxRetries) {
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          continue;
+        }
+        
+        // Silent fail on network errors for polling requests
+        throw new Error('NETWORK_ERROR_SILENT');
+      }
+      throw error;
+    }
+  }
+};
+
 // Export API_BASE_URL for use in other components
 export { API_BASE_URL };
 
@@ -522,8 +547,20 @@ export const apiService = {
       return response.data;
     },
     getKitchenBoard: async () => {
-      const response = await api.get('/orders/kitchen_board/');
-      return response.data;
+      try {
+        return await retryNetworkRequest(async () => {
+          const response = await api.get('/orders/kitchen_board/', {
+            timeout: 8000  // Shorter timeout for frequent polling
+          });
+          return response.data;
+        });
+      } catch (error) {
+        if (error.message === 'NETWORK_ERROR_SILENT') {
+          // Silent fail for network errors in polling
+          return [];
+        }
+        throw error;
+      }
     },
     getServed: async () => {
       const response = await api.get('/orders/served/');
