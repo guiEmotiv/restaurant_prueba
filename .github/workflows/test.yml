@@ -61,6 +61,11 @@ jobs:
         cd backend
         pip install -r requirements.txt
     
+    - name: Setup Django environment
+      run: |
+        cd backend
+        mkdir -p data/logs
+        
     - name: Run Django tests
       run: |
         cd backend
