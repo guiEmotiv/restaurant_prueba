@@ -1,0 +1,58 @@
+# Production docker-compose
+
+services:
+  app:
+    image: ${ECR_REGISTRY}/restaurant-web:latest
+    container_name: restaurant-web-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/opt/restaurant-web/data
+      - ./logs:/opt/restaurant-web/logs
+    environment:
+      - DATABASE_PATH=/opt/restaurant-web/data
+      - DATABASE_NAME=restaurant.prod.sqlite3
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DEBUG=False
+      - ALLOWED_HOSTS=44.248.47.186,xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - USE_COGNITO_AUTH=True
+      - AWS_REGION=us-west-2
+      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+      - COGNITO_APP_CLIENT_ID=${COGNITO_APP_CLIENT_ID}
+    restart: unless-stopped
+    profiles:
+      - production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  nginx:
+    image: nginx:alpine
+    container_name: restaurant-web-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./data/certbot/www:/var/www/certbot:ro
+      - ./data/certbot/conf:/etc/letsencrypt:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  restaurant_data:
+    driver: local
+  restaurant_logs:
+    driver: local
+
+networks:
+  default:
+    name: restaurant-network
