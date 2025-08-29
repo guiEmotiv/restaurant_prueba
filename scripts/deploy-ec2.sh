@@ -81,7 +81,7 @@ ENV_EOF
 cat > docker/docker-compose.prod.yml << COMPOSE_EOF
 services:
   app:
-    image: \${ECR_REGISTRY}/restaurant-web:latest
+    image: ${ECR_REGISTRY}/restaurant-web:latest
     container_name: restaurant-web-app
     ports:
       - '8000:8000'
