@@ -12,6 +12,45 @@ case "$ACTION" in
   "status") sudo docker ps; exit 0 ;;
   "logs") sudo docker logs app; exit 0 ;;
   "restart") sudo docker restart app nginx; exit 0 ;;
+  "debug-db") 
+    # Diagnóstico de base de datos
+    echo "🔍 Ejecutando diagnóstico de base de datos..."
+    sudo docker exec restaurant-web-app python manage.py shell << 'DJANGO_SHELL'
+from django.db import connection
+from datetime import date
+
+try:
+    cursor = connection.cursor()
+    
+    # Verificar vista
+    cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='view' AND name='dashboard_operativo_view'")
+    view_exists = cursor.fetchone()[0]
+    print(f"Vista existe: {view_exists > 0}")
+    
+    if view_exists > 0:
+        # Verificar datos para hoy
+        today = date.today()
+        cursor.execute("SELECT COUNT(*) FROM dashboard_operativo_view WHERE operational_date = ?", [today])
+        today_records = cursor.fetchone()[0]
+        print(f"Registros hoy: {today_records}")
+        
+        # Verificar si hay algún error de estructura
+        try:
+            cursor.execute("SELECT * FROM dashboard_operativo_view LIMIT 1")
+            sample = cursor.fetchone()
+            print(f"Muestra OK: {len(sample) if sample else 0} campos")
+        except Exception as e:
+            print(f"Error estructura: {e}")
+    
+    cursor.close()
+
+except Exception as e:
+    print(f"Error diagnóstico: {e}")
+    import traceback
+    traceback.print_exc()
+DJANGO_SHELL
+    exit 0
+    ;;
 esac
 
 # Aggressive disk cleanup before deployment
