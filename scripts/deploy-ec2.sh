@@ -53,34 +53,48 @@ DJANGO_SHELL
     ;;
 esac
 
-# Aggressive disk cleanup before deployment
-echo "🧹 Aggressively cleaning disk space..."
+# NUCLEAR disk cleanup - free maximum space
+echo "🧹 NUCLEAR disk cleanup - freeing maximum space..."
+echo "🔍 Disk before cleanup:"
 df -h
 
-# Stop and remove all containers
-sudo docker stop $(sudo docker ps -aq) 2>/dev/null || true
-sudo docker rm $(sudo docker ps -aq) 2>/dev/null || true
+# Stop everything
+sudo systemctl stop docker nginx 2>/dev/null || true
+sudo pkill -f docker || true
+sudo pkill -f nginx || true
 
-# Remove all unused images, networks, volumes
-sudo docker system prune -af --volumes || true
-sudo docker image prune -af || true
-sudo docker volume prune -f || true
-sudo docker network prune -f || true
+# Nuclear Docker cleanup
+sudo rm -rf /var/lib/docker 2>/dev/null || true
+sudo rm -rf ~/.docker /root/.docker 2>/dev/null || true
 
-# Clean APT cache
-sudo apt autoremove -y || true
-sudo apt autoclean || true
-sudo apt clean || true
+# System cleanup
+sudo apt-get autoremove --purge -y 2>/dev/null || true
+sudo apt-get autoclean 2>/dev/null || true
+sudo apt-get clean 2>/dev/null || true
 
-# Clean log files
-sudo find /var/log -type f -name "*.log" -exec truncate -s 0 {} \; 2>/dev/null || true
-sudo journalctl --vacuum-time=1d || true
+# Logs cleanup
+sudo rm -rf /var/log/* 2>/dev/null || true
+sudo journalctl --vacuum-size=10M 2>/dev/null || true
 
-# Remove any orphaned files
-sudo find /tmp -type f -atime +1 -delete 2>/dev/null || true
+# Temp cleanup  
+sudo rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
 
-echo "📊 Disk usage after cleanup:"
+# Cache cleanup
+sudo rm -rf /var/cache/* ~/.cache /root/.cache 2>/dev/null || true
+
+# Snap cleanup if exists
+sudo snap list --all | awk '/disabled/{print $1, $3}' | while read snapname revision; do sudo snap remove "$snapname" --revision="$revision"; done 2>/dev/null || true
+
+# Clean old kernels
+dpkg -l 'linux-*' | sed '/^ii/!d;/'"$(uname -r | sed "s/\(.*\)-\([^0-9]\+\)/\1/")"'/d;s/^[^ ]* [^ ]* \([^ ]*\).*/\1/;/[0-9]/!d' | xargs sudo apt-get -y purge 2>/dev/null || true
+
+# Restart Docker with clean state
+sudo systemctl start docker
+sleep 10
+
+echo "📊 Disk after NUCLEAR cleanup:"
 df -h
+free -h
 
 mkdir -p data
 
