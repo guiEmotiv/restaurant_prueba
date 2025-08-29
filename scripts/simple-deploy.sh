@@ -9,35 +9,74 @@ ACTION="${3:-deploy}"
 
 echo "🚀 Starting deployment..."
 
-# Always cleanup first
+# Always cleanup first (non-critical, can fail)
 echo "🧹 Automatic cleanup..."
-/bin/bash ./scripts/auto-cleanup.sh || echo "Cleanup warning ignored"
+/bin/bash ./scripts/auto-cleanup.sh || echo "⚠️ Cleanup failed but continuing deployment"
 
-# Pull latest code
+# Pull latest code with validation
 echo "📥 Syncing latest code..."
-/usr/bin/git pull origin main || echo "Git pull failed, continuing"
-
-# Pull latest image
-echo "📦 Pulling latest Docker image..."
-/usr/bin/docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:latest" || echo "Docker pull failed"
-
-# Quick backup
-echo "💾 Quick backup..."
-if [ -f "data/restaurant.prod.sqlite3" ]; then
-    /bin/cp data/restaurant.prod.sqlite3 "data/backups/prod/backup_$(/bin/date +%Y%m%d_%H%M%S).sqlite3" 2>/dev/null || true
+if ! /usr/bin/git pull origin main; then
+    echo "❌ Git pull failed - deployment aborted"
+    exit 1
 fi
 
-# Run migrations safely
-echo "🔄 Running migrations..."
-/usr/bin/docker-compose -f docker/docker-compose.prod.yml run --rm app python manage.py migrate --fake-initial || /usr/bin/docker-compose -f docker/docker-compose.prod.yml run --rm app python manage.py migrate
+# Pull latest image with validation  
+echo "📦 Pulling latest Docker image..."
+if ! /usr/bin/docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:latest"; then
+    echo "❌ Docker pull failed - deployment aborted"
+    exit 1
+fi
 
-# Deploy
+# Mandatory backup before any changes
+echo "💾 Creating mandatory backup..."
+if [ -f "data/restaurant.prod.sqlite3" ]; then
+    BACKUP_FILE="data/backups/prod/backup_$(/bin/date +%Y%m%d_%H%M%S).sqlite3"
+    /bin/mkdir -p "data/backups/prod"
+    if ! /bin/cp data/restaurant.prod.sqlite3 "$BACKUP_FILE"; then
+        echo "❌ Backup creation failed - deployment aborted"
+        exit 1
+    fi
+    echo "✅ Backup created: $BACKUP_FILE"
+else
+    echo "⚠️ No production database found, proceeding without backup"
+fi
+
+# Run migrations with strict validation
+echo "🔄 Running migrations with validation..."
+if ! /usr/bin/docker-compose -f docker/docker-compose.prod.yml run --rm app python manage.py migrate --check; then
+    echo "❌ Migration validation failed - deployment aborted"
+    exit 1
+fi
+
+echo "✅ Migration validation passed, applying migrations..."
+/usr/bin/docker-compose -f docker/docker-compose.prod.yml run --rm app python manage.py migrate
+
+# Deploy with validation
 echo "🚀 Deploying..."
-/usr/bin/docker-compose -f docker/docker-compose.prod.yml --profile production up -d
+if ! /usr/bin/docker-compose -f docker/docker-compose.prod.yml --profile production up -d; then
+    echo "❌ Docker deployment failed - rolling back"
+    exit 1
+fi
 
-# Health check
-echo "🏥 Health check..."
-sleep 10
-curl -f http://localhost/api/v1/health/ || echo "Health check warning"
+# Strict health check
+echo "🏥 Validating deployment health..."
+sleep 15
 
-echo "✅ Deployment completed!"
+# Check if containers are running
+if ! /usr/bin/docker ps | /bin/grep restaurant-web-app; then
+    echo "❌ Application container not running"
+    exit 1
+fi
+
+# Test critical APIs
+if ! /usr/bin/curl -f -s http://localhost/api/v1/dashboard-operativo/report/?date=2025-08-29; then
+    echo "❌ Dashboard operativo API failed"
+    exit 1
+fi
+
+if ! /usr/bin/curl -f -s http://localhost/api/v1/orders/kitchen_board/; then
+    echo "❌ Kitchen board API failed" 
+    exit 1
+fi
+
+echo "✅ Deployment completed and validated!"

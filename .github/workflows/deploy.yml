@@ -173,7 +173,7 @@ jobs:
           --file Dockerfile.prod .
         echo "✅ Docker image built and pushed with optimized caching"
 
-    - name: 🧪 Quick Migration Check
+    - name: 🧪 Pre-deployment Validation
       env:
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
         EC2_USER: ${{ secrets.EC2_USERNAME }}
@@ -186,14 +186,29 @@ jobs:
         ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
         chmod 644 ~/.ssh/known_hosts
         
-        echo "🔬 Quick migration check..."
+        echo "🔬 Strict pre-deployment validation..."
         ssh -o ConnectTimeout=30 $EC2_USER@$EC2_HOST << VALIDATE_EOF
+        set -e
         export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         cd /opt/restaurant-web
-        echo "✅ Migration validation: using safe migration strategy"
+        
+        # Check disk space (must have at least 500MB)
+        AVAILABLE=\$(/bin/df / | /usr/bin/tail -1 | /usr/bin/awk '{print \$4}')
+        if [ "\$AVAILABLE" -lt 512000 ]; then
+            echo "❌ Insufficient disk space: \${AVAILABLE}KB available"
+            exit 1
+        fi
+        
+        # Check if Docker is running
+        if ! /usr/bin/docker info > /dev/null 2>&1; then
+            echo "❌ Docker is not running"
+            exit 1
+        fi
+        
+        echo "✅ Pre-deployment validation passed"
         VALIDATE_EOF
 
-    - name: 🚀 Smart EC2 Deployment
+    - name: 🚀 Strict EC2 Deployment
       env:
         ACTION: ${{ github.event.inputs.action || 'deploy' }}
         EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
@@ -223,11 +238,37 @@ jobs:
         # Check deployment result
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
-          echo "✅ Smart deployment completed successfully"
+          echo "✅ Strict deployment completed successfully"
         else
-          echo "❌ Smart deployment failed"
+          echo "❌ Strict deployment failed"
           exit 1
         fi
+
+    - name: 🏥 Post-deployment Validation  
+      env:
+        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
+        EC2_USER: ${{ secrets.EC2_USERNAME }}
+      run: |
+        echo "🔬 Validating production deployment..."
+        ssh -o ConnectTimeout=30 $EC2_USER@$EC2_HOST << VALIDATE_EOF
+        set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        
+        # Test critical API endpoints
+        echo "Testing dashboard operativo API..."
+        if ! /usr/bin/curl -f -s http://localhost/api/v1/dashboard-operativo/report/?date=2025-08-29 > /dev/null; then
+            echo "❌ Dashboard operativo API failed"
+            exit 1
+        fi
+        
+        echo "Testing kitchen board API..."  
+        if ! /usr/bin/curl -f -s http://localhost/api/v1/orders/kitchen_board/ > /dev/null; then
+            echo "❌ Kitchen board API failed"
+            exit 1
+        fi
+        
+        echo "✅ All critical APIs validated successfully"
+        VALIDATE_EOF
 
     - name: 📊 Deployment Summary
       if: always()
