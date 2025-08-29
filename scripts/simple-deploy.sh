@@ -20,7 +20,13 @@ if ! /usr/bin/git pull origin main; then
     exit 1
 fi
 
-# Pull latest image with validation  
+# Login to ECR and pull latest image with validation
+echo "🔐 Logging into ECR..."
+if ! /usr/local/bin/aws ecr get-login-password --region us-west-2 | /usr/bin/docker login --username AWS --password-stdin "$ECR_REGISTRY"; then
+    echo "❌ ECR login failed - deployment aborted"
+    exit 1
+fi
+
 echo "📦 Pulling latest Docker image..."
 if ! /usr/bin/docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:latest"; then
     echo "❌ Docker pull failed - deployment aborted"
