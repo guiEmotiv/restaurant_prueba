@@ -319,33 +319,19 @@ jobs:
         echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
         echo "    }" >> docker/nginx/conf.d/default.conf
         echo "" >> docker/nginx/conf.d/default.conf
-        echo "    # Frontend SPA - serve React build files with fallback" >> docker/nginx/conf.d/default.conf
+        echo "    # Frontend SPA - AGGRESSIVE React Router support" >> docker/nginx/conf.d/default.conf
         echo "    location / {" >> docker/nginx/conf.d/default.conf
+        echo "        # ALWAYS proxy to Django - let Django handle ALL routing decisions" >> docker/nginx/conf.d/default.conf
         echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_set_header X-Real-IP \\\$remote_addr;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_set_header X-Forwarded-Proto \\\$scheme;" >> docker/nginx/conf.d/default.conf
-        echo "        # Enhanced SPA fallback for React Router - CRITICAL for client-side routing" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_intercept_errors on;" >> docker/nginx/conf.d/default.conf
-        echo "        error_page 404 = @fallback;" >> docker/nginx/conf.d/default.conf
-        echo "        # Try files first, then fallback to Django for SPA" >> docker/nginx/conf.d/default.conf
-        echo "        try_files \\\$uri @fallback;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_connect_timeout 60s;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_send_timeout 60s;" >> docker/nginx/conf.d/default.conf
         echo "        proxy_read_timeout 60s;" >> docker/nginx/conf.d/default.conf
-        echo "    }" >> docker/nginx/conf.d/default.conf
-        echo "" >> docker/nginx/conf.d/default.conf
-        echo "    # SPA fallback location - enhanced for React Router" >> docker/nginx/conf.d/default.conf
-        echo "    location @fallback {" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_pass http://app:8000;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header Host \\\$host;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Real-IP \\\$remote_addr;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Forwarded-For \\\$proxy_add_x_forwarded_for;" >> docker/nginx/conf.d/default.conf
-        echo "        proxy_set_header X-Forwarded-Proto \\\$scheme;" >> docker/nginx/conf.d/default.conf
-        echo "        # Force no caching for SPA routes" >> docker/nginx/conf.d/default.conf
-        echo "        expires -1;" >> docker/nginx/conf.d/default.conf
-        echo "        add_header Cache-Control 'no-cache, no-store, must-revalidate';" >> docker/nginx/conf.d/default.conf
+        echo "        # Disable nginx error handling - Django handles everything" >> docker/nginx/conf.d/default.conf
+        echo "        proxy_intercept_errors off;" >> docker/nginx/conf.d/default.conf
         echo "    }" >> docker/nginx/conf.d/default.conf
         echo "}" >> docker/nginx/conf.d/default.conf
         
