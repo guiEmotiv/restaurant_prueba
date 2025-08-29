@@ -14,6 +14,13 @@ case "$ACTION" in
   "restart") sudo docker restart app nginx; exit 0 ;;
 esac
 
+# Clean up disk space before deployment
+echo "🧹 Cleaning disk space..."
+sudo docker system prune -af || true
+sudo apt autoremove -y || true
+sudo apt autoclean || true
+df -h
+
 mkdir -p data
 
 cat > .env << 'EOF'
