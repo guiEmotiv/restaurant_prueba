@@ -58,6 +58,11 @@ case "$ACTION" in
     sudo docker-compose -f docker/docker-compose.prod.yml --profile production restart
     exit 0
     ;;
+  "check-security")
+    echo "🔍 Checking Security Groups..."
+    bash ./check-security-groups.sh
+    exit 0
+    ;;
 esac
 
 # Create directory structure
