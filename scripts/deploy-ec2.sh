@@ -407,8 +407,8 @@ server {
     listen 443 ssl http2;
     server_name ${DOMAIN} www.${DOMAIN};
 
-    ssl_certificate /opt/restaurant-web/ssl/server.crt;
-    ssl_certificate_key /opt/restaurant-web/ssl/server.key;
+    ssl_certificate /etc/ssl/certs/server.crt;
+    ssl_certificate_key /etc/ssl/private/server.key;
     
     # SSL optimization
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -494,7 +494,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./ssl:/opt/restaurant-web/ssl:ro
+      - ./ssl/server.crt:/etc/ssl/certs/server.crt:ro
+      - ./ssl/server.key:/etc/ssl/private/server.key:ro
     depends_on:
       - app
     restart: unless-stopped
