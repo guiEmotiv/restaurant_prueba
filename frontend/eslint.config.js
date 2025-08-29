@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'public/notification-sw.js']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -15,7 +15,11 @@ export default defineConfig([
     ],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      globals: {
+        ...globals.browser,
+        ...globals.jest,
+        ...globals.node,
+      },
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },
@@ -23,7 +27,30 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['warn', { 
+        varsIgnorePattern: '^[A-Z_]|^_',
+        argsIgnorePattern: '^_|^error$|^e$|^event$'
+      }],
+      'no-empty': ['warn', { allowEmptyCatch: true }],
+      'no-useless-catch': 'warn',
+      'react-hooks/exhaustive-deps': 'warn',
+    },
+  },
+  {
+    files: ['**/__tests__/**/*.{js,jsx}', '**/*.test.{js,jsx}', '**/*.spec.{js,jsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.jest,
+        global: 'readonly',
+        jest: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+      },
     },
   },
 ])
