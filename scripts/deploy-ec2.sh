@@ -120,6 +120,7 @@ services:
       - production
     networks:
       - restaurant-network
+    command: sh -c "apk add --no-cache openssl && openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/ssl-cert-snakeoil.key -out /etc/ssl/certs/ssl-cert-snakeoil.pem -subj '/C=US/ST=State/L=City/O=Organization/CN=*.xn--elfogndedonsoto-zrb.com' && nginx -g 'daemon off;'"
 volumes:
   restaurant_data:
     driver: local
@@ -155,7 +156,12 @@ NGINX_MAIN_EOF
 cat > docker/nginx/conf.d/default.conf << NGINX_CONF_EOF
 server {
     listen 80 default_server;
+    listen 443 ssl default_server;
     server_name _ *.elfogóndedonsoto.com *.xn--elfogndedonsoto-zrb.com elfogóndedonsoto.com www.elfogóndedonsoto.com xn--elfogndedonsoto-zrb.com www.xn--elfogndedonsoto-zrb.com;
+    
+    # Self-signed SSL certificate (temporary)
+    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
 
     # API requests to Django backend
     location /api/ {
