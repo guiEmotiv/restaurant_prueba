@@ -78,6 +78,11 @@ case "$ACTION" in
     bash ./fix-ssl.sh
     exit 0
     ;;
+  "fix-nginx-ssl")
+    echo "🔧 Fixing Nginx SSL Configuration..."
+    bash ./fix-nginx-ssl.sh
+    exit 0
+    ;;
 esac
 
 # Create directory structure
