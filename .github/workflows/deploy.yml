@@ -227,6 +227,13 @@ jobs:
         export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
         export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
         export AWS_DEFAULT_REGION="us-west-2"
+        
+        # Export Cognito and Django secrets for production configuration
+        export PROD_DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
+        export PROD_COGNITO_USER_POOL_ID="${{ secrets.COGNITO_USER_POOL_ID }}"
+        export PROD_COGNITO_APP_CLIENT_ID="${{ secrets.COGNITO_APP_CLIENT_ID }}"
+        export PROD_DOMAIN_NAME="${{ secrets.DOMAIN_NAME }}"
+        
         cd /opt/restaurant-web
         
         # Copy deployment scripts
@@ -234,7 +241,7 @@ jobs:
         /bin/cp /tmp/auto-cleanup.sh ./scripts/
         /bin/chmod +x scripts/simple-deploy.sh scripts/auto-cleanup.sh
         
-        # Execute simple deployment
+        # Execute simple deployment with production secrets
         ./scripts/simple-deploy.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"
         DEPLOY_EOF
         
