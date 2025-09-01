@@ -46,6 +46,24 @@ const AnalyticsCharts = ({
     '#06b6d4', // cyan-500
   ];
 
+  // Función para formatear fechas - movida fuera del useMemo para ser accesible
+  const formatDate = useCallback((dateStr) => {
+    try {
+      if (!dateStr) return 'Hoy';
+      // Parsear fecha sin conversión de zona horaria
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      
+      return date.toLocaleDateString('es-ES', { 
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+      });
+    } catch (e) {
+      return dateStr || 'Hoy';
+    }
+  }, []);
+
   // Función para obtener color consistente de categoría basado en orden global
   const getCategoryColor = useCallback((categoryName) => {
     if (!dashboardData?.category_breakdown) return categoryColors[0];
@@ -62,11 +80,25 @@ const AnalyticsCharts = ({
   // Use dashboardData passed from parent
   useEffect(() => {
     if (dashboardData) {
+      // CRÍTICO: Loggear la estructura completa de datos del backend
+      console.log('🔍 RAW DASHBOARD DATA STRUCTURE:', {
+        hasSalesByDay: !!dashboardData.sales_by_day,
+        salesByDayLength: dashboardData.sales_by_day?.length || 0,
+        firstDayData: dashboardData.sales_by_day?.[0],
+        topDishesInFirstDay: dashboardData.sales_by_day?.[0]?.top_dishes?.length || 0,
+        sampleTopDishes: dashboardData.sales_by_day?.[0]?.top_dishes?.slice(0, 3) || []
+      });
+      
       // El backend ya filtra los datos según el período seleccionado
       // Usar directamente los sales_by_day del backend que contiene las fechas del view
       if (dashboardData.sales_by_day && Array.isArray(dashboardData.sales_by_day) && dashboardData.sales_by_day.length > 0) {
         // Usar datos REALES del backend - NO calcular proporcionalmente
         const processedData = dashboardData.sales_by_day.map(dayData => {
+          console.log(`📅 Processing day ${dayData.date}:`, {
+            topDishesCount: dayData.top_dishes?.length || 0,
+            categoryBreakdownCount: dayData.category_breakdown?.length || 0,
+            sampleTopDish: dayData.top_dishes?.[0] || null
+          });
           
           return {
             date: dayData.date,
@@ -77,10 +109,11 @@ const AnalyticsCharts = ({
             },
             // Usar category_breakdown REAL del backend para este día específico
             category_breakdown: dayData.category_breakdown || [],
-            top_dishes: dashboardData.top_dishes || [] // Usar top_dishes globales para tooltips
+            top_dishes: dayData.top_dishes || [] // Usar top_dishes específicos del día si están disponibles
           };
         });
         
+        console.log('✅ PROCESSED ANALYTICS DATA:', processedData);
         setAnalyticsData(processedData);
       } else {
         // Si no hay sales_by_day, usar el summary general como single data point
@@ -100,23 +133,6 @@ const AnalyticsCharts = ({
     if (!analyticsData || analyticsData.length === 0) {
       return { sales: [], production: [], customers: [] };
     }
-
-    const formatDate = (dateStr) => {
-      try {
-        if (!dateStr) return 'Hoy';
-        // Parsear fecha sin conversión de zona horaria
-        const [year, month, day] = dateStr.split('-').map(Number);
-        const date = new Date(year, month - 1, day);
-        
-        return date.toLocaleDateString('es-ES', { 
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short'
-        });
-      } catch (e) {
-        return dateStr || 'Hoy';
-      }
-    };
 
     // Vista VENTAS - Métrica: Total de ventas por día
     const salesData = analyticsData.map(data => {
@@ -176,7 +192,7 @@ const AnalyticsCharts = ({
     });
 
     return { sales: salesData, production: productionData, customers: customersData };
-  }, [analyticsData, selectedDate]);
+  }, [analyticsData, selectedDate, formatDate]);
   
   // Clear tooltip when chart type changes
   useEffect(() => {
@@ -315,28 +331,153 @@ const AnalyticsCharts = ({
     };
   }, [analyticsData]);
 
-  // Función para obtener recetas por categoría
-  const getCategoryRecipes = (categoryName, viewType = 'production') => {
-    if (!dashboardData || !dashboardData.top_dishes) return [];
+  // Función para obtener recetas por categoría de la fecha específica
+  const getCategoryRecipes = (categoryName, viewType = 'production', specificDate = null) => {
+    console.log('🔍 getCategoryRecipes called:', { categoryName, viewType, specificDate, selectedDate, analyticsDataLength: analyticsData.length });
     
-    return dashboardData.top_dishes
-      .filter(dish => dish.category === categoryName)
-      .sort((a, b) => {
-        if (viewType === 'sales') {
-          // Ordenar por revenue (mayor a menor)
-          return (Number(b.revenue || 0)) - (Number(a.revenue || 0));
-        } else {
-          // Ordenar por quantity (mayor a menor)
-          return (Number(b.quantity || 0)) - (Number(a.quantity || 0));
-        }
+    // AGREGAR: Log completo de analyticsData para debuggear
+    console.log('📊 FULL analyticsData:', analyticsData.map(data => ({
+      date: data.date,
+      revenue: data.summary?.total_revenue,
+      items: data.summary?.total_items,
+      topDishesCount: data.top_dishes?.length || 0,
+      categoryBreakdownCount: data.category_breakdown?.length || 0,
+      topDishesPreview: data.top_dishes?.slice(0,2)?.map(dish => ({
+        name: dish.name,
+        category: dish.category,
+        quantity: dish.quantity,
+        revenue: dish.revenue
+      })) || []
+    })));
+    
+    // CRÍTICO: Log de TODAS las categorías disponibles en los datos
+    analyticsData.forEach(data => {
+      if (data.top_dishes && data.top_dishes.length > 0) {
+        const categories = [...new Set(data.top_dishes.map(dish => dish.category))];
+        console.log(`📅 Date ${data.date} - Available categories:`, categories);
+        console.log(`🔍 Looking for category "${categoryName}" - Case sensitive match:`, categories.includes(categoryName));
+      }
+    });
+    
+    
+    // ARREGLADO: Buscar en la fecha específica del segmento si se proporciona
+    const targetDate = specificDate || selectedDate;
+    console.log('🔍 SEARCHING FOR CATEGORY ON SPECIFIC DATE:', { categoryName, targetDate });
+    
+    // Buscar datos de la fecha específica del segmento
+    const currentDayData = analyticsData.find(data => {
+      // Comparar la fecha del segmento con los datos disponibles
+      const rawDataDate = data.date;
+      const formattedDataDate = formatDate(data.date);
+      const rawTargetDate = targetDate;
+      const formattedTargetDate = formatDate(targetDate);
+      
+      console.log('📅 SPECIFIC DATE COMPARISON:', { 
+        rawDataDate, 
+        formattedDataDate,
+        rawTargetDate,
+        formattedTargetDate,
+        rawMatch: rawDataDate === rawTargetDate,
+        formattedMatch: formattedDataDate === formattedTargetDate
       });
+      
+      // Intentar múltiples comparaciones para encontrar la fecha exacta
+      return rawDataDate === rawTargetDate || 
+             formattedDataDate === formattedTargetDate ||
+             rawDataDate === formattedTargetDate ||
+             formattedDataDate === rawTargetDate;
+    });
+    
+    console.log('📊 Current day data found:', currentDayData ? 'YES' : 'NO', currentDayData?.top_dishes?.length || 0, 'top_dishes');
+    
+    // Si encontramos datos del día específico y tiene top_dishes, usar esos
+    if (currentDayData && currentDayData.top_dishes && Array.isArray(currentDayData.top_dishes) && currentDayData.top_dishes.length > 0) {
+      console.log('🔍 DEBUGGING FILTER - Available dishes:', currentDayData.top_dishes.map(dish => ({
+        name: dish.name,
+        category: dish.category,
+        categoryLength: dish.category?.length,
+        targetCategory: categoryName,
+        targetLength: categoryName?.length,
+        exactMatch: dish.category === categoryName,
+        trimmedMatch: dish.category?.trim() === categoryName?.trim()
+      })));
+      
+      // MEJORADO: Filtro más robusto con trimming
+      const filteredDishes = currentDayData.top_dishes.filter(dish => {
+        const dishCategory = dish.category?.trim();
+        const targetCategory = categoryName?.trim();
+        return dishCategory === targetCategory;
+      });
+      
+      console.log('🍽️ Filtered dishes for category:', categoryName, filteredDishes.length, filteredDishes);
+      
+      // AGREGAR: Log total de valores para verificar consistencia
+      const totalRevenue = filteredDishes.reduce((sum, dish) => sum + (Number(dish.revenue) || 0), 0);
+      const totalQuantity = filteredDishes.reduce((sum, dish) => sum + (Number(dish.quantity) || 0), 0);
+      console.log('💰 TOOLTIP VALUES:', {
+        categoryName,
+        expectedRevenue: 'Should match bar segment value',
+        calculatedRevenue: totalRevenue.toFixed(2),
+        expectedQuantity: 'Should match bar segment quantity',
+        calculatedQuantity: totalQuantity,
+        dishCount: filteredDishes.length
+      });
+      
+      return filteredDishes.sort((a, b) => {
+          if (viewType === 'sales') {
+            return (Number(b.revenue || 0)) - (Number(a.revenue || 0));
+          } else {
+            return (Number(b.quantity || 0)) - (Number(a.quantity || 0));
+          }
+        });
+    }
+    
+    // Si no hay top_dishes específicos pero hay category_breakdown, mostrar solo mensaje de categoría
+    if (currentDayData && currentDayData.category_breakdown && Array.isArray(currentDayData.category_breakdown)) {
+      const categoryData = currentDayData.category_breakdown.find(cat => cat.category === categoryName);
+      if (categoryData) {
+        // Devolver datos básicos de la categoría para el día específico
+        return [{
+          name: `${categoryName} (${formatDate(selectedDate)})`,
+          category: categoryName,
+          quantity: categoryData.quantity || 0,
+          revenue: categoryData.revenue || 0,
+          unit_price: categoryData.revenue && categoryData.quantity ? (categoryData.revenue / categoryData.quantity).toFixed(2) : 0
+        }];
+      }
+    }
+    
+    // MEJORADO: Fallback más inteligente - buscar en cualquier día disponible si no hay datos específicos
+    if (analyticsData.length > 0) {
+      console.log('🔍 Searching in all available days for category:', categoryName);
+      
+      for (const dayData of analyticsData) {
+        if (dayData.top_dishes && Array.isArray(dayData.top_dishes) && dayData.top_dishes.length > 0) {
+          const filteredDishes = dayData.top_dishes.filter(dish => dish.category === categoryName);
+          if (filteredDishes.length > 0) {
+            console.log('🍽️ Found fallback dishes from date:', dayData.date, filteredDishes.length);
+            return filteredDishes.sort((a, b) => {
+              if (viewType === 'sales') {
+                return (Number(b.revenue || 0)) - (Number(a.revenue || 0));
+              } else {
+                return (Number(b.quantity || 0)) - (Number(a.quantity || 0));
+              }
+            });
+          }
+        }
+      }
+    }
+    
+    // Último fallback: no hay datos
+    console.log('❌ No recipe data found for category:', categoryName);
+    return [];
   };
 
   // Tooltip Component
   const Tooltip = ({ data, position }) => {
     if (!data) return null;
     
-    const recipes = getCategoryRecipes(data.category, data.type);
+    const recipes = getCategoryRecipes(data.category, data.type, data.date);
     
     // Calculate responsive positioning
     const tooltipWidth = 320;
@@ -664,6 +805,7 @@ const AnalyticsCharts = ({
                                   border: '1px solid rgba(255,255,255,0.3)'
                                 }}
                                 onMouseEnter={(e) => {
+                                  console.log('🔥 HOVER ACTIVATED on segment:', { category, segmentValue, chartType, itemDate: item.date });
                                   setIsHovering(true);
                                   const rect = e.currentTarget.getBoundingClientRect();
                                   setTooltipPosition({ 
@@ -674,7 +816,8 @@ const AnalyticsCharts = ({
                                     category,
                                     value: segmentValue,
                                     color: categoryColor,
-                                    type: chartType
+                                    type: chartType,
+                                    date: item.date // ARREGLADO: Pasar la fecha específica del segmento
                                   });
                                 }}
                                 onMouseLeave={() => {
@@ -886,11 +1029,21 @@ const AnalyticsCharts = ({
       </div>
 
       {/* Tooltip - Only show when actively hovering over a segment */}
-      {isHovering && hoveredSegment && tooltipPosition.x > 0 && tooltipPosition.y > 0 && (
-        <Tooltip 
-          data={hoveredSegment} 
-          position={tooltipPosition}
-        />
+      {console.log('🔍 TOOLTIP STATE:', { isHovering, hasHoveredSegment: !!hoveredSegment, tooltipPosition }) || null}
+      {isHovering && hoveredSegment && tooltipPosition.x > 0 && tooltipPosition.y > 0 ? (
+        <>
+          {console.log('✅ RENDERING TOOLTIP:', hoveredSegment) || null}
+          <Tooltip 
+            data={hoveredSegment} 
+            position={tooltipPosition}
+          />
+        </>
+      ) : (
+        console.log('❌ TOOLTIP NOT RENDERED - Conditions:', {
+          isHovering,
+          hasHoveredSegment: !!hoveredSegment,
+          validPosition: tooltipPosition.x > 0 && tooltipPosition.y > 0
+        }) || null
       )}
 
     </div>

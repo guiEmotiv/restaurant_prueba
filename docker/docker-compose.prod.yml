@@ -1,52 +1,39 @@
-# Production docker-compose
-
 services:
   app:
-    image: ${ECR_REGISTRY}/restaurant-web:latest
+    image: 721063839441.dkr.ecr.us-west-2.amazonaws.com/restaurant-web:latest
     container_name: restaurant-web-app
     ports:
-      - "8000:8000"
+      - '8000:8000'
     volumes:
       - ./data:/opt/restaurant-web/data
-      - ./logs:/opt/restaurant-web/logs
-    environment:
-      - DATABASE_PATH=/opt/restaurant-web/data
-      - DATABASE_NAME=restaurant.prod.sqlite3
-    env_file:
-      - .env.ec2
+    env_file: 
+      - /opt/restaurant-web/.env
     restart: unless-stopped
-    profiles:
-      - production
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+    profiles: [production]
+    networks: [restaurant-network]
 
   nginx:
     image: nginx:alpine
     container_name: restaurant-web-nginx
-    ports:
-      - "80:80"
-      - "443:443"
+    ports: ['80:80', '443:443']
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - ./data/certbot/www:/var/www/certbot:ro
-      - ./data/certbot/conf:/etc/letsencrypt:ro
-    depends_on:
-      - app
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on: [app]
     restart: unless-stopped
-    profiles:
-      - production
+    profiles: [production]
+    networks: [restaurant-network]
 
-volumes:
-  restaurant_data:
-    driver: local
-  restaurant_logs:
-    driver: local
+  certbot:
+    image: certbot/certbot
+    container_name: restaurant-web-certbot
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    command: certonly --webroot --webroot-path=/var/www/certbot --email admin@xn--elfogndedonsoto-zrb.com --agree-tos --no-eff-email -d xn--elfogndedonsoto-zrb.com -d www.xn--elfogndedonsoto-zrb.com
+    profiles: [ssl-setup]
 
 networks:
-  default:
-    name: restaurant-network
+  restaurant-network:
+    driver: bridge

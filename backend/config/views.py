@@ -2,12 +2,10 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny
-from rest_framework.views import APIView
 from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.utils import timezone
 from backend.cognito_permissions import (
     CognitoAdminOnlyPermission, 
     CognitoWaiterAndAdminPermission, 
@@ -16,7 +14,6 @@ from backend.cognito_permissions import (
 import pandas as pd
 import io
 import json
-import os
 from .models import Unit, Zone, Table, Container
 from .serializers import (
     UnitSerializer, ZoneSerializer, 
@@ -129,56 +126,4 @@ def operational_info(request):
         'business_hours': '24/7',   # Siempre disponible
         'message': 'Restaurante operativo'
     })
-
-
-class AppVersionView(APIView):
-    """
-    Endpoint to check app version and deployment timestamp
-    Used by frontend to detect when to refresh cache
-    """
-    permission_classes = [AllowAny]
-    
-    def get(self, request):
-        # Read deployment timestamp from file if exists
-        deployment_file = '/tmp/last_deployment_timestamp'
-        deployment_timestamp = None
-        
-        try:
-            if os.path.exists(deployment_file):
-                with open(deployment_file, 'r') as f:
-                    deployment_timestamp = f.read().strip()
-        except Exception:
-            pass
-        
-        return Response({
-            'version': '1.0.0',
-            'deployment_timestamp': deployment_timestamp,
-            'server_time': timezone.now().isoformat(),
-            'cache_bust': int(timezone.now().timestamp())
-        })
-
-
-class ForceRefreshView(APIView):
-    """
-    Endpoint to force frontend refresh
-    Called during deployment to signal cache clear needed
-    """
-    permission_classes = [AllowAny]
-    
-    def post(self, request):
-        # Write deployment timestamp
-        deployment_file = '/tmp/last_deployment_timestamp'
-        current_time = timezone.now().isoformat()
-        
-        try:
-            with open(deployment_file, 'w') as f:
-                f.write(current_time)
-        except Exception as e:
-            return Response({'error': str(e)}, status=500)
-        
-        return Response({
-            'status': 'refresh_triggered',
-            'timestamp': current_time,
-            'message': 'Frontend cache should refresh'
-        })
 

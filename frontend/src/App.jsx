@@ -9,7 +9,6 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleProtectedRoute from './components/auth/RoleProtectedRoute';
 import RoleValidator from './components/auth/RoleValidator';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
-import DeploymentMonitor from './components/DeploymentMonitor';
 import DashboardOperativo from './pages/DashboardOperativo';
 import DashboardFinanciero from './pages/DashboardFinanciero';
 import Units from './pages/config/Units';
@@ -27,7 +26,7 @@ import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
 // Configure AWS Amplify
 Amplify.configure(amplifyConfig);
 
-// 🔐 AWS Cognito Configuration - Required
+// 🔐 AWS Cognito Configuration - Validate credentials
 const isCognitoConfigured = (() => {
   const hasCredentials = !!(
     import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID && 
@@ -35,7 +34,14 @@ const isCognitoConfigured = (() => {
   );
   
   if (!hasCredentials) {
-    // AWS Cognito credentials not configured
+    console.error('🚫 AWS Cognito credentials not configured');
+    console.log('Required environment variables:');
+    console.log('- VITE_AWS_COGNITO_USER_POOL_ID');
+    console.log('- VITE_AWS_COGNITO_APP_CLIENT_ID');
+    console.log('');
+    console.log('Obtén estas credenciales de AWS Console > Cognito > User Pools');
+  } else {
+    console.log('✅ AWS Cognito authentication configured');
   }
   
   return hasCredentials;
@@ -175,7 +181,6 @@ function App() {
       <ToastProvider>
         <AuthProvider>
           <Router>
-            <DeploymentMonitor />
             <LoginForm>
               <RoleValidator>
                 <AppContent />

@@ -24,20 +24,6 @@ This is a restaurant management system with a Django REST API backend and React/
 - Toggle via `USE_COGNITO_AUTH` environment variable
 - Development mode bypasses authentication
 
-## Database Sync Commands
-
-**Sync Local to Production:**
-```bash
-./scripts/sync-db-to-prod.sh        # Interactive sync with confirmation
-./scripts/sync-db-to-prod.sh -f     # Force sync without confirmation
-```
-
-**Sync Production to Local:**
-```bash
-./scripts/sync-db-from-prod.sh      # Download prod DB to local
-./scripts/sync-db-from-prod.sh -f   # Force download without confirmation
-```
-
 ## Development Commands
 
 **Frontend (React/Vite):**

@@ -4,7 +4,6 @@ import '@aws-amplify/ui-react/styles.css';
 import { ChefHat } from 'lucide-react';
 
 const LoginForm = ({ children }) => {
-  
   // Configurar traducciones en español
   translations.es = {
     'Sign In': 'Iniciar Sesión',

@@ -5,6 +5,7 @@ import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import bluetoothPrinter from '../../services/bluetoothPrinter';
+import { getPeruDate } from '../../utils/dashboardUtils';
 
 const PaymentHistory = () => {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ const PaymentHistory = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState(getPeruDate());
   const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -33,7 +34,9 @@ const PaymentHistory = () => {
       // Filtrar por fecha si está seleccionada
       if (selectedDate) {
         paidOrders = paidOrders.filter(order => {
-          const orderDate = new Date(order.paid_at || order.created_at).toLocaleDateString('en-CA');
+          const orderDateObj = new Date(order.paid_at || order.created_at);
+          const peruDate = new Date(orderDateObj.getTime() - (5 * 60 * 60 * 1000));
+          const orderDate = peruDate.toISOString().split('T')[0];
           return orderDate === selectedDate;
         });
       }

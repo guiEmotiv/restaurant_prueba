@@ -201,6 +201,7 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
         payment_stats = defaultdict(lambda: {'amount': Decimal('0'), 'count': 0})
         daily_sales = defaultdict(lambda: {'orders': 0, 'revenue': Decimal('0'), 'items': 0})
         daily_category_stats = defaultdict(lambda: defaultdict(lambda: {'revenue': Decimal('0'), 'quantity': 0}))
+        daily_dish_stats = defaultdict(lambda: defaultdict(lambda: {'category': '', 'quantity': 0, 'revenue': Decimal('0'), 'unit_price': Decimal('0')}))
         
         # PROCESAR DATOS DE dashboard_operativo_view - INCLUIR total_with_container para consistencia
         for row in all_data:
@@ -243,6 +244,13 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
                     dish_stats[recipe_name]['quantity'] += quantity or 0
                     dish_stats[recipe_name]['revenue'] += Decimal(str(total_with_container or 0))
                     dish_stats[recipe_name]['unit_price'] = Decimal(str(unit_price or 0))
+                    
+                    # Stats por día y receta (para tooltips específicos por fecha)
+                    date_str = str(operational_date)
+                    daily_dish_stats[date_str][recipe_name]['category'] = category_name or 'Sin Categoría'
+                    daily_dish_stats[date_str][recipe_name]['quantity'] += quantity or 0
+                    daily_dish_stats[date_str][recipe_name]['revenue'] += Decimal(str(total_with_container or 0))
+                    daily_dish_stats[date_str][recipe_name]['unit_price'] = Decimal(str(unit_price or 0))
                 
                 # Stats de pagos - USAR total de la orden con contenedores para consistencia
                 if payment_method and payment_amount and order_id not in [p['order_id'] for p in payment_stats[payment_method].get('processed_orders', [])]:
@@ -306,12 +314,25 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
                         'quantity': cat_stats['quantity']
                     })
             
+            # Top dishes para este día específico (para tooltips)
+            day_top_dishes = []
+            if day in daily_dish_stats:
+                for dish_name, dish_stat in sorted(daily_dish_stats[day].items(), key=lambda x: x[1]['quantity'], reverse=True):
+                    day_top_dishes.append({
+                        'name': dish_name,
+                        'category': dish_stat['category'],
+                        'quantity': dish_stat['quantity'],
+                        'revenue': float(dish_stat['revenue']),
+                        'unit_price': float(dish_stat['unit_price'])
+                    })
+            
             sales_by_day.append({
                 'date': day,
                 'orders': stats['orders'],
                 'revenue': float(stats['revenue']),
                 'items': stats['items'],
-                'category_breakdown': day_category_breakdown  # Datos reales por día
+                'category_breakdown': day_category_breakdown,  # Datos reales por día
+                'top_dishes': day_top_dishes  # ✅ AGREGADO: top_dishes específicos del día
             })
         
         # Metas dinámicas

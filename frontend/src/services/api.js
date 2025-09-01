@@ -92,10 +92,11 @@ window.testApiAuth = async () => {
 };
 
 // Add global debugging function to test dashboard API
-window.testDashboardApi = async () => {
+window.testDashboardApi = async (date = null) => {
   try {
-    console.log('🔍 Testing dashboard API...');
-    const response = await api.get('/dashboard-operativo/report/');
+    const queryParam = date ? `?date=${date}` : '';
+    console.log(`🔍 Testing dashboard API with date: ${date || 'default'}...`);
+    const response = await api.get(`/dashboard-operativo/report/${queryParam}`);
     console.log('✅ Dashboard API Response:', response.data);
     return response.data;
   } catch (error) {
@@ -103,9 +104,49 @@ window.testDashboardApi = async () => {
     return { 
       error: error.message,
       status: error.response?.status,
-      data: error.response?.data 
+      data: error.response?.data
     };
   }
+};
+
+// Add global debugging function for date consistency
+window.debugDates = () => {
+  const now = new Date();
+  const peruDate = new Date(now.getTime() - (5 * 60 * 60 * 1000));
+  
+  console.log('🗓️ DATE DEBUGGING:');
+  console.log('Browser timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+  console.log('Current date/time (local):', now.toISOString());
+  console.log('Peru date (UTC-5):', peruDate.toISOString());
+  console.log('getPeruDate() would return:', peruDate.toISOString().split('T')[0]);
+  console.log('Browser locale date:', now.toLocaleDateString('en-CA'));
+  
+  return {
+    local: now.toISOString().split('T')[0],
+    peru: peruDate.toISOString().split('T')[0],
+    locale: now.toLocaleDateString('en-CA')
+  };
+};
+
+// Add comprehensive dashboard testing function
+window.testAllDashboards = async () => {
+  const dates = ['2025-08-30', '2025-08-31', '2025-09-01'];
+  const results = {};
+  
+  console.log('🧪 TESTING ALL DASHBOARDS WITH DIFFERENT DATES');
+  
+  for (const date of dates) {
+    try {
+      const result = await window.testDashboardApi(date);
+      results[date] = result;
+      console.log(`✅ ${date}: ${result.summary?.total_orders || 0} orders, $${result.summary?.total_revenue || 0}`);
+    } catch (error) {
+      results[date] = { error: error.message };
+      console.error(`❌ ${date}: ${error.message}`);
+    }
+  }
+  
+  return results;
 };
 
 

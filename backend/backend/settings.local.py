@@ -38,13 +38,9 @@ COGNITO_ENABLED = USE_COGNITO_AUTH
 
 # Rate limiting moved to Nginx - no longer handled by Django
 
-# Validate required Cognito settings only if authentication is enabled
+# Initial configuration message - will validate credentials later
 if USE_COGNITO_AUTH:
-    if not COGNITO_USER_POOL_ID:
-        print("⚠️  COGNITO_USER_POOL_ID not set. Authentication will fail.")
-    if not COGNITO_APP_CLIENT_ID:
-        print("⚠️  COGNITO_APP_CLIENT_ID not set. Authentication will fail.")
-    print(f"✅ AWS Cognito authentication ENABLED - Pool: {COGNITO_USER_POOL_ID}")
+    print("🔄 Cognito authentication requested (USE_COGNITO_AUTH=True)")
 else:
     print("ℹ️  Running without AWS Cognito authentication (USE_COGNITO_AUTH=False)")
 
@@ -148,9 +144,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Django REST Framework
 # ──────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
-    "DEFAULT_PERMISSION_CLASSES": (
+    "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
-    ),
+    ],
     "DEFAULT_AUTHENTICATION_CLASSES": [],  # No authentication in development
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
@@ -242,13 +238,20 @@ AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
 COGNITO_USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID', '')
 COGNITO_APP_CLIENT_ID = os.getenv('COGNITO_APP_CLIENT_ID', '')
 
-# Enable Cognito authentication - Check if Cognito is properly configured
-COGNITO_ENABLED = bool(COGNITO_USER_POOL_ID and COGNITO_APP_CLIENT_ID)
+# Enable Cognito authentication - Use USE_COGNITO_AUTH as single source of truth
+# COGNITO_ENABLED is already set earlier from USE_COGNITO_AUTH (line 37)
+# Do NOT override it based on presence of credentials
 
+# Validate that if Cognito is enabled, credentials are provided
 if COGNITO_ENABLED:
-    print(f"✅ AWS Cognito authentication ENABLED - User Pool: {COGNITO_USER_POOL_ID[:10]}...")
+    if not COGNITO_USER_POOL_ID or not COGNITO_APP_CLIENT_ID:
+        print("⚠️ WARNING: Cognito is enabled but credentials are missing!")
+        print("  COGNITO_USER_POOL_ID:", "Set" if COGNITO_USER_POOL_ID else "Missing")
+        print("  COGNITO_APP_CLIENT_ID:", "Set" if COGNITO_APP_CLIENT_ID else "Missing")
+    else:
+        print(f"✅ AWS Cognito authentication ENABLED - User Pool: {COGNITO_USER_POOL_ID[:10]}...")
 else:
-    print("⚠️ AWS Cognito authentication DISABLED - Missing configuration")
+    print("ℹ️ AWS Cognito authentication DISABLED - USE_COGNITO_AUTH=False")
 
 
 # ──────────────────────────────────────────────────────────────

@@ -29,7 +29,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         'container_sales__container',
         'payments'
     ).order_by('-created_at')
-    permission_classes = [AllowAny]  # Acceso completo en desarrollo
     pagination_class = None  # Deshabilitar paginación para órdenes
     
     def get_serializer_class(self):

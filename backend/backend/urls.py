@@ -984,9 +984,6 @@ urlpatterns = [
     path('api/v1/health/', health_check, name='health_check'),
     # Auth debug endpoint (public - no auth required)
     path('api/v1/auth-debug/', auth_debug, name='auth_debug'),
-    # App version and cache control endpoints
-    path('api/v1/app-version/', lambda request: __import__('config.views', fromlist=['AppVersionView']).AppVersionView.as_view()(request), name='app_version'),
-    path('api/v1/force-refresh/', lambda request: __import__('config.views', fromlist=['ForceRefreshView']).ForceRefreshView.as_view()(request), name='force_refresh'),
     # CSRF endpoint (public - no auth required)
     path('csrf/', get_csrf_token, name='csrf_token'),
     # Import endpoints outside of API middleware

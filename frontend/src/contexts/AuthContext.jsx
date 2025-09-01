@@ -16,10 +16,13 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
+  // Check if we're in development mode
+  const isDevelopmentMode = import.meta.env.VITE_DISABLE_COGNITO === 'true';
+  
+  const [user, setUser] = useState(isDevelopmentMode ? { username: 'dev-user' } : null);
+  const [userRole, setUserRole] = useState(isDevelopmentMode ? USER_ROLES.ADMIN : null);
   const [loading, setLoading] = useState(false); // ✅ Start as false, LoginForm will handle loading
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(isDevelopmentMode);
 
   // Use centralized user roles
   const ROLES = USER_ROLES;
@@ -106,6 +109,16 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
+      // Skip Cognito authentication in development mode
+      if (isDevelopmentMode) {
+        console.log('🔧 Development mode: Bypassing Cognito authentication');
+        setUser({ username: 'dev-user' });
+        setUserRole(USER_ROLES.ADMIN);
+        setIsAuthenticated(true);
+        setLoading(false);
+        return;
+      }
+      
       // Add a small delay to ensure session is fully established
       await new Promise(resolve => setTimeout(resolve, 500));
       const currentUser = await getCurrentUser();
@@ -190,6 +203,7 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       window.location.reload(); // Force page reload to clear any cached data
     } catch (error) {
+      console.error('Logout error:', error);
     }
   };
 

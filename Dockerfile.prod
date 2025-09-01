@@ -1,43 +1,107 @@
-FROM python:3.12-slim
+# ===== MULTI-STAGE OPTIMIZED DOCKERFILE =====
+
+# Stage 1: Frontend Builder
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci --only=production --no-audit --prefer-offline
+
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Backend Builder
+FROM python:3.12-slim AS backend-builder
+
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt .
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+# Stage 3: Production Runtime
+FROM python:3.12-slim AS production
+
+# Security: Create non-root user
+RUN groupadd --gid 1000 appgroup && \
+    useradd --uid 1000 --gid appgroup --shell /bin/bash --create-home appuser
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+    dumb-init \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get purge -y --auto-remove
 
-# Copy requirements first for better caching
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies from wheels
+COPY --from=backend-builder /app/wheels /wheels
+COPY --from=backend-builder /app/requirements.txt .
+RUN pip install --no-cache --find-links /wheels -r requirements.txt \
+    && rm -rf /wheels
 
-# Copy backend code
-COPY backend/ .
+# Copy application code
+COPY --chown=appuser:appgroup backend/ .
+COPY --from=frontend-builder --chown=appuser:appgroup /app/frontend/dist/ ./frontend/dist/
 
-# Copy frontend build
-COPY frontend/dist/ ./frontend/dist/
+# Create directories with proper permissions
+RUN mkdir -p /app/data /app/logs /app/staticfiles && \
+    chown -R appuser:appgroup /app
 
-# Create necessary directories
-RUN mkdir -p /app/data /app/logs /app/staticfiles
+# Production environment
+ENV PYTHONUNBUFFERED=1 \
+    DJANGO_SETTINGS_MODULE=backend.settings \
+    DJANGO_ENV=production \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
 
-# Environment
-ENV PYTHONUNBUFFERED=1
-ENV DJANGO_SETTINGS_MODULE=backend.settings
-ENV DJANGO_ENV=production
-
-# Create entrypoint script
+# Create optimized entrypoint script
 RUN echo '#!/bin/bash\n\
-set -e\n\
-echo "Starting Django application..."\n\
-python manage.py migrate --noinput || echo "Migrations skipped"\n\
-python manage.py collectstatic --noinput || echo "Static collection skipped"\n\
-exec gunicorn --bind 0.0.0.0:8000 --workers 2 --timeout 120 backend.wsgi:application\n\
-' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+set -euo pipefail\n\
+echo "🚀 Starting Restaurant Web Application..."\n\
+echo "📊 System Info: $(uname -a)"\n\
+echo "🐍 Python: $(python --version)"\n\
+echo "👤 User: $(whoami)"\n\
+\n\
+# Database migrations (safe)\n\
+echo "🗄️  Running database migrations..."\n\
+python manage.py migrate --noinput\n\
+\n\
+# Collect static files\n\
+echo "📦 Collecting static files..."\n\
+python manage.py collectstatic --noinput --clear\n\
+\n\
+# Start Gunicorn with optimized settings\n\
+echo "🌟 Starting Gunicorn server..."\n\
+exec gunicorn \\\n\
+    --bind 0.0.0.0:8000 \\\n\
+    --workers 3 \\\n\
+    --worker-class sync \\\n\
+    --worker-connections 1000 \\\n\
+    --max-requests 1000 \\\n\
+    --max-requests-jitter 50 \\\n\
+    --timeout 120 \\\n\
+    --keepalive 2 \\\n\
+    --preload \\\n\
+    --access-logfile - \\\n\
+    --error-logfile - \\\n\
+    --log-level info \\\n\
+    backend.wsgi:application\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh && chown appuser:appgroup /app/entrypoint.sh
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+# Enhanced health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8000/api/v1/health/ || exit 1
 
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["/app/entrypoint.sh"]

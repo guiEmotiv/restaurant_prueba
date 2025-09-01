@@ -96,6 +96,24 @@ deployment.log
 backup.log
 frontend-deployment.log
 
+# Development and testing artifacts
+.coverage
+*.coverage
+coverage/
+htmlcov/
+.pytest_cache/
+.tox/
+.cache/
+.nyc_output/
+
+# Temporary development files
+*.local.sqlite3
+*_dev.sqlite3
+*_test.sqlite3
+*.dockerignore_bk
+*_backup
+*_temp
+
 # Production database
 db.sqlite3
 *.db
