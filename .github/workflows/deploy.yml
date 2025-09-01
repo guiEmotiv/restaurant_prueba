@@ -268,10 +268,8 @@ jobs:
         fi
         
         echo "Testing dashboard financiero API..."
-        RESPONSE=$(/usr/bin/curl -s -w "\n%{http_code}" "http://localhost/api/v1/dashboard-financiero/report/?date=2025-08-29&period=month")
-        HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-        if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ Dashboard financiero API failed (HTTP $HTTP_CODE)"
+        if ! /usr/bin/curl -s http://localhost/api/v1/dashboard-financiero/report/?date=2025-08-29&period=month | grep -q "summary"; then
+            echo "❌ Dashboard financiero API failed"
             exit 1
         fi
         
