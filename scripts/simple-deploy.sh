@@ -87,19 +87,37 @@ if ! /usr/bin/docker-compose -f docker/docker-compose.prod.yml --profile product
     exit 1
 fi
 
-# Add a longer wait for the container to fully initialize  
-echo "⏳ Waiting for container initialization (30 seconds)..."
-sleep 30
-
-# Check Django configuration before health checks
-echo "🔧 Testing Django configuration..."
-if /usr/bin/docker exec restaurant-web-app python manage.py check --deploy 2>/dev/null; then
-    echo "✅ Django configuration check passed"
-else
-    echo "⚠️ Django configuration check failed - checking anyway..."
-    echo "📋 Django check output:"
-    /usr/bin/docker exec restaurant-web-app python manage.py check --deploy 2>&1 || echo "Could not run Django check"
-fi
+# Monitor container startup closely - check every 5 seconds
+echo "⏳ Monitoring container startup..."
+for i in {1..12}; do
+    echo "🔍 Container check $i/12 ($(($i * 5)) seconds)..."
+    
+    # Check if container is running
+    if /usr/bin/docker ps | /bin/grep restaurant-web-app | /bin/grep -v "Restarting"; then
+        echo "✅ Container is running, testing Django..."
+        # Try Django check immediately when container is up
+        if /usr/bin/docker exec restaurant-web-app python manage.py check --deploy 2>/dev/null; then
+            echo "✅ Django configuration check passed"
+            break
+        else
+            echo "⚠️ Django check failed but container is running"
+            /usr/bin/docker exec restaurant-web-app python manage.py check --deploy 2>&1 || echo "Could not run Django check"
+            break
+        fi
+    else
+        echo "⚠️ Container not ready or restarting. Status:"
+        /usr/bin/docker ps -a | /bin/grep restaurant-web-app || echo "Container not found"
+        
+        # If we detect container is restarting, capture logs immediately
+        if /usr/bin/docker ps -a | /bin/grep restaurant-web-app | /bin/grep "Restarting"; then
+            echo "🚨 Container is restarting! Capturing failure logs:"
+            /usr/bin/docker logs --tail=50 restaurant-web-app 2>&1 || echo "Could not retrieve logs"
+            break
+        fi
+        
+        sleep 5
+    fi
+done
 
 # Strict health check
 echo "🏥 Validating deployment health..."
