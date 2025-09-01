@@ -13,17 +13,8 @@ echo "🚀 Starting deployment..."
 echo "🧹 Automatic cleanup..."
 /bin/bash ./scripts/auto-cleanup.sh || echo "⚠️ Cleanup failed but continuing deployment"
 
-# Force sync latest code with validation
-echo "📥 Force syncing latest code..."
-if ! /usr/bin/git fetch origin main; then
-    echo "❌ Git fetch failed - deployment aborted"
-    exit 1
-fi
-
-if ! /usr/bin/git reset --hard origin/main; then
-    echo "❌ Git reset failed - deployment aborted"
-    exit 1
-fi
+# Skip Git sync - Docker image from ECR contains all necessary code
+echo "📥 Using Docker image from ECR (contains latest code)..."
 
 # Login to ECR and pull latest image with validation
 echo "🔐 Logging into ECR..."
