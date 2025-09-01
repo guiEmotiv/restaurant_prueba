@@ -74,5 +74,5 @@ jobs:
     - name: Security check
       run: |
         cd backend
-        pip install safety
+        pip install "safety>=3.0.0" "typer>=0.9.0"
         safety check --json || true
