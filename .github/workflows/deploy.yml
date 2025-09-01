@@ -221,30 +221,30 @@ jobs:
         scp -o ConnectTimeout=30 scripts/auto-cleanup.sh $EC2_USER@$EC2_HOST:/tmp/
         
         echo "🚀 Creating production .env file..."
-        cat > /tmp/production.env << PROD_ENV_EOF
-# Production Environment Configuration (Generated from GitHub Secrets)
-DEBUG=False
-DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-ALLOWED_HOSTS=*
-
-# Database Configuration
-DATABASE_NAME=restaurant.prod.sqlite3
-DATABASE_PATH=/opt/restaurant-web/data
-
-# AWS Cognito Configuration - ENABLED FOR PRODUCTION
-USE_COGNITO_AUTH=True
-AWS_REGION=us-west-2
-COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
-COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
-
-# Application Configuration
-TIME_ZONE=America/Lima
-LANGUAGE_CODE=es-pe
-
-# Network Configuration
-EC2_PUBLIC_IP=44.248.47.186
-DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
-PROD_ENV_EOF
+        cat > /tmp/production.env << 'PROD_ENV_EOF'
+        # Production Environment Configuration (Generated from GitHub Secrets)
+        DEBUG=False
+        DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        ALLOWED_HOSTS=*
+        
+        # Database Configuration
+        DATABASE_NAME=restaurant.prod.sqlite3
+        DATABASE_PATH=/opt/restaurant-web/data
+        
+        # AWS Cognito Configuration - ENABLED FOR PRODUCTION
+        USE_COGNITO_AUTH=True
+        AWS_REGION=us-west-2
+        COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
+        COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
+        
+        # Application Configuration
+        TIME_ZONE=America/Lima
+        LANGUAGE_CODE=es-pe
+        
+        # Network Configuration
+        EC2_PUBLIC_IP=44.248.47.186
+        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+        PROD_ENV_EOF
 
         echo "🚀 Uploading production environment configuration..."
         scp -o ConnectTimeout=30 /tmp/production.env $EC2_USER@$EC2_HOST:/tmp/
