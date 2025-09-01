@@ -119,9 +119,10 @@ for i in {1..12}; do
     fi
 done
 
-# Strict health check
+# Extended health check - wait longer for application readiness
 echo "🏥 Validating deployment health..."
-sleep 15
+echo "⏳ Waiting 45 seconds for application to fully initialize..."
+sleep 45
 
 # Check if containers are running and diagnose failures
 if ! /usr/bin/docker ps | /bin/grep restaurant-web-app; then
@@ -143,12 +144,32 @@ if ! /usr/bin/docker ps | /bin/grep restaurant-web-app; then
     exit 1
 fi
 
-# Test critical APIs
+# Test critical APIs with enhanced debugging
+echo "🔍 Testing basic health endpoint first..."
+HEALTH_RESPONSE=$(/usr/bin/curl -s -w "\n%{http_code}" http://localhost/api/v1/health/ 2>&1)
+HEALTH_CODE=$(echo "$HEALTH_RESPONSE" | tail -n 1)
+if [ "$HEALTH_CODE" != "200" ]; then
+    echo "❌ Health endpoint failed (HTTP $HEALTH_CODE)"
+    echo "Health response: $HEALTH_RESPONSE"
+    
+    # Test direct container connectivity
+    echo "🔍 Testing direct container connectivity..."
+    if /usr/bin/docker exec restaurant-web-app curl -s http://localhost:8000/api/v1/health/ > /dev/null; then
+        echo "✅ Direct container connection works - issue is with Nginx proxy"
+    else
+        echo "❌ Direct container connection also fails - issue is with Django app"
+        /usr/bin/docker exec restaurant-web-app curl -v http://localhost:8000/api/v1/health/ 2>&1 || echo "Could not test direct connection"
+    fi
+    exit 1
+fi
+echo "✅ Health endpoint working (HTTP 200)"
+
 echo "🔍 Testing dashboard operativo API..."
 RESPONSE=$(/usr/bin/curl -s -w "\n%{http_code}" http://localhost/api/v1/dashboard-operativo/report/?date=2025-08-29)
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 if [ "$HTTP_CODE" != "200" ]; then
     echo "❌ Dashboard operativo API failed (HTTP $HTTP_CODE)"
+    echo "Response: $RESPONSE"
     exit 1
 fi
 echo "✅ Dashboard operativo API working (HTTP 200)"
