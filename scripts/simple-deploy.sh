@@ -16,55 +16,14 @@ echo "🧹 Automatic cleanup..."
 # Skip Git sync - Docker image from ECR contains all necessary code
 echo "📥 Using Docker image from ECR (contains latest code)..."
 
-# Create production .env file with proper Cognito configuration
-echo "⚙️ Configuring production environment with AWS Cognito..."
-
-# Validate that required secrets are available
-if [ -z "$PROD_DJANGO_SECRET_KEY" ] || [ -z "$PROD_COGNITO_USER_POOL_ID" ] || [ -z "$PROD_COGNITO_APP_CLIENT_ID" ]; then
-    echo "❌ Missing required production secrets. Deployment aborted."
-    if [ -z "$PROD_DJANGO_SECRET_KEY" ]; then
-        echo "  PROD_DJANGO_SECRET_KEY: Missing"
-    else
-        echo "  PROD_DJANGO_SECRET_KEY: Set"
-    fi
-    if [ -z "$PROD_COGNITO_USER_POOL_ID" ]; then
-        echo "  PROD_COGNITO_USER_POOL_ID: Missing" 
-    else
-        echo "  PROD_COGNITO_USER_POOL_ID: Set"
-    fi
-    if [ -z "$PROD_COGNITO_APP_CLIENT_ID" ]; then
-        echo "  PROD_COGNITO_APP_CLIENT_ID: Missing"
-    else
-        echo "  PROD_COGNITO_APP_CLIENT_ID: Set"
-    fi
+# Validate production environment configuration exists
+echo "⚙️ Validating production environment configuration..."
+if [ ! -f ".env" ]; then
+    echo "❌ Production .env file not found. Deployment aborted."
     exit 1
 fi
 
-cat > .env << ENV_EOF
-# Production Environment Configuration
-DEBUG=False
-DJANGO_SECRET_KEY=$PROD_DJANGO_SECRET_KEY
-ALLOWED_HOSTS=*
-
-# Database Configuration
-DATABASE_NAME=restaurant.prod.sqlite3
-DATABASE_PATH=/opt/restaurant-web/data
-
-# AWS Cognito Configuration - ENABLED FOR PRODUCTION
-USE_COGNITO_AUTH=True
-AWS_REGION=us-west-2
-COGNITO_USER_POOL_ID=$PROD_COGNITO_USER_POOL_ID
-COGNITO_APP_CLIENT_ID=$PROD_COGNITO_APP_CLIENT_ID
-
-# Application Configuration
-TIME_ZONE=America/Lima
-LANGUAGE_CODE=es-pe
-
-# Network Configuration
-EC2_PUBLIC_IP=44.248.47.186
-DOMAIN_NAME=${PROD_DOMAIN_NAME:-xn--elfogndedonsoto-zrb.com}
-ENV_EOF
-echo "✅ Production environment configured with AWS Cognito enabled"
+echo "✅ Production environment configuration validated"
 
 # Login to ECR and pull latest image with validation
 echo "🔐 Logging into ECR..."
