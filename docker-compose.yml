@@ -1,0 +1,108 @@
+# Unified Docker Compose for Development
+# Uses PostgreSQL as the single database for consistency with production
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: restaurant-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: restaurant_db
+      POSTGRES_USER: restaurant_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-restaurant_secure_pass_2024}
+      POSTGRES_HOST_AUTH_METHOD: md5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restaurant_user -d restaurant_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Django Backend (Development)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: restaurant-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    environment:
+      DEBUG: "True"
+      DJANGO_ENV: development
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: restaurant_db
+      POSTGRES_USER: restaurant_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-restaurant_secure_pass_2024}
+      ALLOWED_HOSTS: "*"
+      USE_COGNITO_AUTH: "False"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - restaurant-network
+    command: >
+      sh -c "
+        echo 'Waiting for PostgreSQL...' &&
+        while ! pg_isready -h postgres -p 5432 -U restaurant_user; do sleep 1; done &&
+        echo 'PostgreSQL is ready!' &&
+        python manage.py migrate --noinput &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+
+  # Frontend (optional - usually run natively for hot reload)
+  frontend:
+    image: node:20-alpine
+    container_name: restaurant-frontend
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    command: >
+      sh -c "
+        npm install &&
+        npm run dev -- --host 0.0.0.0
+      "
+    networks:
+      - restaurant-network
+    profiles:
+      - full
+
+  # Nginx (optional - for production-like testing)
+  nginx:
+    image: nginx:alpine
+    container_name: restaurant-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./frontend/dist:/var/www/html:ro
+    depends_on:
+      - backend
+    networks:
+      - restaurant-network
+    profiles:
+      - with-nginx
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  restaurant-network:
+    driver: bridge
