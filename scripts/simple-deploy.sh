@@ -68,13 +68,41 @@ if ! /usr/bin/docker-compose -f docker/docker-compose.prod.yml --profile product
     exit 1
 fi
 
+# Add a longer wait for the container to fully initialize  
+echo "⏳ Waiting for container initialization (30 seconds)..."
+sleep 30
+
+# Check Django configuration before health checks
+echo "🔧 Testing Django configuration..."
+if /usr/bin/docker exec restaurant-web-app python manage.py check --deploy 2>/dev/null; then
+    echo "✅ Django configuration check passed"
+else
+    echo "⚠️ Django configuration check failed - checking anyway..."
+    echo "📋 Django check output:"
+    /usr/bin/docker exec restaurant-web-app python manage.py check --deploy 2>&1 || echo "Could not run Django check"
+fi
+
 # Strict health check
 echo "🏥 Validating deployment health..."
 sleep 15
 
-# Check if containers are running
+# Check if containers are running and diagnose failures
 if ! /usr/bin/docker ps | /bin/grep restaurant-web-app; then
     echo "❌ Application container not running"
+    echo "🔍 Checking container status and logs..."
+    
+    # Show detailed container status
+    echo "📋 Container status:"
+    /usr/bin/docker ps -a | /bin/grep restaurant-web-app || echo "No restaurant-web-app container found"
+    
+    # Show last 50 lines of container logs
+    echo "📋 Container logs (last 50 lines):"
+    /usr/bin/docker logs --tail=50 restaurant-web-app 2>&1 || echo "Could not retrieve container logs"
+    
+    # Show Django-specific logs if available  
+    echo "📋 Django logs from container:"
+    /usr/bin/docker exec restaurant-web-app cat /opt/restaurant-web/data/logs/django.log 2>/dev/null | tail -20 || echo "Django log file not accessible"
+    
     exit 1
 fi
 
