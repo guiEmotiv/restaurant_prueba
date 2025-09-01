@@ -16,6 +16,34 @@ echo "🧹 Automatic cleanup..."
 # Skip Git sync - Docker image from ECR contains all necessary code
 echo "📥 Using Docker image from ECR (contains latest code)..."
 
+# Create production .env file with Cognito disabled temporarily
+echo "⚙️ Configuring production environment..."
+cat > .env << ENV_EOF
+# Production Environment Configuration
+DEBUG=False
+DJANGO_SECRET_KEY=production-secret-key-should-be-from-github-secrets
+ALLOWED_HOSTS=*
+
+# Database Configuration
+DATABASE_NAME=restaurant.prod.sqlite3
+DATABASE_PATH=/opt/restaurant-web/data
+
+# AWS Cognito Configuration - TEMPORARILY DISABLED
+USE_COGNITO_AUTH=False
+AWS_REGION=us-west-2
+COGNITO_USER_POOL_ID=
+COGNITO_APP_CLIENT_ID=
+
+# Application Configuration
+TIME_ZONE=America/Lima
+LANGUAGE_CODE=es-pe
+
+# Network Configuration
+EC2_PUBLIC_IP=44.248.47.186
+DOMAIN_NAME=xn--elfogndedonsoto-zrb.com
+ENV_EOF
+echo "✅ Production environment configured (Cognito disabled)"
+
 # Login to ECR and pull latest image with validation
 echo "🔐 Logging into ECR..."
 if ! /usr/bin/aws ecr get-login-password --region us-west-2 | /usr/bin/docker login --username AWS --password-stdin "$ECR_REGISTRY"; then
