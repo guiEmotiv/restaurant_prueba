@@ -11,6 +11,16 @@ services:
     restart: unless-stopped
     profiles: [production]
     networks: [restaurant-network]
+    # Temporarily disable healthcheck to isolate restart issue
+    healthcheck:
+      disable: true
+    # Add resource limits to prevent OOM kills
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
   nginx:
     image: nginx:alpine

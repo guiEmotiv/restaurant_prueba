@@ -75,21 +75,21 @@ python manage.py migrate --noinput\n\
 echo "📦 Collecting static files..."\n\
 python manage.py collectstatic --noinput --clear\n\
 \n\
-# Start Gunicorn with optimized settings\n\
+# Start Gunicorn with conservative settings\n\
 echo "🌟 Starting Gunicorn server..."\n\
 exec gunicorn \\\n\
     --bind 0.0.0.0:8000 \\\n\
-    --workers 3 \\\n\
+    --workers 2 \\\n\
     --worker-class sync \\\n\
-    --worker-connections 1000 \\\n\
-    --max-requests 1000 \\\n\
-    --max-requests-jitter 50 \\\n\
-    --timeout 120 \\\n\
-    --keepalive 2 \\\n\
-    --preload \\\n\
+    --worker-connections 500 \\\n\
+    --max-requests 500 \\\n\
+    --max-requests-jitter 25 \\\n\
+    --timeout 180 \\\n\
+    --keepalive 5 \\\n\
     --access-logfile - \\\n\
     --error-logfile - \\\n\
-    --log-level info \\\n\
+    --log-level debug \\\n\
+    --capture-output \\\n\
     backend.wsgi:application\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh && chown appuser:appgroup /app/entrypoint.sh
 
@@ -98,8 +98,8 @@ USER appuser
 
 EXPOSE 8000
 
-# Enhanced health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Enhanced health check with more generous timing
+HEALTHCHECK --interval=45s --timeout=30s --start-period=120s --retries=5 \
   CMD curl -f http://localhost:8000/api/v1/health/ || exit 1
 
 # Use dumb-init for proper signal handling
