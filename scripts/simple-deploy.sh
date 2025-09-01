@@ -22,9 +22,21 @@ echo "⚙️ Configuring production environment with AWS Cognito..."
 # Validate that required secrets are available
 if [ -z "$PROD_DJANGO_SECRET_KEY" ] || [ -z "$PROD_COGNITO_USER_POOL_ID" ] || [ -z "$PROD_COGNITO_APP_CLIENT_ID" ]; then
     echo "❌ Missing required production secrets. Deployment aborted."
-    echo "  PROD_DJANGO_SECRET_KEY: $([ -z "$PROD_DJANGO_SECRET_KEY" ] && echo "Missing" || echo "Set")"
-    echo "  PROD_COGNITO_USER_POOL_ID: $([ -z "$PROD_COGNITO_USER_POOL_ID" ] && echo "Missing" || echo "Set")"
-    echo "  PROD_COGNITO_APP_CLIENT_ID: $([ -z "$PROD_COGNITO_APP_CLIENT_ID" ] && echo "Missing" || echo "Set")"
+    if [ -z "$PROD_DJANGO_SECRET_KEY" ]; then
+        echo "  PROD_DJANGO_SECRET_KEY: Missing"
+    else
+        echo "  PROD_DJANGO_SECRET_KEY: Set"
+    fi
+    if [ -z "$PROD_COGNITO_USER_POOL_ID" ]; then
+        echo "  PROD_COGNITO_USER_POOL_ID: Missing" 
+    else
+        echo "  PROD_COGNITO_USER_POOL_ID: Set"
+    fi
+    if [ -z "$PROD_COGNITO_APP_CLIENT_ID" ]; then
+        echo "  PROD_COGNITO_APP_CLIENT_ID: Missing"
+    else
+        echo "  PROD_COGNITO_APP_CLIENT_ID: Set"
+    fi
     exit 1
 fi
 
