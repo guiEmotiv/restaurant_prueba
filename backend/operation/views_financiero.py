@@ -89,8 +89,17 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
             return Response(financial_data)
         
         except Exception as e:
+            # Enhanced error logging for production debugging
+            import traceback
+            error_details = {
+                'error_type': type(e).__name__,
+                'error_message': str(e),
+                'traceback': traceback.format_exc()
+            }
+            
             return Response({
                 'error': f'Error en dashboard financiero: {str(e)}',
+                'debug_info': error_details,
                 'period_info': {'period': 'error', 'start_date': None, 'end_date': None, 'display_date': None, 'total_days': 0},
                 'summary': {'total_orders': 0, 'total_revenue': 0, 'average_ticket': 0, 'total_items': 0},
                 'category_breakdown': [],
@@ -203,7 +212,7 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
                     order_id, order_total, order_status, waiter, operational_date,
                     item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
                     recipe_name, category_name, category_id,
-                    payment_method, payment_amount
+                    payment_info, total_paid
                 FROM dashboard_operativo_view
                 {date_filter}
                 ORDER BY operational_date DESC, order_id, item_id
@@ -253,7 +262,7 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
             (order_id, order_total, order_status, waiter, operational_date,
              item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
              recipe_name, category_name, category_id,
-             payment_method, payment_amount) = row
+             payment_info, total_paid) = row
             
             # Solo órdenes PAID
             if order_status == 'PAID' and item_id:
@@ -297,21 +306,32 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
                     daily_dish_stats[date_str][recipe_name]['revenue'] += Decimal(str(total_with_container or 0))
                     daily_dish_stats[date_str][recipe_name]['unit_price'] = Decimal(str(unit_price or 0))
                 
-                # Stats de pagos - USAR total de la orden con contenedores para consistencia
-                if payment_method and payment_amount and order_id not in [p['order_id'] for p in payment_stats[payment_method].get('processed_orders', [])]:
-                    # Usar el total_with_container de todos los items de la orden para este método de pago
-                    order_total_with_container = Decimal('0')
-                    for check_row in all_data:
-                        if check_row[0] == order_id and check_row[2] == 'PAID' and check_row[5] is not None:  # order_id, order_status, item_id
-                            order_total_with_container += Decimal(str(check_row[9] or 0))  # total_with_container
+                # Stats de pagos - USAR payment_info y total_paid para análisis simplificado
+                if payment_info and total_paid and order_id not in [order_id for stat in payment_stats.values() for order_id in stat.get('processed_orders', [])]:
+                    # Procesar payment_info string (e.g., "CASH:$10.72, CARD:$10.72")
+                    if payment_info and payment_info != 'Sin pagos':
+                        # Parsear payment_info para extraer métodos individuales
+                        payment_parts = str(payment_info).split(', ') if payment_info else []
+                        for payment_part in payment_parts:
+                            if ':$' in payment_part:
+                                method, amount_str = payment_part.split(':$')
+                                try:
+                                    amount = Decimal(amount_str)
+                                    payment_stats[method]['amount'] += amount
+                                    payment_stats[method]['count'] += 1
+                                    if 'processed_orders' not in payment_stats[method]:
+                                        payment_stats[method]['processed_orders'] = []
+                                    payment_stats[method]['processed_orders'].append(order_id)
+                                except (ValueError, IndexError):
+                                    continue
                     
-                    payment_stats[payment_method]['amount'] += order_total_with_container
-                    payment_stats[payment_method]['count'] += 1
-                    
-                    # Marcar orden como procesada para este método de pago
-                    if 'processed_orders' not in payment_stats[payment_method]:
-                        payment_stats[payment_method]['processed_orders'] = []
-                    payment_stats[payment_method]['processed_orders'].append({'order_id': order_id})
+                    # Si no hay payment_info pero sí total_paid, usar método genérico
+                    elif total_paid and total_paid > 0:
+                        payment_stats['UNKNOWN']['amount'] += Decimal(str(total_paid))
+                        payment_stats['UNKNOWN']['count'] += 1
+                        if 'processed_orders' not in payment_stats['UNKNOWN']:
+                            payment_stats['UNKNOWN']['processed_orders'] = []
+                        payment_stats['UNKNOWN']['processed_orders'].append(order_id)
                 
                 # Items por día
                 date_str = str(operational_date)
