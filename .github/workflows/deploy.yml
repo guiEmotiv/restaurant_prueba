@@ -1,4 +1,4 @@
-name: 🔄 Legacy Restaurant Web Deployment (Deprecated - Use production-deployment.yml)
+name: ⚠️ DEPRECATED - Use devops-deployment.yml instead
 
 on:
   push:
@@ -244,7 +244,14 @@ jobs:
         echo "✅ Code and scripts synced to latest version"
         
         # Make scripts executable
-        /bin/chmod +x scripts/simple-deploy.sh scripts/auto-cleanup.sh
+        /bin/chmod +x scripts/simple-deploy.sh scripts/auto-cleanup.sh scripts/fix-ec2-migrations.sh
+        
+        # Execute EC2 migration repair FIRST (critical fix)
+        echo "🔧 Executing EC2 migration repair before deployment..."
+        if ! ./scripts/fix-ec2-migrations.sh; then
+            echo "❌ EC2 migration repair failed"
+            exit 1
+        fi
         
         # Execute deployment with comprehensive debugging
         ./scripts/simple-deploy.sh "$ECR_REGISTRY" "$ECR_REPOSITORY" "$ACTION"

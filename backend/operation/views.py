@@ -456,10 +456,12 @@ class OrderViewSet(viewsets.ModelViewSet):
             
             # Reiniciar el contador de autoincremento en SQLite
             with connection.cursor() as cursor:
-                cursor.execute('DELETE FROM sqlite_sequence WHERE name="operation_order"')
-                cursor.execute('DELETE FROM sqlite_sequence WHERE name="operation_orderitem"')
-                cursor.execute('DELETE FROM sqlite_sequence WHERE name="operation_payment"')
-                cursor.execute('DELETE FROM sqlite_sequence WHERE name="operation_containersale"')
+                # Usar nombres de tabla correctos (sin prefijo 'operation_')
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="order"')
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="order_item"')
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="payment"')
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="payment_item"')  # ¡FALTABA!
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="container_sale"')
             
             return Response({
                 'message': '✅ Todos los pedidos han sido eliminados y contadores reiniciados',

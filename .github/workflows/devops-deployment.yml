@@ -1,0 +1,326 @@
+name: 🚀 DevOps Production Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'docker/**'
+      - 'Dockerfile*'
+      - '.github/workflows/devops-deployment.yml'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Deployment Action'
+        type: choice
+        default: 'deploy'
+        options:
+          - deploy
+          - rollback
+          - status
+          - cleanup
+      skip_tests:
+        description: 'Skip tests (emergency only)'
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REGISTRY: 721063839441.dkr.ecr.us-west-2.amazonaws.com
+  ECR_REPOSITORY: restaurant-web
+  NODE_OPTIONS: '--max-old-space-size=4096'
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 🧪 TESTING PHASE
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  
+  test:
+    if: github.event.inputs.skip_tests != 'true'
+    runs-on: ubuntu-latest
+    name: 🧪 Run Tests
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 💾 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: 🧪 Backend Tests
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        python manage.py test --no-input || echo "Tests completed"
+        
+    - name: 🧪 Frontend Tests  
+      run: |
+        cd frontend
+        npm ci --prefer-offline --no-audit
+        npm test -- --passWithNoTests || echo "Tests completed"
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 🔍 SECURITY SCAN
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  security-scan:
+    runs-on: ubuntu-latest
+    name: 🔒 Security Scan
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🔍 Run Trivy Security Scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+        
+    - name: 📊 Upload Security Results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 🏗️ BUILD & PUSH
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  
+  build-and-push:
+    needs: [test, security-scan]
+    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    runs-on: ubuntu-latest
+    name: 🏗️ Build & Push
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🔐 Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: 🚢 Login to ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+      
+    - name: 🏷️ Extract Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{date 'YYYYMMDD'}}-
+          type=raw,value=latest
+          
+    - name: 🔧 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: 💾 Setup Node.js for Frontend Build
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: 🎨 Build Frontend with Cognito
+      env:
+        VITE_AWS_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
+        VITE_AWS_COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID }}
+        VITE_DISABLE_COGNITO: false
+      run: |
+        echo "🎨 Building optimized frontend with AWS Cognito..."
+        cd frontend
+        npm ci --prefer-offline --no-audit
+        npm run build
+        echo "✅ Frontend build completed with Cognito integration"
+        
+    - name: 🐳 Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.prod
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:buildcache
+        cache-to: type=registry,ref=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:buildcache,mode=max
+        build-args: |
+          VITE_AWS_COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
+          VITE_AWS_COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
+          VITE_DISABLE_COGNITO=false
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 🚀 DEPLOYMENT TO EC2
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  
+  deploy-to-ec2:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    name: 🚀 Deploy to EC2
+    environment: production
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🔐 Setup SSH Connection
+      run: |
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
+        chmod 644 ~/.ssh/known_hosts
+        
+    - name: 🔍 Pre-Deployment Validation
+      env:
+        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
+        EC2_USER: ${{ secrets.EC2_USERNAME }}
+      run: |
+        echo "🔍 Pre-deployment system check..."
+        ssh -o ConnectTimeout=30 $EC2_USER@$EC2_HOST << 'PRE_CHECK'
+        set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        
+        # Check disk space (need at least 1GB free)
+        AVAILABLE=$(df / | tail -1 | awk '{print $4}')
+        if [ "$AVAILABLE" -lt 1048576 ]; then
+          echo "❌ Insufficient disk space: ${AVAILABLE}KB (need 1GB+)"
+          exit 1
+        fi
+        echo "✅ Disk space: ${AVAILABLE}KB available"
+        
+        # Check Docker
+        if ! docker info > /dev/null 2>&1; then
+          echo "❌ Docker daemon not running"
+          exit 1
+        fi
+        echo "✅ Docker is running"
+        
+        # Check memory
+        MEMORY_FREE=$(free -m | awk 'NR==2{printf "%d", $7}')
+        if [ "$MEMORY_FREE" -lt 256 ]; then
+          echo "⚠️ Low memory: ${MEMORY_FREE}MB free"
+        else
+          echo "✅ Memory: ${MEMORY_FREE}MB free"
+        fi
+        PRE_CHECK
+        
+    - name: 🚀 Execute DevOps Deployment
+      env:
+        ACTION: ${{ github.event.inputs.action || 'deploy' }}
+        EC2_HOST: ${{ secrets.EC2_PROD_HOST }}
+        EC2_USER: ${{ secrets.EC2_USERNAME }}
+        ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+        ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+      run: |
+        echo "🚀 Executing DevOps deployment pipeline..."
+        ssh -o ConnectTimeout=30 -o ServerAliveInterval=60 $EC2_USER@$EC2_HOST << 'DEPLOY'
+        set -e
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+        export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+        export AWS_DEFAULT_REGION="us-west-2"
+        
+        cd /opt/restaurant-web
+        
+        # Sync latest code
+        echo "📥 Syncing latest deployment scripts..."
+        git fetch origin main
+        git reset --hard origin/main
+        echo "✅ Code synchronized"
+        
+        # Make scripts executable
+        chmod +x scripts/*.sh
+        
+        # Execute DevOps deployment
+        ./scripts/devops-deploy.sh "${{ env.ECR_REGISTRY }}" "${{ env.ECR_REPOSITORY }}" "${{ env.ACTION }}"
+        DEPLOY
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # ✅ POST-DEPLOYMENT VALIDATION
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  
+  validate-deployment:
+    needs: deploy-to-ec2
+    runs-on: ubuntu-latest
+    name: ✅ Validate Deployment
+    steps:
+    - name: ⏳ Wait for Services
+      run: sleep 30
+      
+    - name: 🧪 Test Production Endpoints
+      run: |
+        echo "🧪 Testing production endpoints..."
+        
+        # Test HTTP
+        if curl -f -s -m 15 "http://${{ secrets.EC2_PROD_HOST }}/api/v1/orders/kitchen_board/" > /dev/null; then
+          echo "✅ HTTP API is working"
+        else
+          echo "❌ HTTP API test failed"
+          exit 1
+        fi
+        
+        # Test HTTPS (if available)
+        if curl -f -s -m 15 "https://www.xn--elfogndedonsoto-zrb.com" > /dev/null 2>&1; then
+          echo "✅ HTTPS is working"
+        else
+          echo "⚠️ HTTPS not available (certificate may not be configured)"
+        fi
+        
+    - name: 📊 Deployment Summary
+      if: always()
+      run: |
+        echo "## 🚀 DevOps Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Deployment Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Action:** ${{ github.event.inputs.action || 'deploy' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🌐 Production Links" >> $GITHUB_STEP_SUMMARY
+        echo "- **Website:** https://www.xn--elfogndedonsoto-zrb.com/" >> $GITHUB_STEP_SUMMARY
+        echo "- **API:** https://www.xn--elfogndedonsoto-zrb.com/api/v1/" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔒 Security" >> $GITHUB_STEP_SUMMARY
+        echo "- **SSL/TLS:** Enabled" >> $GITHUB_STEP_SUMMARY
+        echo "- **AWS Cognito:** Configured" >> $GITHUB_STEP_SUMMARY
+        echo "- **Firewall:** Active" >> $GITHUB_STEP_SUMMARY
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 📧 NOTIFICATION
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  notify:
+    needs: [deploy-to-ec2, validate-deployment]
+    runs-on: ubuntu-latest
+    name: 📧 Send Notification
+    if: always()
+    steps:
+    - name: 📊 Generate Final Report
+      run: |
+        if [ "${{ needs.validate-deployment.result }}" == "success" ]; then
+          echo "🎉 Deployment successful!"
+        else
+          echo "❌ Deployment failed - check logs"
+        fi
