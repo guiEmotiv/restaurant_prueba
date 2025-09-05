@@ -60,20 +60,29 @@ docker-compose -f docker/docker-compose.prod.yml --profile production up -d
 
 ## Deployment
 
-**Smart Production Deployment:**
+**Enterprise Production Deployment (RECOMMENDED):**
 ```bash
-./prod/deploy.sh deploy    # Smart auto-deployment (RECOMMENDED)
-./prod/deploy.sh sync      # Full database sync (destructive)
-./prod/deploy.sh check     # Health check
-./prod/deploy.sh rollback  # Rollback deployment
+# Via GitHub Actions (Recommended)
+gh workflow run "Enterprise Production Deployment" -f action=deploy
+gh workflow run "Enterprise Production Deployment" -f action=rollback  
+gh workflow run "Enterprise Production Deployment" -f action=status
+gh workflow run "Enterprise Production Deployment" -f action=cleanup
+
+# Manual EC2 Deployment
+./deploy/enterprise-deploy.sh [ECR_REGISTRY] [ECR_REPOSITORY] deploy
+./deploy/enterprise-deploy.sh [ECR_REGISTRY] [ECR_REPOSITORY] rollback
+./deploy/enterprise-deploy.sh [ECR_REGISTRY] [ECR_REPOSITORY] status
 ```
 
-The smart deployment system:
-- **Auto-detects** frontend, backend, and database changes
-- **Applies only necessary updates** for maximum efficiency
-- **Creates automatic backups** before any database changes
-- **Uses safer migrations** (no --run-syncdb by default)
-- **Provides detailed deployment summaries**
+**Enterprise deployment features:**
+- **Ultra-secure SSL/HTTPS** with TLS 1.2/1.3 only
+- **Comprehensive security headers** (CSP, HSTS, X-Frame-Options)
+- **Enterprise-grade rate limiting** for API protection
+- **Automated rollback** capability on deployment failure
+- **Health monitoring** with 10+ critical endpoint checks
+- **Memory optimization** with intelligent cleanup
+- **Database integrity** validation and automated backups
+- **Container vulnerability** scanning and validation
 
 **Database Management:**
 - Uses SQLite for both dev (`restaurant_dev.sqlite3`) and prod (`restaurant_prod.sqlite3`)

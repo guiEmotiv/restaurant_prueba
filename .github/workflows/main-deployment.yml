@@ -113,7 +113,7 @@ jobs:
       env:
         VITE_AWS_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
         VITE_AWS_COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_APP_CLIENT_ID }}
-        VITE_DISABLE_COGNITO: true
+        VITE_DISABLE_COGNITO: false
       run: |
         cd frontend
         npm ci --prefer-offline --no-audit
