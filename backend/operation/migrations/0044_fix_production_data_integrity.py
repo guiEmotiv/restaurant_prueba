@@ -113,7 +113,7 @@ def reverse_fix_production_data_integrity(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('operation', '0037_remove_cartitem_cart_remove_cartitem_container_and_more'),
+        ('operation', '0041_order_canceled_at_order_cancellation_reason_and_more'),
     ]
 
     operations = [

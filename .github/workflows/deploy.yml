@@ -1,4 +1,4 @@
-name: Restaurant Web Deployment
+name: 🔄 Legacy Restaurant Web Deployment (Deprecated - Use production-deployment.yml)
 
 on:
   push:
