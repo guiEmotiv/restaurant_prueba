@@ -27,9 +27,13 @@ local_settings.py
 db.sqlite3
 media/
 
-# Environment variables and sensitive files
-.env
+# Environment variables and sensitive files (ALLOW development .env)
+.env.local
+.env.production
+.env.prod
 .env.*
+!.env
+!.env.development
 !.env.example
 !.env.*.example
 !.env.credentials.example
@@ -148,10 +152,14 @@ service-account*.json
 .azure/
 .gcp/
 
-# Database Files
+# Database Files (ALLOW migrations in data/)
 *.sqlite3
 *.db
-data/
+data/*.sqlite3
+data/*.db
+data/backups/
+data/logs/
+!data/migrations/
 restaurant_*.sqlite3
 restaurant_*.db
 

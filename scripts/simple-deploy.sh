@@ -13,8 +13,8 @@ echo "🚀 Starting deployment..."
 echo "🧹 Automatic cleanup..."
 /bin/bash ./scripts/auto-cleanup.sh || echo "⚠️ Cleanup failed but continuing deployment"
 
-# Skip Git sync - Docker image from ECR contains all necessary code
-echo "📥 Using Docker image from ECR (contains latest code)..."
+# Code already synced by GitHub Actions
+echo "📥 Using latest code from GitHub (synced by CI/CD)..."
 
 # Create minimal production .env file
 echo "⚙️ Creating minimal production environment configuration..."
@@ -28,11 +28,11 @@ ALLOWED_HOSTS=*
 DATABASE_NAME=restaurant.prod.sqlite3
 DATABASE_PATH=/opt/restaurant-web/data
 
-# AWS Cognito Configuration - TEMPORARILY DISABLED FOR DEBUGGING
-USE_COGNITO_AUTH=False
+# AWS Cognito Configuration - ENABLED FOR PRODUCTION
+USE_COGNITO_AUTH=True
 AWS_REGION=us-west-2
-COGNITO_USER_POOL_ID=
-COGNITO_APP_CLIENT_ID=
+COGNITO_USER_POOL_ID=us-west-2_bdCwF60ZI
+COGNITO_APP_CLIENT_ID=4i9hrd7srgbqbtun09p43ncfn0
 
 # Application Configuration
 TIME_ZONE=America/Lima

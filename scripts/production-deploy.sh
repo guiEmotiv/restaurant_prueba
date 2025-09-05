@@ -225,14 +225,14 @@ main() {
         exit 1
     fi
     
-    # Step 6: Skip migrations (using migrated database)
-    log_info "🔄 Skipping migrations - using pre-migrated database..."
-    # if ! docker-compose -f docker/docker-compose.prod.yml run --rm app python manage.py migrate; then
-    #     log_error "Migration failed"
-    #     rollback_deployment
-    #     exit 1
-    # fi
-    log_success "Using migrated database successfully"
+    # Step 6: Run database migrations
+    log_info "🔄 Running database migrations..."
+    if ! docker-compose -f docker/docker-compose.prod.yml run --rm app python manage.py migrate; then
+        log_error "Migration failed"
+        rollback_deployment
+        exit 1
+    fi
+    log_success "Database migrations completed successfully"
     
     # Step 7: Deploy new version
     log_info "🚀 Deploying new version..."
