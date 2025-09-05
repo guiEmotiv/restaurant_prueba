@@ -18,6 +18,47 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
     """
     # Use default authentication from settings (Cognito if enabled)
     
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def debug_view(self, request):
+        """Debug endpoint para verificar estado de dashboard_operativo_view"""
+        try:
+            from django.db import connection
+            cursor = connection.cursor()
+            
+            # Verificar si la vista existe
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='view' AND name='dashboard_operativo_view'")
+            view_exists = cursor.fetchone()
+            
+            if view_exists:
+                # Contar registros
+                cursor.execute("SELECT COUNT(*) FROM dashboard_operativo_view")
+                count = cursor.fetchone()[0]
+                
+                # Obtener primeros 3 registros
+                cursor.execute("SELECT * FROM dashboard_operativo_view LIMIT 3")
+                sample_data = cursor.fetchall()
+                
+                cursor.close()
+                return Response({
+                    'view_exists': True,
+                    'record_count': count,
+                    'sample_data': sample_data[:3] if sample_data else [],
+                    'status': 'success'
+                })
+            else:
+                cursor.close()
+                return Response({
+                    'view_exists': False,
+                    'error': 'dashboard_operativo_view no existe',
+                    'status': 'error'
+                })
+                
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'status': 'database_error'
+            })
+    
     @action(detail=False, methods=['get'])
     def report(self, request):
         """
