@@ -5,7 +5,7 @@ services:
     ports:
       - '8000:8000'
     volumes:
-      - ./data:/opt/restaurant-web/data
+      - /opt/restaurant-web/data:/opt/restaurant-web/data
     env_file: 
       - /opt/restaurant-web/.env
     restart: unless-stopped
