@@ -18,7 +18,7 @@ print("ℹ️  Using environment variables loaded by Docker Compose")
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'sc0b)i_r+hlfgo^4v0^1lwvg-y=ttt#$(ngxgr7gh_n=xo5(kz')
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '44.248.47.186,xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '44.248.47.186,xn--elfogndedonsoto-zrb.com,www.xn--elfogndedonsoto-zrb.com,localhost,127.0.0.1').split(',')
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # APPLICATIONS
@@ -295,7 +295,8 @@ SPECTACULAR_SETTINGS = {
 USE_COGNITO_AUTH = os.getenv('USE_COGNITO_AUTH', 'True').lower() == 'true'  # Habilitado por defecto en producción
 
 # AWS Configuration
-AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+AWS_DEFAULT_REGION = os.getenv('AWS_DEFAULT_REGION', 'us-west-2')
+AWS_REGION = AWS_DEFAULT_REGION
 
 # Cognito Configuration
 COGNITO_USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID', '')

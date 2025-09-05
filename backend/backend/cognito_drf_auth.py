@@ -23,7 +23,7 @@ class CognitoJWTAuthentication(authentication.BaseAuthentication):
         self.jwks_client = None
         self.user_pool_id = getattr(settings, 'COGNITO_USER_POOL_ID', '')
         self.app_client_id = getattr(settings, 'COGNITO_APP_CLIENT_ID', '')
-        self.region = getattr(settings, 'AWS_REGION', 'us-east-1')
+        self.region = getattr(settings, 'AWS_DEFAULT_REGION', getattr(settings, 'AWS_REGION', 'us-west-2'))
         
     def authenticate(self, request):
         """
