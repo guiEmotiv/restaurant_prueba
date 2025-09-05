@@ -1,0 +1,238 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.check_deploy.outputs.should_deploy }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Set up Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run backend tests
+      id: backend_tests
+      run: |
+        cd backend
+        python manage.py check
+        python manage.py test
+      continue-on-error: true
+    
+    - name: Run frontend tests
+      id: frontend_tests
+      run: |
+        cd frontend
+        npm run lint
+        npm run test:ci
+      continue-on-error: true
+    
+    - name: Check if deployment should proceed
+      id: check_deploy
+      run: |
+        if [[ "${{ steps.backend_tests.outcome }}" == "success" && "${{ steps.frontend_tests.outcome }}" == "success" ]]; then
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.event.inputs.force_deploy }}" == "true" ]]; then
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+          echo "⚠️ Force deploying despite test failures!"
+        else
+          echo "should_deploy=false" >> $GITHUB_OUTPUT
+          echo "❌ Tests failed and force_deploy is not enabled"
+        fi
+
+  build-and-push:
+    needs: tests
+    if: needs.tests.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      image_digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.prod
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VITE_AWS_COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
+          VITE_AWS_COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
+          VITE_DISABLE_COGNITO=${{ secrets.VITE_DISABLE_COGNITO || 'false' }}
+          VITE_API_BASE_URL=https://${{ secrets.DOMAIN_NAME }}/api
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Generate deployment summary
+      run: |
+        echo "## 🚀 Docker Image Built Successfully" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image**: ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Digest**: ${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Registry**: ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    needs: [tests, build-and-push]
+    if: needs.tests.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup SSH key
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+    
+    - name: Add EC2 to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -p ${{ secrets.EC2_SSH_PORT || '22' }} -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Create deployment directory on EC2
+      run: |
+        ssh -p ${{ secrets.EC2_SSH_PORT || '22' }} ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }} "
+          sudo mkdir -p /opt/restaurant-web
+          sudo chown ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} /opt/restaurant-web
+        "
+    
+    - name: Copy deployment files to EC2
+      run: |
+        scp -P ${{ secrets.EC2_SSH_PORT || '22' }} -r docker/production/* ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }}:/opt/restaurant-web/
+        scp -P ${{ secrets.EC2_SSH_PORT || '22' }} docker-compose.prod.yml ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }}:/opt/restaurant-web/docker-compose.yml
+    
+    - name: Deploy to EC2
+      run: |
+        ssh -p ${{ secrets.EC2_SSH_PORT || '22' }} ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }} "
+          cd /opt/restaurant-web
+          
+          # Login to GitHub Container Registry
+          echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          
+          # Set environment variables
+          export IMAGE_TAG='${{ needs.build-and-push.outputs.image_tag }}'
+          export DOMAIN='${{ secrets.DOMAIN_NAME }}'
+          export DJANGO_SECRET_KEY='${{ secrets.DJANGO_SECRET_KEY }}'
+          export COGNITO_USER_POOL_ID='${{ secrets.COGNITO_USER_POOL_ID }}'
+          export COGNITO_APP_CLIENT_ID='${{ secrets.COGNITO_APP_CLIENT_ID }}'
+          
+          # Create data directories
+          sudo mkdir -p /opt/restaurant-web/data/{db,static,media,logs,certbot/conf,certbot/www}
+          sudo chown -R ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} /opt/restaurant-web/data
+          
+          # Pull latest images
+          docker-compose pull
+          
+          # Graceful deployment with health checks
+          echo '🚀 Starting deployment...'
+          docker-compose up -d --remove-orphans
+          
+          # Wait for services to be healthy
+          echo '⏳ Waiting for services to be ready...'
+          timeout 300 bash -c 'until docker-compose ps | grep -q \"healthy\"; do sleep 10; echo \"Waiting for health checks...\"; done' || {
+            echo '❌ Health check timeout - rolling back'
+            docker-compose logs
+            exit 1
+          }
+          
+          # Clean up old images
+          docker system prune -f
+          
+          echo '✅ Deployment completed successfully!'
+        "
+    
+    - name: Verify deployment
+      run: |
+        # Wait a bit for the service to fully start
+        sleep 30
+        
+        # Check if the application is responding
+        response=$(curl -s -o /dev/null -w \"%{http_code}\" https://${{ secrets.DOMAIN_NAME }}/api/v1/health/ || echo \"000\")
+        
+        if [ \"$response\" = \"200\" ]; then
+          echo \"✅ Application is healthy and responding\"
+          echo \"🌍 Deployed at: https://${{ secrets.DOMAIN_NAME }}\"
+        else
+          echo \"❌ Application health check failed (HTTP $response)\"
+          
+          # Get logs for debugging
+          ssh -p ${{ secrets.EC2_SSH_PORT || '22' }} ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }} "
+            cd /opt/restaurant-web
+            echo '=== Docker Compose Status ==='
+            docker-compose ps
+            echo '=== Application Logs ==='
+            docker-compose logs --tail=50
+          "
+          exit 1
+        fi
+    
+    - name: Post deployment summary
+      if: always()
+      run: |
+        echo \"## 🎉 Production Deployment Summary\" >> $GITHUB_STEP_SUMMARY
+        echo \"- **Environment**: Production\" >> $GITHUB_STEP_SUMMARY
+        echo \"- **Image**: ${{ needs.build-and-push.outputs.image_tag }}\" >> $GITHUB_STEP_SUMMARY
+        echo \"- **Domain**: https://${{ secrets.DOMAIN_NAME }}\" >> $GITHUB_STEP_SUMMARY
+        echo \"- **Deployed at**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> $GITHUB_STEP_SUMMARY
+        echo \"- **Commit**: ${{ github.sha }}\" >> $GITHUB_STEP_SUMMARY

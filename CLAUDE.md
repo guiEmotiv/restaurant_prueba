@@ -2,110 +2,82 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Architecture
+## Project Structure
 
-This is a restaurant management system with a Django REST API backend and React/Vite frontend, designed for AWS Cognito authentication and deployed via Docker.
-
-**Core Structure:**
-- `backend/` - Django REST API with apps: `config`, `inventory`, `operation`
-- `frontend/` - React SPA with Vite, TailwindCSS, AWS Amplify integration
-- `data/` - SQLite databases (dev/prod) and backups
-- `docker/` - Docker configurations (Compose files, Nginx)
-- `scripts/` - Development and production deployment scripts
-- `deploy/` - Deployment keys and configurations
-
-**Key Models:**
-- `inventory`: Group, Ingredient, Recipe (menu management)
-- `operation`: Order, OrderItem, Payment (POS operations)  
-- `config`: Unit, Container, Table, Zone (restaurant configuration)
-
-**Authentication:**
-- AWS Cognito integration via AWS Amplify (frontend) and custom DRF auth (backend)
-- Toggle via `USE_COGNITO_AUTH` environment variable
-- Development mode bypasses authentication
+This is a full-stack restaurant management web application with:
+- **Frontend**: React (Vite) with Tailwind CSS, AWS Amplify authentication, located in `frontend/`
+- **Backend**: Django REST API with SQLite database, located in `backend/`
+- **Deployment**: Docker-based production deployment with multiple deployment scripts
 
 ## Development Commands
 
-**Frontend (React/Vite):**
-```bash
-cd frontend
-npm run dev          # Development server (port 5173)
-npm run build        # Production build
-npm run lint         # ESLint validation
-npm run lint:fix     # Auto-fix linting issues
-npm test             # Jest tests
-npm run test:watch   # Jest in watch mode
-```
+### Frontend Development (run from `frontend/` directory)
+- **Development server**: `npm run dev` (runs on port 5173)
+- **Build**: `npm run build` or `npm run build:prod` (production)
+- **Linting**: `npm run lint` or `npm run lint:fix`
+- **Testing**: `npm test`, `npm run test:watch`, `npm run test:coverage`
+- **Clean rebuild**: `npm run reset`
 
-**Backend (Django):**
-```bash
-cd backend
-make run            # Django runserver (port 8000)  
-make migrate        # Apply database migrations
-make shell          # Django shell
-make test           # Run pytest
-# Or directly:
-python manage.py runserver 0.0.0.0:8000
-python manage.py migrate
-```
+### Backend Development (run from `backend/` directory)  
+- **Development server**: `python manage.py runserver`
+- **Database migrations**: `python manage.py makemigrations` then `python manage.py migrate`
+- **Django shell**: `python manage.py shell`
+- **Admin superuser**: `python manage.py createsuperuser`
+- **Database checks**: `python manage.py check`
+- **Reset data**: `python manage.py clean_database` or `python manage.py reset_operational_data`
 
-**Docker Development:**
-```bash
-# Backend only (frontend runs natively) 
-docker-compose -f docker/docker-compose.prod.yml -f docker/docker-compose.local.yml up -d app
+### Production Deployment
+- **Main deployment**: `./deploy/enterprise-deploy.sh` (comprehensive deployment script)
+- **Alternative scripts**: Various scripts in `scripts/` directory for specific deployment scenarios
+- **Docker build**: Uses `Dockerfile.prod` for multi-stage production builds
 
-# Full production stack  
-docker-compose -f docker/docker-compose.prod.yml --profile production up -d
-```
+## Architecture Overview
 
-## Deployment
+### Backend (Django)
+- **Main app**: `operation/` - Contains models, views, serializers for restaurant operations
+- **Config app**: `config/` - System configuration and management commands  
+- **Key models**: Tables, orders, menu items, users, financial tracking
+- **API views**: Separate views for operational (`views_operativo.py`) and financial (`views_financiero.py`) concerns
+- **SSE support**: Real-time updates via `sse_views.py`
+- **Database**: SQLite with comprehensive migration history
 
-**Enterprise Production Deployment (RECOMMENDED):**
-```bash
-# Via GitHub Actions (Recommended)
-gh workflow run "Enterprise Production Deployment" -f action=deploy
-gh workflow run "Enterprise Production Deployment" -f action=rollback  
-gh workflow run "Enterprise Production Deployment" -f action=status
-gh workflow run "Enterprise Production Deployment" -f action=cleanup
+### Frontend (React)
+- **Authentication**: AWS Cognito integration via Amplify (`contexts/AuthContext.jsx`)
+- **Styling**: Tailwind CSS with custom components
+- **State management**: React Context for auth and toast notifications
+- **Key directories**:
+  - `components/` - Reusable UI components
+  - `contexts/` - Global state management
+  - `utils/` - Utility functions including Bluetooth, Excel import, dashboard utils
+  - `config/` - Configuration files for Amplify and printer setup
 
-# Manual EC2 Deployment
-./deploy/enterprise-deploy.sh [ECR_REGISTRY] [ECR_REPOSITORY] deploy
-./deploy/enterprise-deploy.sh [ECR_REGISTRY] [ECR_REPOSITORY] rollback
-./deploy/enterprise-deploy.sh [ECR_REGISTRY] [ECR_REPOSITORY] status
-```
+### Key Features
+- **Restaurant POS system**: Order management, table management, menu configuration
+- **Real-time updates**: Server-sent events for live order status updates
+- **Financial reporting**: Dashboard with analytics and reporting capabilities
+- **Bluetooth printing**: Integration for receipt printing
+- **AWS Cognito auth**: User authentication and authorization
+- **Excel import/export**: Bulk data operations
 
-**Enterprise deployment features:**
-- **Ultra-secure SSL/HTTPS** with TLS 1.2/1.3 only
-- **Comprehensive security headers** (CSP, HSTS, X-Frame-Options)
-- **Enterprise-grade rate limiting** for API protection
-- **Automated rollback** capability on deployment failure
-- **Health monitoring** with 10+ critical endpoint checks
-- **Memory optimization** with intelligent cleanup
-- **Database integrity** validation and automated backups
-- **Container vulnerability** scanning and validation
+## Important Development Notes
 
-**Database Management:**
-- Uses SQLite for both dev (`restaurant_dev.sqlite3`) and prod (`restaurant_prod.sqlite3`)
-- Automatic backups during sync operations
-- Migration handling with rollback support
+- The project uses environment variables for AWS Cognito configuration
+- Database migrations have a complex history - be careful when creating new migrations
+- The frontend has specific build configurations for development vs production environments
+- Deployment scripts are comprehensive and handle database migrations, Docker builds, and EC2 deployment
+- Tests are configured with Jest for frontend and Django's built-in testing for backend
+- The application supports both development and production modes with different authentication configurations
 
-## Development Practices
+## Database Management
 
-**File Organization:**
-- Backend follows Django app structure with separate `models.py`, `views.py`, `serializers.py`
-- Frontend uses feature-based organization under `src/pages/` and `src/components/`
-- Shared utilities in `src/utils/`, services in `src/services/`
+- Primary database: `db.sqlite3` in backend directory
+- Migration management is critical - always test migrations in development first
+- Use management commands for data cleanup and reset operations
+- The app includes complex financial views and operational dashboards that depend on specific data structures
 
-**Key Technologies:**
-- Backend: Django 5.2, DRF 3.16, AWS Cognito auth, SQLite
-- Frontend: React 19, Vite 7, TailwindCSS, AWS Amplify, Axios
-- Infrastructure: Docker, Nginx, AWS EC2
+## AWS Integration
 
-**Testing:**
-- Frontend: Jest with React Testing Library (70% coverage threshold)
-- Backend: pytest (run via `make test`)
-
-**Performance Notes:**
-- Frontend build uses `NODE_OPTIONS='--max-old-space-size=4096'` for memory optimization
-- Production Nginx serves static files and proxies API requests
-- SSE (Server-Sent Events) used for real-time kitchen updates
+- Uses AWS Cognito for authentication
+- Environment variables control Cognito configuration
+- Can be deployed with or without Cognito depending on VITE_DISABLE_COGNITO setting
+- Production deployment includes proper AWS configuration handling
