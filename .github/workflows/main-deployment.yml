@@ -163,14 +163,22 @@ jobs:
         git fetch origin main
         git reset --hard origin/main
         
+        # Fix database permissions (CRITICAL FIX)
+        sudo chown -R ubuntu:ubuntu /opt/restaurant-web/data/
+        sudo chmod 755 /opt/restaurant-web/data/
+        sudo chmod 664 /opt/restaurant-web/data/*.sqlite3 2>/dev/null || true
+        
         # Make scripts executable
-        chmod +x scripts/*.sh
+        chmod +x scripts/*.sh deploy/*.sh
         
         # Choose action
         ACTION="${{ env.ACTION }}"
         if [ "$ACTION" = "rebuild" ]; then
           echo "🏗️ Executing total rebuild..."
           ./scripts/total-rebuild-deploy.sh "${{ env.ECR_REGISTRY }}" "${{ env.ECR_REPOSITORY }}"
+        elif [ -f "deploy/enterprise-deploy.sh" ]; then
+          echo "🚀 Executing Enterprise Deployment v3.0..."
+          ./deploy/enterprise-deploy.sh "${{ env.ECR_REGISTRY }}" "${{ env.ECR_REPOSITORY }}" "$ACTION"
         elif [ -f "scripts/devops-deploy.sh" ]; then
           echo "🚀 Executing DevOps deployment..."
           ./scripts/devops-deploy.sh "${{ env.ECR_REGISTRY }}" "${{ env.ECR_REPOSITORY }}" "$ACTION"
