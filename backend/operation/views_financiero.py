@@ -150,22 +150,26 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
         params = []
         
         if period_info['start_date'] and period_info['end_date']:
-            date_filter = "WHERE operational_date BETWEEN %s AND %s AND order_status = 'PAID'"
+            date_filter = "WHERE operational_date BETWEEN ? AND ? AND order_status = 'PAID'"
             params = [period_info['start_date'], period_info['end_date']]
         else:
             date_filter = "WHERE order_status = 'PAID'"
         
         # CONSULTA ÚNICA A dashboard_operativo_view - INCLUIR total_with_container para consistencia
-        cursor.execute(f"""
-            SELECT 
-                order_id, order_total, order_status, waiter, operational_date,
-                item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
-                recipe_name, category_name, category_id,
-                payment_method, payment_amount
-            FROM dashboard_operativo_view
-            {date_filter}
-            ORDER BY operational_date DESC, order_id, item_id
-        """, params)
+        try:
+            cursor.execute(f"""
+                SELECT 
+                    order_id, order_total, order_status, waiter, operational_date,
+                    item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
+                    recipe_name, category_name, category_id,
+                    payment_method, payment_amount
+                FROM dashboard_operativo_view
+                {date_filter}
+                ORDER BY operational_date DESC, order_id, item_id
+            """, params)
+        except Exception as db_error:
+            cursor.close()
+            raise Exception(f"Error en consulta dashboard_operativo_view: {str(db_error)}")
         
         all_data = cursor.fetchall()
         cursor.close()
