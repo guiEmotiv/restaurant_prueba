@@ -206,7 +206,7 @@ jobs:
         docker buildx build \
           --platform linux/amd64 \
           --cache-from type=registry,ref=$ECR_REGISTRY/$ECR_REPOSITORY:cache \
-          --cache-to type=registry,ref=$ECR_REPOSITORY:cache,mode=max \
+          --cache-to type=registry,ref=$ECR_REGISTRY/$ECR_REPOSITORY:cache,mode=max \
           --build-arg VITE_AWS_COGNITO_USER_POOL_ID="$VITE_AWS_COGNITO_USER_POOL_ID" \
           --build-arg VITE_AWS_COGNITO_APP_CLIENT_ID="$VITE_AWS_COGNITO_APP_CLIENT_ID" \
           --build-arg VITE_DISABLE_COGNITO="$VITE_DISABLE_COGNITO" \
