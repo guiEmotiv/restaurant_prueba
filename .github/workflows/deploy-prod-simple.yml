@@ -97,33 +97,33 @@ jobs:
         # Wait for services to fully initialize
         sleep 60
         
-        # Test HTTP endpoint
-        echo '🔍 Testing HTTP endpoint...'
-        response=\$(curl -s -o /dev/null -w \"%{http_code}\" http://${{ secrets.DOMAIN_NAME }}/ || echo \"000\")
+        # Test HTTP endpoint  
+        echo 'Testing HTTP endpoint...'
+        response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.DOMAIN_NAME }}/ || echo "000")
         
-        if [ \"\$response\" = \"200\" ] || [ \"\$response\" = \"301\" ] || [ \"\$response\" = \"302\" ]; then
-          echo \"✅ Application is responding (HTTP \$response)\"
-          echo \"🌍 Available at: http://${{ secrets.DOMAIN_NAME }}\"
+        if [ "$response" = "200" ] || [ "$response" = "301" ] || [ "$response" = "302" ]; then
+          echo "Application is responding (HTTP $response)"
+          echo "Available at: http://${{ secrets.DOMAIN_NAME }}"
         else
-          echo \"⚠️  HTTP response: \$response (may still be starting up)\"
+          echo "HTTP response: $response (may still be starting up)"
         fi
         
         # Test HTTPS if available
-        https_response=\$(curl -s -o /dev/null -w \"%{http_code}\" https://${{ secrets.DOMAIN_NAME }}/ || echo \"000\")
-        if [ \"\$https_response\" = \"200\" ]; then
-          echo \"✅ HTTPS is working!\"
-          echo \"🌍 Secure URL: https://${{ secrets.DOMAIN_NAME }}\"
+        https_response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.DOMAIN_NAME }}/ || echo "000")
+        if [ "$https_response" = "200" ]; then
+          echo "HTTPS is working!"
+          echo "Secure URL: https://${{ secrets.DOMAIN_NAME }}"
         else
-          echo \"⚠️  HTTPS not yet available (response: \$https_response)\"
-          echo \"SSL certificates may still be initializing...\"
+          echo "HTTPS not yet available (response: $https_response)"
+          echo "SSL certificates may still be initializing..."
         fi
     
     - name: Post deployment summary
       if: always()
       run: |
-        echo \"## 🎉 Production Deployment Summary\" >> \$GITHUB_STEP_SUMMARY
-        echo \"- **Method**: Direct build on server\" >> \$GITHUB_STEP_SUMMARY
-        echo \"- **Domain**: http://${{ secrets.DOMAIN_NAME }}\" >> \$GITHUB_STEP_SUMMARY
-        echo \"- **HTTPS**: https://${{ secrets.DOMAIN_NAME }} (if SSL configured)\" >> \$GITHUB_STEP_SUMMARY
-        echo \"- **Deployed at**: \$(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> \$GITHUB_STEP_SUMMARY
-        echo \"- **Commit**: ${{ github.sha }}\" >> \$GITHUB_STEP_SUMMARY
+        echo "## Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Method**: Direct build on server" >> $GITHUB_STEP_SUMMARY
+        echo "- **Domain**: http://${{ secrets.DOMAIN_NAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **HTTPS**: https://${{ secrets.DOMAIN_NAME }} (if SSL configured)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Deployed at**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
