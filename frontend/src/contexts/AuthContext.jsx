@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }) => {
       canViewKitchen: true,
       canViewTableStatus: true,
       canManagePayments: true,
+      canProcessPayment: true,
       canViewHistory: true,
     },
     [ROLES.WAITER]: {
@@ -70,6 +71,7 @@ export const AuthProvider = ({ children }) => {
       canViewKitchen: false,
       canViewTableStatus: true,   // Pueden ver estado de mesas para operaciones
       canManagePayments: true,    // Función principal de cajeros
+      canProcessPayment: true,    // Pueden procesar pagos
       canViewHistory: true,       // Pueden ver historial de transacciones
     }
   };

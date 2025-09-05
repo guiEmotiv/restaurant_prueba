@@ -44,10 +44,10 @@ class TableSerializer(serializers.ModelSerializer):
         return None
     
     def get_active_orders_count(self, obj):
-        return obj.order_set.filter(status='CREATED').count()
+        return obj.order_set.filter(status__in=['CREATED', 'SERVED']).count()
     
     def get_has_active_orders(self, obj):
-        return obj.order_set.filter(status='CREATED').exists()
+        return obj.order_set.filter(status__in=['CREATED', 'SERVED']).exists()
 
 
 class TableDetailSerializer(TableSerializer):

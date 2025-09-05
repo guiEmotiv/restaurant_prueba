@@ -118,6 +118,10 @@ const DashboardOperativo = () => {
         
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">DashboardOperativo - Panel de Control Operacional</h1>
+            <p className="text-sm text-gray-600 mt-1">Métricas y análisis del día en tiempo real</p>
+          </div>
           <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4">
             <div className="flex items-center gap-3">
               <CustomDatePicker

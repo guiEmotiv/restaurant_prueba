@@ -14,11 +14,16 @@ import uuid
 class Order(models.Model):
     STATUS_CHOICES = [
         ('CREATED', 'Creado'),
+        ('PREPARING', 'En Preparación'),
+        ('SERVED', 'Servido'),
         ('PAID', 'Pagado'),
+        ('CANCELED', 'Cancelado'),
     ]
 
     table = models.ForeignKey(Table, on_delete=models.PROTECT)
     waiter = models.CharField(max_length=150, blank=True, null=True, verbose_name="Mesero", help_text="Usuario que creó la orden")
+    customer_name = models.CharField(max_length=150, default='Cliente', verbose_name="Nombre del cliente")
+    party_size = models.PositiveIntegerField(default=2, verbose_name="Cantidad de personas")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='CREATED')
     total_amount = models.DecimalField(
         max_digits=10, 
@@ -27,8 +32,11 @@ class Order(models.Model):
         default=Decimal('0.00')
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    preparing_at = models.DateTimeField(null=True, blank=True)
     served_at = models.DateTimeField(null=True, blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
+    canceled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.TextField(blank=True, null=True, verbose_name="Motivo de cancelación")
 
     class Meta:
         db_table = 'order'
@@ -90,14 +98,31 @@ class Order(models.Model):
             for order_item in self.orderitem_set.all():
                 order_item.recipe.consume_ingredients()
 
-    def update_status(self, new_status):
+    def update_status(self, new_status, cancellation_reason=None):
         """Actualiza el estado de la orden y timestamps"""
         self.status = new_status
         now = timezone.now()
         
-        if new_status == 'PAID':
+        if new_status == 'PREPARING':
+            self.preparing_at = now
+        elif new_status == 'SERVED':
+            self.served_at = now
+            # When order is SERVED, update CREATED and PREPARING items to SERVED
+            # CANCELED items remain CANCELED
+            for item in self.orderitem_set.filter(status__in=['CREATED', 'PREPARING']):
+                item.update_status('SERVED')  # Use proper method to update timestamps
+            # Release the table
+            self.table.release_table()
+        elif new_status == 'PAID':
             self.paid_at = now
+        elif new_status == 'CANCELED':
+            self.canceled_at = now
+            if cancellation_reason:
+                self.cancellation_reason = cancellation_reason
+            # Release table when order is canceled
+            self.table.release_table()
         
+        # Save the order after updating status and timestamps
         self.save()
 
     def check_and_update_order_status(self):
@@ -132,6 +157,7 @@ class OrderItem(models.Model):
         ('PREPARING', 'En Preparación'),
         ('SERVED', 'Entregado'),
         ('PAID', 'Pagado'),
+        ('CANCELED', 'Cancelado'),
     ]
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE)
@@ -171,6 +197,8 @@ class OrderItem(models.Model):
     preparing_at = models.DateTimeField(null=True, blank=True)
     served_at = models.DateTimeField(null=True, blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
+    canceled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.TextField(blank=True, null=True, verbose_name="Motivo de cancelación")
 
     class Meta:
         db_table = 'order_item'
@@ -243,6 +271,11 @@ class OrderItem(models.Model):
         self.refresh_from_db()
         print(f"DEBUG: After refresh_from_db: {self.status} -> {new_status}")
         
+        # IMPORTANT: Los items cancelados nunca cambian de estado
+        if self.status == 'CANCELED':
+            print(f"DEBUG: Item is CANCELED - cannot change status")
+            return  # Los items cancelados permanecen así
+        
         # ARQUITECTURA IDEMPOTENTE: Si ya está en el estado deseado, es un éxito
         if self.status == new_status:
             print(f"DEBUG: Item already in {new_status} state - idempotent success")
@@ -253,10 +286,11 @@ class OrderItem(models.Model):
         
         # Validar transiciones válidas solo si hay un cambio real
         valid_transitions = {
-            'CREATED': ['PREPARING'],
-            'PREPARING': ['SERVED'],
-            'SERVED': ['PAID'],
-            'PAID': []
+            'CREATED': ['PREPARING', 'CANCELED'],  # CREATED puede ir a preparación o cancelarse
+            'PREPARING': ['SERVED', 'CANCELED'],   # PREPARING puede ir a servido o cancelarse
+            'SERVED': ['PAID'],          # SERVED solo puede ir a PAID
+            'PAID': [],                  # PAID es estado final
+            'CANCELED': []               # CANCELED es estado final
         }
         
         print(f"DEBUG: Valid transitions for {self.status}: {valid_transitions.get(self.status, [])}")

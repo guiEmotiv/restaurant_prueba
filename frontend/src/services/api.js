@@ -575,6 +575,12 @@ export const apiService = {
     update: (id, data) => apiService.update('orders', id, data),
     patch: (id, data) => apiService.patch('orders', id, data),
     delete: (id) => apiService.delete('orders', id),
+    cancel: async (id, cancellationReason) => {
+      const response = await api.post(`/orders/${id}/cancel/`, {
+        cancellation_reason: cancellationReason
+      });
+      return response.data;
+    },
     updateStatus: async (id, status) => {
       const response = await api.post(`/orders/${id}/update_status/`, { status });
       return response.data;
@@ -585,10 +591,6 @@ export const apiService = {
     },
     getActive: async () => {
       const response = await api.get('/orders/active/');
-      return response.data;
-    },
-    getKitchen: async () => {
-      const response = await api.get('/orders/kitchen/');
       return response.data;
     },
     getKitchenBoard: async () => {
@@ -623,6 +625,10 @@ export const apiService = {
       const response = await api.post(`/orders/${id}/process_split_payment/`, splitData);
       return response.data;
     },
+    resetAll: async () => {
+      const response = await api.post('/orders/reset_all/');
+      return response.data;
+    },
   },
 
   orderItems: {
@@ -632,8 +638,14 @@ export const apiService = {
     update: (id, data) => apiService.update('order-items', id, data),
     patch: (id, data) => apiService.patch('order-items', id, data),
     delete: (id) => apiService.delete('order-items', id),
-    updateStatus: async (id, status) => {
-      const response = await api.post(`/order-items/${id}/update_status/`, { status });
+    updateStatus: async (id, data) => {
+      const response = await api.patch(`/order-items/${id}/`, data);
+      return response.data;
+    },
+    cancel: async (id, cancellationReason) => {
+      const response = await api.post(`/order-items/${id}/cancel/`, {
+        cancellation_reason: cancellationReason
+      });
       return response.data;
     },
     processPayment: async (id, paymentData) => {

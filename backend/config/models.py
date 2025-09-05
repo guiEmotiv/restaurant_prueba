@@ -61,6 +61,12 @@ class Table(models.Model):
     def __str__(self):
         return f"Mesa {self.table_number} - {self.zone.name}"
 
+    def release_table(self):
+        """Releases the table when order is SERVED"""
+        # For now, just mark as available
+        # In the future, we might want to add a 'status' field to Table model
+        pass
+    
     def delete(self, *args, **kwargs):
         if self.order_set.exists():
             raise ValidationError("No se puede eliminar una mesa que tiene órdenes asociadas")

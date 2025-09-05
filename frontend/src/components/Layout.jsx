@@ -87,10 +87,18 @@ const Layout = ({ children }) => {
       permission: null, // Se filtrará por sus hijos
       children: [
         { name: 'Gestión de Mesas', href: '/operations', icon: Table, permission: 'canManageOrders' },
-        { name: 'Cocina', href: '/kitchen', icon: Utensils, permission: 'canViewKitchen' },
+        { name: 'Vista de Cocina', href: '/kitchen', icon: ChefHat, permission: 'canViewKitchen' },
       ]
     },
-    { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
+    { 
+      name: 'Pagos', 
+      icon: CreditCard,
+      permission: null, // Se filtrará por sus hijos
+      children: [
+        { name: 'Procesar Pagos', href: '/cashier-payment', icon: CreditCard, permission: 'canProcessPayment' },
+        { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
+      ]
+    },
   ];
 
   // Filter navigation based on user permissions
@@ -137,10 +145,10 @@ const Layout = ({ children }) => {
         />
       )}
 
-      {/* Menu Toggle Button - Top Left - Optimizado */}
+      {/* Menu Toggle Button - Top Left - Márgenes mínimos */}
       <button
         onClick={handleToggle}
-        className="fixed top-4 left-4 z-[60] inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white text-gray-700 shadow-lg border border-gray-200 hover:bg-gray-50 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 hover:scale-105"
+        className="fixed top-1 left-1 z-[60] inline-flex items-center justify-center w-10 h-10 rounded-lg bg-white text-gray-700 shadow-lg border border-gray-200 hover:bg-gray-50 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 hover:scale-105"
         aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
       >
         <div className={`transform transition-transform duration-200 ${isMenuOpen ? 'rotate-90' : 'rotate-0'}`}>
@@ -157,13 +165,11 @@ const Layout = ({ children }) => {
         isMenuOpen ? 'translate-x-0' : '-translate-x-full'
       } fixed inset-y-0 left-0 z-50 w-80 lg:w-64 bg-white shadow-xl transition-transform duration-300 ease-in-out`}>
         <div className="flex flex-col h-full">
-          {/* Header with integrated toggle space */}
-          <div className="flex items-center justify-between px-6 py-6 border-b border-gray-200">
-            <div className="ml-12 lg:ml-0"> {/* Space for toggle button */}
-              <h1 className="text-xl font-bold text-gray-900">
-                El Fogón de Don Soto
-              </h1>
-            </div>
+          {/* Header */}
+          <div className="flex items-center justify-center px-6 py-6 border-b border-gray-200">
+            <h1 className="text-xl font-bold text-gray-900">
+              El Fogón de Don Soto
+            </h1>
           </div>
           
           {/* Navigation */}
@@ -241,7 +247,7 @@ const Layout = ({ children }) => {
 
       {/* Main content */}
       <div className="min-h-screen">
-        <main className="p-4 lg:p-8 pt-20 lg:pt-8">
+        <main className="p-4 lg:p-8">
           {children}
         </main>
       </div>

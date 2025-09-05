@@ -90,7 +90,7 @@ class TableViewSet(viewsets.ModelViewSet):
     def active_orders(self, request, pk=None):
         """Obtener todas las órdenes activas (no pagadas) de una mesa"""
         table = self.get_object()
-        orders = table.order_set.filter(status='CREATED').order_by('-created_at')
+        orders = table.order_set.filter(status__in=['CREATED', 'SERVED']).order_by('-created_at')
         from operation.serializers import OrderDetailSerializer
         serializer = OrderDetailSerializer(orders, many=True)
         return Response(serializer.data)

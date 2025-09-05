@@ -126,6 +126,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'table', 'table_number', 'zone_name', 'waiter', 'waiter_name', 'status',
+            'customer_name', 'party_size',
             'total_amount', 'containers_total', 'grand_total', 'total_paid', 'pending_amount', 'is_fully_paid',
             'items', 'items_count', 'created_at',
             'served_at', 'paid_at'
@@ -322,7 +323,19 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Order
-        fields = ['table', 'waiter', 'items']
+        fields = ['table', 'waiter', 'customer_name', 'party_size', 'items']
+    
+    def validate_customer_name(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("El nombre del cliente es obligatorio")
+        return value.strip()
+    
+    def validate_party_size(self, value):
+        if not value or value < 1:
+            raise serializers.ValidationError("La cantidad de personas debe ser mayor a 0")
+        if value > 20:
+            raise serializers.ValidationError("La cantidad de personas no puede ser mayor a 20")
+        return value
     
     def validate_items(self, value):
         if not value:
@@ -370,17 +383,16 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             quantity = item_data.pop('quantity', 1)  # Remover quantity del item_data
             
             # Obtener información del container para este item
-            container_id = None
+            container = None
             container_price = None
             if selected_container_id:
                 # Buscar container usando Django ORM
                 try:
                     from config.models import Container
                     container = Container.objects.get(id=selected_container_id, is_active=True)
-                    container_id = container.id
                     container_price = container.price
                 except Container.DoesNotExist:
-                    container_id = None
+                    container = None
                     container_price = None
             
             # Crear OrderItems individuales (uno por cada cantidad)
@@ -388,7 +400,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             for i in range(quantity):
                 order_item = OrderItem.objects.create(
                     order=order, 
-                    container_id=container_id,
+                    container=container,
                     container_price=container_price,
                     quantity=1,  # Cada OrderItem tiene quantity=1
                     **item_data
@@ -434,7 +446,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'table', 'waiter', 'status', 'total_amount', 'items', 'container_sales', 'payments',
+            'id', 'table', 'waiter', 'customer_name', 'party_size', 'status', 'total_amount', 'items', 'container_sales', 'payments',
             'items_data', 'container_sales_data',
             'total_paid', 'pending_amount', 'is_fully_paid', 'containers_total', 'grand_total',
             'created_at', 'served_at', 'paid_at'
@@ -558,10 +570,9 @@ class PaymentSerializer(serializers.ModelSerializer):
     def validate(self, data):
         order = data['order']
         
-        # Verificar que todos los items estén servidos
-        all_items_served = order.orderitem_set.exists() and order.orderitem_set.filter(status='CREATED').count() == 0
-        if not all_items_served:
-            raise serializers.ValidationError("Solo se pueden pagar órdenes cuando todos los items han sido entregados")
+        # Verificar que el order esté en estado SERVED (permite pagos parciales de items servidos)
+        if order.status != 'SERVED':
+            raise serializers.ValidationError("Solo se pueden procesar pagos para órdenes en estado SERVED")
         
         # Verificar que no se pague más del total pendiente
         pending = order.get_pending_amount()
@@ -579,7 +590,9 @@ class OrderStatusUpdateSerializer(serializers.Serializer):
         
         # Validar transiciones de estado válidas
         valid_transitions = {
-            'CREATED': ['PAID'],
+            'CREATED': ['PREPARING', 'PAID'],
+            'PREPARING': ['SERVED', 'PAID'],
+            'SERVED': ['PAID'],
             'PAID': []
         }
         

@@ -90,6 +90,10 @@ const Units = () => {
 
   return (
     <div className="space-y-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Units - Configuración de Unidades</h1>
+        <p className="text-sm text-gray-600 mt-1">Gestiona las unidades de medida del sistema</p>
+      </div>
       <div className="flex items-center justify-end gap-3">
         <Button 
           variant="outline"

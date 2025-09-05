@@ -85,6 +85,10 @@ const DashboardFinanciero = () => {
         
         {/* Header unificado con todos los controles */}
         <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">DashboardFinanciero - Panel de Control Financiero</h1>
+            <p className="text-sm text-gray-600 mt-1">Análisis de ingresos y tendencias financieras</p>
+          </div>
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             
             {/* Filtro de Período */}

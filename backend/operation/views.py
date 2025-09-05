@@ -65,6 +65,53 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Override create to return full order details after creation"""
+        # Buscar pedido activo existente para la mesa
+        table_id = request.data.get('table')
+        if table_id:
+            active_order = Order.objects.filter(
+                table_id=table_id, 
+                status__in=['CREATED', 'SERVED']
+            ).first()
+            
+            if active_order:
+                # Si ya existe un pedido activo, agregar items a ese pedido
+                items = request.data.get('items', [])
+                if not items:
+                    return Response(
+                        {'error': 'La orden debe tener al menos un item'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Actualizar información del cliente si se proporciona
+                customer_name = request.data.get('customer_name')
+                party_size = request.data.get('party_size')
+                
+                if customer_name:
+                    active_order.customer_name = customer_name
+                if party_size:
+                    active_order.party_size = party_size
+                active_order.save()
+                
+                # Agregar items al pedido existente
+                for item_data in items:
+                    OrderItem.objects.create(
+                        order=active_order,
+                        recipe_id=item_data.get('recipe'),
+                        quantity=item_data.get('quantity', 1),
+                        notes=item_data.get('notes', ''),
+                        is_takeaway=item_data.get('is_takeaway', False),
+                        has_taper=item_data.get('has_taper', False),
+                        container_id=item_data.get('selected_container')
+                    )
+                
+                # Recalcular total del pedido
+                active_order.calculate_total()
+                
+                # Devolver el pedido actualizado con detalles completos
+                serializer = OrderDetailSerializer(active_order, context={'request': request})
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        # Si no hay pedido activo, crear uno nuevo
         # Validación adicional antes del serializer
         items = request.data.get('items', [])
         if not items:
@@ -97,12 +144,46 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         if serializer.is_valid():
             new_status = serializer.validated_data['status']
-            order.update_status(new_status)
+            cancellation_reason = request.data.get('cancellation_reason', '')
+            order.update_status(new_status, cancellation_reason=cancellation_reason)
             
             response_serializer = OrderDetailSerializer(order)
             return Response(response_serializer.data)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancelar una orden completa"""
+        order = self.get_object()
+        
+        # Verificar que el pedido puede ser cancelado
+        if order.status in ['PAID', 'CANCELED']:
+            return Response(
+                {'error': f'No se puede cancelar un pedido con estado {order.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        cancellation_reason = request.data.get('cancellation_reason', '')
+        if not cancellation_reason:
+            return Response(
+                {'error': 'El motivo de cancelación es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Cancelar el pedido y todos sus items
+        order.update_status('CANCELED', cancellation_reason=cancellation_reason)
+        
+        # Cancelar todos los items del pedido
+        for item in order.orderitem_set.all():
+            if item.status not in ['PAID', 'CANCELED']:
+                item.status = 'CANCELED'
+                item.cancellation_reason = cancellation_reason
+                item.canceled_at = timezone.now()
+                item.save()
+        
+        response_serializer = OrderDetailSerializer(order)
+        return Response(response_serializer.data)
     
     @action(detail=True, methods=['post'])
     def add_item(self, request, pk=None):
@@ -116,9 +197,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         logger.error(f"ADD_ITEM DEBUG - Order ID: {order.id}, Status: {order.status}")
         logger.error(f"ADD_ITEM DEBUG - Request data: {request.data}")
         
-        if order.status != 'CREATED':
+        if order.status not in ['CREATED', 'PREPARING']:
             return Response(
-                {'error': 'Solo se pueden agregar items a órdenes con status CREATED'},
+                {'error': 'Solo se pueden agregar items a órdenes con status CREATED o PREPARING'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -127,6 +208,12 @@ class OrderViewSet(viewsets.ModelViewSet):
             try:
                 order_item = serializer.save()
                 order.calculate_total()
+                
+                # Si el pedido estaba en PREPARING, regresarlo a CREATED para que aparezca en cocina
+                if order.status == 'PREPARING':
+                    order.status = 'CREATED'
+                    order.save()
+                    logger.error(f"ADD_ITEM DEBUG - Order {order.id} status changed from PREPARING to CREATED")
                 
                 response_serializer = OrderItemSerializer(order_item)
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)
@@ -191,10 +278,10 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response(cached_data)
         from django.db.models import Q
         
-        # Obtener todos los order items que están pendientes (CREATED y PREPARING)
-        # No filtrar por el estado de la orden, solo por el estado del item
+        # Obtener todos los order items que están pendientes (CREATED, PREPARING, SERVED)
+        # Incluir SERVED para que se vean tachados en la vista de cocina
         order_items = OrderItem.objects.filter(
-            status__in=['CREATED', 'PREPARING']
+            status__in=['CREATED', 'PREPARING', 'SERVED']
         ).exclude(
             order__status='PAID'  # Excluir solo órdenes ya pagadas
         ).select_related('recipe', 'recipe__group', 'order', 'order__table', 'order__table__zone').order_by('created_at')
@@ -354,21 +441,47 @@ class OrderViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': f'Error procesando pago dividido: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+    @action(detail=False, methods=['post'], permission_classes=[CognitoAdminOnlyPermission])
+    def reset_all(self, request):
+        """Reiniciar todos los pedidos (solo para desarrollo/admin)"""
+        try:
+            from django.db import connection
+            
+            # Eliminar todos los datos relacionados con pedidos
+            PaymentItem.objects.all().delete()
+            Payment.objects.all().delete()
+            ContainerSale.objects.all().delete()
+            OrderItem.objects.all().delete()
+            Order.objects.all().delete()
+            
+            # Reiniciar el contador de autoincremento en SQLite
+            with connection.cursor() as cursor:
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="operation_order"')
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="operation_orderitem"')
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="operation_payment"')
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="operation_containersale"')
+            
+            return Response({
+                'message': '✅ Todos los pedidos han sido eliminados y contadores reiniciados',
+                'status': 'success'
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'error': f'Error al reiniciar pedidos: {str(e)}',
+                'status': 'error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     @action(detail=False, methods=['get'])
     def served(self, request):
-        """Vista para pagos - órdenes con todos los items entregados listas para pagar"""
-        # Obtener órdenes no pagadas que tienen todos sus items entregados
-        from django.db.models import Count, Q, F
-        
+        """Vista para pagos - órdenes que pueden ser pagadas (SERVED o con items PREPARING/SERVED)"""
+        # Mostrar órdenes que tienen items listos para pagar:
+        # 1. Órdenes en estado SERVED (cerradas por mesero)
+        # 2. Órdenes que tienen items en estado PREPARING o SERVED (pueden pagarse directamente)
+        from django.db.models import Q
         orders = Order.objects.filter(
-            status='CREATED'  # Solo órdenes no pagadas
-        ).annotate(
-            total_items=Count('orderitem'),
-            served_items=Count('orderitem', filter=Q(orderitem__status='SERVED'))
-        ).filter(
-            total_items__gt=0,  # Que tengan items
-            total_items=F('served_items')  # Todos los items entregados
-        ).order_by('-created_at')
+            Q(status='SERVED') |  # Órdenes cerradas
+            Q(orderitem__status__in=['PREPARING', 'SERVED'])  # O con items procesables
+        ).distinct().order_by('-created_at')
         
         serializer = OrderDetailSerializer(orders, many=True)
         return Response(serializer.data)
@@ -436,13 +549,42 @@ class OrderItemViewSet(viewsets.ModelViewSet):
         return queryset
     
     @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancelar un item de orden"""
+        order_item = self.get_object()
+        
+        # Verificar que el item puede ser cancelado
+        if order_item.status in ['PAID', 'CANCELED']:
+            return Response(
+                {'error': f'No se puede cancelar un item con estado {order_item.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        cancellation_reason = request.data.get('cancellation_reason', '')
+        if not cancellation_reason:
+            return Response(
+                {'error': 'El motivo de cancelación es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Cancelar el item
+        order_item.status = 'CANCELED'
+        order_item.cancellation_reason = cancellation_reason
+        order_item.canceled_at = timezone.now()
+        order_item.save()
+        
+        # Invalidar cache
+        cache.delete('kitchen_board_data')
+        
+        serializer = OrderItemSerializer(order_item)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None):
         """Actualizar estado de un item de orden"""
         order_item = self.get_object()
         new_status = request.data.get('status')
         
-        print(f"DEBUG: Updating order item {pk} from {order_item.status} to {new_status}")
-        print(f"DEBUG: Request data: {request.data}")
         
         if not new_status:
             return Response(
@@ -451,6 +593,16 @@ class OrderItemViewSet(viewsets.ModelViewSet):
             )
         
         try:
+            if new_status == 'CANCELED':
+                cancellation_reason = request.data.get('cancellation_reason', '')
+                if not cancellation_reason:
+                    return Response(
+                        {'error': 'El motivo de cancelación es requerido para cancelar'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                order_item.cancellation_reason = cancellation_reason
+                order_item.canceled_at = timezone.now()
+            
             order_item.update_status(new_status)
             
             # CRITICAL: Invalidate kitchen_board cache immediately after status update
@@ -562,6 +714,78 @@ class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all().order_by('-created_at')
     permission_classes = [CognitoPaymentPermission]  # Solo administradores pueden procesar pagos
     serializer_class = PaymentSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """Override create para actualizar estados de OrderItems según el tipo de pago"""
+        from django.db import transaction
+        
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
+            with transaction.atomic():
+                payment = serializer.save()
+                order = payment.order
+                
+                
+                # Si tiene split_group, es un pago parcial
+                if hasattr(payment, 'split_group') and payment.split_group:
+                    # Para pagos parciales, necesitamos identificar qué items se están pagando
+                    selected_items = request.data.get('selected_items', [])
+                    
+                    if selected_items:
+                        # Primero cerrar la orden si tiene items PREPARING (esto los mueve a SERVED automáticamente)
+                        has_preparing_items = order.orderitem_set.filter(status='PREPARING').exists()
+                        if has_preparing_items and order.status != 'SERVED':
+                            order.update_status('SERVED')
+                        
+                        # Ahora actualizar solo los items seleccionados a PAID
+                        for item_id in selected_items:
+                            try:
+                                order_item = order.orderitem_set.get(id=item_id)
+                                # Solo cambiar a PAID si está en SERVED (ya debería estar después del cierre)
+                                if order_item.status == 'SERVED':
+                                    order_item.update_status('PAID')
+                            except OrderItem.DoesNotExist:
+                                continue
+                    
+                    # Verificar si todos los items están pagados para cambiar el estado del order
+                    all_items_paid = all(
+                        item.status == 'PAID' or item.status == 'CANCELED'
+                        for item in order.orderitem_set.all()
+                    )
+                    if all_items_paid:
+                        order.status = 'PAID'
+                        order.save()
+                        
+                else:
+                    # Pago completo - actualizar todos los items a PAID
+                    # Primero cerrar la orden si tiene items PREPARING (esto los mueve a SERVED automáticamente)
+                    has_preparing_items = order.orderitem_set.filter(status='PREPARING').exists()
+                    if has_preparing_items and order.status != 'SERVED':
+                        order.update_status('SERVED')
+                    
+                    # Luego actualizar todos los items SERVED a PAID
+                    for order_item in order.orderitem_set.filter(status='SERVED'):
+                        order_item.update_status('PAID')
+                    
+                    # Actualizar estado de la orden
+                    order.status = 'PAID'
+                    order.save()
+                
+                headers = self.get_success_headers(serializer.data)
+                return Response(
+                    {**serializer.data, 'order_status': order.status},
+                    status=status.HTTP_201_CREATED,
+                    headers=headers
+                )
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Error procesando pago: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     def get_queryset(self):
         queryset = Payment.objects.all().order_by('-created_at')

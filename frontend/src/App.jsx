@@ -19,8 +19,9 @@ import Groups from './pages/inventory/Groups';
 import Ingredients from './pages/inventory/Ingredients';
 import Recipes from './pages/inventory/Recipes';
 import PaymentHistory from './pages/operation/PaymentHistory';
+import CashierPayment from './pages/operation/CashierPayment';
+import TableOrderEcommerce from './pages/operation/TableOrderEcommerce/TableManagement';
 import Kitchen from './pages/operation/Kitchen';
-import TableOrderEcommerce from './pages/operation/TableOrderEcommerce';
 
 
 // Configure AWS Amplify
@@ -111,16 +112,6 @@ const AppContent = () => {
 
 
           {/* Operation routes */}
-          <Route path="/kitchen" element={
-            <RoleProtectedRoute requiredPermission="canViewKitchen">
-              <Kitchen />
-            </RoleProtectedRoute>
-          } />
-          <Route path="/kitchen-legacy" element={
-            <RoleProtectedRoute requiredPermission="canViewKitchen">
-              <Kitchen />
-            </RoleProtectedRoute>
-          } />
           <Route path="/operations" element={
             <RoleProtectedRoute requiredPermission="canManageOrders">
               <TableOrderEcommerce />
@@ -131,11 +122,25 @@ const AppContent = () => {
               <TableOrderEcommerce />
             </RoleProtectedRoute>
           } />
+          
 
           {/* Payment routes */}
           <Route path="/payment-history" element={
             <RoleProtectedRoute requiredPermission="canViewHistory">
               <PaymentHistory />  
+            </RoleProtectedRoute>
+          } />
+          
+          <Route path="/cashier-payment" element={
+            <RoleProtectedRoute requiredPermission="canProcessPayment">
+              <CashierPayment />  
+            </RoleProtectedRoute>
+          } />
+
+          {/* Kitchen route */}
+          <Route path="/kitchen" element={
+            <RoleProtectedRoute requiredPermission="canViewKitchen">
+              <Kitchen />  
             </RoleProtectedRoute>
           } />
 
@@ -161,6 +166,7 @@ const AppContent = () => {
   }
 };
 
+
 function App() {
   try {
     if (!isCognitoConfigured) {
@@ -183,7 +189,10 @@ function App() {
           <Router>
             <LoginForm>
               <RoleValidator>
-                <AppContent />
+                <Routes>
+                  {/* All routes - Inside Layout */}
+                  <Route path="/*" element={<AppContent />} />
+                </Routes>
               </RoleValidator>
             </LoginForm>
           </Router>
