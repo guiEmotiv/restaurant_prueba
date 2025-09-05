@@ -93,6 +93,52 @@ def auth_debug(request):
     
     return JsonResponse(user_info)
 
+def db_debug(request):
+    """Debug endpoint to check database status - no auth required"""
+    try:
+        from django.db import connection
+        cursor = connection.cursor()
+        
+        # Check if dashboard_operativo_view exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='view' AND name='dashboard_operativo_view'")
+        view_exists = cursor.fetchone()
+        
+        result = {
+            'view_exists': bool(view_exists),
+            'status': 'success'
+        }
+        
+        if view_exists:
+            try:
+                # Try to count records
+                cursor.execute("SELECT COUNT(*) FROM dashboard_operativo_view")
+                count = cursor.fetchone()[0]
+                result['record_count'] = count
+                
+                # Try to get sample data
+                cursor.execute("SELECT * FROM dashboard_operativo_view LIMIT 1")
+                sample = cursor.fetchone()
+                result['has_sample_data'] = bool(sample)
+                if sample:
+                    result['sample_columns'] = len(sample)
+                    
+            except Exception as query_error:
+                result['query_error'] = str(query_error)
+        
+        # Check table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
+        result['tables'] = tables
+        
+        cursor.close()
+        return JsonResponse(result)
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'status': 'error'
+        })
+
 def create_optimized_import_function(model_class, table_name, required_columns, process_row_func=None, max_file_size_mb=10):
     """
     Optimized factory function to create Excel import functions for different models
@@ -984,6 +1030,8 @@ urlpatterns = [
     path('api/v1/health/', health_check, name='health_check'),
     # Auth debug endpoint (public - no auth required)
     path('api/v1/auth-debug/', auth_debug, name='auth_debug'),
+    # Database debug endpoint (public - no auth required)
+    path('api/v1/db-debug/', db_debug, name='db_debug'),
     # CSRF endpoint (public - no auth required)
     path('csrf/', get_csrf_token, name='csrf_token'),
     # Import endpoints outside of API middleware
