@@ -23,7 +23,7 @@ jobs:
   security-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Validate deployment confirmation
+      - name: Validate deployment confirmation (manual)
         if: github.event_name == 'workflow_dispatch'
         run: |
           if [ "${{ github.event.inputs.deploy_confirmation }}" != "DEPLOY" ]; then
@@ -31,6 +31,11 @@ jobs:
             exit 1
           fi
           echo "✅ Deployment confirmed"
+      
+      - name: Auto-approve push deployment
+        if: github.event_name == 'push'
+        run: |
+          echo "✅ Auto-deployment from push to main branch"
 
   # Build and push Docker image
   build-and-push:
