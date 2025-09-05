@@ -1,6 +1,6 @@
 services:
   app:
-    image: 721063839441.dkr.ecr.us-west-2.amazonaws.com/restaurant-web:latest
+    image: restaurant-app:fixed
     container_name: restaurant-web-app
     ports:
       - '8000:8000'

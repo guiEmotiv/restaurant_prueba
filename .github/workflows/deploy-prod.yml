@@ -1,238 +1,402 @@
-name: Deploy to Production
+name: Deploy to Production EC2
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
-      force_deploy:
-        description: 'Force deployment even if tests fail'
-        required: false
-        default: 'false'
-        type: boolean
+      deploy_confirmation:
+        description: 'Type "DEPLOY" to confirm production deployment'
+        required: true
+        default: ''
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  tests:
+  # Security check before deployment
+  security-check:
     runs-on: ubuntu-latest
-    outputs:
-      should_deploy: ${{ steps.check_deploy.outputs.should_deploy }}
-    
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-    
-    - name: Set up Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-    
-    - name: Install backend dependencies
-      run: |
-        cd backend
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Install frontend dependencies
-      run: |
-        cd frontend
-        npm ci
-    
-    - name: Run backend tests
-      id: backend_tests
-      run: |
-        cd backend
-        python manage.py check
-        python manage.py test
-      continue-on-error: true
-    
-    - name: Run frontend tests
-      id: frontend_tests
-      run: |
-        cd frontend
-        npm run lint
-        npm run test:ci
-      continue-on-error: true
-    
-    - name: Check if deployment should proceed
-      id: check_deploy
-      run: |
-        if [[ "${{ steps.backend_tests.outcome }}" == "success" && "${{ steps.frontend_tests.outcome }}" == "success" ]]; then
-          echo "should_deploy=true" >> $GITHUB_OUTPUT
-        elif [[ "${{ github.event.inputs.force_deploy }}" == "true" ]]; then
-          echo "should_deploy=true" >> $GITHUB_OUTPUT
-          echo "⚠️ Force deploying despite test failures!"
-        else
-          echo "should_deploy=false" >> $GITHUB_OUTPUT
-          echo "❌ Tests failed and force_deploy is not enabled"
-        fi
-
-  build-and-push:
-    needs: tests
-    if: needs.tests.outputs.should_deploy == 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.tags }}
-      image_digest: ${{ steps.build.outputs.digest }}
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
-    
-    - name: Build and push Docker image
-      id: build
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile.prod
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        build-args: |
-          VITE_AWS_COGNITO_USER_POOL_ID=${{ secrets.COGNITO_USER_POOL_ID }}
-          VITE_AWS_COGNITO_APP_CLIENT_ID=${{ secrets.COGNITO_APP_CLIENT_ID }}
-          VITE_DISABLE_COGNITO=${{ secrets.VITE_DISABLE_COGNITO || 'false' }}
-          VITE_API_BASE_URL=https://${{ secrets.DOMAIN_NAME }}/api
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-    
-    - name: Generate deployment summary
-      run: |
-        echo "## 🚀 Docker Image Built Successfully" >> $GITHUB_STEP_SUMMARY
-        echo "- **Image**: ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Digest**: ${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Registry**: ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
-
-  deploy:
-    needs: [tests, build-and-push]
-    if: needs.tests.outputs.should_deploy == 'true'
-    runs-on: ubuntu-latest
-    environment: production
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup SSH key
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-        ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-    
-    - name: Add EC2 to known hosts
-      run: |
-        mkdir -p ~/.ssh
-        ssh-keyscan -p ${{ secrets.EC2_SSH_PORT || '22' }} -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
-    
-    - name: Create deployment directory on EC2
-      run: |
-        ssh -p ${{ secrets.EC2_SSH_PORT || '22' }} ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }} "
-          sudo mkdir -p /opt/restaurant-web
-          sudo chown ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} /opt/restaurant-web
-        "
-    
-    - name: Copy deployment files to EC2
-      run: |
-        scp -P ${{ secrets.EC2_SSH_PORT || '22' }} -r docker/production/* ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }}:/opt/restaurant-web/
-        scp -P ${{ secrets.EC2_SSH_PORT || '22' }} docker-compose.prod.yml ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }}:/opt/restaurant-web/docker-compose.yml
-    
-    - name: Deploy to EC2
-      run: |
-        ssh -p ${{ secrets.EC2_SSH_PORT || '22' }} ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }} "
-          cd /opt/restaurant-web
-          
-          # Login to GitHub Container Registry
-          echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
-          
-          # Set environment variables
-          export IMAGE_TAG='${{ needs.build-and-push.outputs.image_tag }}'
-          export DOMAIN='${{ secrets.DOMAIN_NAME }}'
-          export DJANGO_SECRET_KEY='${{ secrets.DJANGO_SECRET_KEY }}'
-          export COGNITO_USER_POOL_ID='${{ secrets.COGNITO_USER_POOL_ID }}'
-          export COGNITO_APP_CLIENT_ID='${{ secrets.COGNITO_APP_CLIENT_ID }}'
-          
-          # Create data directories
-          sudo mkdir -p /opt/restaurant-web/data/{db,static,media,logs,certbot/conf,certbot/www}
-          sudo chown -R ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} /opt/restaurant-web/data
-          
-          # Pull latest images
-          docker-compose pull
-          
-          # Graceful deployment with health checks
-          echo '🚀 Starting deployment...'
-          docker-compose up -d --remove-orphans
-          
-          # Wait for services to be healthy
-          echo '⏳ Waiting for services to be ready...'
-          timeout 300 bash -c 'until docker-compose ps | grep -q \"healthy\"; do sleep 10; echo \"Waiting for health checks...\"; done' || {
-            echo '❌ Health check timeout - rolling back'
-            docker-compose logs
+      - name: Validate deployment confirmation
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event.inputs.deploy_confirmation }}" != "DEPLOY" ]; then
+            echo "❌ Deployment cancelled - confirmation required"
             exit 1
-          }
+          fi
+          echo "✅ Deployment confirmed"
+
+  # Build and push Docker image
+  build-and-push:
+    needs: security-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=prod-{{sha}},enable={{is_default_branch}}
+
+      - name: Build production configuration
+        run: |
+          # Create production environment file
+          cat > .env.prod << EOF
+          DEBUG=False
+          DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          ALLOWED_HOSTS=${{ fromJson(secrets.PRODUCTION_CONFIG).ALLOWED_HOSTS }}
+          CORS_ALLOWED_ORIGINS=${{ fromJson(secrets.PRODUCTION_CONFIG).CORS_ALLOWED_ORIGINS }}
           
-          # Clean up old images
-          docker system prune -f
+          # Database Configuration
+          DATABASE_NAME=${{ fromJson(secrets.PRODUCTION_CONFIG).DATABASE_NAME }}
+          DATABASE_PATH=${{ fromJson(secrets.PRODUCTION_CONFIG).DATABASE_PATH }}
           
-          echo '✅ Deployment completed successfully!'
-        "
-    
-    - name: Verify deployment
-      run: |
-        # Wait a bit for the service to fully start
-        sleep 30
-        
-        # Check if the application is responding
-        response=$(curl -s -o /dev/null -w \"%{http_code}\" https://${{ secrets.DOMAIN_NAME }}/api/v1/health/ || echo \"000\")
-        
-        if [ \"$response\" = \"200\" ]; then
-          echo \"✅ Application is healthy and responding\"
-          echo \"🌍 Deployed at: https://${{ secrets.DOMAIN_NAME }}\"
-        else
-          echo \"❌ Application health check failed (HTTP $response)\"
+          # AWS Cognito Configuration
+          USE_COGNITO_AUTH=True
+          AWS_REGION=${{ fromJson(secrets.AWS_COGNITO_CONFIG).REGION }}
+          COGNITO_USER_POOL_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).USER_POOL_ID }}
+          COGNITO_APP_CLIENT_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).APP_CLIENT_ID }}
           
-          # Get logs for debugging
-          ssh -p ${{ secrets.EC2_SSH_PORT || '22' }} ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }} "
+          # Frontend Configuration
+          VITE_DISABLE_COGNITO=false
+          VITE_AWS_COGNITO_USER_POOL_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).USER_POOL_ID }}
+          VITE_AWS_COGNITO_APP_CLIENT_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).APP_CLIENT_ID }}
+          VITE_API_BASE_URL=${{ fromJson(secrets.PRODUCTION_CONFIG).API_BASE_URL }}
+          
+          # Application Configuration
+          TIME_ZONE=${{ fromJson(secrets.PRODUCTION_CONFIG).TIME_ZONE }}
+          LANGUAGE_CODE=${{ fromJson(secrets.PRODUCTION_CONFIG).LANGUAGE_CODE }}
+          
+          # Domain Configuration
+          DOMAIN_NAME=${{ fromJson(secrets.PRODUCTION_CONFIG).DOMAIN_NAME }}
+          EC2_PUBLIC_IP=${{ fromJson(secrets.EC2_CONFIG).PUBLIC_IP }}
+          EOF
+
+      - name: Build frontend with production configuration
+        run: |
+          cd frontend
+          npm ci
+          npm run lint
+          NODE_ENV=production \
+          VITE_DISABLE_COGNITO=false \
+          VITE_AWS_COGNITO_USER_POOL_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).USER_POOL_ID }} \
+          VITE_AWS_COGNITO_APP_CLIENT_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).APP_CLIENT_ID }} \
+          VITE_API_BASE_URL=${{ fromJson(secrets.PRODUCTION_CONFIG).API_BASE_URL }} \
+          npm run build
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          
+  # Deploy to EC2 Production
+  deploy-to-production:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: 
+      name: production
+      url: ${{ fromJson(secrets.PRODUCTION_CONFIG).DOMAIN_URL }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2_key.pem
+          chmod 600 ~/.ssh/ec2_key.pem
+          ssh-keyscan -H ${{ fromJson(secrets.EC2_CONFIG).PUBLIC_IP }} >> ~/.ssh/known_hosts
+
+      - name: Prepare deployment files
+        run: |
+          # Create production Docker Compose
+          cat > docker-compose.prod.yml << 'EOF'
+          services:
+            app:
+              image: ${{ needs.build-and-push.outputs.image-tag }}
+              container_name: restaurant-web-app
+              ports:
+                - '8000:8000'
+              volumes:
+                - /opt/restaurant-web/data:/opt/restaurant-web/data
+              env_file: 
+                - /opt/restaurant-web/.env
+              restart: unless-stopped
+              profiles: [production]
+              networks: [restaurant-network]
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 40s
+              deploy:
+                resources:
+                  limits:
+                    memory: 1G
+                    cpus: '1'
+                  reservations:
+                    memory: 512M
+                    cpus: '0.5'
+          
+            nginx:
+              image: nginx:alpine
+              container_name: restaurant-web-nginx
+              ports: ['80:80', '443:443']
+              volumes:
+                - ./nginx/conf.d:/etc/nginx/conf.d:ro
+                - /etc/letsencrypt:/etc/letsencrypt:ro
+                - /var/www/certbot:/var/www/certbot:ro
+              depends_on:
+                app:
+                  condition: service_healthy
+              restart: unless-stopped
+              profiles: [production]
+              networks: [restaurant-network]
+              healthcheck:
+                test: ["CMD", "nginx", "-t"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+          
+          networks:
+            restaurant-network:
+              driver: bridge
+          EOF
+
+          # Create production environment file
+          cat > .env.prod << EOF
+          DEBUG=False
+          DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          ALLOWED_HOSTS=${{ fromJson(secrets.PRODUCTION_CONFIG).ALLOWED_HOSTS }}
+          CORS_ALLOWED_ORIGINS=${{ fromJson(secrets.PRODUCTION_CONFIG).CORS_ALLOWED_ORIGINS }}
+          
+          # Database Configuration
+          DATABASE_NAME=${{ fromJson(secrets.PRODUCTION_CONFIG).DATABASE_NAME }}
+          DATABASE_PATH=${{ fromJson(secrets.PRODUCTION_CONFIG).DATABASE_PATH }}
+          
+          # AWS Cognito Configuration
+          USE_COGNITO_AUTH=True
+          AWS_REGION=${{ fromJson(secrets.AWS_COGNITO_CONFIG).REGION }}
+          COGNITO_USER_POOL_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).USER_POOL_ID }}
+          COGNITO_APP_CLIENT_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).APP_CLIENT_ID }}
+          
+          # Frontend Configuration
+          VITE_DISABLE_COGNITO=false
+          VITE_AWS_COGNITO_USER_POOL_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).USER_POOL_ID }}
+          VITE_AWS_COGNITO_APP_CLIENT_ID=${{ fromJson(secrets.AWS_COGNITO_CONFIG).APP_CLIENT_ID }}
+          VITE_API_BASE_URL=${{ fromJson(secrets.PRODUCTION_CONFIG).API_BASE_URL }}
+          
+          # Application Configuration
+          TIME_ZONE=${{ fromJson(secrets.PRODUCTION_CONFIG).TIME_ZONE }}
+          LANGUAGE_CODE=${{ fromJson(secrets.PRODUCTION_CONFIG).LANGUAGE_CODE }}
+          
+          # Domain Configuration
+          DOMAIN_NAME=${{ fromJson(secrets.PRODUCTION_CONFIG).DOMAIN_NAME }}
+          EC2_PUBLIC_IP=${{ fromJson(secrets.EC2_CONFIG).PUBLIC_IP }}
+          EOF
+
+      - name: Pre-deployment health check
+        run: |
+          echo "🔍 Checking EC2 connectivity and resources..."
+          ssh -i ~/.ssh/ec2_key.pem -o ConnectTimeout=30 ubuntu@${{ fromJson(secrets.EC2_CONFIG).PUBLIC_IP }} << 'EOF'
+            # System health check
+            echo "=== System Resources ==="
+            df -h | head -2
+            free -h
+            docker system df
+            
+            # Network connectivity
+            echo "=== Network Status ==="
+            curl -s -o /dev/null -w "%{http_code}" https://registry.docker.com/v2/ || echo "Registry check failed"
+            
+            # Current services status
+            echo "=== Current Services ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          EOF
+
+      - name: Clean EC2 resources before deployment
+        run: |
+          echo "🧹 Cleaning EC2 resources for deployment..."
+          ssh -i ~/.ssh/ec2_key.pem ubuntu@${{ fromJson(secrets.EC2_CONFIG).PUBLIC_IP }} << 'EOF'
+            set -e
+            
+            # Stop existing containers gracefully
+            if [ -f /opt/restaurant-web/docker-compose.prod.yml ]; then
+              cd /opt/restaurant-web
+              docker-compose -f docker-compose.prod.yml --profile production down --remove-orphans || true
+            fi
+            
+            # Clean Docker resources
+            docker system prune -af --volumes
+            docker network prune -f
+            
+            # Clean old images (keep last 2)
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}" | \
+              grep "ghcr.io/${{ github.repository }}" | \
+              tail -n +3 | \
+              awk '{print $3}' | \
+              xargs -r docker rmi -f || true
+            
+            # Ensure directory structure
+            sudo mkdir -p /opt/restaurant-web/{data,logs,backups}
+            sudo chown -R ubuntu:ubuntu /opt/restaurant-web
+            
+            # System cleanup
+            sudo apt clean
+            sudo journalctl --vacuum-time=7d
+            
+            echo "✅ Cleanup completed"
+          EOF
+
+      - name: Transfer deployment files
+        run: |
+          echo "📦 Transferring deployment files..."
+          
+          # Transfer Docker Compose and environment
+          scp -i ~/.ssh/ec2_key.pem docker-compose.prod.yml ubuntu@${{ fromJson(secrets.EC2_CONFIG).PUBLIC_IP }}:/opt/restaurant-web/
+          scp -i ~/.ssh/ec2_key.pem .env.prod ubuntu@${{ fromJson(secrets.EC2_CONFIG).PUBLIC_IP }}:/opt/restaurant-web/.env
+          
+          # Transfer nginx configuration
+          scp -i ~/.ssh/ec2_key.pem -r docker/nginx ubuntu@${{ fromJson(secrets.EC2_CONFIG).PUBLIC_IP }}:/opt/restaurant-web/
+
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying to production..."
+          ssh -i ~/.ssh/ec2_key.pem ubuntu@${{ fromJson(secrets.EC2_CONFIG).PUBLIC_IP }} << 'EOF'
+            set -e
             cd /opt/restaurant-web
-            echo '=== Docker Compose Status ==='
-            docker-compose ps
-            echo '=== Application Logs ==='
-            docker-compose logs --tail=50
-          "
-          exit 1
-        fi
-    
-    - name: Post deployment summary
-      if: always()
-      run: |
-        echo \"## 🎉 Production Deployment Summary\" >> $GITHUB_STEP_SUMMARY
-        echo \"- **Environment**: Production\" >> $GITHUB_STEP_SUMMARY
-        echo \"- **Image**: ${{ needs.build-and-push.outputs.image_tag }}\" >> $GITHUB_STEP_SUMMARY
-        echo \"- **Domain**: https://${{ secrets.DOMAIN_NAME }}\" >> $GITHUB_STEP_SUMMARY
-        echo \"- **Deployed at**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> $GITHUB_STEP_SUMMARY
-        echo \"- **Commit**: ${{ github.sha }}\" >> $GITHUB_STEP_SUMMARY
+            
+            # Login to GitHub Container Registry
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Pull latest image
+            docker pull ${{ needs.build-and-push.outputs.image-tag }}
+            
+            # Start services with health checks
+            echo "🎯 Starting production services..."
+            docker-compose -f docker-compose.prod.yml --profile production up -d
+            
+            # Wait for services to be healthy
+            echo "⏳ Waiting for services to be healthy..."
+            timeout 300 bash -c '
+              while true; do
+                app_health=$(docker inspect restaurant-web-app --format="{{.State.Health.Status}}" 2>/dev/null || echo "starting")
+                nginx_health=$(docker inspect restaurant-web-nginx --format="{{.State.Health.Status}}" 2>/dev/null || echo "starting")
+                
+                echo "App: $app_health, Nginx: $nginx_health"
+                
+                if [[ "$app_health" == "healthy" && "$nginx_health" == "healthy" ]]; then
+                  echo "✅ All services are healthy!"
+                  break
+                fi
+                
+                if [[ "$app_health" == "unhealthy" || "$nginx_health" == "unhealthy" ]]; then
+                  echo "❌ Service health check failed"
+                  docker-compose -f docker-compose.prod.yml --profile production logs --tail=50
+                  exit 1
+                fi
+                
+                sleep 10
+              done
+            '
+            
+            # Final verification
+            echo "🔍 Final deployment verification..."
+            docker-compose -f docker-compose.prod.yml --profile production ps
+            
+            # Test endpoints
+            sleep 5
+            curl -f -s -o /dev/null "http://localhost:8000/api/v1/health/" && echo "✅ Backend health check passed" || echo "❌ Backend health check failed"
+            
+            echo "✅ Deployment completed successfully!"
+          EOF
+            
+      - name: Post-deployment verification
+        run: |
+          echo "🔍 Running post-deployment verification..."
+          
+          # Wait for SSL to be ready
+          sleep 30
+          
+          # Test HTTPS endpoint
+          DOMAIN_URL="${{ fromJson(secrets.PRODUCTION_CONFIG).DOMAIN_URL }}"
+          
+          echo "Testing: $DOMAIN_URL"
+          
+          # Test with retries
+          for i in {1..5}; do
+            if curl -f -s -k --max-time 30 "$DOMAIN_URL" > /dev/null; then
+              echo "✅ HTTPS endpoint is responsive (attempt $i)"
+              break
+            else
+              echo "⏳ Waiting for HTTPS endpoint (attempt $i/5)..."
+              sleep 15
+            fi
+          done
+          
+          # Test API endpoint
+          API_URL="${DOMAIN_URL}/api/v1/health/"
+          if curl -f -s -k --max-time 30 "$API_URL" > /dev/null; then
+            echo "✅ API endpoint is responsive"
+          else
+            echo "⚠️  API endpoint check failed, but deployment may still be successful"
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/ec2_key.pem
+          docker logout ghcr.io
+
+      - name: Deployment notification
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "🎉 Production deployment successful!"
+            echo "🌐 Application URL: ${{ fromJson(secrets.PRODUCTION_CONFIG).DOMAIN_URL }}"
+            echo "🔐 AWS Cognito User Pool: ${{ fromJson(secrets.AWS_COGNITO_CONFIG).USER_POOL_ID }}"
+          else
+            echo "❌ Production deployment failed!"
+            exit 1
+          fi

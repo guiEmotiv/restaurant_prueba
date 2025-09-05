@@ -161,9 +161,8 @@ const getCSRFToken = async () => {
     
     if (token) return token;
     
-    // If not in cookies, get from main server (not API)
-    const baseUrl = API_BASE_URL.replace('/api/v1', '');
-    const response = await fetch(`${baseUrl}/csrf/`, {
+    // If not in cookies, get from API server
+    const response = await fetch(`${API_BASE_URL}/csrf/`, {
       credentials: 'include'
     });
     const data = await response.json();
