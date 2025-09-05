@@ -1,0 +1,129 @@
+name: Deploy to Production (Simple)
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deployment'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup SSH key
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+    
+    - name: Add EC2 to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -p ${{ secrets.EC2_SSH_PORT || '22' }} -H ${{ secrets.EC2_PROD_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to EC2
+      run: |
+        ssh -p ${{ secrets.EC2_SSH_PORT || '22' }} ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_PROD_HOST }} "
+          # Navigate to deployment directory
+          cd /opt/restaurant-web || {
+            echo '📁 Creating deployment directory...'
+            sudo mkdir -p /opt/restaurant-web
+            sudo chown ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} /opt/restaurant-web
+            cd /opt/restaurant-web
+          }
+          
+          # Clone or update repository
+          if [ -d 'restaurant-web/.git' ]; then
+            echo '🔄 Updating existing repository...'
+            cd restaurant-web
+            git fetch origin
+            git reset --hard origin/main
+          else
+            echo '📥 Cloning repository...'
+            git clone https://github.com/guiEmotiv/restaurant-web.git
+            cd restaurant-web
+          fi
+          
+          # Set environment variables
+          export DOMAIN='${{ secrets.DOMAIN_NAME }}'
+          export DJANGO_SECRET_KEY='${{ secrets.DJANGO_SECRET_KEY }}'
+          export COGNITO_USER_POOL_ID='${{ secrets.COGNITO_USER_POOL_ID }}'
+          export COGNITO_APP_CLIENT_ID='${{ secrets.COGNITO_APP_CLIENT_ID }}'
+          
+          # Create data directories
+          sudo mkdir -p /opt/restaurant-web/data/{db,static,media,logs,certbot/conf,certbot/www}
+          sudo chown -R ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} /opt/restaurant-web/data
+          
+          # Build and deploy with Docker Compose
+          echo '🐳 Building and deploying with Docker Compose...'
+          
+          # Stop existing containers
+          docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+          
+          # Build images locally
+          docker-compose -f docker-compose.prod.yml build --no-cache
+          
+          # Start services
+          docker-compose -f docker-compose.prod.yml up -d
+          
+          # Wait for services to be ready
+          echo '⏳ Waiting for services to start...'
+          sleep 30
+          
+          # Check service health
+          if docker-compose -f docker-compose.prod.yml ps | grep -q 'Up'; then
+            echo '✅ Services are running!'
+            docker-compose -f docker-compose.prod.yml ps
+          else
+            echo '❌ Services failed to start'
+            docker-compose -f docker-compose.prod.yml logs
+            exit 1
+          fi
+          
+          # Clean up old images
+          docker system prune -f
+          
+          echo '🎉 Deployment completed successfully!'
+        "
+    
+    - name: Verify deployment
+      run: |
+        # Wait for services to fully initialize
+        sleep 60
+        
+        # Test HTTP endpoint
+        echo '🔍 Testing HTTP endpoint...'
+        response=\$(curl -s -o /dev/null -w \"%{http_code}\" http://${{ secrets.DOMAIN_NAME }}/ || echo \"000\")
+        
+        if [ \"\$response\" = \"200\" ] || [ \"\$response\" = \"301\" ] || [ \"\$response\" = \"302\" ]; then
+          echo \"✅ Application is responding (HTTP \$response)\"
+          echo \"🌍 Available at: http://${{ secrets.DOMAIN_NAME }}\"
+        else
+          echo \"⚠️  HTTP response: \$response (may still be starting up)\"
+        fi
+        
+        # Test HTTPS if available
+        https_response=\$(curl -s -o /dev/null -w \"%{http_code}\" https://${{ secrets.DOMAIN_NAME }}/ || echo \"000\")
+        if [ \"\$https_response\" = \"200\" ]; then
+          echo \"✅ HTTPS is working!\"
+          echo \"🌍 Secure URL: https://${{ secrets.DOMAIN_NAME }}\"
+        else
+          echo \"⚠️  HTTPS not yet available (response: \$https_response)\"
+          echo \"SSL certificates may still be initializing...\"
+        fi
+    
+    - name: Post deployment summary
+      if: always()
+      run: |
+        echo \"## 🎉 Production Deployment Summary\" >> \$GITHUB_STEP_SUMMARY
+        echo \"- **Method**: Direct build on server\" >> \$GITHUB_STEP_SUMMARY
+        echo \"- **Domain**: http://${{ secrets.DOMAIN_NAME }}\" >> \$GITHUB_STEP_SUMMARY
+        echo \"- **HTTPS**: https://${{ secrets.DOMAIN_NAME }} (if SSL configured)\" >> \$GITHUB_STEP_SUMMARY
+        echo \"- **Deployed at**: \$(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> \$GITHUB_STEP_SUMMARY
+        echo \"- **Commit**: ${{ github.sha }}\" >> \$GITHUB_STEP_SUMMARY
