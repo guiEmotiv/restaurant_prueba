@@ -580,8 +580,12 @@ export const apiService = {
       });
       return response.data;
     },
-    updateStatus: async (id, status) => {
-      const response = await api.post(`/orders/${id}/update_status/`, { status });
+    updateStatus: async (id, status, cancellationReason = null) => {
+      const data = { status };
+      if (cancellationReason) {
+        data.cancellation_reason = cancellationReason;
+      }
+      const response = await api.post(`/orders/${id}/update_status/`, data);
       return response.data;
     },
     addItem: async (id, itemData) => {
@@ -675,6 +679,10 @@ export const apiService = {
     create: (data) => apiService.create('payments', data),
     update: (id, data) => apiService.update('payments', id, data),
     delete: (id) => apiService.delete('payments', id),
+    markReceiptPrinted: async (paymentId) => {
+      const response = await api.post(`/payments/${paymentId}/mark_receipt_printed/`);
+      return response.data;
+    },
     getDailySummary: async () => {
       const response = await api.get('/payments/daily_summary/');
       return response.data;

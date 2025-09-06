@@ -17,6 +17,7 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
     AHORA USA dashboard_operativo_view para estandarización completa del sistema
     """
     # Use default authentication from settings (Cognito if enabled)
+    # Use default authentication from settings (Cognito if enabled)
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def debug_view(self, request):
@@ -195,31 +196,44 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
         
         cursor = connection.cursor()
         
-        # Construir filtro de fechas para el período
-        date_filter = ""
-        params = []
-        
-        if period_info['start_date'] and period_info['end_date']:
-            date_filter = "WHERE operational_date BETWEEN ? AND ? AND order_status = 'PAID'"
-            params = [period_info['start_date'], period_info['end_date']]
-        else:
-            date_filter = "WHERE order_status = 'PAID'"
-        
-        # CONSULTA ÚNICA A dashboard_operativo_view - INCLUIR total_with_container para consistencia
+        # USAR dashboard_operativo_view para consistencia con dashboard operativo
         try:
-            cursor.execute(f"""
+            # Construir consulta con filtro de fechas usando la vista consolidada
+            if period_info['start_date'] and period_info['end_date']:
+                date_where = f"WHERE operational_date BETWEEN '{period_info['start_date']}' AND '{period_info['end_date']}'"
+            else:
+                date_where = ""
+                
+            query = f"""
                 SELECT 
-                    order_id, order_total, order_status, waiter, operational_date,
-                    item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
-                    recipe_name, category_name, category_id,
-                    payment_info, total_paid
+                    order_id, 
+                    order_total, 
+                    order_status, 
+                    waiter, 
+                    operational_date,
+                    item_id, 
+                    quantity, 
+                    unit_price, 
+                    total_price, 
+                    total_with_container, 
+                    item_status, 
+                    is_takeaway,
+                    recipe_name, 
+                    category_name, 
+                    category_id,
+                    payment_method,
+                    payment_amount,
+                    created_at,
+                    paid_at
                 FROM dashboard_operativo_view
-                {date_filter}
+                {date_where}
                 ORDER BY operational_date DESC, order_id, item_id
-            """, params)
+            """
+            
+            cursor.execute(query)
         except Exception as db_error:
             cursor.close()
-            raise Exception(f"Error en consulta dashboard_operativo_view: {str(db_error)}")
+            raise Exception(f"Error en consulta de tablas directas: {str(db_error)}")
         
         all_data = cursor.fetchall()
         cursor.close()
@@ -262,7 +276,7 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
             (order_id, order_total, order_status, waiter, operational_date,
              item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
              recipe_name, category_name, category_id,
-             payment_info, total_paid) = row
+             payment_method, payment_amount, created_at, paid_at) = row
             
             # Solo órdenes PAID
             if order_status == 'PAID' and item_id:
@@ -306,32 +320,20 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
                     daily_dish_stats[date_str][recipe_name]['revenue'] += Decimal(str(total_with_container or 0))
                     daily_dish_stats[date_str][recipe_name]['unit_price'] = Decimal(str(unit_price or 0))
                 
-                # Stats de pagos - USAR payment_info y total_paid para análisis simplificado
-                if payment_info and total_paid and order_id not in [order_id for stat in payment_stats.values() for order_id in stat.get('processed_orders', [])]:
-                    # Procesar payment_info string (e.g., "CASH:$10.72, CARD:$10.72")
-                    if payment_info and payment_info != 'Sin pagos':
-                        # Parsear payment_info para extraer métodos individuales
-                        payment_parts = str(payment_info).split(', ') if payment_info else []
-                        for payment_part in payment_parts:
-                            if ':$' in payment_part:
-                                method, amount_str = payment_part.split(':$')
-                                try:
-                                    amount = Decimal(amount_str)
-                                    payment_stats[method]['amount'] += amount
-                                    payment_stats[method]['count'] += 1
-                                    if 'processed_orders' not in payment_stats[method]:
-                                        payment_stats[method]['processed_orders'] = []
-                                    payment_stats[method]['processed_orders'].append(order_id)
-                                except (ValueError, IndexError):
-                                    continue
-                    
-                    # Si no hay payment_info pero sí total_paid, usar método genérico
-                    elif total_paid and total_paid > 0:
-                        payment_stats['UNKNOWN']['amount'] += Decimal(str(total_paid))
-                        payment_stats['UNKNOWN']['count'] += 1
-                        if 'processed_orders' not in payment_stats['UNKNOWN']:
-                            payment_stats['UNKNOWN']['processed_orders'] = []
-                        payment_stats['UNKNOWN']['processed_orders'].append(order_id)
+                # Stats de pagos - USAR payment_method y payment_amount de la vista
+                if payment_method and payment_amount and order_id not in [order_id for stat in payment_stats.values() for order_id in stat.get('processed_orders', [])]:
+                    # Usar payment_method y payment_amount directamente
+                    if payment_method and payment_method != 'Sin pagos':
+                        try:
+                            amount = Decimal(str(payment_amount or 0))
+                            if amount > 0:
+                                if 'processed_orders' not in payment_stats[payment_method]:
+                                    payment_stats[payment_method]['processed_orders'] = []
+                                payment_stats[payment_method]['amount'] += amount
+                                payment_stats[payment_method]['count'] += 1
+                                payment_stats[payment_method]['processed_orders'].append(order_id)
+                        except (ValueError, TypeError):
+                            continue
                 
                 # Items por día
                 date_str = str(operational_date)
@@ -457,3 +459,71 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
             })
         
         return payment_methods
+    
+    def _query_fallback_data(self, period_info):
+        """
+        Método fallback usando consultas básicas sin vista compleja
+        """
+        try:
+            # Calcular filtro de fechas
+            start_date = period_info.get('start_date')
+            end_date = period_info.get('end_date')
+            
+            # Consultas básicas seguras
+            orders_filter = Order.objects.filter(status='PAID')
+            items_filter = OrderItem.objects.filter(order__status='PAID')
+            
+            if start_date and end_date:
+                orders_filter = orders_filter.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+                items_filter = items_filter.filter(order__created_at__date__gte=start_date, order__created_at__date__lte=end_date)
+            
+            total_orders = orders_filter.count()
+            total_revenue = orders_filter.aggregate(total=Sum('total_amount'))['total'] or 0
+            total_items = items_filter.count()
+            
+            return {
+                'summary': {
+                    'total_orders': total_orders,
+                    'total_revenue': float(total_revenue),
+                    'average_ticket': float(total_revenue / total_orders) if total_orders > 0 else 0,
+                    'total_items': total_items
+                },
+                'category_breakdown': [],
+                'top_dishes': [],
+                'payment_methods': [],
+                'sales_by_day': [],
+                'revenue_trends': {
+                    'daily_average': 0,
+                    'daily_maximum': 0,
+                    'items_average': 0,
+                    'items_maximum': 0
+                },
+                'goals': {
+                    'sales': {'meta300': 0, 'meta500': 0},
+                    'production': {'meta300': 0, 'meta500': 0}
+                }
+            }
+        except Exception as e:
+            # Si todo falla, devolver datos vacíos pero válidos
+            return {
+                'summary': {
+                    'total_orders': 0,
+                    'total_revenue': 0,
+                    'average_ticket': 0,
+                    'total_items': 0
+                },
+                'category_breakdown': [],
+                'top_dishes': [],
+                'payment_methods': [],
+                'sales_by_day': [],
+                'revenue_trends': {
+                    'daily_average': 0,
+                    'daily_maximum': 0,
+                    'items_average': 0,
+                    'items_maximum': 0
+                },
+                'goals': {
+                    'sales': {'meta300': 0, 'meta500': 0},
+                    'production': {'meta300': 0, 'meta500': 0}
+                }
+            }

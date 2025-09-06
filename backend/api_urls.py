@@ -23,6 +23,7 @@ from operation.views import (
 )
 from operation.views_financiero import DashboardFinancieroViewSet
 from operation.views_operativo import DashboardOperativoViewSet
+from operation.views_kitchen_printer import KitchenPrinterViewSet
 from operation.sse_views import order_updates_stream, kitchen_updates_stream
 
 # Create router and register viewsets
@@ -48,6 +49,7 @@ router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'container-sales', ContainerSaleViewSet, basename='containersale')
 router.register(r'dashboard-financiero', DashboardFinancieroViewSet, basename='dashboard-financiero')
 router.register(r'dashboard-operativo', DashboardOperativoViewSet, basename='dashboard-operativo')
+router.register(r'kitchen', KitchenPrinterViewSet, basename='kitchen')
 
 # ELIMINADO: Cart routes
 # Sistema Cart eliminado para simplificar operaciones

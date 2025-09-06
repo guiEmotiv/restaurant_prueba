@@ -57,7 +57,8 @@ const Layout = ({ children }) => {
 
   // Define navigation items with permissions
   const allNavigation = [
-    { name: 'Dashboard Operativo', href: '/', icon: Activity, permission: 'canViewDashboard' },
+    { name: 'Inicio', href: '/', icon: Home },
+    { name: 'Dashboard Operativo', href: '/dashboard-operativo', icon: Activity, permission: 'canViewDashboard' },
     { name: 'Dashboard Financiero', href: '/dashboard-financiero', icon: DollarSign, permission: 'canViewDashboard' },
     { 
       name: 'Configuración', 
@@ -97,6 +98,7 @@ const Layout = ({ children }) => {
       children: [
         { name: 'Procesar Pagos', href: '/cashier-payment', icon: CreditCard, permission: 'canProcessPayment' },
         { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
+        { name: 'Consultar Pedido', href: '/order-tracker', icon: Eye, permission: 'canViewHistory' },
       ]
     },
   ];

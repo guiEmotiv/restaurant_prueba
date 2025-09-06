@@ -1,31 +1,37 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import api, { apiService, API_BASE_URL } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { Clock, Users, Utensils } from 'lucide-react';
+import { Clock, Users, Utensils, Settings } from 'lucide-react';
+import { printBluetoothKitchenLabels } from '../../services/bluetoothKitchenPrinter';
+import bluetoothKitchenPrinter from '../../services/bluetoothKitchenPrinter';
+
 
 const Kitchen = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
   
-  // Estados
+  // Estados optimizados
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showBackButton, setShowBackButton] = useState(false);
-  const [previousOrderIds, setPreviousOrderIds] = useState(new Set());
-
-  // Hook para tiempo actual optimizado
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  // Actualizar tiempo cada segundo (solo la referencia de tiempo)
+  // Estados menos volátiles agrupados
+  const [kitchenState, setKitchenState] = useState({
+    showBackButton: false,
+    previousOrderIds: new Set(),
+    lastFetchTime: null
+  });
+  
+  // Actualizar tiempo cada segundo para mostrar segundos en tiempo real
   useEffect(() => {
     const timeInterval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000);
+    }, 1000); // 1 segundo para precisión de segundos
     return () => clearInterval(timeInterval);
   }, []);
 
-  // Función memoizada para calcular tiempo transcurrido
+  // Función memoizada para calcular tiempo transcurrido (con segundos)
   const getElapsedTime = useCallback((createdAt) => {
     const created = new Date(createdAt);
     const diffMs = currentTime - created;
@@ -75,7 +81,7 @@ const Kitchen = () => {
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.4);
         
-        console.log('🔊 Sonido reproducido - Nuevo pedido en cocina');
+        // [Kitchen] Sonido reproducido - Nuevo pedido en cocina
         
       } catch (webAudioError) {
         console.warn('Web Audio API falló, intentando método alternativo:', webAudioError);
@@ -100,68 +106,299 @@ const Kitchen = () => {
     }
   };
 
-  // Función para manejar click en tarjeta
+  // Función para manejar click en tarjeta con flujo atómico correcto
   const handleCardClick = async (order) => {
-    console.log('Tarjeta clickeada:', order);
-    
     try {
-      // Filtrar solo los items que están en estado CREATED
-      const itemsToUpdate = order.items.filter(item => item.status === 'CREATED');
+      // Filtrar solo los items que están en estado CREATED y NO han sido impresos
+      const itemsToProcess = order.items.filter(item => 
+        item.status === 'CREATED' && !item.printed_at
+      );
       
-      if (itemsToUpdate.length === 0) {
-        showToast('No hay items pendientes para preparar', 'info');
+      if (itemsToProcess.length === 0) {
+        const alreadyPrintedCount = order.items.filter(item => 
+          item.status === 'CREATED' && item.printed_at
+        ).length;
+        
+        if (alreadyPrintedCount > 0) {
+          showToast(`No hay items nuevos para imprimir. ${alreadyPrintedCount} items ya fueron impresos previamente.`, 'info');
+        } else {
+          showToast('No hay items pendientes para preparar', 'info');
+        }
         return;
       }
       
-      // Mostrar loading mientras se actualiza
-      showToast(`Iniciando preparación de ${itemsToUpdate.length} items...`, 'info');
+      // [Kitchen] Procesando ${itemsToProcess.length} items para impresión: ${itemsToProcess.map(item => `${item.id}:${item.recipe_name}`)}
       
-      // Actualizar todos los items a estado PREPARING usando el endpoint correcto
-      const updatePromises = itemsToUpdate.map(async (item) => {
+      showToast(`🏷️ Imprimiendo etiquetas para ${itemsToProcess.length} items...`, 'info');
+      
+      // PASO 1: IMPRIMIR PRIMERO (sin cambiar nada en BD)
+      let printResult;
+      let successfullyPrintedItems = [];
+      
+      try {
+        // Enviar a impresora Bluetooth
+        printResult = await printBluetoothKitchenLabels(itemsToProcess, order);
+        const printerLabel = 'Bluetooth';
+        
+        if (printResult.success) {
+          // Toda la impresión fue exitosa
+          successfullyPrintedItems = itemsToProcess;
+          // [Kitchen] ${itemsToProcess.length} etiquetas impresas exitosamente via ${printerLabel}
+          showToast(`✅ ${itemsToProcess.length} etiquetas impresas exitosamente`, 'success');
+        } else if (printResult.successful > 0) {
+          // Impresión parcial - determinar cuáles se imprimieron
+          successfullyPrintedItems = itemsToProcess.slice(0, printResult.successful);
+          // [Kitchen] Impresión parcial: ${printResult.successful}/${printResult.total} etiquetas impresas via ${printerLabel}
+          showToast(`⚠️ Impresión parcial: ${printResult.successful}/${printResult.total} etiquetas impresas`, 'warning');
+        } else {
+          // Impresión completamente fallida
+          showToast(`❌ No se pudo imprimir ninguna etiqueta`, 'error');
+          return; // Salir sin cambiar nada - items siguen disponibles para retry
+        }
+      } catch (printError) {
+        showToast(`❌ Error al imprimir etiquetas: ${printError.message}`, 'error');
+        return; // Salir sin cambiar nada - items siguen disponibles para retry
+      }
+      
+      // PASO 2: MARCAR COMO IMPRESO (solo items que se imprimieron exitosamente)
+      // [Kitchen] Marcando ${successfullyPrintedItems.length} items como impresos
+      const markPrintedPromises = successfullyPrintedItems.map(async (item) => {
         try {
-          // Usar api para incluir autenticación
-          const response = await api.post(`/order-items/${item.id}/update_status/`, {
-            status: 'PREPARING'
-          });
-          
-          console.log(`✅ Item ${item.id} actualizado a PREPARING`);
-          return response.data;
+          const response = await api.post(`/order-items/${item.id}/mark_printed/`);
+          // [Kitchen] Item ${item.id} marcado como impreso: ${response.data.printed_at}
+          return { success: true, itemId: item.id, data: response.data };
         } catch (error) {
-          console.error(`❌ Error actualizando item ${item.id}:`, error);
-          throw error;
+          return { success: false, itemId: item.id, error: error.message };
         }
       });
       
-      // Ejecutar todas las actualizaciones en paralelo
-      await Promise.all(updatePromises);
+      const markResults = await Promise.all(markPrintedPromises);
+      const successfullyMarked = markResults.filter(r => r.success);
+      const failedToMark = markResults.filter(r => !r.success);
       
-      // También actualizar el estado del pedido a PREPARING si está en CREATED
-      if (order.status === 'CREATED') {
-        try {
-          const orderResponse = await api.post(`/orders/${order.id}/update_status/`, {
-            status: 'PREPARING'
-          });
-          
-          console.log(`✅ Pedido ${order.id} actualizado a PREPARING`);
-        } catch (error) {
-          console.error(`❌ Error actualizando pedido ${order.id}:`, error);
-        }
+      if (failedToMark.length > 0) {
+        showToast(`⚠️ ${failedToMark.length} items impresos pero no marcados en BD`, 'warning');
       }
       
-      // Mostrar mensaje de éxito
-      showToast(`¡${itemsToUpdate.length} items en preparación!`, 'success');
+      // PASO 3: CAMBIAR STATUS A PREPARING (solo items marcados exitosamente)
+      const itemsToChangeStatus = successfullyPrintedItems.filter(item => 
+        successfullyMarked.some(marked => marked.itemId === item.id)
+      );
       
-      // Recargar las órdenes para mostrar el estado actualizado
-      await loadOrders();
+      if (itemsToChangeStatus.length === 0) {
+        showToast('❌ No se pudo procesar completamente ningún item', 'error');
+        return;
+      }
+      
+      // [Kitchen] Cambiando status de ${itemsToChangeStatus.length} items a PREPARING
+      const updateStatusPromises = itemsToChangeStatus.map(async (item) => {
+        try {
+          const response = await api.post(`/order-items/${item.id}/update_status/`, {
+            status: 'PREPARING'
+          });
+          // [Kitchen] Item ${item.id} cambiado a PREPARING exitosamente
+          return { success: true, itemId: item.id, data: response.data };
+        } catch (error) {
+          return { success: false, itemId: item.id, error: error.message };
+        }
+      });
+      
+      const statusResults = await Promise.all(updateStatusPromises);
+      const successfulStatusUpdates = statusResults.filter(r => r.success);
+      const failedStatusUpdates = statusResults.filter(r => !r.success);
+      
+      // PASO 4: ACTUALIZAR ORDER STATUS Y DAR FEEDBACK FINAL
+      if (successfulStatusUpdates.length > 0) {
+        // [Kitchen] ${successfulStatusUpdates.length} items procesados completamente
+        
+        // Cambiar estado del order a PREPARING si está en CREATED
+        if (order.status === 'CREATED') {
+          try {
+            await api.post(`/orders/${order.id}/update_status/`, {
+              status: 'PREPARING'
+            });
+            // [Kitchen] Order ${order.id} cambiado a PREPARING
+          } catch (error) {
+          }
+        }
+        
+        // Mensaje final de éxito
+        showToast(
+          `🍳 ${successfulStatusUpdates.length} items procesados completamente (impresos → marcados → preparación)`, 
+          'success'
+        );
+      }
+      
+      if (failedStatusUpdates.length > 0) {
+        showToast(`⚠️ ${failedStatusUpdates.length} items impresos pero no iniciaron preparación`, 'warning');
+      }
+      
+      // Items que fallaron en cualquier paso siguen visibles para retry
+      const totalProcessed = successfulStatusUpdates.length;
+      const totalFailed = itemsToProcess.length - totalProcessed;
+      
+      if (totalFailed > 0) {
+        // [Kitchen] ${totalFailed} items siguen disponibles para reintento
+      }
+      
+      // Recargar datos para mostrar cambios
+      await loadOrders(true);
       
     } catch (error) {
-      console.error('Error al actualizar items a PREPARING:', error);
-      showToast(`Error al iniciar preparación: ${error.message}`, 'error');
+      showToast('❌ Error al procesar el pedido', 'error');
+    }
+  };
+
+  // Función de test de impresora con diagnóstico
+  const testPrinter = async () => {
+    try {
+      showToast('🧪 Test ultra básico...', 'info');
+      
+      // 1. Verificar conexión
+      if (!bluetoothKitchenPrinter.device || !bluetoothKitchenPrinter.device.gatt.connected) {
+        showToast('⚠️ Impresora no conectada. Usa "Conectar" primero', 'warning');
+        return;
+      }
+      
+      // 2. Test ULTRA básico - solo texto y saltos de línea
+      const testData = new Uint8Array([
+        // Solo texto ASCII y saltos de línea - SIN comandos ESC/POS
+        84, 69, 83, 84, 10,           // "TEST\n"
+        72, 79, 76, 65, 10,           // "HOLA\n"
+        49, 50, 51, 10,               // "123\n"
+        45, 45, 45, 45, 10,           // "----\n"
+        10, 10, 10, 10, 10, 10        // Muchos saltos de línea
+      ]);
+      
+      await bluetoothKitchenPrinter.sendCommand(testData);
+      showToast('✅ Test enviado - debe salir papel con texto', 'success');
+      
+    } catch (error) {
+      showToast(`❌ Error: ${error.message}`, 'error');
+    }
+  };
+
+  // Test adicional - solo avance de papel
+  const testPaperFeed = async () => {
+    try {
+      if (!bluetoothKitchenPrinter.device || !bluetoothKitchenPrinter.device.gatt.connected) {
+        showToast('⚠️ Conecta la impresora primero', 'warning');
+        return;
+      }
+
+      // Solo comandos de avance de papel
+      const feedData = new Uint8Array([
+        10, 10, 10, 10, 10, 10, 10, 10, 10, 10  // 10 saltos de línea
+      ]);
+      
+      await bluetoothKitchenPrinter.sendCommand(feedData);
+      showToast('📄 Comando de avance enviado', 'success');
+      
+    } catch (error) {
+      showToast(`❌ Error: ${error.message}`, 'error');
+    }
+  };
+
+  // Test con diagnóstico completo
+  const testDensity = async () => {
+    try {
+      if (!bluetoothKitchenPrinter.device || !bluetoothKitchenPrinter.device.gatt.connected) {
+        showToast('⚠️ Conecta la impresora primero', 'warning');
+        return;
+      }
+
+      showToast('🔍 Verificando estado del dispositivo...', 'info');
+      
+      // Información detallada del dispositivo
+      const device = bluetoothKitchenPrinter.device;
+      console.log('📱 Dispositivo:', {
+        name: device.name,
+        id: device.id,
+        connected: device.gatt.connected
+      });
+      
+      // Test con comando de auto-test de la impresora
+      const autoTest = new Uint8Array([
+        0x1B, 0x40,           // Reset
+        0x12, 0x54,           // Comando de auto-test (algunos modelos)
+        0x1D, 0x28, 0x41, 0x02, 0x00, 0x00, 0x02,  // Test pattern command
+        10, 10, 10
+      ]);
+      
+      await bluetoothKitchenPrinter.sendCommand(autoTest);
+      showToast('🔥 Comando auto-test enviado', 'success');
+      
+      // Esperar y enviar patrón de prueba básico
+      setTimeout(async () => {
+        const pattern = new Uint8Array([
+          // Patrón de 'X' que debería ser muy visible
+          88, 88, 88, 88, 88, 88, 88, 88, 10,  // "XXXXXXXX\n"
+          88, 32, 88, 32, 88, 32, 88, 32, 10,  // "X X X X \n"
+          88, 88, 88, 88, 88, 88, 88, 88, 10,  // "XXXXXXXX\n"
+          10, 10, 10, 10, 10
+        ]);
+        
+        await bluetoothKitchenPrinter.sendCommand(pattern);
+        showToast('📊 Patrón de prueba enviado', 'success');
+      }, 2000);
+      
+    } catch (error) {
+      showToast(`❌ Error: ${error.message}`, 'error');
+      console.error('Error detallado:', error);
+    }
+  };
+
+  // Test térmico específico
+  const testThermalMax = async () => {
+    try {
+      if (!bluetoothKitchenPrinter.device || !bluetoothKitchenPrinter.device.gatt.connected) {
+        showToast('⚠️ Conecta la impresora primero', 'warning');
+        return;
+      }
+
+      showToast('🔥 Configurando máximo calor térmico...', 'info');
+      
+      await bluetoothKitchenPrinter.testThermalConfig();
+      showToast('✅ Test térmico máximo enviado', 'success');
+      
+    } catch (error) {
+      showToast(`❌ Error: ${error.message}`, 'error');
+      console.error('Error térmico:', error);
+    }
+  };
+
+  // Función para conectar manualmente la impresora
+  const connectPrinter = async () => {
+    try {
+      showToast('🔌 Buscando impresoras Bluetooth...', 'info');
+      
+      // Verificar si Bluetooth está disponible
+      if (!navigator.bluetooth) {
+        showToast('❌ Bluetooth no disponible en este navegador', 'error');
+        return;
+      }
+      
+      await bluetoothKitchenPrinter.connect();
+      
+      // Verificar conexión exitosa
+      if (bluetoothKitchenPrinter.device && bluetoothKitchenPrinter.device.gatt.connected) {
+        const deviceName = bluetoothKitchenPrinter.device.name || 'Impresora sin nombre';
+        showToast(`✅ Conectado a: ${deviceName}`, 'success');
+      } else {
+        showToast('⚠️ Conexión incierta. Prueba el test', 'warning');
+      }
+      
+    } catch (error) {
+      if (error.message.includes('User cancelled')) {
+        showToast('⚠️ Conexión cancelada por el usuario', 'warning');
+      } else {
+        showToast(`❌ Error: ${error.message}`, 'error');
+      }
     }
   };
 
   // Cargar órdenes activas
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (silent = false) => {
     try {
       const ordersData = await apiService.orders.getAll();
       
@@ -178,27 +415,36 @@ const Kitchen = () => {
       // Detectar nuevos pedidos con items CREATED
       const currentOrderIds = new Set(activeOrders.map(order => order.id));
       const newCreatedOrders = activeOrders.filter(order => 
-        !previousOrderIds.has(order.id)
+        !kitchenState.previousOrderIds.has(order.id)
       );
       
       // Solo reproducir sonido si hay nuevos pedidos Y no es la primera carga
-      if (newCreatedOrders.length > 0 && previousOrderIds.size > 0) {
-        console.log(`🆕 ${newCreatedOrders.length} nuevo(s) pedido(s) CREATED detectado(s):`, newCreatedOrders.map(o => `#${o.id}`));
+      if (newCreatedOrders.length > 0 && kitchenState.previousOrderIds.size > 0) {
+        // [Kitchen] ${newCreatedOrders.length} nuevo(s) pedido(s) CREATED detectado(s): ${newCreatedOrders.map(o => `#${o.id}`)}
         playNotificationSound();
-      } else if (previousOrderIds.size === 0) {
-        console.log(`ℹ️ Primera carga: ${activeOrders.length} pedidos encontrados, no se reproduce sonido`);
+      } else if (kitchenState.previousOrderIds.size === 0) {
+        // [Kitchen] Primera carga: ${activeOrders.length} pedidos encontrados, no se reproduce sonido
       }
       
-      setPreviousOrderIds(currentOrderIds);
+      // Actualizar estado de cocina de manera optimizada
+      setKitchenState(prev => ({
+        ...prev,
+        previousOrderIds: currentOrderIds,
+        lastFetchTime: new Date().getTime()
+      }));
+      
       setOrders(activeOrders);
     } catch (error) {
-      if (error.message !== 'NETWORK_ERROR_SILENT') {
+      // Si es modo silencioso (desde handleCardClick), no mostrar errores de red
+      if (!silent && error.message !== 'NETWORK_ERROR_SILENT') {
         showToast(`Error al cargar órdenes: ${error.message}`, 'error');
+      } else if (silent) {
+        console.warn('🔄 Sincronización silenciosa falló:', error.message);
       }
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, kitchenState.previousOrderIds]);
 
   // Habilitar audio con interacción del usuario
   useEffect(() => {
@@ -209,7 +455,7 @@ const Kitchen = () => {
         if (audioContext.state === 'suspended') {
           audioContext.resume();
         }
-        console.log('🔊 Audio habilitado para notificaciones');
+        // [Kitchen] Audio habilitado para notificaciones
       } catch (error) {
         console.warn('No se pudo habilitar audio:', error);
       }
@@ -228,17 +474,40 @@ const Kitchen = () => {
     };
   }, []);
 
-  // Cargar órdenes al montar
+
+  // No inicializar automáticamente - solo mantener conexión durante la sesión
+
+  // Sistema de polling inteligente memoizado
+  const pollingConfig = useMemo(() => {
+    const hasOrders = orders.length > 0;
+    const timeSinceLastFetch = kitchenState.lastFetchTime ? 
+      Date.now() - kitchenState.lastFetchTime : 0;
+    
+    // Si no hay órdenes y la última consulta fue hace más de 2 minutos, consultar menos
+    if (!hasOrders && timeSinceLastFetch > 120000) {
+      return { interval: 60000, label: 'bajo tráfico' };
+    }
+    
+    // Si hay órdenes, mantener frecuencia alta
+    return { 
+      interval: hasOrders ? 30000 : 45000, 
+      label: hasOrders ? 'activo' : 'normal'
+    };
+  }, [orders.length, kitchenState.lastFetchTime]);
+
+  // Cargar órdenes al montar con polling inteligente
   useEffect(() => {
     loadOrders();
     
-    // Recargar cada 45 segundos (menos agresivo)
-    const interval = setInterval(loadOrders, 45000);
+    // [Kitchen] Configurando polling en modo: ${pollingConfig.label} (${pollingConfig.interval/1000}s)
+    const interval = setInterval(() => {
+      loadOrders();
+    }, pollingConfig.interval);
     
     return () => {
       clearInterval(interval);
     };
-  }, [loadOrders]);
+  }, [loadOrders, pollingConfig]);
 
   if (loading) {
     return (
@@ -290,6 +559,48 @@ const Kitchen = () => {
                   })}
                 </span>
               </div>
+              <button
+                onClick={connectPrinter}
+                className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md font-medium transition-colors"
+                title="Conectar"
+              >
+                🔌
+              </button>
+              <button
+                onClick={testPaperFeed}
+                className="px-2 py-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded-md font-medium transition-colors"
+                title="Test papel"
+              >
+                📄
+              </button>
+              <button
+                onClick={testPrinter}
+                className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-md font-medium transition-colors"
+                title="Test básico"
+              >
+                🧪
+              </button>
+              <button
+                onClick={testDensity}
+                className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-md font-medium transition-colors"
+                title="Test avanzado"
+              >
+                🔥
+              </button>
+              <button
+                onClick={testThermalMax}
+                className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white text-xs rounded-md font-medium transition-colors"
+                title="Test térmico máximo"
+              >
+                🌡️
+              </button>
+              <button
+                onClick={() => window.open('/printer-diagnostic', '_blank')}
+                className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-md font-medium transition-colors"
+                title="Diagnóstico completo"
+              >
+                🔧 Diagnóstico
+              </button>
             </div>
           </div>
         </div>
@@ -351,20 +662,20 @@ const Kitchen = () => {
                         return nameA.localeCompare(nameB);
                       })
                       .map((item, index) => (
-                      <div key={item.id || index}>
-                        <div className="text-lg lg:text-xl font-medium text-gray-900">
-                          <span className="break-words">
-                            {item.quantity}x {item.recipe_name || item.recipe?.name}
-                            {item.is_takeaway && " (delivery)"}
-                          </span>
-                        </div>
-                        {item.notes && (
-                          <div className="ml-4 text-base lg:text-lg text-gray-600 italic break-words">
-                            • {item.notes}
+                        <div key={item.id || index}>
+                          <div className="text-lg lg:text-xl font-medium text-gray-900">
+                            <span className="break-words">
+                              {item.quantity}x {item.recipe_name || item.recipe?.name}
+                              {item.is_takeaway && " (delivery)"}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          {item.notes && (
+                            <div className="ml-4 text-base lg:text-lg text-gray-600 italic break-words">
+                              • {item.notes}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                   </div>
 
                   {/* Footer compacto */}

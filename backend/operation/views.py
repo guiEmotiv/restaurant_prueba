@@ -70,7 +70,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         if table_id:
             active_order = Order.objects.filter(
                 table_id=table_id, 
-                status__in=['CREATED', 'SERVED']
+                status__in=['CREATED', 'PREPARING']  # Solo considerar órdenes realmente activas
             ).first()
             
             if active_order:
@@ -618,6 +618,39 @@ class OrderItemViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    @action(detail=True, methods=['post'])
+    def mark_printed(self, request, pk=None):
+        """Marcar un item como impreso en cocina"""
+        order_item = self.get_object()
+        
+        # Verificar que el item está en estado CREATED (listo para imprimir)
+        if order_item.status != 'CREATED':
+            return Response(
+                {'error': f'Solo se pueden marcar como impresos los items con estado CREATED (actual: {order_item.status})'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar que no haya sido impreso ya
+        if order_item.printed_at is not None:
+            return Response(
+                {'error': 'Este item ya ha sido marcado como impreso'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Marcar como impreso
+        order_item.printed_at = timezone.now()
+        order_item.save()
+        
+        # Invalidar cache
+        cache.delete('kitchen_board_data')
+        
+        serializer = OrderItemSerializer(order_item)
+        return Response({
+            'message': f'Item {order_item.id} marcado como impreso exitosamente',
+            'item': serializer.data,
+            'printed_at': order_item.printed_at
+        })
+    
     def destroy(self, request, *args, **kwargs):
         """Override destroy to check if item can be deleted"""
         order_item = self.get_object()
@@ -788,6 +821,30 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 {'error': f'Error procesando pago: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+    
+    @action(detail=True, methods=['post'])
+    def mark_receipt_printed(self, request, pk=None):
+        """Marcar un pago como impreso su recibo"""
+        from django.utils import timezone
+        
+        payment = self.get_object()
+        
+        # Verificar que el recibo no haya sido impreso ya
+        if payment.receipt_printed_at is not None:
+            return Response({
+                'error': f'El recibo de este pago ya ha sido marcado como impreso el {payment.receipt_printed_at.strftime("%Y-%m-%d %H:%M:%S")}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Marcar como impreso
+        payment.receipt_printed_at = timezone.now()
+        payment.save()
+        
+        return Response({
+            'message': f'Recibo del pago #{payment.id} marcado como impreso exitosamente',
+            'payment_id': payment.id,
+            'receipt_printed_at': payment.receipt_printed_at.isoformat(),
+            'order_id': payment.order.id
+        }, status=status.HTTP_200_OK)
     
     def get_queryset(self):
         queryset = Payment.objects.all().order_by('-created_at')

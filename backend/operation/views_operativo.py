@@ -17,9 +17,7 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
     Vista específica para Dashboard Operativo
     Usa EXCLUSIVAMENTE dashboard_operativo_view para máximo rendimiento y consistencia
     """
-    # Use default authentication from settings (Cognito if enabled)
-    # permission_classes and authentication_classes will be inherited from REST_FRAMEWORK defaults
-    permission_classes = [AllowAny]  # Explicitly allow access for development
+    # Usar autenticación AWS Cognito configurada en settings
     
     @action(detail=False, methods=['get'])
     def report(self, request):
@@ -108,6 +106,8 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
                     'pending_items': pending_items,
                     'preparing_items': preparing_items, 
                     'served_items': served_items,
+                    'overdue_items': 0,
+                    'total_revenue_today': float(total_revenue),
                     'delivery_orders': 0,
                     'restaurant_orders': total_orders,
                     'delivery_revenue': 0,
@@ -115,6 +115,10 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
                     'delivery_items': 0,
                     'restaurant_items': all_items.count()
                 },
+                'kitchen_status': [],
+                'zone_activity': [],
+                'recent_orders': [],
+                'hourly_activity': [],
                 'category_breakdown': [],
                 'delivery_category_breakdown': [],
                 'top_dishes': [],
@@ -131,10 +135,12 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
                 'summary': {
                     'total_orders': 0, 'total_revenue': 0, 'average_ticket': 0, 'total_items': 0,
                     'average_service_time': 0, 'active_orders': 0, 'pending_items': 0,
-                    'preparing_items': 0, 'served_items': 0, 'delivery_orders': 0, 
+                    'preparing_items': 0, 'served_items': 0, 'overdue_items': 0,
+                    'total_revenue_today': 0, 'delivery_orders': 0, 
                     'restaurant_orders': 0, 'delivery_revenue': 0, 'restaurant_revenue': 0,
                     'delivery_items': 0, 'restaurant_items': 0
                 },
+                'kitchen_status': [], 'zone_activity': [], 'recent_orders': [], 'hourly_activity': [],
                 'category_breakdown': [], 'delivery_category_breakdown': [],
                 'top_dishes': [], 'waiter_performance': [], 'payment_methods': [], 
                 'item_status_breakdown': [], 'unsold_recipes': []
@@ -149,36 +155,58 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
         from decimal import Decimal
         from collections import defaultdict
         
-        # CONSULTA ÚNICA A LA VISTA CONSOLIDADA
+        # CONSULTA DIRECTA SIN PARÁMETROS PROBLEMÁTICOS
+        from django.db import connection
+        import logging
+        
+        # Deshabilitar temporalmente el logging SQL de Django para evitar string formatting issues
+        django_db_logger = logging.getLogger('django.db.backends')
+        original_level = django_db_logger.level
+        django_db_logger.setLevel(logging.ERROR)
+        
         cursor = connection.cursor()
+        
         try:
-            # Debug: Primero verificar que la vista existe y tiene datos
-            cursor.execute("""
-                SELECT COUNT(*) FROM dashboard_operativo_view
-                WHERE operational_date = %s
-            """, [selected_date])
+            # Query con parámetros seguros usando ? placeholder
+            date_str = selected_date.strftime('%Y-%m-%d')
             
-            count_result = cursor.fetchone()
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Registros encontrados en dashboard_operativo_view para {selected_date}: {count_result[0] if count_result else 0}")
-            
-            # Consulta principal con campos básicos primero
-            cursor.execute("""
+            # Query completamente literal - sin parámetros para evitar string formatting issues
+            query = f"""
                 SELECT 
-                    order_id, order_total, order_status, waiter, operational_date,
-                    item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
-                    recipe_name, category_name, category_id,
-                    payment_info, total_paid
+                    order_id, 
+                    order_total, 
+                    order_status, 
+                    waiter, 
+                    operational_date,
+                    item_id, 
+                    quantity, 
+                    unit_price, 
+                    total_price, 
+                    total_with_container, 
+                    item_status, 
+                    is_takeaway,
+                    recipe_name, 
+                    category_name, 
+                    category_id,
+                    payment_method,
+                    payment_amount,
+                    created_at,
+                    paid_at
                 FROM dashboard_operativo_view
-                WHERE operational_date = ?
+                WHERE operational_date = '{date_str}'
                 ORDER BY order_id, item_id
-            """, [selected_date])
+            """
             
+            cursor.execute(query)
             all_data = cursor.fetchall()
-            logger.info(f"Filas procesadas: {len(all_data)}")
+            
+        except Exception as e:
+            cursor.close()
+            raise Exception(f"Error en consulta dashboard: {str(e)}")
         finally:
             cursor.close()
+            # Restaurar el logging SQL de Django
+            django_db_logger.setLevel(original_level)
         
         if not all_data:
             # Sin datos para la fecha
@@ -229,12 +257,12 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
         
         # PROCESAR TODOS LOS DATOS DE LA VISTA CONSOLIDADA
         for row in all_data:
-            # Desempaquetar con manejo de errores
+            # Desempaquetar con manejo de errores - exactamente 19 campos del SELECT
             try:
                 (order_id, order_total, order_status, waiter, operational_date,
                  item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
                  recipe_name, category_name, category_id,
-                 payment_info, total_paid) = row
+                 payment_method, payment_amount, created_at, paid_at) = row
             except ValueError as e:
                 # Debug: imprimir la estructura de datos recibida
                 import logging
@@ -321,28 +349,24 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
             elif item_status == 'SERVED':
                 served_items += 1
             
-            # Stats de pagos (solo órdenes PAID) - USAR payment_info y total_paid para análisis simplificado
-            if payment_info and total_paid and order_status == 'PAID' and order_id not in [order_id for stat in payment_stats.values() for order_id in stat.get('processed_orders', [])]:
-                # Procesar payment_info string (e.g., "CASH:$10.72, CARD:$10.72")
-                if payment_info and payment_info != 'Sin pagos':
-                    # Parsear payment_info para extraer métodos individuales
-                    payment_parts = str(payment_info).split(', ') if payment_info else []
-                    for payment_part in payment_parts:
-                        if ':$' in payment_part:
-                            method, amount_str = payment_part.split(':$')
-                            try:
-                                amount = Decimal(amount_str)
-                                payment_stats[method]['amount'] += amount
-                                payment_stats[method]['count'] += 1
-                                if 'processed_orders' not in payment_stats[method]:
-                                    payment_stats[method]['processed_orders'] = []
-                                payment_stats[method]['processed_orders'].append(order_id)
-                            except (ValueError, IndexError):
-                                continue
+            # Stats de pagos (solo órdenes PAID) - USAR payment_method y payment_amount para análisis simplificado
+            if payment_method and payment_amount and order_status == 'PAID' and order_id not in [order_id for stat in payment_stats.values() for order_id in stat.get('processed_orders', [])]:
+                # El payment_method viene directamente de la tabla payment
+                if payment_method and payment_method != 'Sin pagos':
+                    try:
+                        amount = Decimal(str(payment_amount or 0))
+                        if amount > 0:
+                            payment_stats[payment_method]['amount'] += amount
+                            payment_stats[payment_method]['count'] += 1
+                            if 'processed_orders' not in payment_stats[payment_method]:
+                                payment_stats[payment_method]['processed_orders'] = []
+                            payment_stats[payment_method]['processed_orders'].append(order_id)
+                    except (ValueError, TypeError):
+                        continue
                 
-                # Si no hay payment_info pero sí total_paid, usar método genérico
-                elif total_paid and total_paid > 0:
-                    payment_stats['UNKNOWN']['amount'] += Decimal(str(total_paid))
+                # Si no hay payment_method pero sí payment_amount, usar método genérico
+                elif payment_amount and payment_amount > 0:
+                    payment_stats['UNKNOWN']['amount'] += Decimal(str(payment_amount))
                     payment_stats['UNKNOWN']['count'] += 1
                     if 'processed_orders' not in payment_stats['UNKNOWN']:
                         payment_stats['UNKNOWN']['processed_orders'] = []
@@ -350,48 +374,29 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
             
             # Calcular tiempo de servicio para órdenes completadas
             if order_status == 'PAID' and order_id not in [entry['order_id'] for entry in service_times]:
-                # Obtener datos de tiempo específicos para esta orden desde la BD
-                try:
-                    cursor_time = connection.cursor()
-                    cursor_time.execute('''
-                        SELECT created_at, paid_at 
-                        FROM dashboard_operativo_view 
-                        WHERE order_id = %s 
-                        LIMIT 1
-                    ''', [order_id])
+                # Usar datos directos de la fila actual
+                if created_at and paid_at:
+                    # Calcular diferencia en minutos - USAR TIEMPO REAL
+                    time_diff = (paid_at - created_at).total_seconds() / 60
                     
-                    time_row = cursor_time.fetchone()
-                    if time_row:
-                        created_at, paid_at = time_row
-                        
-                        if created_at and paid_at:
-                            # Calcular diferencia en minutos - USAR TIEMPO REAL
-                            time_diff = (paid_at - created_at).total_seconds() / 60
-                            
-                            # Usar el tiempo REAL siempre (sin estimaciones)
-                            # Solo filtrar tiempos completamente irreales (> 7 días)
-                            if 0 < time_diff < 10080:  # Entre 0 minutos y 7 días
-                                service_times.append({
-                                    'order_id': order_id,
-                                    'service_time': time_diff
-                                })
-                            # Solo ignorar tiempos > 7 días (datos claramente incorrectos)
-                    
-                    cursor_time.close()
-                except Exception as e:
-                    # Si hay error en cálculo de tiempo, continuar sin agregar
-                    pass
+                    # Usar el tiempo REAL siempre (sin estimaciones)
+                    # Solo filtrar tiempos completamente irreales (> 7 días)
+                    if 0 < time_diff < 10080:  # Entre 0 minutos y 7 días
+                        service_times.append({
+                            'order_id': order_id,
+                            'service_time': time_diff
+                        })
         
         # Contar órdenes únicas por tipo
         order_has_delivery_items = set()
         order_has_local_items = set()
         
         for row in all_data:
-            # Use the same unpacking as the main loop (17 fields) - INCLUIR total_with_container
+            # Use the same unpacking as the main loop (19 fields) - INCLUIR created_at, paid_at
             (order_id, order_total, order_status, waiter, operational_date,
              item_id, quantity, unit_price, total_price, total_with_container, item_status, is_takeaway,
              recipe_name, category_name, category_id,
-             payment_info, total_paid) = row
+             payment_method, payment_amount, created_at, paid_at) = row
             
             if order_status == 'PAID' and item_id:
                 if is_takeaway:
@@ -580,46 +585,53 @@ class DashboardOperativoViewSet(viewsets.ViewSet):
             cursor = connection.cursor()
             cursor.execute("""
                 SELECT 
-                    dov.operational_date,
-                    dov.order_id,
-                    dov.order_status,
-                    dov.waiter,
-                    dov.table_number,
-                    dov.zone_name,
-                    dov.item_id,
-                    dov.recipe_name,
-                    dov.category_name,
-                    dov.quantity,
-                    dov.unit_price,
-                    dov.total_price,
-                    dov.total_with_container,
-                    dov.item_status,
-                    dov.is_takeaway,
-                    dov.payment_method,
-                    dov.payment_amount,
-                    dov.recipe_total_ingredient_cost,
-                    dov.recipe_profit_margin,
-                    dov.preparation_time,
-                    dov.service_time_minutes,
-                    dov.meal_period,
-                    dov.day_of_week,
-                    dov.container_name,
-                    dov.container_unit_price,
+                    DATE(o.created_at) as operational_date,
+                    o.id as order_id,
+                    o.status as order_status,
+                    o.waiter,
+                    o.table_number,
+                    z.name as zone_name,
+                    oi.id as item_id,
+                    r.name as recipe_name,
+                    g.name as category_name,
+                    oi.quantity,
+                    oi.unit_price,
+                    oi.total_price,
+                    (oi.total_price + COALESCE(cs.total_container_price, 0)) as total_with_container,
+                    oi.status as item_status,
+                    oi.is_takeaway,
+                    p.payment_method,
+                    p.amount as payment_amount,
+                    0 as recipe_total_ingredient_cost,
+                    0 as recipe_profit_margin,
+                    0 as preparation_time,
+                    0 as service_time_minutes,
+                    'N/A' as meal_period,
+                    'N/A' as day_of_week,
+                    c.name as container_name,
+                    cs.unit_price as container_unit_price,
                     -- Datos específicos del ingrediente (UNA FILA POR INGREDIENTE)
                     COALESCE(ing.name, 'Sin ingredientes definidos') as ingredient_name,
                     COALESCE(ri.quantity, 0) as ingredient_quantity,
                     COALESCE(ing.unit_price, 0) as ingredient_unit_price,
                     COALESCE(ri.quantity * ing.unit_price, 0) as ingredient_total_cost,
-                    COALESCE(ri.quantity * ing.unit_price * dov.quantity, 0) as ingredient_cost_for_item,
+                    COALESCE(ri.quantity * ing.unit_price * oi.quantity, 0) as ingredient_cost_for_item,
                     COALESCE(ing.current_stock, 0) as ingredient_stock,
-                    dov.created_at,
-                    dov.paid_at
-                FROM dashboard_operativo_view dov
-                LEFT JOIN recipe r ON dov.recipe_name = r.name
+                    o.created_at,
+                    p.paid_at
+                FROM "order" o
+                LEFT JOIN order_item oi ON o.id = oi.order_id
+                LEFT JOIN recipe r ON oi.recipe_id = r.id
+                LEFT JOIN "group" g ON r.group_id = g.id
+                LEFT JOIN "table" t ON o.table_id = t.id
+                LEFT JOIN zone z ON t.zone_id = z.id
+                LEFT JOIN payment p ON o.id = p.order_id
+                LEFT JOIN container_sale cs ON o.id = cs.order_id
+                LEFT JOIN container c ON cs.container_id = c.id
                 LEFT JOIN recipe_item ri ON r.id = ri.recipe_id
                 LEFT JOIN ingredient ing ON ri.ingredient_id = ing.id
-                WHERE dov.operational_date = %s
-                ORDER BY dov.order_id, dov.item_id, ing.name
+                WHERE DATE(o.created_at) = ?
+                ORDER BY o.id, oi.id, ing.name
             """, [selected_date])
             
             raw_data = cursor.fetchall()

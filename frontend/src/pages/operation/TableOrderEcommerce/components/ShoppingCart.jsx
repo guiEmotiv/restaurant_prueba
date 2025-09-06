@@ -8,6 +8,7 @@ const ShoppingCart = ({
   onRemoveFromCart, 
   onSaveOrder, 
   onCancelOrderItem,
+  onCancelOrder,
   onCloseOrder,
   saving, 
   userRole, 
@@ -50,9 +51,17 @@ const ShoppingCart = ({
       return;
     }
     
+    const partySizeValue = parseInt(partySize) || currentOrder?.party_size;
+    
+    // Validación frontend adicional
+    if (partySizeValue && (partySizeValue < 1 || partySizeValue > 100)) {
+      alert('La cantidad de personas debe estar entre 1 y 100');
+      return;
+    }
+    
     await onSaveOrder({
       customer_name: customerName.trim() || currentOrder?.customer_name,
-      party_size: parseInt(partySize) || currentOrder?.party_size
+      party_size: partySizeValue
     });
     
     // Limpiar formulario después de guardar
@@ -119,6 +128,7 @@ const ShoppingCart = ({
                   className="w-full p-4 text-lg border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Número de personas"
                   min="1"
+                  max="100"
                   required
                 />
               </div>
@@ -163,7 +173,7 @@ const ShoppingCart = ({
                       containerPrice: item.container_info?.total_price || 0,
                       containerName: item.container_info?.container_name,
                       originalItem: item,
-                      canCancel: canCancelItem(item) && userRole !== 'cajeros',
+                      canCancel: canCancelItem(item) && userRole === 'administradores',
                       status: item.status || 'CREATED'
                     })),
                     // Items del carrito (nuevos)
@@ -346,6 +356,39 @@ const ShoppingCart = ({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>Cerrar Cuenta</span>
+                  </>
+                )}
+              </button>
+            )}
+            
+            {/* Botón cancelar orden - solo para administradores y cuando TODOS los items están cancelados */}
+            {currentOrder && cart.length === 0 && userRole === 'administradores' && (() => {
+              const allItems = currentOrder?.items || [];
+              // Verificar si hay items y todos están cancelados
+              if (allItems.length === 0) return false;
+              const allCanceled = allItems.every(item => item.status === 'CANCELED');
+              return allCanceled;
+            })() && (
+              <button
+                onClick={() => onCancelOrder(currentOrder.id)}
+                disabled={saving}
+                className={`w-full py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-3 font-medium text-lg ${
+                  !saving
+                    ? 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800'
+                    : 'bg-red-400 text-red-200'
+                }`}
+              >
+                {saving ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Procesando...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Cancelar Orden Completa</span>
                   </>
                 )}
               </button>

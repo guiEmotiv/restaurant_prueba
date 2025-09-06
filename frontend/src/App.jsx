@@ -9,6 +9,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import RoleProtectedRoute from './components/auth/RoleProtectedRoute';
 import RoleValidator from './components/auth/RoleValidator';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
+import Welcome from './pages/Welcome';
 import DashboardOperativo from './pages/DashboardOperativo';
 import DashboardFinanciero from './pages/DashboardFinanciero';
 import Units from './pages/config/Units';
@@ -22,6 +23,8 @@ import PaymentHistory from './pages/operation/PaymentHistory';
 import CashierPayment from './pages/operation/CashierPayment';
 import TableOrderEcommerce from './pages/operation/TableOrderEcommerce/TableManagement';
 import Kitchen from './pages/operation/Kitchen';
+import OrderTracker from './pages/operation/OrderTracker';
+import PrinterDiagnostic from './pages/operation/PrinterDiagnostic';
 
 
 // Configure AWS Amplify
@@ -42,7 +45,7 @@ const isCognitoConfigured = (() => {
     console.log('');
     console.log('Obtén estas credenciales de AWS Console > Cognito > User Pools');
   } else {
-    console.log('✅ AWS Cognito authentication configured');
+    // AWS Cognito authentication configured
   }
   
   return hasCredentials;
@@ -54,11 +57,11 @@ const AppContent = () => {
     const content = (
       <Layout>
         <Routes>
-          {/* Dashboards - Solo administradores */}
+          {/* Welcome Page - Available to all authenticated users */}
           <Route path="/" element={
-            <RoleProtectedRoute requiredPermission="canViewDashboard">
-              <DashboardOperativo />
-            </RoleProtectedRoute>
+            <ProtectedRoute>
+              <Welcome />
+            </ProtectedRoute>
           } />
           <Route path="/dashboard-operativo" element={
             <RoleProtectedRoute requiredPermission="canViewDashboard">
@@ -142,6 +145,20 @@ const AppContent = () => {
             <RoleProtectedRoute requiredPermission="canViewKitchen">
               <Kitchen />  
             </RoleProtectedRoute>
+          } />
+
+          {/* Order Tracker route */}
+          <Route path="/order-tracker" element={
+            <RoleProtectedRoute requiredPermission="canViewHistory">
+              <OrderTracker />  
+            </RoleProtectedRoute>
+          } />
+
+          {/* Printer Diagnostic route - Temporal para debugging */}
+          <Route path="/printer-diagnostic" element={
+            <ProtectedRoute>
+              <PrinterDiagnostic />  
+            </ProtectedRoute>
           } />
 
           {/* Role-based redirect for unauthorized paths */}

@@ -10,9 +10,13 @@ const RoleProtectedRoute = ({ children, requiredPermission }) => {
     if (!loading && isAuthenticated) {
       // Check if user has the required permission
       if (requiredPermission && !hasPermission(requiredPermission)) {
-        // User doesn't have permission, redirect to their default route
-        const defaultRoute = getDefaultRoute();
-        navigate(defaultRoute, { replace: true });
+        // Add delay to prevent redirect loops with RoleBasedRedirect
+        const redirectTimeout = setTimeout(() => {
+          const defaultRoute = getDefaultRoute();
+          navigate(defaultRoute, { replace: true });
+        }, 100); // Slightly longer delay than RoleBasedRedirect
+        
+        return () => clearTimeout(redirectTimeout);
       }
     }
   }, [hasPermission, requiredPermission, getDefaultRoute, navigate, loading, isAuthenticated]);

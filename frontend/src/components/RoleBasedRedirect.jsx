@@ -8,22 +8,17 @@ const RoleBasedRedirect = () => {
 
 
   useEffect(() => {
-
-    if (!loading) {
+    // Only redirect once when loading is complete and we have authentication info
+    if (!loading && userRole) {
+      // Add a small delay to prevent redirect loops and allow components to stabilize
+      const redirectTimeout = setTimeout(() => {
+        // All authenticated users go to welcome page
+        navigate('/', { replace: true });
+      }, 50); // Small delay to prevent redirect loops
       
-      // Redirect based on user role
-      if (userRole === 'administradores') {
-        navigate('/', { replace: true });
-      } else if (userRole === 'meseros') {
-        navigate('/', { replace: true });
-      } else if (userRole === 'cocineros') {
-        navigate('/kitchen', { replace: true });
-      } else {
-        navigate('/', { replace: true });
-      }
-    } else {
+      return () => clearTimeout(redirectTimeout);
     }
-  }, [userRole, loading, navigate, isAuthenticated]);
+  }, [userRole, loading, navigate]);
 
   // Show loading while determining route
   if (loading) {

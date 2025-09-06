@@ -121,11 +121,7 @@ class BluetoothPrinter {
     receipt += cmd.SIZE_NORMAL + cmd.BOLD_OFF;
     
     // Tipo de comprobante
-    if (orderData.is_partial) {
-      receipt += cmd.BOLD_ON + 'COMPROBANTE DE PAGO PARCIAL\n' + cmd.BOLD_OFF;
-    } else {
-      receipt += 'COMPROBANTE DE ORDEN\n';
-    }
+    receipt += cmd.BOLD_ON + 'COMPROBANTE DE PAGO\n' + cmd.BOLD_OFF;
     receipt += cmd.FEED_LINE;
 
     // Información de la orden
@@ -189,13 +185,7 @@ class BluetoothPrinter {
     receipt += '================================\n';
     receipt += cmd.BOLD_ON + cmd.SIZE_DOUBLE;
     
-    if (orderData.is_partial && orderData.payment_amount) {
-      receipt += cmd.RIGHT + `PAGADO: S/ ${parseFloat(orderData.payment_amount).toFixed(2)}\n`;
-      receipt += cmd.SIZE_NORMAL + cmd.BOLD_OFF;
-      receipt += cmd.RIGHT + `Subtotal items: S/ ${total.toFixed(2)}\n`;
-    } else {
-      receipt += cmd.RIGHT + `TOTAL: S/ ${total.toFixed(2)}\n`;
-    }
+    receipt += cmd.RIGHT + `TOTAL: S/ ${orderData.payment_amount ? parseFloat(orderData.payment_amount).toFixed(2) : total.toFixed(2)}\n`;
     
     receipt += cmd.SIZE_NORMAL + cmd.BOLD_OFF + cmd.LEFT;
     receipt += '================================\n';

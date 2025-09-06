@@ -198,6 +198,7 @@ class OrderItem(models.Model):
     served_at = models.DateTimeField(null=True, blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
     canceled_at = models.DateTimeField(null=True, blank=True)
+    printed_at = models.DateTimeField(null=True, blank=True, verbose_name="Impreso en cocina")
     cancellation_reason = models.TextField(blank=True, null=True, verbose_name="Motivo de cancelación")
 
     class Meta:
@@ -412,6 +413,8 @@ class Payment(models.Model):
     split_group = models.CharField(max_length=36, null=True, blank=True)
     # Persona responsable del pago (opcional)
     payer_name = models.CharField(max_length=100, blank=True)
+    # Control de impresión de recibo
+    receipt_printed_at = models.DateTimeField(null=True, blank=True, verbose_name="Recibo impreso")
 
     class Meta:
         db_table = 'payment'

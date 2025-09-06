@@ -44,11 +44,12 @@ export const AuthProvider = ({ children }) => {
       canViewDashboard: false,
       canManageConfig: false,
       canManageInventory: false,
-      canManageOrders: true,      // Necesario para crear/modificar pedidos desde Estado Mesas
+      canManageOrders: true,      // Función principal de meseros - gestión de pedidos
       canViewOrders: true,
       canViewKitchen: false,
-      canViewTableStatus: true,
+      canViewTableStatus: true,   // Necesario para ver estado de mesas
       canManagePayments: false,   // SOLO administradores y cajeros pueden procesar pagos
+      canProcessPayment: false,   // NO pueden procesar pagos
       canViewHistory: false,
     },
     [ROLES.COOK]: {
@@ -66,10 +67,10 @@ export const AuthProvider = ({ children }) => {
       canViewDashboard: false,
       canManageConfig: false,
       canManageInventory: false,
-      canManageOrders: true,      // Pueden ver/procesar pedidos para pagos
-      canViewOrders: true,        // Necesario para ver pedidos a pagar
+      canManageOrders: false,     // NO pueden gestionar pedidos/mesas - solo pagos
+      canViewOrders: false,       // NO necesitan ver gestión de pedidos
       canViewKitchen: false,
-      canViewTableStatus: true,   // Pueden ver estado de mesas para operaciones
+      canViewTableStatus: false,  // NO pueden ver gestión de mesas
       canManagePayments: true,    // Función principal de cajeros
       canProcessPayment: true,    // Pueden procesar pagos
       canViewHistory: true,       // Pueden ver historial de transacciones
@@ -113,7 +114,7 @@ export const AuthProvider = ({ children }) => {
       
       // Skip Cognito authentication in development mode
       if (isDevelopmentMode) {
-        console.log('🔧 Development mode: Bypassing Cognito authentication');
+        // Development mode: Bypassing Cognito authentication
         setUser({ username: 'dev-user' });
         setUserRole(USER_ROLES.ADMIN);
         setIsAuthenticated(true);
@@ -226,21 +227,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const getDefaultRoute = () => {
-    if (!userRole) return '/';
-    
-    // Return default route based on user role
-    switch (userRole) {
-      case ROLES.ADMIN:
-        return '/';  // Dashboard Operativo
-      case ROLES.WAITER:
-        return '/operations';  // Gestión de Mesas
-      case ROLES.COOK:
-        return '/kitchen';  // Cocina
-      case ROLES.CASHIER:
-        return '/operations';  // Vista de operaciones para procesar pagos
-      default:
-        return '/';
-    }
+    // All users go to welcome page initially
+    return '/';
   };
 
   const value = {

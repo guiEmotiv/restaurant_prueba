@@ -80,25 +80,18 @@ const AnalyticsCharts = ({
   // Use dashboardData passed from parent
   useEffect(() => {
     if (dashboardData) {
-      // CRÍTICO: Loggear la estructura completa de datos del backend
-      console.log('🔍 RAW DASHBOARD DATA STRUCTURE:', {
-        hasSalesByDay: !!dashboardData.sales_by_day,
-        salesByDayLength: dashboardData.sales_by_day?.length || 0,
-        firstDayData: dashboardData.sales_by_day?.[0],
-        topDishesInFirstDay: dashboardData.sales_by_day?.[0]?.top_dishes?.length || 0,
-        sampleTopDishes: dashboardData.sales_by_day?.[0]?.top_dishes?.slice(0, 3) || []
-      });
+      // [AnalyticsCharts] Processing dashboard data structure from DashboardFinanciero
       
       // El backend ya filtra los datos según el período seleccionado
       // Usar directamente los sales_by_day del backend que contiene las fechas del view
       if (dashboardData.sales_by_day && Array.isArray(dashboardData.sales_by_day) && dashboardData.sales_by_day.length > 0) {
         // Usar datos REALES del backend - NO calcular proporcionalmente
         const processedData = dashboardData.sales_by_day.map(dayData => {
-          console.log(`📅 Processing day ${dayData.date}:`, {
-            topDishesCount: dayData.top_dishes?.length || 0,
-            categoryBreakdownCount: dayData.category_breakdown?.length || 0,
-            sampleTopDish: dayData.top_dishes?.[0] || null
-          });
+          // console.log(`📅 Processing day ${dayData.date}:`, {
+          //   topDishesCount: dayData.top_dishes?.length || 0,
+          //   categoryBreakdownCount: dayData.category_breakdown?.length || 0,
+          //   sampleTopDish: dayData.top_dishes?.[0] || null
+          // });
           
           return {
             date: dayData.date,
@@ -113,7 +106,7 @@ const AnalyticsCharts = ({
           };
         });
         
-        console.log('✅ PROCESSED ANALYTICS DATA:', processedData);
+        // console.log('✅ PROCESSED ANALYTICS DATA:', processedData);
         setAnalyticsData(processedData);
       } else {
         // Si no hay sales_by_day, usar el summary general como single data point
@@ -333,36 +326,23 @@ const AnalyticsCharts = ({
 
   // Función para obtener recetas por categoría de la fecha específica
   const getCategoryRecipes = (categoryName, viewType = 'production', specificDate = null) => {
-    console.log('🔍 getCategoryRecipes called:', { categoryName, viewType, specificDate, selectedDate, analyticsDataLength: analyticsData.length });
+    // console.log('🔍 getCategoryRecipes called:', { categoryName, viewType, specificDate, selectedDate, analyticsDataLength: analyticsData.length });
     
-    // AGREGAR: Log completo de analyticsData para debuggear
-    console.log('📊 FULL analyticsData:', analyticsData.map(data => ({
-      date: data.date,
-      revenue: data.summary?.total_revenue,
-      items: data.summary?.total_items,
-      topDishesCount: data.top_dishes?.length || 0,
-      categoryBreakdownCount: data.category_breakdown?.length || 0,
-      topDishesPreview: data.top_dishes?.slice(0,2)?.map(dish => ({
-        name: dish.name,
-        category: dish.category,
-        quantity: dish.quantity,
-        revenue: dish.revenue
-      })) || []
-    })));
+    // [AnalyticsCharts] Debug log removed for performance
     
     // CRÍTICO: Log de TODAS las categorías disponibles en los datos
     analyticsData.forEach(data => {
       if (data.top_dishes && data.top_dishes.length > 0) {
         const categories = [...new Set(data.top_dishes.map(dish => dish.category))];
-        console.log(`📅 Date ${data.date} - Available categories:`, categories);
-        console.log(`🔍 Looking for category "${categoryName}" - Case sensitive match:`, categories.includes(categoryName));
+        // console.log(`📅 Date ${data.date} - Available categories:`, categories);
+        // console.log(`🔍 Looking for category "${categoryName}" - Case sensitive match:`, categories.includes(categoryName));
       }
     });
     
     
     // ARREGLADO: Buscar en la fecha específica del segmento si se proporciona
     const targetDate = specificDate || selectedDate;
-    console.log('🔍 SEARCHING FOR CATEGORY ON SPECIFIC DATE:', { categoryName, targetDate });
+    // console.log('🔍 SEARCHING FOR CATEGORY ON SPECIFIC DATE:', { categoryName, targetDate });
     
     // Buscar datos de la fecha específica del segmento
     const currentDayData = analyticsData.find(data => {
@@ -372,14 +352,7 @@ const AnalyticsCharts = ({
       const rawTargetDate = targetDate;
       const formattedTargetDate = formatDate(targetDate);
       
-      console.log('📅 SPECIFIC DATE COMPARISON:', { 
-        rawDataDate, 
-        formattedDataDate,
-        rawTargetDate,
-        formattedTargetDate,
-        rawMatch: rawDataDate === rawTargetDate,
-        formattedMatch: formattedDataDate === formattedTargetDate
-      });
+      // [AnalyticsCharts] Date comparison debug removed
       
       // Intentar múltiples comparaciones para encontrar la fecha exacta
       return rawDataDate === rawTargetDate || 
@@ -388,19 +361,11 @@ const AnalyticsCharts = ({
              formattedDataDate === rawTargetDate;
     });
     
-    console.log('📊 Current day data found:', currentDayData ? 'YES' : 'NO', currentDayData?.top_dishes?.length || 0, 'top_dishes');
+    // console.log('📊 Current day data found:', currentDayData ? 'YES' : 'NO', currentDayData?.top_dishes?.length || 0, 'top_dishes');
     
     // Si encontramos datos del día específico y tiene top_dishes, usar esos
     if (currentDayData && currentDayData.top_dishes && Array.isArray(currentDayData.top_dishes) && currentDayData.top_dishes.length > 0) {
-      console.log('🔍 DEBUGGING FILTER - Available dishes:', currentDayData.top_dishes.map(dish => ({
-        name: dish.name,
-        category: dish.category,
-        categoryLength: dish.category?.length,
-        targetCategory: categoryName,
-        targetLength: categoryName?.length,
-        exactMatch: dish.category === categoryName,
-        trimmedMatch: dish.category?.trim() === categoryName?.trim()
-      })));
+      // [AnalyticsCharts] Filter debugging removed
       
       // MEJORADO: Filtro más robusto con trimming
       const filteredDishes = currentDayData.top_dishes.filter(dish => {
@@ -409,19 +374,12 @@ const AnalyticsCharts = ({
         return dishCategory === targetCategory;
       });
       
-      console.log('🍽️ Filtered dishes for category:', categoryName, filteredDishes.length, filteredDishes);
+      // console.log('🍽️ Filtered dishes for category:', categoryName, filteredDishes.length, filteredDishes);
       
       // AGREGAR: Log total de valores para verificar consistencia
       const totalRevenue = filteredDishes.reduce((sum, dish) => sum + (Number(dish.revenue) || 0), 0);
       const totalQuantity = filteredDishes.reduce((sum, dish) => sum + (Number(dish.quantity) || 0), 0);
-      console.log('💰 TOOLTIP VALUES:', {
-        categoryName,
-        expectedRevenue: 'Should match bar segment value',
-        calculatedRevenue: totalRevenue.toFixed(2),
-        expectedQuantity: 'Should match bar segment quantity',
-        calculatedQuantity: totalQuantity,
-        dishCount: filteredDishes.length
-      });
+      // [AnalyticsCharts] Tooltip values debug removed
       
       return filteredDishes.sort((a, b) => {
           if (viewType === 'sales') {
@@ -449,13 +407,13 @@ const AnalyticsCharts = ({
     
     // MEJORADO: Fallback más inteligente - buscar en cualquier día disponible si no hay datos específicos
     if (analyticsData.length > 0) {
-      console.log('🔍 Searching in all available days for category:', categoryName);
+      // console.log('🔍 Searching in all available days for category:', categoryName);
       
       for (const dayData of analyticsData) {
         if (dayData.top_dishes && Array.isArray(dayData.top_dishes) && dayData.top_dishes.length > 0) {
           const filteredDishes = dayData.top_dishes.filter(dish => dish.category === categoryName);
           if (filteredDishes.length > 0) {
-            console.log('🍽️ Found fallback dishes from date:', dayData.date, filteredDishes.length);
+            // console.log('🍽️ Found fallback dishes from date:', dayData.date, filteredDishes.length);
             return filteredDishes.sort((a, b) => {
               if (viewType === 'sales') {
                 return (Number(b.revenue || 0)) - (Number(a.revenue || 0));
@@ -469,7 +427,7 @@ const AnalyticsCharts = ({
     }
     
     // Último fallback: no hay datos
-    console.log('❌ No recipe data found for category:', categoryName);
+    // console.log('❌ No recipe data found for category:', categoryName);
     return [];
   };
 
@@ -805,7 +763,7 @@ const AnalyticsCharts = ({
                                   border: '1px solid rgba(255,255,255,0.3)'
                                 }}
                                 onMouseEnter={(e) => {
-                                  console.log('🔥 HOVER ACTIVATED on segment:', { category, segmentValue, chartType, itemDate: item.date });
+                                  // console.log('🔥 HOVER ACTIVATED on segment:', { category, segmentValue, chartType, itemDate: item.date });
                                   setIsHovering(true);
                                   const rect = e.currentTarget.getBoundingClientRect();
                                   setTooltipPosition({ 
@@ -1029,21 +987,22 @@ const AnalyticsCharts = ({
       </div>
 
       {/* Tooltip - Only show when actively hovering over a segment */}
-      {console.log('🔍 TOOLTIP STATE:', { isHovering, hasHoveredSegment: !!hoveredSegment, tooltipPosition }) || null}
+      {/* [AnalyticsCharts] Tooltip state debug removed */}
       {isHovering && hoveredSegment && tooltipPosition.x > 0 && tooltipPosition.y > 0 ? (
         <>
-          {console.log('✅ RENDERING TOOLTIP:', hoveredSegment) || null}
+          {/* [AnalyticsCharts] Rendering tooltip debug removed */}
           <Tooltip 
             data={hoveredSegment} 
             position={tooltipPosition}
           />
         </>
       ) : (
-        console.log('❌ TOOLTIP NOT RENDERED - Conditions:', {
-          isHovering,
-          hasHoveredSegment: !!hoveredSegment,
-          validPosition: tooltipPosition.x > 0 && tooltipPosition.y > 0
-        }) || null
+        null
+        // console.log('❌ TOOLTIP NOT RENDERED - Conditions:', {
+        //   isHovering,
+        //   hasHoveredSegment: !!hoveredSegment,
+        //   validPosition: tooltipPosition.x > 0 && tooltipPosition.y > 0
+        // })
       )}
 
     </div>

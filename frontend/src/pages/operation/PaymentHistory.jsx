@@ -91,7 +91,7 @@ const PaymentHistory = () => {
           waiter: selectedOrderDetail.waiter || 'Usuario',
           created_at: selectedOrderDetail.created_at,
           total_amount: selectedOrderDetail.total_amount,
-          items: selectedOrderDetail.items?.map(item => ({
+          items: selectedOrderDetail.items?.filter(item => item.status !== 'CANCELED').map(item => ({
             recipe_name: item.recipe_name,
             quantity: item.quantity,
             total_price: item.total_with_container || item.total_price,
@@ -102,7 +102,8 @@ const PaymentHistory = () => {
           created_at: selectedOrderDetail.paid_at || selectedOrderDetail.created_at
         },
         amount: selectedOrderDetail.items?.reduce((sum, item) => 
-          sum + parseFloat(item.total_with_container || item.total_price || 0), 0
+          // Solo sumar items que NO están cancelados para el comprobante de pago
+          item.status !== 'CANCELED' ? sum + parseFloat(item.total_with_container || item.total_price || 0) : sum, 0
         ) || parseFloat(selectedOrderDetail.total_amount)
       };
 
@@ -369,30 +370,40 @@ const PaymentHistory = () => {
                   <div>
                     <h4 className="font-medium text-gray-800 mb-3">Items del Pedido</h4>
                     <div className="space-y-2">
-                      {selectedOrderDetail.items?.map((item, index) => (
-                        <div key={item.id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div 
-                              className="w-2 h-2 rounded-full bg-gray-500 flex-shrink-0" 
-                              title="Pagado"
-                            />
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {item.quantity}x {item.recipe_name}
+                      {selectedOrderDetail.items?.map((item, index) => {
+                        const isCanceled = item.status === 'CANCELED';
+                        return (
+                          <div key={item.id || index} className={`flex justify-between items-center p-3 rounded-lg ${isCanceled ? 'bg-red-50' : 'bg-gray-50'}`}>
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className={`w-2 h-2 rounded-full flex-shrink-0 ${isCanceled ? 'bg-red-500' : 'bg-gray-500'}`} 
+                                title={isCanceled ? "Cancelado" : "Pagado"}
+                              />
+                              <div>
+                                <div className={`text-sm font-medium ${isCanceled ? 'text-red-600 line-through' : 'text-gray-900'}`}>
+                                  {item.quantity}x {item.recipe_name}
+                                  {isCanceled && (
+                                    <span className="ml-2 text-xs font-normal text-red-500">(Cancelado)</span>
+                                  )}
+                                </div>
+                                {item.notes && (
+                                  <div className={`text-xs italic ${isCanceled ? 'text-red-400 line-through' : 'text-gray-500'}`}>
+                                    {item.notes}
+                                  </div>
+                                )}
+                                {item.is_takeaway && (
+                                  <div className={`text-xs ${isCanceled ? 'text-red-400 line-through' : 'text-blue-600'}`}>
+                                    Para llevar
+                                  </div>
+                                )}
                               </div>
-                              {item.notes && (
-                                <div className="text-xs text-gray-500 italic">{item.notes}</div>
-                              )}
-                              {item.is_takeaway && (
-                                <div className="text-xs text-blue-600">Para llevar</div>
-                              )}
+                            </div>
+                            <div className={`text-sm font-semibold ${isCanceled ? 'text-red-600 line-through' : 'text-gray-900'}`}>
+                              S/ {item.total_with_container || item.total_price}
                             </div>
                           </div>
-                          <div className="text-sm font-semibold text-gray-900">
-                            S/ {item.total_with_container || item.total_price}
-                          </div>
-                        </div>
-                      )) || []}
+                        );
+                      }) || []}
                     </div>
                   </div>
 
@@ -402,7 +413,8 @@ const PaymentHistory = () => {
                       <span>Total:</span>
                       <span>{formatCurrency(
                         selectedOrderDetail.items?.reduce((sum, item) => 
-                          sum + parseFloat(item.total_with_container || item.total_price || 0), 0
+                          // Solo sumar items que NO están cancelados (es decir, que están PAID)
+                          item.status !== 'CANCELED' ? sum + parseFloat(item.total_with_container || item.total_price || 0) : sum, 0
                         ) || parseFloat(selectedOrderDetail.total_amount)
                       )}</span>
                     </div>

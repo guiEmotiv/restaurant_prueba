@@ -31,10 +31,10 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'status', 'notes', 'quantity', 'is_takeaway', 'has_taper', 'order_zone', 'order_table', 'order_id',
             'elapsed_time_minutes', 'is_overdue',
             'paid_amount', 'pending_amount', 'is_fully_paid',
-            'container_info', 'total_with_container', 'created_at', 'served_at'
+            'container_info', 'total_with_container', 'created_at', 'preparing_at', 'served_at', 'canceled_at', 'printed_at'
         ]
         read_only_fields = [
-            'id', 'unit_price', 'total_price', 'created_at', 'served_at'
+            'id', 'unit_price', 'total_price', 'created_at', 'preparing_at', 'served_at', 'canceled_at', 'printed_at'
         ]
     
     # get_customizations_count removed - OrderItemIngredient functionality deprecated
@@ -333,8 +333,8 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     def validate_party_size(self, value):
         if not value or value < 1:
             raise serializers.ValidationError("La cantidad de personas debe ser mayor a 0")
-        if value > 20:
-            raise serializers.ValidationError("La cantidad de personas no puede ser mayor a 20")
+        if value > 100:
+            raise serializers.ValidationError("La cantidad de personas no puede ser mayor a 100")
         return value
     
     def validate_items(self, value):
@@ -350,8 +350,15 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         """
         items_data = validated_data.pop('items')
         
+        # DEBUG: Log before creating order
+        print(f"🔍 DEBUG ORDER CREATE - validated_data: {validated_data}")
+        print(f"🔍 DEBUG ORDER CREATE - items count: {len(items_data)}")
+        
         # Crear orden
         order = Order.objects.create(**validated_data)
+        
+        # DEBUG: Log after creating order
+        print(f"🔍 DEBUG ORDER CREATED - Order ID: {order.id}, Status: {order.status}, Table: {order.table_id}")
         
         # Pre-validar stock de containers antes de crear items
         containers_to_reduce = []
@@ -449,9 +456,9 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             'id', 'table', 'waiter', 'customer_name', 'party_size', 'status', 'total_amount', 'items', 'container_sales', 'payments',
             'items_data', 'container_sales_data',
             'total_paid', 'pending_amount', 'is_fully_paid', 'containers_total', 'grand_total',
-            'created_at', 'served_at', 'paid_at'
+            'created_at', 'preparing_at', 'served_at', 'paid_at'
         ]
-        read_only_fields = ['id', 'created_at', 'served_at', 'paid_at']
+        read_only_fields = ['id', 'created_at', 'preparing_at', 'served_at', 'paid_at']
     
     def get_items(self, obj):
         return OrderItemSerializer(obj.orderitem_set.all(), many=True).data
@@ -563,9 +570,9 @@ class PaymentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order', 'order_table', 'order_total', 'payment_method',
             'tax_amount', 'amount', 'payer_name', 'split_group', 'notes', 
-            'payment_items', 'created_at'
+            'payment_items', 'created_at', 'receipt_printed_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'receipt_printed_at']
     
     def validate(self, data):
         order = data['order']
@@ -590,10 +597,11 @@ class OrderStatusUpdateSerializer(serializers.Serializer):
         
         # Validar transiciones de estado válidas
         valid_transitions = {
-            'CREATED': ['PREPARING', 'PAID'],
-            'PREPARING': ['SERVED', 'PAID'],
-            'SERVED': ['PAID'],
-            'PAID': []
+            'CREATED': ['PREPARING', 'PAID', 'CANCELED'],
+            'PREPARING': ['SERVED', 'PAID', 'CANCELED'],
+            'SERVED': ['PAID', 'CANCELED'],
+            'PAID': [],
+            'CANCELED': []
         }
         
         if value not in valid_transitions.get(order.status, []):

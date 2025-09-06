@@ -29,71 +29,90 @@ const TableManagement = () => {
   const { user, userRole, hasPermission } = useAuth();
   const { showToast } = useToast();
 
-  // Estados de la aplicación
-  const [step, setStep] = useState('zones'); // 'zones', 'tables', 'menu'
-  const [selectedZone, setSelectedZone] = useState(null);
-  const [recipes, setRecipes] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [containers, setContainers] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
+  // Estados agrupados para mejor rendimiento
+  const [appState, setAppState] = useState({
+    step: 'zones', // 'zones', 'tables', 'menu'
+    selectedZone: null,
+    saving: false,
+    isCartOpen: false
+  });
   
-  // Estados para modal de notas
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [selectedRecipe, setSelectedRecipe] = useState(null);
-  const [noteText, setNoteText] = useState('');
-  const [isTakeaway, setIsTakeaway] = useState(false);
+  // Estados para datos del menú (menos volátiles)
+  const [menuData, setMenuData] = useState({
+    recipes: [],
+    groups: [],
+    containers: []
+  });
   
-  // Estados para modal de cancelación
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [cancelTarget, setCancelTarget] = useState(null); // {type: 'order'|'item', id: number}
-  const [cancelReason, setCancelReason] = useState('');
+  // Estados para modales (agrupados)
+  const [modals, setModals] = useState({
+    // Modal de notas
+    isNoteModalOpen: false,
+    selectedRecipe: null,
+    noteText: '',
+    isTakeaway: false,
+    // Modal de cancelación
+    isCancelModalOpen: false,
+    cancelTarget: null, // {type: 'order'|'item', id: number}
+    cancelReason: ''
+  });
 
   // Hooks personalizados
   const tableOrdersHook = useTableOrders(showToast);
   const cartHook = useCart();
   const paymentHook = usePayment(showToast);
 
-  // Cargar datos iniciales
+  // Estado de carga inicial optimizado
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // Cargar datos iniciales con skeleton loading
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [recipesData, groupsData, containersData] = await Promise.all([
+        // Cargar datos en paralelo con indicador de carga
+        const [, recipesData, groupsData, containersData] = await Promise.all([
+          tableOrdersHook.loadInitialData(),
           apiService.recipes.getAll({ is_active: true, is_available: true }),
           apiService.groups.getAll(),
           apiService.containers.getAll()
         ]);
         
-        setRecipes(recipesData || []);
-        setGroups(groupsData || []);
-        setContainers(containersData || []);
+        // Batch update para evitar múltiples renders
+        setMenuData({
+          recipes: recipesData || [],
+          groups: groupsData || [],
+          containers: containersData || []
+        });
+        
+        // Pequeño delay para evitar flash de contenido
+        setTimeout(() => setInitialLoading(false), 100);
       } catch (error) {
-        showToast(`Error al cargar datos del menú: ${error.message}`, 'error');
+        setInitialLoading(false);
+        showToast(`Error al cargar menú y configuración: ${error.message}`, 'error');
       }
     };
 
-    tableOrdersHook.loadInitialData();
     loadData();
   }, []);
 
   // Polling optimizado - solo cuando es necesario
   useEffect(() => {
     // Solo hacer polling en vista de zonas y mesas para ver estado actualizado
-    if (['zones', 'tables'].includes(step)) {
+    if (['zones', 'tables'].includes(appState.step)) {
       const interval = setInterval(async () => {
         // No hacer polling si estamos guardando
-        if (saving) return;
+        if (appState.saving) return;
         
         try {
           await tableOrdersHook.loadInitialData();
         } catch (error) {
-          console.log('Polling error (ignored):', error.message);
+          // Error en actualización automática (ignorado)
         }
       }, 15000); // Menos frecuente: cada 15 segundos
 
       return () => clearInterval(interval);
     }
-  }, [step, saving, tableOrdersHook]);
+  }, [appState.step, appState.saving, tableOrdersHook]);
 
   // Navegación optimizada - recargar solo cuando sea necesario
   const navigateWithDataReload = useCallback(async (newStep, additionalActions = null, skipReload = false) => {
@@ -108,42 +127,46 @@ const TableManagement = () => {
       await tableOrdersHook.loadInitialData();
     }
     
-    // Cambiar al nuevo paso
-    setStep(newStep);
+    // Cambiar al nuevo paso usando el estado agrupado
+    setAppState(prev => ({ ...prev, step: newStep }));
   }, [tableOrdersHook]);
 
   // Handlers para navegación
   const handleZoneSelect = useCallback(async (zone) => {
     await navigateWithDataReload('tables', async () => {
-      setSelectedZone(zone);
+      setAppState(prev => ({ ...prev, selectedZone: zone, isCartOpen: false }));
     });
   }, [navigateWithDataReload]);
 
   const handleTableSelect = useCallback(async (table) => {
     await navigateWithDataReload('menu', async () => {
+      // Cerrar carrito inmediatamente al seleccionar una mesa diferente
+      setAppState(prev => ({ ...prev, isCartOpen: false }));
+      
       tableOrdersHook.setSelectedTable(table);
       await tableOrdersHook.loadTableOrders(table.id);
       
       // Verificar si la mesa tiene un pedido activo para cargarlo automáticamente
       const existingOrders = tableOrdersHook.getTableOrders(table.id);
+      
       if (existingOrders.length > 0) {
         // Mesa tiene pedido activo - cargar para edición
         const activeOrder = existingOrders[0];
         cartHook.setCurrentOrder(activeOrder);
         cartHook.clearCart(); // Limpiar carrito para mostrar solo los items del pedido existente
-        console.log('Mesa con pedido activo detectada - cargando para edición:', activeOrder);
+        // Mesa tiene pedido activo - cargando para edición
       } else {
         // Mesa vacía - preparar para nuevo pedido
         cartHook.setCurrentOrder(null);
         cartHook.clearCart();
-        console.log('Mesa disponible - preparar para nuevo pedido');
+        // Mesa disponible - preparar para nuevo pedido
       }
     });
   }, [navigateWithDataReload, tableOrdersHook, cartHook]);
 
   const handleBackToZones = useCallback(async () => {
     await navigateWithDataReload('zones', async () => {
-      setSelectedZone(null);
+      setAppState(prev => ({ ...prev, selectedZone: null, isCartOpen: false }));
     });
   }, [navigateWithDataReload]);
 
@@ -158,7 +181,7 @@ const TableManagement = () => {
   // Handlers para carrito
   const handleAddToCart = useCallback((recipe) => {
     cartHook.addToCart(recipe, '', false, 0, null); // Parámetros explícitos para evitar confusión
-    showToast(`✅ ${recipe.name} agregado al pedido`, 'success', 1000);
+    showToast(`✅ ${recipe.name} agregado al carrito (Mesa ${tableOrdersHook.selectedTable?.table_number || '?'})`, 'success', 1000);
     
     // Reproducir sonido de agregar al carrito
     try {
@@ -171,28 +194,34 @@ const TableManagement = () => {
   }, [cartHook, showToast]);
 
   const openNoteModal = useCallback((recipe) => {
-    setSelectedRecipe(recipe);
-    setNoteText('');
-    setIsTakeaway(false);
-    setIsNoteModalOpen(true);
+    setModals(prev => ({
+      ...prev,
+      selectedRecipe: recipe,
+      noteText: '',
+      isTakeaway: false,
+      isNoteModalOpen: true
+    }));
   }, []);
 
   const closeNoteModal = useCallback(() => {
-    setIsNoteModalOpen(false);
-    setSelectedRecipe(null);
-    setNoteText('');
-    setIsTakeaway(false);
+    setModals(prev => ({
+      ...prev,
+      isNoteModalOpen: false,
+      selectedRecipe: null,
+      noteText: '',
+      isTakeaway: false
+    }));
   }, []);
 
   const handleAddWithNotes = useCallback(() => {
-    if (!selectedRecipe) return;
+    if (!modals.selectedRecipe) return;
     
     let containerPrice = 0;
     
     // Validar si es para llevar
     let containerId = null;
-    if (isTakeaway) {
-      const validation = validateTakeawayContainer(selectedRecipe, containers);
+    if (modals.isTakeaway) {
+      const validation = validateTakeawayContainer(modals.selectedRecipe, menuData.containers);
       if (!validation.isValid) {
         showToast(validation.message, 'error');
         return;
@@ -201,8 +230,8 @@ const TableManagement = () => {
       containerId = validation.container.id;
     }
     
-    cartHook.addToCart(selectedRecipe, noteText, isTakeaway, containerPrice, containerId);
-    showToast(`✅ ${selectedRecipe.name} agregado al pedido`, 'success', 1000);
+    cartHook.addToCart(modals.selectedRecipe, modals.noteText, modals.isTakeaway, containerPrice, containerId);
+    showToast(`✅ ${modals.selectedRecipe.name} ${modals.isTakeaway ? '(Para llevar)' : '(Para mesa)'} agregado al carrito`, 'success', 1000);
     
     // Reproducir sonido de agregar al carrito
     try {
@@ -214,32 +243,35 @@ const TableManagement = () => {
     }
     
     closeNoteModal();
-  }, [selectedRecipe, noteText, isTakeaway, containers, cartHook, showToast, closeNoteModal]);
+  }, [modals.selectedRecipe, modals.noteText, modals.isTakeaway, menuData.containers, cartHook, showToast, closeNoteModal]);
 
-  // Handler para cerrar pedido (cambiar a SERVED)
+  // Handler para cerrar pedido (cambiar items PREPARING a SERVED)
   const handleCloseOrder = useCallback(async (orderId) => {
     try {
-      setSaving(true);
+      setAppState(prev => ({ ...prev, saving: true }));
       
-      // Cambiar estado del pedido a SERVED (esto actualizará automáticamente los order items)
+      // Cambiar estado del pedido a SERVED (esto actualizará automáticamente los order items PREPARING a SERVED)
       await apiService.orders.updateStatus(orderId, 'SERVED');
       
-      showToast('🍽️ Pedido cerrado y enviado a caja', 'success');
+      showToast(`🍽️ Pedido #${orderId} de Mesa ${tableOrdersHook.selectedTable?.table_number || '?'} servido y listo para cobrar`, 'success');
       
       // Actualizar datos
       await tableOrdersHook.loadInitialData();
       
+      // Limpiar el pedido actual del carrito ya que ha sido cerrado
+      cartHook.setCurrentOrder(null);
+      cartHook.clearCart();
+      
       // Volver al paso de zonas sin recargar de nuevo
       await navigateWithDataReload('zones', async () => {
-        setIsCartOpen(false);
-        setSelectedZone(null);
+        setAppState(prev => ({ ...prev, selectedZone: null, isCartOpen: false }));
         tableOrdersHook.setSelectedTable(null);
       }, true); // true = skipReload
       
     } catch (error) {
-      showToast('❌ Error al cerrar pedido', 'error');
+      showToast(`❌ Error al cerrar pedido #${orderId}: ${error.message}`, 'error');
     } finally {
-      setSaving(false);
+      setAppState(prev => ({ ...prev, saving: false }));
     }
   }, [apiService, showToast, tableOrdersHook]);
 
@@ -252,7 +284,7 @@ const TableManagement = () => {
     }
 
     try {
-      setSaving(true);
+      setAppState(prev => ({ ...prev, saving: true }));
       
       const orderData = {
         table: tableOrdersHook.selectedTable.id,
@@ -283,13 +315,13 @@ const TableManagement = () => {
         for (const item of orderData.items) {
           await apiService.orders.addItem(cartHook.currentOrder.id, item);
         }
-        showToast('Pedido actualizado exitosamente', 'success');
+        showToast(`✅ Pedido #${cartHook.currentOrder.id} actualizado - ${orderData.items.length} items agregados`, 'success');
       } else {
         // Crear nuevo pedido
-        console.log('🚀 CREATING NEW ORDER:', orderData);
+        // Creando nuevo pedido
         const createdOrder = await apiService.orders.create(orderData);
-        console.log('✅ ORDER CREATED SUCCESSFULLY:', createdOrder);
-        showToast(`✅ Pedido #${createdOrder.id} creado exitosamente`, 'success');
+        // Pedido creado exitosamente
+        showToast(`✅ Pedido #${createdOrder.id} creado para Mesa ${tableOrdersHook.selectedTable?.table_number || '?'} - ${orderData.items.length} items`, 'success');
       }
 
       // Limpiar carrito
@@ -303,83 +335,109 @@ const TableManagement = () => {
       
       // Navegar sin recargar de nuevo (ya lo hicimos arriba)
       await navigateWithDataReload('zones', async () => {
-        setSelectedZone(null);
+        setAppState(prev => ({ ...prev, selectedZone: null, isCartOpen: false }));
         tableOrdersHook.setSelectedTable(null);
       }, true); // true = skipReload
       
     } catch (error) {
-      console.error('❌ ERROR CREATING/UPDATING ORDER:', error);
-      console.error('❌ Error response:', error.response);
-      console.error('❌ Error data:', error.response?.data);
-      console.error('❌ Full error object:', JSON.stringify(error, null, 2));
-      showToast(`❌ Error al guardar pedido: ${error.message}`, 'error');
+      console.error(`[TableManagement] ❌ Error al ${cartHook.currentOrder ? 'actualizar' : 'crear'} pedido:`, error);
+      console.error('[TableManagement] ❌ Respuesta del servidor:', error.response);
+      console.error('[TableManagement] ❌ Datos del error:', error.response?.data);
+      console.error('[TableManagement] ❌ Objeto de error completo:', JSON.stringify(error, null, 2));
+      showToast(`❌ Error al ${cartHook.currentOrder ? 'actualizar' : 'crear'} pedido: ${error.response?.data?.detail || error.message}`, 'error');
     } finally {
-      setSaving(false);
+      setAppState(prev => ({ ...prev, saving: false }));
     }
   }, [cartHook, tableOrdersHook, showToast]);
 
 
   // Handler para abrir modal de cancelación
   const openCancelModal = useCallback((type, id) => {
-    setCancelTarget({type, id});
-    setCancelReason('');
-    setIsCancelModalOpen(true);
+    setModals(prev => ({
+      ...prev,
+      cancelTarget: { type, id },
+      cancelReason: '',
+      isCancelModalOpen: true
+    }));
   }, []);
 
   const closeCancelModal = useCallback(() => {
-    setIsCancelModalOpen(false);
-    setCancelTarget(null);
-    setCancelReason('');
+    setModals(prev => ({
+      ...prev,
+      isCancelModalOpen: false,
+      cancelTarget: null,
+      cancelReason: ''
+    }));
   }, []);
 
   // Handler para confirmar cancelación
   const handleConfirmCancel = useCallback(async () => {
-    if (!cancelReason.trim()) {
+    if (!modals.cancelReason.trim()) {
       showToast('❌ El motivo de cancelación es requerido', 'error');
       return;
     }
 
     try {
-      setSaving(true);
+      setAppState(prev => ({ ...prev, saving: true }));
       
-      if (cancelTarget.type === 'order') {
-        await apiService.orders.cancel(cancelTarget.id, cancelReason);
-        showToast('✅ Pedido cancelado exitosamente', 'success');
+      if (modals.cancelTarget.type === 'order') {
+        // Cancelar la orden con el motivo
+        await apiService.orders.updateStatus(modals.cancelTarget.id, 'CANCELED', modals.cancelReason);
+        showToast(`✅ Pedido #${modals.cancelTarget.id} cancelado: ${modals.cancelReason}`, 'success');
         
         // Actualizar datos y volver a la vista de zonas
-        await tableOrdersHook.refreshData();
-        await navigateWithDataReload('zones', async () => {
-          setSelectedZone(null);
-          tableOrdersHook.setSelectedTable(null);
-        });
-      } else if (cancelTarget.type === 'item') {
+        await tableOrdersHook.loadInitialData();
+        setAppState(prev => ({ ...prev, selectedZone: null, step: 'zones', isCartOpen: false }));
+        tableOrdersHook.setSelectedTable(null);
+        cartHook.setCurrentOrder(null);
+        cartHook.clearCart();
+      } else if (modals.cancelTarget.type === 'item') {
         // Actualización optimista del UI primero
-        tableOrdersHook.updateOrderItemStatus(cancelTarget.id, 'CANCELED', cancelReason);
-        cartHook.updateCurrentOrderItemStatus(cancelTarget.id, 'CANCELED', cancelReason);
-        showToast(`✅ Item cancelado: ${cancelReason}`, 'success');
+        tableOrdersHook.updateOrderItemStatus(modals.cancelTarget.id, 'CANCELED', modals.cancelReason);
+        cartHook.updateCurrentOrderItemStatus(modals.cancelTarget.id, 'CANCELED', modals.cancelReason);
+        showToast(`✅ Item cancelado: ${modals.cancelReason}`, 'success');
         
         try {
           // Enviar al backend en segundo plano
-          await apiService.orderItems.cancel(cancelTarget.id, cancelReason);
+          await apiService.orderItems.cancel(modals.cancelTarget.id, modals.cancelReason);
         } catch (error) {
           // Si falla el backend, revertir la actualización optimista
-          console.error('Error al cancelar item en backend:', error);
+          console.error(`[TableManagement] Error al cancelar item #${modals.cancelTarget.id} en backend:`, error);
           // Recargar datos para sincronizar estado real
           await tableOrdersHook.loadTableOrders(tableOrdersHook.selectedTable.id);
-          showToast('⚠️ Error al sincronizar cancelación', 'warning');
+          showToast(`⚠️ Item cancelado localmente pero falló sincronización con servidor: ${error.message}`, 'warning');
         }
       }
       
-      setIsCancelModalOpen(false);
-      setCancelTarget(null);
-      setCancelReason('');
+      setModals(prev => ({
+        ...prev,
+        isCancelModalOpen: false,
+        cancelTarget: null,
+        cancelReason: ''
+      }));
     } catch (error) {
       console.error('Error cancelando:', error);
-      showToast('❌ Error al cancelar', 'error');
+      console.error('Detalles del error:', error.response?.data);
+      
+      // Manejar diferentes formatos de error
+      let errorMessage = 'Error al cancelar';
+      if (error.response?.data) {
+        if (error.response.data.status) {
+          errorMessage = Array.isArray(error.response.data.status) 
+            ? error.response.data.status[0] 
+            : error.response.data.status;
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        }
+      }
+      
+      showToast(`❌ ${errorMessage}`, 'error');
     } finally {
-      setSaving(false);
+      setAppState(prev => ({ ...prev, saving: false }));
     }
-  }, [cancelTarget, cancelReason, apiService, showToast, tableOrdersHook]);
+  }, [modals.cancelTarget, modals.cancelReason, showToast, tableOrdersHook, cartHook]);
 
 
   // Calcular total completo (carrito + pedido actual) - solo items activos
@@ -425,21 +483,21 @@ const TableManagement = () => {
 
   // Obtener mesas de la zona seleccionada
   const selectedZoneTables = useMemo(() => {
-    if (!selectedZone || !tableOrdersHook.tables) return [];
+    if (!appState.selectedZone || !tableOrdersHook.tables) return [];
     
     return tableOrdersHook.tables
       .filter(table => 
-        (table.zone_name || table.zone_detail?.name || 'Sin zona') === selectedZone.name
+        (table.zone_name || table.zone_detail?.name || 'Sin zona') === appState.selectedZone.name
       )
       .sort((a, b) => {
         const aNum = parseInt(a.table_number.replace(/\D/g, '')) || 0;
         const bNum = parseInt(b.table_number.replace(/\D/g, '')) || 0;
         return aNum - bNum;
       });
-  }, [selectedZone, tableOrdersHook.tables]);
+  }, [appState.selectedZone, tableOrdersHook.tables]);
 
-  // Loading state
-  if (tableOrdersHook.loading && (step === 'zones' || step === 'tables')) {
+  // Loading state mejorado
+  if (initialLoading || (tableOrdersHook.loading && (appState.step === 'zones' || appState.step === 'tables'))) {
     return (
       <div className="fixed inset-0 bg-white flex items-center justify-center">
         <div className="text-center">
@@ -458,9 +516,9 @@ const TableManagement = () => {
         <div className="px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
           <div className="flex items-center justify-center space-x-2">
             {/* Step 1: Zona */}
-            <div className={`flex items-center ${step === 'zones' ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+            <div className={`flex items-center ${appState.step === 'zones' ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                step === 'zones' ? 'bg-blue-600 text-white' : 'bg-gray-300 text-white'
+                appState.step === 'zones' ? 'bg-blue-600 text-white' : 'bg-gray-300 text-white'
               }`}>1</div>
               <span className="ml-1 hidden sm:inline text-xs">Zona</span>
             </div>
@@ -469,10 +527,10 @@ const TableManagement = () => {
             <div className="w-8 h-0.5 bg-gray-300"></div>
             
             {/* Step 2: Mesa */}
-            <div className={`flex items-center ${step === 'tables' ? 'text-blue-600 font-medium' : step === 'zones' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <div className={`flex items-center ${appState.step === 'tables' ? 'text-blue-600 font-medium' : appState.step === 'zones' ? 'text-gray-400' : 'text-gray-500'}`}>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                step === 'tables' ? 'bg-blue-600 text-white' : 
-                step === 'zones' ? 'bg-gray-200 text-gray-400' : 'bg-gray-300 text-white'
+                appState.step === 'tables' ? 'bg-blue-600 text-white' : 
+                appState.step === 'zones' ? 'bg-gray-200 text-gray-400' : 'bg-gray-300 text-white'
               }`}>2</div>
               <span className="ml-1 hidden sm:inline text-xs">Mesa</span>
             </div>
@@ -481,10 +539,10 @@ const TableManagement = () => {
             <div className="w-8 h-0.5 bg-gray-300"></div>
             
             {/* Step 3: Menú */}
-            <div className={`flex items-center ${step === 'menu' ? 'text-blue-600 font-medium' : ['zones', 'tables'].includes(step) ? 'text-gray-400' : 'text-gray-500'}`}>
+            <div className={`flex items-center ${appState.step === 'menu' ? 'text-blue-600 font-medium' : ['zones', 'tables'].includes(appState.step) ? 'text-gray-400' : 'text-gray-500'}`}>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                step === 'menu' ? 'bg-blue-600 text-white' : 
-                ['zones', 'tables'].includes(step) ? 'bg-gray-200 text-gray-400' : 'bg-gray-300 text-white'
+                appState.step === 'menu' ? 'bg-blue-600 text-white' : 
+                ['zones', 'tables'].includes(appState.step) ? 'bg-gray-200 text-gray-400' : 'bg-gray-300 text-white'
               }`}>3</div>
               <span className="ml-1 hidden sm:inline text-xs">Menú</span>
             </div>
@@ -497,22 +555,22 @@ const TableManagement = () => {
         <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
           <div className="flex items-center text-xs text-gray-600">
             <span className="font-medium">Gestión de Mesas</span>
-            {step !== 'zones' && (
+            {appState.step !== 'zones' && (
               <>
                 <span className="mx-2">›</span>
-                <span className={step === 'tables' ? 'font-medium text-gray-700' : ''}>{selectedZone?.name || 'Zona'}</span>
+                <span className={appState.step === 'tables' ? 'font-medium text-gray-700' : ''}>{appState.selectedZone?.name || 'Zona'}</span>
               </>
             )}
-            {step === 'menu' && tableOrdersHook.selectedTable && (
+            {appState.step === 'menu' && tableOrdersHook.selectedTable && (
               <>
                 <span className="mx-2">›</span>
                 <span>Mesa {tableOrdersHook.selectedTable.table_number}</span>
               </>
             )}
-            {step === 'menu' && cartHook.currentOrder && (
+            {appState.step === 'menu' && cartHook.currentOrder && (
               <>
                 <span className="mx-2">›</span>
-                <span className={step === 'menu' ? 'font-medium text-gray-700' : ''}>Pedido #{cartHook.currentOrder.id}</span>
+                <span className={appState.step === 'menu' ? 'font-medium text-gray-700' : ''}>Pedido #{cartHook.currentOrder.id}</span>
               </>
             )}
           </div>
@@ -521,15 +579,19 @@ const TableManagement = () => {
         {/* Main header */}
         <div className="px-4 py-3 relative flex items-center">
           {/* Botón Atrás mejorado */}
-          {step !== 'zones' && (
+          {appState.step !== 'zones' && (
             <button
               onClick={async () => {
-                if (step === 'tables') {
+                if (appState.step === 'tables') {
                   await handleBackToZones();
-                } else if (step === 'menu') {
-                  await navigateWithDataReload('tables');
-                } else if (step === 'payment') {
-                  await navigateWithDataReload('menu');
+                } else if (appState.step === 'menu') {
+                  await navigateWithDataReload('tables', async () => {
+                    setAppState(prev => ({ ...prev, isCartOpen: false }));
+                  });
+                } else if (appState.step === 'payment') {
+                  await navigateWithDataReload('menu', async () => {
+                    setAppState(prev => ({ ...prev, isCartOpen: false }));
+                  });
                 }
               }}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors mr-4"
@@ -549,22 +611,22 @@ const TableManagement = () => {
               onClick={async () => {
                 if (window.confirm('⚠️ ¿Estás seguro de que quieres reiniciar TODOS los pedidos?\n\n• Se eliminarán todas las órdenes\n• Se eliminarán todos los pagos\n• Se reiniciarán los contadores de ID\n\nEsta acción no se puede deshacer.')) {
                   try {
-                    setSaving(true);
+                    setAppState(prev => ({ ...prev, saving: true }));
                     await apiService.orders.resetAll();
-                    showToast('✅ Pedidos eliminados y contadores reiniciados', 'success');
+                    showToast('✅ Sistema reiniciado: Todos los pedidos eliminados y contadores restablecidos', 'success');
                     
                     // Recargar datos
                     await tableOrdersHook.loadInitialData();
                     
                     // Volver a la vista de zonas
                     await navigateWithDataReload('zones', async () => {
-                      setSelectedZone(null);
+                      setAppState(prev => ({ ...prev, selectedZone: null, isCartOpen: false }));
                       tableOrdersHook.setSelectedTable(null);
                       cartHook.clearCart();
                     }, true);
                   } catch (error) {
-                    console.error('Error al reiniciar pedidos:', error);
-                    showToast('❌ Error al reiniciar pedidos', 'error');
+                    console.error('[TableManagement] Error al reiniciar sistema de pedidos:', error);
+                    showToast(`❌ Error al reiniciar sistema de pedidos: ${error.message}`, 'error');
                   } finally {
                     setSaving(false);
                   }
@@ -572,17 +634,62 @@ const TableManagement = () => {
               }}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors mr-2"
               title="Reiniciar todos los pedidos y contadores"
-              disabled={saving}
+              disabled={appState.saving}
             >
               <Trash2 className="h-4 w-4" />
               <span className="hidden sm:inline">Reset DB</span>
             </button>
           )}
 
-          {/* Carrito solo en vista menu - ahora posicionado correctamente */}
-          {step === 'menu' && (
+          {/* Botón de limpiar base de datos de producción (solo para admins) */}
+          {userRole === 'administradores' && (
             <button
-              onClick={() => setIsCartOpen(!isCartOpen)}
+              onClick={async () => {
+                if (window.confirm('🚨 ATENCIÓN: LIMPIAR BASE DE DATOS DE PRODUCCIÓN\n\n⚠️ Esta acción eliminará TODOS los pedidos del servidor en producción:\n\n• Se eliminarán todas las órdenes del servidor EC2\n• Se eliminarán todos los pagos del servidor EC2\n• Se reiniciarán los contadores de ID del servidor EC2\n• Afectará a todos los usuarios conectados\n\n🔴 ESTA ACCIÓN NO SE PUEDE DESHACER\n\n¿Estás COMPLETAMENTE seguro de proceder?')) {
+                  if (window.confirm('🔴 CONFIRMACIÓN FINAL\n\n¿Realmente quieres ELIMINAR TODOS los datos de producción?\n\nEscribe "CONFIRMAR" en el siguiente diálogo para continuar.')) {
+                    const confirmation = window.prompt('Por seguridad, escribe "CONFIRMAR" para proceder:');
+                    if (confirmation === 'CONFIRMAR') {
+                      try {
+                        setAppState(prev => ({ ...prev, saving: true }));
+                        await apiService.orders.resetAll();
+                        showToast('🚨 BASE DE DATOS DE PRODUCCIÓN LIMPIADA: Todos los pedidos del servidor eliminados', 'success');
+                        
+                        // Recargar datos
+                        await tableOrdersHook.loadInitialData();
+                        
+                        // Volver a la vista de zonas
+                        await navigateWithDataReload('zones', async () => {
+                          setAppState(prev => ({ ...prev, selectedZone: null, isCartOpen: false }));
+                          tableOrdersHook.setSelectedTable(null);
+                          cartHook.clearCart();
+                        }, true);
+                      } catch (error) {
+                        console.error('[TableManagement] Error al limpiar base de datos de producción:', error);
+                        showToast(`❌ Error al limpiar base de datos de producción: ${error.message}`, 'error');
+                      } finally {
+                        setSaving(false);
+                      }
+                    } else {
+                      showToast('❌ Operación cancelada - Confirmación incorrecta', 'error');
+                    }
+                  } else {
+                    showToast('❌ Operación cancelada por el usuario', 'info');
+                  }
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-700 text-white hover:bg-red-800 transition-colors mr-2 border-2 border-red-900"
+              title="⚠️ LIMPIAR base de datos del servidor de producción (EC2)"
+              disabled={appState.saving}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="hidden sm:inline">🚨 Reset PROD</span>
+            </button>
+          )}
+
+          {/* Carrito solo en vista menu - ahora posicionado correctamente */}
+          {appState.step === 'menu' && (
+            <button
+              onClick={() => setAppState(prev => ({ ...prev, isCartOpen: !prev.isCartOpen }))}
               className={`relative flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 ml-4 ${
                 cartHook.cart.length > 0 || cartHook.currentOrder
                   ? 'bg-blue-600 text-white hover:bg-blue-700' 
@@ -616,7 +723,7 @@ const TableManagement = () => {
       {/* Contenido principal */}
       <div className="flex-1 overflow-hidden">
         {/* Vista Zonas - Diseño minimalista */}
-        {step === 'zones' && (
+        {appState.step === 'zones' && (
           <div className="flex items-center justify-center h-full p-6">
             <div className="w-full max-w-lg space-y-6">
               {availableZones.map(zone => (
@@ -646,7 +753,7 @@ const TableManagement = () => {
         )}
 
         {/* Vista Mesas - Diseño minimalista */}
-        {step === 'tables' && (
+        {appState.step === 'tables' && (
           <div className="h-full p-6 overflow-y-auto">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 max-w-5xl mx-auto">
               {selectedZoneTables.map(table => {
@@ -709,26 +816,27 @@ const TableManagement = () => {
 
 
         {/* Vista Menú */}
-        {step === 'menu' && (
+        {appState.step === 'menu' && (
           <div className="h-full overflow-y-auto p-4">
             <MenuCatalog
-              recipes={recipes}
-              groups={groups}
+              recipes={menuData.recipes}
+              groups={menuData.groups}
               onAddToCart={handleAddToCart}
               onOpenNoteModal={openNoteModal}
             />
             
             {/* Carrito lateral */}
             <ShoppingCart
-              isOpen={isCartOpen}
-              onToggle={() => setIsCartOpen(!isCartOpen)}
+              isOpen={appState.isCartOpen}
+              onToggle={() => setAppState(prev => ({ ...prev, isCartOpen: !prev.isCartOpen }))}
               cart={cartHook.cart}
               currentOrder={cartHook.currentOrder}
               onRemoveFromCart={cartHook.removeFromCart}
               onSaveOrder={handleSaveOrder}
               onCloseOrder={handleCloseOrder}
               onCancelOrderItem={(id) => openCancelModal('item', id)}
-              saving={saving}
+              onCancelOrder={(id) => openCancelModal('order', id)}
+              saving={appState.saving}
               userRole={userRole}
               getItemStatusColor={getItemStatusColor}
               canCancelItem={canCancelItem}
@@ -740,7 +848,7 @@ const TableManagement = () => {
       </div>
 
       {/* Modal de notas */}
-      {isNoteModalOpen && (
+      {modals.isNoteModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-8">
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
@@ -748,8 +856,8 @@ const TableManagement = () => {
             </h3>
             
             <div className="mb-6">
-              <p className="font-semibold text-gray-900 text-xl">{selectedRecipe?.name}</p>
-              <p className="text-lg text-gray-600 mt-2">S/ {selectedRecipe?.price || selectedRecipe?.base_price}</p>
+              <p className="font-semibold text-gray-900 text-xl">{modals.selectedRecipe?.name}</p>
+              <p className="text-lg text-gray-600 mt-2">S/ {modals.selectedRecipe?.price || modals.selectedRecipe?.base_price}</p>
             </div>
 
             <div className="space-y-6">
@@ -758,8 +866,8 @@ const TableManagement = () => {
                   Notas especiales
                 </label>
                 <textarea
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
+                  value={modals.noteText}
+                  onChange={(e) => setModals(prev => ({ ...prev, noteText: e.target.value }))}
                   className="w-full p-4 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   rows={4}
                   placeholder="Sin cebolla, extra queso, etc..."
@@ -770,8 +878,8 @@ const TableManagement = () => {
                 <label className="flex items-center">
                   <input
                     type="checkbox"
-                    checked={isTakeaway}
-                    onChange={(e) => setIsTakeaway(e.target.checked)}
+                    checked={modals.isTakeaway}
+                    onChange={(e) => setModals(prev => ({ ...prev, isTakeaway: e.target.checked }))}
                     className="h-6 w-6 text-blue-600 border-gray-300 rounded"
                   />
                   <span className="ml-3 text-lg text-gray-700">Delivery</span>
@@ -798,17 +906,17 @@ const TableManagement = () => {
       )}
 
       {/* Modal de cancelación */}
-      {isCancelModalOpen && (
+      {modals.isCancelModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {cancelTarget?.type === 'order' ? 'Cancelar Pedido' : 'Cancelar Producto'}
+                {modals.cancelTarget?.type === 'order' ? 'Cancelar Pedido' : 'Cancelar Producto'}
               </h3>
               
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-3">
-                  {cancelTarget?.type === 'order' 
+                  {modals.cancelTarget?.type === 'order' 
                     ? 'Se cancelará todo el pedido. Esta acción no se puede deshacer.'
                     : 'Se cancelará este producto del pedido. Esta acción no se puede deshacer.'
                   }
@@ -818,15 +926,15 @@ const TableManagement = () => {
                   Motivo de cancelación *
                 </label>
                 <textarea
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
+                  value={modals.cancelReason}
+                  onChange={(e) => setModals(prev => ({ ...prev, cancelReason: e.target.value }))}
                   className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   rows={4}
                   placeholder="Ingresa el motivo de la cancelación..."
                   required
                 />
                 
-                {!cancelReason.trim() && (
+                {!modals.cancelReason.trim() && (
                   <p className="text-red-500 text-xs mt-1">El motivo de cancelación es obligatorio</p>
                 )}
               </div>
@@ -840,14 +948,14 @@ const TableManagement = () => {
                 </button>
                 <button
                   onClick={handleConfirmCancel}
-                  disabled={!cancelReason.trim()}
+                  disabled={!modals.cancelReason.trim()}
                   className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
-                    cancelReason.trim()
+                    modals.cancelReason.trim()
                       ? 'bg-red-600 text-white hover:bg-red-700'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  {cancelTarget?.type === 'order' ? 'Cancelar Pedido' : 'Cancelar Producto'}
+                  {modals.cancelTarget?.type === 'order' ? 'Cancelar Pedido' : 'Cancelar Producto'}
                 </button>
               </div>
             </div>

@@ -2,82 +2,125 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Structure
-
-This is a full-stack restaurant management web application with:
-- **Frontend**: React (Vite) with Tailwind CSS, AWS Amplify authentication, located in `frontend/`
-- **Backend**: Django REST API with SQLite database, located in `backend/`
-- **Deployment**: Docker-based production deployment with multiple deployment scripts
-
-## Development Commands
-
-### Frontend Development (run from `frontend/` directory)
-- **Development server**: `npm run dev` (runs on port 5173)
-- **Build**: `npm run build` or `npm run build:prod` (production)
-- **Linting**: `npm run lint` or `npm run lint:fix`
-- **Testing**: `npm test`, `npm run test:watch`, `npm run test:coverage`
-- **Clean rebuild**: `npm run reset`
-
-### Backend Development (run from `backend/` directory)  
-- **Development server**: `python manage.py runserver`
-- **Database migrations**: `python manage.py makemigrations` then `python manage.py migrate`
-- **Django shell**: `python manage.py shell`
-- **Admin superuser**: `python manage.py createsuperuser`
-- **Database checks**: `python manage.py check`
-- **Reset data**: `python manage.py clean_database` or `python manage.py reset_operational_data`
-
-### Production Deployment
-- **Main deployment**: `./deploy/enterprise-deploy.sh` (comprehensive deployment script)
-- **Alternative scripts**: Various scripts in `scripts/` directory for specific deployment scenarios
-- **Docker build**: Uses `Dockerfile.prod` for multi-stage production builds
-
 ## Architecture Overview
 
-### Backend (Django)
-- **Main app**: `operation/` - Contains models, views, serializers for restaurant operations
-- **Config app**: `config/` - System configuration and management commands  
-- **Key models**: Tables, orders, menu items, users, financial tracking
-- **API views**: Separate views for operational (`views_operativo.py`) and financial (`views_financiero.py`) concerns
-- **SSE support**: Real-time updates via `sse_views.py`
-- **Database**: SQLite with comprehensive migration history
+This is a full-stack restaurant management system with:
+- **Backend**: Django 5.2 + Django REST Framework (port 8000)
+- **Frontend**: React 19.1 + Vite (port 5173)
+- **Database**: SQLite (local) / PostgreSQL (production)
+- **Authentication**: AWS Cognito (configurable)
+- **Deployment**: Docker-based enterprise deployment
 
-### Frontend (React)
-- **Authentication**: AWS Cognito integration via Amplify (`contexts/AuthContext.jsx`)
-- **Styling**: Tailwind CSS with custom components
-- **State management**: React Context for auth and toast notifications
-- **Key directories**:
-  - `components/` - Reusable UI components
-  - `contexts/` - Global state management
-  - `utils/` - Utility functions including Bluetooth, Excel import, dashboard utils
-  - `config/` - Configuration files for Amplify and printer setup
+## Common Development Commands
 
-### Key Features
-- **Restaurant POS system**: Order management, table management, menu configuration
-- **Real-time updates**: Server-sent events for live order status updates
-- **Financial reporting**: Dashboard with analytics and reporting capabilities
-- **Bluetooth printing**: Integration for receipt printing
-- **AWS Cognito auth**: User authentication and authorization
-- **Excel import/export**: Bulk data operations
+### Frontend (from `/frontend`)
+```bash
+npm run dev              # Start development server
+npm run build            # Production build
+npm run build:prod       # Optimized production build with env vars
+npm run test             # Run Jest tests
+npm run lint             # ESLint checking
+npm run preview          # Preview production build
+```
 
-## Important Development Notes
+### Backend (from `/backend`)
+```bash
+make run                 # Start Django server
+make migrate             # Apply migrations
+make createsuperuser     # Create admin user
+make shell               # Django shell
 
-- The project uses environment variables for AWS Cognito configuration
-- Database migrations have a complex history - be careful when creating new migrations
-- The frontend has specific build configurations for development vs production environments
-- Deployment scripts are comprehensive and handle database migrations, Docker builds, and EC2 deployment
-- Tests are configured with Jest for frontend and Django's built-in testing for backend
-- The application supports both development and production modes with different authentication configurations
+# Direct commands
+python manage.py runserver 0.0.0.0:8000
+python manage.py migrate
+python manage.py makemigrations
+```
 
-## Database Management
+### Full Development Setup
+1. Start backend: `cd backend && make run`
+2. Start frontend: `cd frontend && npm run dev`
+3. Access app at: `http://localhost:5173`
+4. API available at: `http://localhost:8000/api/v1/`
 
-- Primary database: `db.sqlite3` in backend directory
-- Migration management is critical - always test migrations in development first
-- Use management commands for data cleanup and reset operations
-- The app includes complex financial views and operational dashboards that depend on specific data structures
+## Key Architecture Components
 
-## AWS Integration
+### Django Apps Structure
+- **`config/`**: Base configuration (Tables, Zones, Units, Containers)
+- **`inventory/`**: Recipe and ingredient management (Groups, Ingredients, Recipes, RecipeItems)
+- **`operation/`**: Restaurant operations (Orders, OrderItems, Payments, ContainerSales)
 
-- Uses AWS Cognito for authentication
-- Environment variables control Cognito configuration
-- Can be deployed with or without Cognito depending on VITE_DISABLE_COGNITO setting
-- Production deployment includes proper AWS configuration handling
+### API Patterns
+- Base URL: `/api/v1/`
+- All apps follow DRF ViewSet pattern with full CRUD
+- Special endpoints: `/dashboard-financiero/`, `/dashboard-operativo/`, `/kitchen-printer/`
+- Excel import endpoints: `/import-units/`, `/import-recipes/`, etc.
+
+### Frontend Structure
+- **`pages/`**: Route components organized by feature area
+- **`components/`**: Reusable UI components
+- **`contexts/`**: React contexts (AuthContext, ToastContext)
+- **`services/`**: API integration (api.js, bluetoothPrinter.js)
+
+### Authentication System
+- AWS Cognito integration (controlled by `USE_COGNITO_AUTH` env var)
+- Development bypass: `DevAuthBypassMiddleware` when Cognito disabled
+- Role-based access control with protected routes
+- JWT token management in AuthContext
+
+## Database and Models
+
+### Key Model Relationships
+- **Recipe → RecipeItem → Ingredient**: Recipe composition
+- **Order → OrderItem**: Order details
+- **Table → Zone**: Restaurant layout hierarchy
+- **Payment**: Links to orders for transaction tracking
+
+### Migration Management
+- Always run `make migrate` after model changes
+- New migrations in `/backend/operation/migrations/`
+- Complex dashboard views use raw SQL migrations
+
+## Deployment
+
+### Production Environment Variables
+```bash
+NODE_ENV=production
+VITE_DISABLE_COGNITO=false
+VITE_AWS_COGNITO_USER_POOL_ID=us-west-2_bdCwF60ZI
+VITE_AWS_COGNITO_APP_CLIENT_ID=4i9hrd7srgbqbtun09p43ncfn0
+VITE_API_BASE_URL=https://www.xn--elfogndedonsoto-zrb.com/api/v1
+```
+
+### Deployment Commands
+```bash
+# GitHub Actions deployment
+gh workflow run "Enterprise Production Deployment" -f action=deploy
+
+# Manual deployment
+./deploy/enterprise-deploy.sh [ECR_REGISTRY] [ECR_REPOSITORY] deploy
+```
+
+## Special Features
+
+### Excel Import System
+- Bulk import endpoints for all master data types
+- Located in respective app views (config/views.py, inventory/views.py)
+- Handle Excel parsing with pandas integration
+
+### Kitchen Operations
+- Real-time order updates via Server-Sent Events
+- Bluetooth printer integration (`bluetoothPrinter.js`, `bluetoothKitchenPrinter.js`)
+- Kitchen display in `/pages/operation/Kitchen.jsx`
+
+### Dashboard System
+- Complex SQL views for financial and operational reporting
+- Custom dashboard endpoints with aggregated data
+- Located in `operation/views_financiero.py` and `operation/views_operativo.py`
+
+## Development Notes
+
+- Vite proxy configuration routes `/api/*` to Django backend
+- CORS configured for cross-origin requests during development
+- Use `make` commands for common Django operations
+- Frontend uses Tailwind CSS for styling
+- All API responses follow DRF serializer patterns

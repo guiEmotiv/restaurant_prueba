@@ -82,7 +82,7 @@ const CashierPayment = () => {
   };
 
 
-  // Procesar pago con updates optimistas para fluidez
+  // Procesar pago con flujo atómico: IMPRIMIR PRIMERO, PAGO DESPUÉS
   const handleProcessPayment = async (orderId) => {
     try {
       setProcessing(true);
@@ -95,48 +95,17 @@ const CashierPayment = () => {
       const amount = calculateSelectedTotal();
       const backendPaymentMethod = mapPaymentMethod(paymentMethod);
 
-      // Update optimista: actualizar UI inmediatamente
-      const optimisticOrder = {
-        ...selectedOrder,
-        items: selectedOrder?.items?.map(item => 
-          selectedItems.includes(item.id) 
-            ? { ...item, status: 'PAID' }
-            : item
-        )
-      };
-      setSelectedOrder(optimisticOrder);
-
-      // Actualizar lista de órdenes optimísticamente
-      setServedOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === orderId ? optimisticOrder : order
-        )
-      );
-
-      // Siempre procesar como pago parcial para actualizar states individuales de order items
-      const splitData = {
-        order: orderId,
-        payment_method: backendPaymentMethod,
-        notes: paymentNotes || `Pago ${paymentMethod} - Items: ${selectedItems.length}`,
-        amount: amount,
-        tax_amount: 0.00,
-        payer_name: selectedOrder?.customer_name || 'Cliente',
-        split_group: `split_${orderId}_${Date.now()}`,
-        selected_items: selectedItems  // Enviar items seleccionados para actualizar sus estados
-      };
+      // [CashierPayment] Procesando pago de ${selectedItems.length} items por S/ ${amount.toFixed(2)}
       
-      // Procesar pago en el backend
-      await apiService.payments.create(splitData);
+      // ===== PASO 1: IMPRIMIR PRIMERO (SIN CAMBIAR ESTADO EN BD) =====
+      let printResult = { success: true }; // Default success si printing disabled
       
-      // Limpiar selección inmediatamente (UI fluido)
-      setSelectedItems([]);
-      showToast('💰 Pago procesado exitosamente', 'success');
-
-      // Intentar imprimir recibo por Bluetooth solo si está habilitado
       if (enablePrinting) {
         try {
+          // [CashierPayment] PASO 1: Intentando imprimir recibo...
+          
           if (bluetoothPrinter.isSupported()) {
-            // Crear datos de recibo para los items pagados
+            // Crear datos de recibo para los items que se van a pagar
             const receiptData = {
               id: selectedOrder.id,
               table_name: selectedOrder.table_name || selectedOrder.table?.table_number || selectedOrder.table,
@@ -146,16 +115,105 @@ const CashierPayment = () => {
               items: selectedOrder.items?.filter(item => selectedItems.includes(item.id)),
               payment_method: paymentMethod,
               payment_amount: amount,
-              is_partial: true // Siempre parcial en este flujo
+              is_partial: true
             };
             
             await bluetoothPrinter.printOrder(receiptData);
-            showToast('🖨️ Recibo impreso', 'success');
+            // [CashierPayment] Recibo impreso exitosamente
+            showToast('🖨️ Recibo impreso exitosamente', 'success');
+            printResult = { success: true };
+            
+          } else {
+            // [CashierPayment] Bluetooth no soportado, saltando impresión
+            printResult = { success: true }; // Continue without printing
           }
+          
         } catch (printError) {
-          // No mostrar error si no se puede imprimir, es opcional
-          showToast('⚠️ Pago procesado, pero no se pudo imprimir recibo', 'warning');
+          console.error('❌ Error imprimiendo recibo:', printError);
+          printResult = { success: false, error: printError.message };
+          
+          // Preguntar al usuario si continuar sin impresión
+          const continueWithoutPrint = confirm(
+            '❌ Error al imprimir recibo. ¿Continuar con el pago sin imprimir?\n\n' +
+            `Error: ${printError.message}`
+          );
+          
+          if (!continueWithoutPrint) {
+            showToast('❌ Pago cancelado - No se pudo imprimir', 'error');
+            return;
+          }
+          
+          // [CashierPayment] Usuario decidió continuar sin imprimir
+          printResult = { success: true, warning: 'Continuando sin impresión' };
         }
+      }
+
+      // ===== PASO 2: PROCESAR PAGO SOLO SI IMPRESIÓN FUE EXITOSA =====
+      if (printResult.success) {
+        // [CashierPayment] PASO 2: Procesando pago en backend...
+        
+        // Siempre procesar como pago parcial para actualizar states individuales de order items
+        const splitData = {
+          order: orderId,
+          payment_method: backendPaymentMethod,
+          notes: paymentNotes || `Pago ${paymentMethod} - Items: ${selectedItems.length}`,
+          amount: amount,
+          tax_amount: 0.00,
+          payer_name: selectedOrder?.customer_name || 'Cliente',
+          split_group: `split_${orderId}_${Date.now()}`,
+          selected_items: selectedItems  // Enviar items seleccionados para actualizar sus estados
+        };
+        
+        // Procesar pago en el backend
+        const paymentResponse = await apiService.payments.create(splitData);
+        const createdPayment = paymentResponse.data || paymentResponse;
+        
+        // [CashierPayment] Pago procesado exitosamente en backend
+        // [CashierPayment] Payment ID: ${createdPayment.id}
+        
+        // ===== PASO 3: MARCAR RECIBO COMO IMPRESO EN BD (si se imprimió) =====
+        if (printResult.success && enablePrinting && createdPayment.id) {
+          try {
+            // [CashierPayment] PASO 3: Marcando recibo como impreso en BD...
+            await apiService.payments.markReceiptPrinted(createdPayment.id);
+            // [CashierPayment] Recibo marcado como impreso en base de datos
+          } catch (markError) {
+            console.warn('⚠️ Error marcando recibo como impreso (no crítico):', markError);
+            // No es crítico, el pago ya se procesó exitosamente
+          }
+        }
+        
+        showToast('💰 Pago procesado exitosamente', 'success');
+        
+        // Update optimista: actualizar UI después del pago exitoso
+        const optimisticOrder = {
+          ...selectedOrder,
+          items: selectedOrder?.items?.map(item => 
+            selectedItems.includes(item.id) 
+              ? { ...item, status: 'PAID' }
+              : item
+          )
+        };
+        setSelectedOrder(optimisticOrder);
+
+        // Actualizar lista de órdenes optimísticamente
+        setServedOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === orderId ? optimisticOrder : order
+          )
+        );
+        
+        // Limpiar selección después del éxito completo
+        setSelectedItems([]);
+        
+        if (printResult.warning) {
+          showToast('⚠️ Pago procesado, pero no se imprimió recibo', 'warning');
+        }
+        
+      } else {
+        // Si llegamos aquí, hubo error crítico de impresión y usuario no quiso continuar
+        showToast('❌ Pago cancelado por error de impresión', 'error');
+        return;
       }
 
       // Recargar datos reales del servidor (en background para verificar consistencia)
@@ -334,11 +392,36 @@ const CashierPayment = () => {
                   <button
                     key={order.id}
                     onClick={() => {
-                      setSelectedOrder(order);
-                      setSelectedItems([]);
-                      setCurrentStep('payment');
+                      // Solo permitir click si hay items SERVED
+                      if (order.items?.some(item => item.status === 'SERVED')) {
+                        setSelectedOrder(order);
+                        setSelectedItems([]);
+                        setCurrentStep('payment');
+                      }
                     }}
-                    className="h-32 p-4 rounded-lg border transition-all duration-200 flex items-center justify-center border-blue-300 bg-blue-50 hover:bg-blue-100"
+                    className={`h-32 p-4 rounded-lg border transition-all duration-200 flex items-center justify-center ${
+                      // Determinar color según el estado de los items
+                      (() => {
+                        const hasServed = order.items?.some(item => item.status === 'SERVED');
+                        const hasPreparing = order.items?.some(item => item.status === 'PREPARING');
+                        const hasCreated = order.items?.some(item => item.status === 'CREATED');
+                        
+                        if (hasServed) {
+                          // Azul claro - Tiene items listos para cobrar (clickeable)
+                          return 'border-blue-300 bg-blue-50 hover:bg-blue-100 cursor-pointer';
+                        } else if (hasPreparing) {
+                          // Amarillo claro - En preparación (no clickeable)
+                          return 'border-yellow-300 bg-yellow-50 cursor-not-allowed opacity-75';
+                        } else if (hasCreated) {
+                          // Verde claro - Recién creado (no clickeable) 
+                          return 'border-green-300 bg-green-50 cursor-not-allowed opacity-75';
+                        } else {
+                          // Fallback
+                          return 'border-gray-300 bg-gray-50 cursor-not-allowed opacity-75';
+                        }
+                      })()
+                    }`}
+                    disabled={!order.items?.some(item => item.status === 'SERVED')}
                   >
                     <div className="text-center w-full">
                       {/* Número de mesa más pequeño */}

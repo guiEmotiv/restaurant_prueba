@@ -154,18 +154,132 @@ class BluetoothPrinterService {
   }
 
   /**
-   * Envía comandos a la impresora
+   * Verifica si la conexión está activa
+   */
+  async checkConnection() {
+    if (!this.device || !this.device.gatt.connected) {
+      this.isConnected = false;
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Intenta reconectar si la conexión se perdió
+   */
+  async reconnect() {
+    try {
+      console.log('🔄 Intentando reconectar...');
+      
+      // Si el dispositivo existe pero se desconectó
+      if (this.device && !this.device.gatt.connected) {
+        this.server = await this.device.gatt.connect();
+        
+        // Restablecer servicio y característica
+        let serviceFound = false;
+        for (const serviceUUID of this.config.serviceUUIDs) {
+          try {
+            this.service = await this.server.getPrimaryService(serviceUUID);
+            serviceFound = true;
+            break;
+          } catch (error) {
+            continue;
+          }
+        }
+
+        if (!serviceFound) {
+          throw new Error('No se pudo encontrar el servicio tras reconexión');
+        }
+
+        // Restablecer característica
+        let characteristicFound = false;
+        for (const charUUID of this.config.characteristicUUIDs) {
+          try {
+            this.characteristic = await this.service.getCharacteristic(charUUID);
+            characteristicFound = true;
+            break;
+          } catch (error) {
+            continue;
+          }
+        }
+
+        if (!characteristicFound) {
+          throw new Error('No se pudo encontrar la característica tras reconexión');
+        }
+
+        this.isConnected = true;
+        console.log('✅ Reconexión exitosa');
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('❌ Error en reconexión:', error);
+      this.isConnected = false;
+      return false;
+    }
+  }
+
+  /**
+   * Envía comandos a la impresora con transmisión robusta por chunks
    */
   async sendCommand(command) {
+    // Verificar si necesita reconectar
     if (!this.isConnected || !this.characteristic) {
-      throw new Error('Impresora no conectada');
+      console.log('🔌 Auto-reconectando impresora Bluetooth...');
+      await this.connect();
     }
 
     try {
       const data = new Uint8Array(command);
-      await this.characteristic.writeValue(data);
+      console.log('🔍 DEBUG sendCommand - Enviando', data.length, 'bytes');
+      
+      // ENVÍO ROBUSTO POR CHUNKS para conexiones débiles (distancia)
+      const chunkSize = 20; // Bluetooth LE limitation
+      let bytesEnviados = 0;
+      
+      console.log(`📤 Enviando ${data.length} bytes en chunks de ${chunkSize}`);
+      
+      for (let i = 0; i < data.length; i += chunkSize) {
+        const chunk = data.slice(i, i + chunkSize);
+        
+        try {
+          await this.characteristic.writeValue(chunk);
+          bytesEnviados += chunk.length;
+          console.log(`✅ Chunk ${Math.ceil((i + 1) / chunkSize)}/${Math.ceil(data.length / chunkSize)} enviado (${chunk.length} bytes)`);
+          
+          // Pausa entre chunks para conexiones débiles (distancia)
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (chunkError) {
+          console.error(`❌ Error enviando chunk en byte ${i}:`, chunkError);
+          throw new Error(`Error transmitiendo datos en byte ${i}: ${chunkError.message}`);
+        }
+      }
+      
+      console.log(`✅ Transmisión completa: ${bytesEnviados}/${data.length} bytes enviados`);
+      
+      // Verificación adicional - esperar para que lleguen todos los datos
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
     } catch (error) {
-      throw new Error(`Error de impresión: ${error.message}`);
+      // Si falla por desconexión, intentar reconectar una vez
+      if (error.message.includes('GATT Server is disconnected') || 
+          error.message.includes('disconnected') || 
+          error.name === 'NotSupportedError' || 
+          error.message.includes('GATT operation failed')) {
+        
+        console.log('🔄 Reconectando debido a error GATT/desconexión...');
+        try {
+          await this.connect();
+          // Reintento con el mismo proceso robusto
+          return await this.sendCommand(command);
+        } catch (retryError) {
+          throw new Error(`Error enviando comando después de reconexión: ${retryError.message}`);
+        }
+      } else {
+        throw new Error(`Error enviando comando: ${error.message}`);
+      }
     }
   }
 

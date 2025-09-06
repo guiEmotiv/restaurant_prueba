@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
             CREATE VIEW dashboard_operativo_view AS
             SELECT DISTINCT
                 o.id as order_id,
-                o.total as order_total,
+                o.total_amount as order_total,
                 o.status as order_status,
                 CASE 
                     WHEN o.waiter = '' OR o.waiter IS NULL THEN 'Sin Asignar'
@@ -27,23 +27,19 @@ class Migration(migrations.Migration):
                 oi.quantity,
                 oi.unit_price,
                 oi.total_price,
-                CASE 
-                    WHEN oi.is_takeaway = 1 AND r.container_price > 0 
-                    THEN oi.total_price + (r.container_price * oi.quantity)
-                    ELSE oi.total_price
-                END as total_with_container,
+                oi.total_price as total_with_container,
                 oi.status as item_status,
                 oi.is_takeaway,
                 r.name as recipe_name,
                 g.name as category_name,
                 g.id as category_id,
-                p.method as payment_method,
+                p.payment_method as payment_method,
                 p.amount as payment_amount
-            FROM order o
-            LEFT JOIN order_item oi ON o.id = oi.order_id
-            LEFT JOIN recipe r ON oi.recipe_id = r.id
+            FROM "order" o
+            LEFT JOIN "order_item" oi ON o.id = oi.order_id
+            LEFT JOIN "recipe" r ON oi.recipe_id = r.id
             LEFT JOIN "group" g ON r.group_id = g.id
-            LEFT JOIN payment p ON o.id = p.order_id
+            LEFT JOIN "payment" p ON o.id = p.order_id
             WHERE (o.status IN ('PAID', 'PENDING', 'IN_PREPARATION', 'COMPLETED') OR o.status IS NULL)
             ORDER BY o.created_at DESC, o.id DESC, oi.id
             """,
