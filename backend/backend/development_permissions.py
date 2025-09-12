@@ -1,24 +1,16 @@
 """
-Development-aware permission classes
-Automatically switches between authenticated and open access based on environment
+Django authentication permission classes
+Standard Django authentication system
 """
 from rest_framework import permissions
-from django.conf import settings
 
 
-class DevelopmentAwarePermission(permissions.BasePermission):
+class IsAuthenticatedPermission(permissions.BasePermission):
     """
-    Permission class that adapts to environment:
-    - Production (COGNITO_ENABLED=True): Requires authentication
-    - Development (COGNITO_ENABLED=False): Allows any access
+    Standard Django authentication requirement
     """
     
     def has_permission(self, request, view):
-        # If Cognito is disabled (development mode), allow all access
-        if not getattr(settings, 'COGNITO_ENABLED', True):
-            return True
-        
-        # Otherwise, require authentication
         return (
             request.user and 
             hasattr(request.user, 'is_authenticated') and 
@@ -26,28 +18,22 @@ class DevelopmentAwarePermission(permissions.BasePermission):
         )
 
 
-class DevelopmentAwareAdminPermission(permissions.BasePermission):
+class IsAdminPermission(permissions.BasePermission):
     """
-    Permission class for admin-only endpoints that adapts to environment:
-    - Production (COGNITO_ENABLED=True): Requires admin authentication
-    - Development (COGNITO_ENABLED=False): Allows any access
+    Requires admin/staff authentication
     """
     
     def has_permission(self, request, view):
-        # If Cognito is disabled (development mode), allow all access
-        if not getattr(settings, 'COGNITO_ENABLED', True):
-            return True
-        
-        # Otherwise, require admin authentication
         return (
             request.user and 
             hasattr(request.user, 'is_authenticated') and 
             request.user.is_authenticated and
-            hasattr(request.user, 'is_admin') and
-            request.user.is_admin()
+            (request.user.is_staff or request.user.is_superuser)
         )
 
 
-# Legacy compatibility - use DevelopmentAwarePermission instead of IsAuthenticated
-IsAuthenticatedOrDev = DevelopmentAwarePermission
-IsAdminOrDev = DevelopmentAwareAdminPermission
+# Compatibility aliases - for replacing DevelopmentAware classes
+DevelopmentAwarePermission = IsAuthenticatedPermission
+DevelopmentAwareAdminPermission = IsAdminPermission
+IsAuthenticatedOrDev = IsAuthenticatedPermission
+IsAdminOrDev = IsAdminPermission

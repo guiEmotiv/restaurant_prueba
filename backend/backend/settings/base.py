@@ -23,22 +23,8 @@ DEBUG = False  # Override in development.py
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 # ──────────────────────────────────────────────────────────────
-# AWS Cognito Configuration (REQUIRED - No bypass)
+# Authentication Configuration - Django only (Cognito removed)
 # ──────────────────────────────────────────────────────────────
-
-# AWS Configuration
-AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
-
-# Cognito Configuration - ALWAYS REQUIRED
-COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "us-west-2_bdCwF60ZI")
-COGNITO_APP_CLIENT_ID = os.getenv("COGNITO_APP_CLIENT_ID", "4i9hrd7srgbqbtun09p43ncfn0")
-
-# Cognito configuration - Environment aware
-USE_COGNITO_AUTH = os.getenv('USE_COGNITO_AUTH', 'true').lower() == 'true'
-COGNITO_ENABLED = USE_COGNITO_AUTH
-
-# Development bypass option (only for local development)
-DEVELOPMENT_MODE = os.getenv('DEVELOPMENT_MODE', 'false').lower() == 'true'
 
 TEMPLATES = [
     {
@@ -88,24 +74,17 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# AWS Cognito middleware - only if enabled
-if COGNITO_ENABLED:
-    auth_index = MIDDLEWARE.index("django.contrib.auth.middleware.AuthenticationMiddleware")
-    MIDDLEWARE.insert(auth_index + 1, "backend.cognito_auth.CognitoAuthenticationMiddleware")
+# Standard Django authentication middleware (Cognito removed)
 
 ROOT_URLCONF  = "backend.urls"
 WSGI_APPLICATION = "backend.wsgi.application"
 ASGI_APPLICATION = "backend.asgi.application"
 
 # ──────────────────────────────────────────────────────────────
-# Base de datos PostgreSQL 17
-# Usa múltiples esquemas y fija el search_path.
+# Database - Local Development Only
 # ──────────────────────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────
-# Database - Override in environment-specific settings
-# ──────────────────────────────────────────────────────────────
-# Database configuration is environment-specific
-# Override in development.py or production.py
+# Database configuration is handled in development.py
+# This project is configured for local development with SQLite
 
 # ──────────────────────────────────────────────────────────────
 # Internacionalización
@@ -128,31 +107,19 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ──────────────────────────────────────────────────────────────
 # Django REST Framework
 # ──────────────────────────────────────────────────────────────
-# DRF Configuration - Environment aware
+# DRF Configuration - Django authentication only
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",  # Require Django authentication
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",  # Django session auth
+        "rest_framework.authentication.BasicAuthentication",    # Django basic auth
+    ]
 }
-
-# Authentication configuration based on environment
-if COGNITO_ENABLED:
-    REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"] = [
-        "rest_framework.permissions.IsAuthenticated",  # AWS Cognito authentication REQUIRED
-    ]
-    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] = [
-        "backend.cognito_drf_auth.CognitoJWTAuthentication",  # AWS Cognito JWT validation
-    ]
-else:
-    # Development mode - allow unauthenticated access
-    REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"] = [
-        "rest_framework.permissions.AllowAny",  # Development mode - no auth required
-    ]
-    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"] = [
-        "rest_framework.authentication.SessionAuthentication",  # Basic session auth for admin
-    ]
-
-# Authentication classes are ALWAYS enabled
 
 # ──────────────────────────────────────────────────────────────
 # CORS Configuration
@@ -160,27 +127,12 @@ else:
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite development server
     "http://127.0.0.1:5173",
-    "http://192.168.1.35:5173",  # Local network IP
+    "http://192.168.1.100:5173",  # Local network IP
 ]
 
 # Allow all origins in development for easier testing
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
-
-# Add EC2 IP to CORS if configured
-EC2_IP = os.getenv('EC2_PUBLIC_IP', '')
-if EC2_IP:
-    CORS_ALLOWED_ORIGINS.append(f"http://{EC2_IP}")
-
-# Add domain to CORS if configured
-DOMAIN_NAME = os.getenv('DOMAIN_NAME', '')
-if DOMAIN_NAME:
-    CORS_ALLOWED_ORIGINS.extend([
-        f"https://{DOMAIN_NAME}",
-        f"https://www.{DOMAIN_NAME}",
-        f"http://{DOMAIN_NAME}",
-        f"http://www.{DOMAIN_NAME}",
-    ])
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -188,15 +140,13 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",  # Vite development server
     "http://127.0.0.1:5173",
-    "http://192.168.1.35:5173",  # Local network IP
+    "http://192.168.1.100:5173",  # Local network IP
+    "http://localhost:8000",  # Backend server
+    "http://127.0.0.1:8000",
+    "http://192.168.1.100:8000",  # Backend on network IP
 ]
 
-# Add domain to CSRF if configured
-if DOMAIN_NAME:
-    CSRF_TRUSTED_ORIGINS.extend([
-        f"https://{DOMAIN_NAME}",
-        f"https://www.{DOMAIN_NAME}",
-    ])
+# Local development CSRF origins only
 
 # CSRF Cookie settings for frontend
 CSRF_COOKIE_NAME = 'csrftoken'
@@ -224,28 +174,40 @@ CORS_ALLOW_HEADERS = [
 
 
 # ──────────────────────────────────────────────────────────────
-# AWS Cognito Configuration
+# Django Authentication - Standard Django user system
 # ──────────────────────────────────────────────────────────────
-AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
-COGNITO_USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID', '')
-COGNITO_APP_CLIENT_ID = os.getenv('COGNITO_APP_CLIENT_ID', '')
 
-# Enable Cognito authentication - Use USE_COGNITO_AUTH as single source of truth
-# COGNITO_ENABLED is already set earlier from USE_COGNITO_AUTH (line 37)
-# Do NOT override it based on presence of credentials
+# Session Configuration - Enhanced Security
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Database sessions
+SESSION_COOKIE_NAME = 'sessionid'
+SESSION_COOKIE_AGE = 86400  # 24 hours (86400 seconds)
+SESSION_SAVE_EVERY_REQUEST = True  # Refresh session on every request
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session after browser close
+SESSION_COOKIE_SECURE = not DEBUG  # Use secure cookies in production
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
+SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 
-# Validate that if Cognito is enabled, credentials are provided
-# Validate Cognito credentials - only if enabled
-if COGNITO_ENABLED:
-    if not COGNITO_USER_POOL_ID or not COGNITO_APP_CLIENT_ID:
-        print("❌ CRITICAL: Cognito credentials are missing!")
-        print("  COGNITO_USER_POOL_ID:", "Set" if COGNITO_USER_POOL_ID else "Missing")
-        print("  COGNITO_APP_CLIENT_ID:", "Set" if COGNITO_APP_CLIENT_ID else "Missing")
-        raise ValueError("AWS Cognito credentials are required when COGNITO_ENABLED=True")
-    else:
-        print(f"✅ AWS Cognito authentication ENABLED - User Pool: {COGNITO_USER_POOL_ID[:10]}...")
-else:
-    print("⚠️  AWS Cognito authentication DISABLED - Development mode active")
+# Password Validation - Enhanced Security
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 8,  # Increased minimum length
+        }
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+print("✅ Django authentication ENABLED - Enhanced Standard Django user system")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -262,7 +224,7 @@ SPECTACULAR_SETTINGS = {
 # Rate Limiting Configuration
 # ──────────────────────────────────────────────────────────────
 
-# NO RATE LIMITING - AWS Cognito handles authentication, unlimited requests
+# NO RATE LIMITING - Local development unlimited requests
 # Cache configuration for Django sessions only
 CACHES = {
     'default': {
@@ -274,7 +236,7 @@ CACHES = {
     }
 }
 
-# Logging configuration
+# Enhanced Logging configuration with Authentication support
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -287,6 +249,10 @@ LOGGING = {
             'format': '{levelname} {message}',
             'style': '{',
         },
+        'auth': {
+            'format': '[AUTH] {levelname} {asctime} {name} - {message}',
+            'style': '{',
+        },
     },
     'handlers': {
         'file': {
@@ -296,16 +262,38 @@ LOGGING = {
             'formatter': 'verbose',
         },
         'console': {
-            'level': 'WARNING',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+        'auth_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'data' / 'logs' / 'auth.log',
+            'maxBytes': 1024*1024*5,  # 5MB
+            'backupCount': 5,
+            'formatter': 'auth',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'backend.auth_views': {  # Our enhanced authentication views
+            'handlers': ['console', 'auth_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.contrib.auth': {  # Django auth system
+            'handlers': ['auth_file'],
             'level': 'WARNING',
-            'propagate': True,
+            'propagate': False,
         },
     },
 }

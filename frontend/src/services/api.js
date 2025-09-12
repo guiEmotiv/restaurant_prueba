@@ -7,16 +7,12 @@ let API_BASE_URL;
 if (import.meta.env.VITE_API_BASE_URL) {
   // Use explicit environment variable if set
   API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-} else if (import.meta.env.MODE === 'production') {
-  // In production, assume API is on same host
-  API_BASE_URL = `${window.location.origin}/api/v1`;
 } else {
-  // Development mode - use same host as frontend but port 8000
-  const hostname = window.location.hostname;
-  API_BASE_URL = `http://${hostname}:8000/api/v1`;
+  // Use relative path to leverage Vite proxy in dev and work in production
+  API_BASE_URL = '/api/v1';
 }
 
-// API configurado silenciosamente
+// API configurado silenciosamente - Fixed paths for proxy
 logger.info('API Configuration:', {
   VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
   API_BASE_URL,
@@ -69,85 +65,15 @@ export { API_BASE_URL };
 // Debug function for authentication
 export const debugAuth = async () => {
   try {
-    const { fetchAuthSession } = await import('aws-amplify/auth');
-    const session = await fetchAuthSession();
-    
-    return session;
+    // Check Django session authentication
+    const response = await api.get('/debug/auth/');
+    return response.data;
   } catch (error) {
     return null;
   }
 };
 
-// Make debug function available globally in development and production
-window.debugAuth = debugAuth;
-
-// Add global debugging function to test API with current auth
-window.testApiAuth = async () => {
-  try {
-    const response = await api.get('/auth-debug/');
-    return response.data;
-  } catch (error) {
-    return { error: error.message };
-  }
-};
-
-// Add global debugging function to test dashboard API
-window.testDashboardApi = async (date = null) => {
-  try {
-    const queryParam = date ? `?date=${date}` : '';
-    console.log(`🔍 Testing dashboard API with date: ${date || 'default'}...`);
-    const response = await api.get(`/dashboard-operativo/report/${queryParam}`);
-    console.log('✅ Dashboard API Response:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('❌ Dashboard API Error:', error);
-    return { 
-      error: error.message,
-      status: error.response?.status,
-      data: error.response?.data
-    };
-  }
-};
-
-// Add global debugging function for date consistency
-window.debugDates = () => {
-  const now = new Date();
-  const peruDate = new Date(now.getTime() - (5 * 60 * 60 * 1000));
-  
-  console.log('🗓️ DATE DEBUGGING:');
-  console.log('Browser timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
-  console.log('Current date/time (local):', now.toISOString());
-  console.log('Peru date (UTC-5):', peruDate.toISOString());
-  console.log('getPeruDate() would return:', peruDate.toISOString().split('T')[0]);
-  console.log('Browser locale date:', now.toLocaleDateString('en-CA'));
-  
-  return {
-    local: now.toISOString().split('T')[0],
-    peru: peruDate.toISOString().split('T')[0],
-    locale: now.toLocaleDateString('en-CA')
-  };
-};
-
-// Add comprehensive dashboard testing function
-window.testAllDashboards = async () => {
-  const dates = ['2025-08-30', '2025-08-31', '2025-09-01'];
-  const results = {};
-  
-  console.log('🧪 TESTING ALL DASHBOARDS WITH DIFFERENT DATES');
-  
-  for (const date of dates) {
-    try {
-      const result = await window.testDashboardApi(date);
-      results[date] = result;
-      console.log(`✅ ${date}: ${result.summary?.total_orders || 0} orders, $${result.summary?.total_revenue || 0}`);
-    } catch (error) {
-      results[date] = { error: error.message };
-      console.error(`❌ ${date}: ${error.message}`);
-    }
-  }
-  
-  return results;
-};
+// Debug functions removed for production security
 
 
 // Get CSRF token function
@@ -161,12 +87,9 @@ const getCSRFToken = async () => {
     
     if (token) return token;
     
-    // If not in cookies, get from API server
-    const response = await fetch(`${API_BASE_URL}/csrf/`, {
-      credentials: 'include'
-    });
-    const data = await response.json();
-    return data.csrfToken;
+    // If not in cookies, get from API server using axios instance
+    const response = await api.get('/csrf/');
+    return response.data.csrfToken;
   } catch (error) {
     logger.warn('Failed to get CSRF token:', error);
     return null;
@@ -186,36 +109,9 @@ api.interceptors.request.use(
       }
     }
     
-    // Add JWT token for authentication
-    try {
-      // Try to get auth session from AWS Amplify
-      const { fetchAuthSession } = await import('aws-amplify/auth');
-      const session = await fetchAuthSession();
-      
-      logger.info('🔐 Auth Debug:', {
-        hasTokens: !!session.tokens,
-        hasIdToken: !!session.tokens?.idToken,
-        hasAccessToken: !!session.tokens?.accessToken,
-        url: config.url
-      });
-      
-      // IMPORTANTE: Usar ID Token en lugar de Access Token para obtener grupos
-      // El ID Token incluye los grupos del usuario (cognito:groups)
-      if (session.tokens?.idToken?.toString) {
-        config.headers.Authorization = `Bearer ${session.tokens.idToken.toString()}`;
-        logger.info('✅ ID Token attached to request');
-      } else if (session.tokens?.accessToken?.toString) {
-        // Fallback to access token if ID token not available
-        config.headers.Authorization = `Bearer ${session.tokens.accessToken.toString()}`;
-        logger.info('✅ Access Token attached to request (fallback)');
-      } else {
-        logger.warn('❌ No auth tokens available');
-        // Don't throw error here - let backend handle it
-      }
-    } catch (error) {
-      logger.error('❌ Auth error:', error);
-      // If not authenticated or error getting token, continue without auth
-    }
+    // Django session authentication - no additional headers needed
+    // Authentication is handled via session cookies (withCredentials: true)
+    logger.info('🔐 Using Django session authentication for:', config.url);
     
     return config;
   },
@@ -346,12 +242,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const baseUrl = API_BASE_URL.replace('/api/v1', '');
-      const response = await axios.post(`${baseUrl}/import-units/`, formData, {
+      const response = await axios.post('/import-units/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
         timeout: 30000,
+        withCredentials: true
       });
       return response.data;
     },
@@ -368,12 +264,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const baseUrl = API_BASE_URL.replace('/api/v1', '');
-      const response = await axios.post(`${baseUrl}/import-zones/`, formData, {
+      const response = await axios.post('/import-zones/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
         timeout: 30000,
+        withCredentials: true
       });
       return response.data;
     },
@@ -398,12 +294,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const baseUrl = API_BASE_URL.replace('/api/v1', '');
-      const response = await axios.post(`${baseUrl}/import-tables/`, formData, {
+      const response = await axios.post('/import-tables/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
         timeout: 30000,
+        withCredentials: true
       });
       return response.data;
     },
@@ -422,12 +318,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const baseUrl = API_BASE_URL.replace('/api/v1', '');
-      const response = await axios.post(`${baseUrl}/import-groups/`, formData, {
+      const response = await axios.post('/import-groups/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
         timeout: 30000,
+        withCredentials: true
       });
       return response.data;
     },
@@ -479,12 +375,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      const baseUrl = API_BASE_URL.replace('/api/v1', '');
-      const response = await axios.post(`${baseUrl}/import-ingredients/`, formData, {
+      const response = await axios.post('/import-ingredients/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
         timeout: 30000,
+        withCredentials: true
       });
       return response.data;
     },
@@ -543,13 +439,12 @@ export const apiService = {
       return response.data;
     },
     importExcel: async (formData) => {
-      // Use direct axios to bypass API base path since import endpoints are at root level
-      const baseUrl = API_BASE_URL.replace('/api/v1', ''); // Remove /api/v1 from base URL
-      const response = await axios.post(`${baseUrl}/import-recipes/`, formData, {
+      const response = await axios.post('/import-recipes/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 30000, // 30 seconds for file upload
+        timeout: 30000,
+        withCredentials: true
       });
       return response.data;
     },
@@ -853,12 +748,12 @@ export const apiService = {
     update: (id, data) => apiService.update('containers', id, data),
     delete: (id) => apiService.delete('containers', id),
     importExcel: async (formData) => {
-      const baseUrl = API_BASE_URL.replace('/api/v1', '');
-      const response = await axios.post(`${baseUrl}/import-containers/`, formData, {
+      const response = await axios.post('/import-containers/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
         timeout: 30000,
+        withCredentials: true
       });
       return response.data;
     },

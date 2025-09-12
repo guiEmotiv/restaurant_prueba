@@ -10,7 +10,6 @@ from django.middleware.csrf import get_token
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-import pandas as pd
 import os
 from django.utils import timezone
 
@@ -49,7 +48,6 @@ router.register(r'recipe-items', RecipeItemViewSet, basename='recipeitem')
 # Operation app routes
 router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'order-items', OrderItemViewSet, basename='orderitem')
-# router.register(r'order-item-ingredients', OrderItemIngredientViewSet, basename='orderitemingredient')  # Removed - functionality deprecated
 router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'container-sales', ContainerSaleViewSet, basename='containersale')
 router.register(r'dashboard-financiero', DashboardFinancieroViewSet, basename='dashboard-financiero')
@@ -170,6 +168,8 @@ urlpatterns = [
     path('health/', health_check, name='health-check'),
     # CSRF endpoint for frontend
     path('csrf/', get_csrf_token, name='csrf-token'),
+    # Authentication endpoints
+    path('auth/', include('backend.auth_urls')),
     # Server-Sent Events endpoints
     path('sse/orders/', order_updates_stream, name='sse-orders'),
     # Import endpoints FIRST to avoid router conflicts

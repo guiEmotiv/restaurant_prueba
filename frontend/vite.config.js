@@ -16,7 +16,15 @@ const injectBuildTime = () => {
 export default defineConfig(({ mode }) => {
   // Cargar variables desde la raíz del proyecto
   const env = loadEnv(mode, resolve(__dirname, '..'), '');
-  
+
+  // Determinar la IP del backend dinámicamente
+  const backendHost = env.LOCAL_IP || 'localhost';
+  const backendTarget = `http://${backendHost}:8000`;
+
+  console.log(`🌐 Vite Proxy Configuration:`);
+  console.log(`   Backend Target: ${backendTarget}`);
+  console.log(`   Frontend Host: :: (all interfaces)`);
+
   return {
   plugins: [react(), injectBuildTime()],
   envDir: resolve(__dirname, '..'), // Buscar .env en la raíz
@@ -24,12 +32,12 @@ export default defineConfig(({ mode }) => {
   server: {
     port: 5173,
     strictPort: true,
-    host: '0.0.0.0', // Listen on all network interfaces
-    open: true,
+    host: '::', // Listen on all interfaces (IPv6 + IPv4)
+    open: false, // Don't auto-open browser
     cors: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: backendTarget,
         changeOrigin: true,
         secure: false,
         configure: (proxy, options) => {

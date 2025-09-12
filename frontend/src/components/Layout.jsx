@@ -55,58 +55,58 @@ const Layout = ({ children }) => {
   }, [location.pathname]);
   
   const authContext = useAuth();
-  const { user, userRole, logout, hasPermission } = authContext;
+  const { user, userRole, logout, hasPermission, loading } = authContext;
 
-  // Define navigation items with permissions
+  // Define navigation items with permissions using backend permission names
   const allNavigation = [
     { name: 'Inicio', href: '/', icon: Home },
-    { name: 'Dashboard Operativo', href: '/dashboard-operativo', icon: Activity, permission: 'canViewDashboard' },
-    { name: 'Dashboard Financiero', href: '/dashboard-financiero', icon: DollarSign, permission: 'canViewDashboard' },
-    { 
-      name: 'Configuración', 
+    { name: 'Dashboard Operativo', href: '/dashboard-operativo', icon: Activity, permission: 'can_access_dashboard' },
+    { name: 'Dashboard Financiero', href: '/dashboard-financiero', icon: DollarSign, permission: 'can_access_dashboard' },
+    {
+      name: 'Configuración',
       icon: Settings,
-      permission: 'canManageConfig',
+      permission: 'can_manage_users', // Only admins
       children: [
-        { name: 'Unidades', href: '/units', icon: Ruler, permission: 'canManageConfig' },
-        { name: 'Zonas', href: '/zones', icon: MapPin, permission: 'canManageConfig' },
-        { name: 'Mesas', href: '/tables', icon: Table, permission: 'canManageConfig' },
-        { name: 'Envases', href: '/containers', icon: Package, permission: 'canManageConfig' },
-        { name: 'Impresoras', href: '/printer-management', icon: Printer, permission: 'canManageConfig' },
+        { name: 'Usuarios', href: '/user-management', icon: Users, permission: 'can_manage_users' },
+        { name: 'Unidades', href: '/units', icon: Ruler, permission: 'can_manage_users' },
+        { name: 'Zonas', href: '/zones', icon: MapPin, permission: 'can_manage_users' },
+        { name: 'Mesas', href: '/tables', icon: Table, permission: 'can_manage_users' },
+        { name: 'Envases', href: '/containers', icon: Package, permission: 'can_manage_users' },
+        { name: 'Impresoras', href: '/printer-management', icon: Printer, permission: 'can_manage_users' },
       ]
     },
-    { 
-      name: 'Inventario', 
+    {
+      name: 'Inventario',
       icon: Package,
-      permission: 'canManageInventory',
+      permission: 'can_access_dashboard', // Admins and Managers
       children: [
-        { name: 'Grupos', href: '/groups', icon: Layers, permission: 'canManageInventory' },
-        { name: 'Ingredientes', href: '/ingredients', icon: Apple, permission: 'canManageInventory' },
-        { name: 'Recetas', href: '/recipes', icon: ChefHat, permission: 'canManageInventory' },
+        { name: 'Grupos', href: '/groups', icon: Layers, permission: 'can_access_dashboard' },
+        { name: 'Ingredientes', href: '/ingredients', icon: Apple, permission: 'can_access_dashboard' },
+        { name: 'Recetas', href: '/recipes', icon: ChefHat, permission: 'can_access_dashboard' },
       ]
     },
-    { 
-      name: 'Operaciones', 
+    {
+      name: 'Operaciones',
       icon: ShoppingCart,
-      // Mostrar si tiene cualquier permiso de operaciones (meseros o cocineros)
       permission: null, // Se filtrará por sus hijos
       children: [
-        { name: 'Gestión de Pedidos', href: '/operations', icon: Table, permission: 'canManageOrders' },
+        { name: 'Gestión de Pedidos', href: '/operations', icon: Table, permission: 'can_create_orders' },
       ]
     },
-    { 
-      name: 'Pagos', 
+    {
+      name: 'Pagos',
       icon: CreditCard,
       permission: null, // Se filtrará por sus hijos
       children: [
-        { name: 'Procesar Pagos', href: '/cashier-payment', icon: CreditCard, permission: 'canProcessPayment' },
-        { name: 'Historial', href: '/payment-history', icon: History, permission: 'canViewHistory' },
-        { name: 'Consultar Pedido', href: '/order-tracker', icon: Eye, permission: 'canViewHistory' },
+        { name: 'Procesar Pagos', href: '/cashier-payment', icon: CreditCard, permission: 'can_process_payments' },
+        { name: 'Historial', href: '/payment-history', icon: History, permission: 'can_access_dashboard' },
+        { name: 'Consultar Pedido', href: '/order-tracker', icon: Eye, permission: 'can_manage_kitchen' },
       ]
     },
   ];
 
-  // Filter navigation based on user permissions
-  const navigation = allNavigation
+  // Filter navigation based on user permissions - wait for auth to complete
+  const navigation = !loading && user ? allNavigation
     .filter(item => {
       if (!item.permission) return true; // No permission required
       return hasPermission ? hasPermission(item.permission) : false;
@@ -114,14 +114,23 @@ const Layout = ({ children }) => {
     .map(item => {
       // If item has children, filter them too
       if (item.children) {
-        const filteredChildren = item.children.filter(child => 
+        const filteredChildren = item.children.filter(child =>
           !child.permission || (hasPermission && hasPermission(child.permission))
         );
         return filteredChildren.length > 0 ? { ...item, children: filteredChildren } : null;
       }
       return item;
     })
-    .filter(item => item !== null);
+    .filter(item => item !== null) : [];
+
+  // Show loading state if auth is still loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   const isActive = (href) => location.pathname === href;
 

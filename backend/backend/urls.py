@@ -1,12 +1,8 @@
 from django.contrib import admin
-from django.urls import path, include, re_path
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import HttpResponse, FileResponse, Http404, JsonResponse
-from pathlib import Path
-import mimetypes
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from django.http import JsonResponse
 from django.db import connection
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
@@ -19,125 +15,10 @@ def get_csrf_token(request):
     """Get CSRF token for frontend - public endpoint"""
     return JsonResponse({'csrfToken': get_token(request)})
 
-def index_view(request):
-    """Serve React index.html for production"""
-    import os
-    try:
-        frontend_path = settings.BASE_DIR / 'frontend' / 'dist' / 'index.html'
-        with open(frontend_path, 'r') as f:
-            response = HttpResponse(f.read(), content_type='text/html')
-            # Add anti-cache headers for production
-            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            response['Pragma'] = 'no-cache' 
-            response['Expires'] = '0'
-            return response
-    except FileNotFoundError:
-        # Debug: Show what paths exist
-        debug_info = f"""
-        Frontend not found. Debug info:
-        BASE_DIR: {settings.BASE_DIR}
-        Looking for: {frontend_path}
-        Frontend dir exists: {os.path.exists(settings.BASE_DIR / 'frontend')}
-        Frontend dist exists: {os.path.exists(settings.BASE_DIR / 'frontend' / 'dist')}
-        Files in frontend/: {os.listdir(settings.BASE_DIR / 'frontend') if os.path.exists(settings.BASE_DIR / 'frontend') else 'Directory not found'}
-        Files in frontend/dist/: {os.listdir(settings.BASE_DIR / 'frontend' / 'dist') if os.path.exists(settings.BASE_DIR / 'frontend' / 'dist') else 'Directory not found'}
-        """
-        return HttpResponse(debug_info, content_type='text/plain', status=404)
-
-def serve_frontend_asset(request, path):
-    """Serve frontend assets (CSS, JS, etc.) from frontend/dist/assets"""
-    static_asset_path = settings.BASE_DIR / 'frontend' / 'dist' / 'assets' / path
-    if static_asset_path.exists() and static_asset_path.is_file():
-        content_type, _ = mimetypes.guess_type(str(static_asset_path))
-        return FileResponse(open(static_asset_path, 'rb'), content_type=content_type)
-    
-    raise Http404(f"Asset not found at {static_asset_path}: {path}")
-
-def serve_vite_svg(request):
-    """Serve vite.svg from frontend dist"""
-    # Try frontend/dist first
-    svg_path = settings.BASE_DIR / 'frontend' / 'dist' / 'vite.svg'
-    if svg_path.exists():
-        return FileResponse(open(svg_path, 'rb'), content_type='image/svg+xml')
-    
-    raise Http404("vite.svg not found")
+# Production frontend serving functions removed for local development
+# Frontend is served by Vite dev server on http://localhost:5173
 
 
-def health_check(request):
-    """Simple health check endpoint that doesn't require authentication"""
-    return JsonResponse({
-        'status': 'ok',
-        'message': 'Restaurant API is running'
-    })
-
-def auth_debug(request):
-    """Debug endpoint to check authentication status - no auth required"""
-    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-    user_info = {
-        'is_authenticated': hasattr(request, 'user') and request.user.is_authenticated,
-        'user': str(request.user) if hasattr(request, 'user') else 'No user',
-        'has_auth_header': bool(auth_header),
-        'auth_header_prefix': auth_header[:20] + '...' if len(auth_header) > 20 else auth_header,
-        'auth_header_length': len(auth_header),
-    }
-    
-    if auth_header.startswith('Bearer '):
-        token = auth_header.split(' ')[1]
-        token_segments = len(token.split('.'))
-        user_info.update({
-            'token_length': len(token),
-            'token_segments': token_segments,
-            'token_prefix': token[:30] + '...' if len(token) > 30 else token,
-            'token_valid_format': token_segments == 3
-        })
-    
-    return JsonResponse(user_info)
-
-def db_debug(request):
-    """Debug endpoint to check database status - no auth required"""
-    try:
-        from django.db import connection
-        cursor = connection.cursor()
-        
-        # Check if dashboard_operativo_view exists
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='view' AND name='dashboard_operativo_view'")
-        view_exists = cursor.fetchone()
-        
-        result = {
-            'view_exists': bool(view_exists),
-            'status': 'success'
-        }
-        
-        if view_exists:
-            try:
-                # Try to count records
-                cursor.execute("SELECT COUNT(*) FROM dashboard_operativo_view")
-                count = cursor.fetchone()[0]
-                result['record_count'] = count
-                
-                # Try to get sample data
-                cursor.execute("SELECT * FROM dashboard_operativo_view LIMIT 1")
-                sample = cursor.fetchone()
-                result['has_sample_data'] = bool(sample)
-                if sample:
-                    result['sample_columns'] = len(sample)
-                    
-            except Exception as query_error:
-                result['query_error'] = str(query_error)
-        
-        # Check table exists
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = [row[0] for row in cursor.fetchall()]
-        result['tables'] = tables
-        
-        cursor.close()
-        return JsonResponse(result)
-        
-    except Exception as e:
-        return JsonResponse({
-            'error': str(e),
-            'status': 'error'
-        })
 
 def create_optimized_import_function(model_class, table_name, required_columns, process_row_func=None, max_file_size_mb=10):
     """
@@ -1026,12 +907,6 @@ import_ingredients_excel_main = csrf_exempt(import_ingredients_excel_main)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Health check - MUST come before api/v1/ include to bypass authentication
-    path('api/v1/health/', health_check, name='health_check'),
-    # Auth debug endpoint (public - no auth required)
-    path('api/v1/auth-debug/', auth_debug, name='auth_debug'),
-    # Database debug endpoint (public - no auth required)
-    path('api/v1/db-debug/', db_debug, name='db_debug'),
     # CSRF endpoint (public - no auth required)
     path('csrf/', get_csrf_token, name='csrf_token'),
     # Import endpoints outside of API middleware
@@ -1042,24 +917,11 @@ urlpatterns = [
     path('import-groups/', import_groups_excel_main, name='import_groups'),
     path('import-ingredients/', import_ingredients_excel_main, name='import_ingredients'),
     path('import-recipes/', import_recipes_excel_main, name='import_recipes'),
-    # Serve frontend assets - MUST come before the catch-all route
-    re_path(r'^assets/(?P<path>.*)$', serve_frontend_asset, name='frontend_assets'),
-    path('vite.svg', serve_vite_svg, name='vite_svg'),
-    # TEST ROUTE - Direct React app serving
-    path('test-react-app/', index_view, name='test_react_app'),
-    # Include API routes with explicit api/v1/ prefix
+    # Frontend assets served by Vite dev server in development
+    # Include API routes with unified api/v1/ prefix (includes auth + main API)
     path('api/v1/', include('api_urls')),
 ]
 
-# Serve static and media files in production
-urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-# Also serve assets directly from static
-urlpatterns += static('/assets/', document_root=settings.STATIC_ROOT / 'assets')
-
-# Serve React app for root and SPA fallback routes (after API routes)
-urlpatterns += [
-    path('', index_view, name='frontend_index'),  # Root
-    # SPA fallback for React Router - catch all non-API routes (more specific)
-    re_path(r'^(?!api/|admin/|assets/|static/|media/|import-|csrf/)[^/]+/?.*$', index_view, name='spa_fallback'),
-]
+# Static files served by Django in development
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

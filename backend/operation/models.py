@@ -942,7 +942,7 @@ class PrintQueue(models.Model):
     printer = models.ForeignKey('PrinterConfig', on_delete=models.CASCADE, related_name='print_jobs')
     
     # Contenido del trabajo
-    content = models.TextField(help_text='Contenido ESC/POS para imprimir')
+    content = models.TextField(default='', help_text='Contenido ESC/POS para imprimir')
     
     # Estado y control
     status = models.CharField(max_length=20, choices=PRINT_STATUS_CHOICES, default='pending')

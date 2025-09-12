@@ -39,6 +39,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://192.168.1.43:5173",  # Ethernet interface
+    "http://192.168.1.100:5173", # WiFi interface (needed for AP isolation bypass)
 ]
 
 # Get local network IPs from environment
@@ -55,6 +57,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://192.168.1.43:5173",  # Ethernet interface
+    "http://192.168.1.100:5173", # WiFi interface (needed for AP isolation bypass)
 ]
 
 if LOCAL_IP:
@@ -65,6 +69,11 @@ if LOCAL_IP:
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Session cookie settings for development
+SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_HTTPONLY = True  # Keep session secure
 
 # ──────────────────────────────────────────────────────────────
 # Logging - More verbose in development
@@ -102,27 +111,17 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['console', 'file'],
-            'level': 'WARNING' if COGNITO_ENABLED else 'INFO',
+            'level': 'INFO',
             'propagate': False,
         },
         'django.request': {
             'handlers': ['console', 'file'],
-            'level': 'WARNING' if COGNITO_ENABLED else 'DEBUG',
+            'level': 'DEBUG',
             'propagate': False,
         },
         'backend': {
             'handlers': ['console', 'file'],
-            'level': 'WARNING' if COGNITO_ENABLED else 'DEBUG',
-            'propagate': False,
-        },
-        'backend.cognito_auth': {
-            'handlers': ['console', 'file'],
-            'level': 'ERROR',  # Reduce Cognito logging noise
-            'propagate': False,
-        },
-        'backend.cognito_drf_auth': {
-            'handlers': ['console', 'file'],
-            'level': 'ERROR',  # Reduce Cognito logging noise
+            'level': 'DEBUG',
             'propagate': False,
         },
     },
@@ -153,4 +152,4 @@ print("🚀 Django Development Settings Loaded")
 print(f"   Environment: {ENVIRONMENT}")
 print(f"   Debug: {DEBUG}")
 print(f"   Database: SQLite ({DATABASES['default']['NAME']})")
-print(f"   AWS Cognito: {'Enabled' if COGNITO_ENABLED else 'Disabled'}")
+print(f"   Authentication: Django Users")

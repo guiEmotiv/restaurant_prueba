@@ -6,13 +6,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from backend.cognito_permissions import (
-    CognitoAdminOnlyPermission, 
-    CognitoWaiterAndAdminPermission, 
-    CognitoOrderStatusPermission,
-    CognitoPaymentPermission
-)
-from backend.development_permissions import DevelopmentAwarePermission, DevelopmentAwareAdminPermission
+from backend.development_permissions import IsAuthenticatedPermission, IsAdminPermission, DevelopmentAwarePermission, DevelopmentAwareAdminPermission
 # Rate limiting moved to Nginx - no longer using Django decorators
 from .models import Order, OrderItem, Payment, PaymentItem, ContainerSale, PrinterConfig, PrintQueue
 from .serializers import (

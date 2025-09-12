@@ -3,10 +3,6 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError
-from backend.cognito_permissions import (
-    CognitoAdminOnlyPermission, 
-    CognitoReadOnlyForNonAdmins
-)
 from backend.development_permissions import DevelopmentAwarePermission
 from .models import Group, Ingredient, Recipe, RecipeItem
 from .serializers import (

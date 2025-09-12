@@ -20,9 +20,7 @@
     "reset": "npm run clean && npm install && npm run dev"
   },
   "dependencies": {
-    "@aws-amplify/ui-react": "^6.11.2",
     "autoprefixer": "^10.4.21",
-    "aws-amplify": "^6.15.4",
     "axios": "^1.10.0",
     "lucide-react": "^0.525.0",
     "postcss": "^8.5.6",

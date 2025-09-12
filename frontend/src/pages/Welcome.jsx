@@ -43,7 +43,8 @@ const Welcome = () => {
   const getQuickActions = () => {
     const actions = [];
 
-    if (hasPermission('canViewDashboard')) {
+    // Dashboard - Admins and Managers
+    if (hasPermission('can_access_dashboard')) {
       actions.push({
         title: 'Dashboard Operativo',
         description: 'Ver resumen de operaciones',
@@ -51,7 +52,7 @@ const Welcome = () => {
         path: '/dashboard-operativo',
         color: 'bg-blue-500 hover:bg-blue-600'
       });
-      
+
       actions.push({
         title: 'Dashboard Financiero',
         description: 'Ver reportes financieros',
@@ -61,9 +62,10 @@ const Welcome = () => {
       });
     }
 
-    if (hasPermission('canManageOrders')) {
+    // Order Management - Admins, Managers, and Waiters
+    if (hasPermission('can_create_orders')) {
       actions.push({
-        title: 'Gestión de Mesas',
+        title: 'Gestión de Pedidos',
         description: 'Administrar mesas y pedidos',
         icon: '🍽️',
         path: '/operations',
@@ -71,17 +73,19 @@ const Welcome = () => {
       });
     }
 
-    if (hasPermission('canViewKitchen')) {
+    // Kitchen - Admins and Cooks
+    if (hasPermission('can_manage_kitchen')) {
       actions.push({
-        title: 'Cocina',
-        description: 'Ver pedidos en preparación',
+        title: 'Consultar Pedidos',
+        description: 'Ver estado de pedidos',
         icon: '👨‍🍳',
-        path: '/kitchen',
+        path: '/order-tracker',
         color: 'bg-orange-500 hover:bg-orange-600'
       });
     }
 
-    if (hasPermission('canManagePayments')) {
+    // Payment Processing - Admins and Cashiers
+    if (hasPermission('can_process_payments')) {
       actions.push({
         title: 'Procesar Pagos',
         description: 'Gestionar pagos y cobros',
@@ -91,13 +95,14 @@ const Welcome = () => {
       });
     }
 
-    if (hasPermission('canViewHistory')) {
+    // Configuration - Admins only
+    if (hasPermission('can_manage_users')) {
       actions.push({
-        title: 'Historial de Pagos',
-        description: 'Ver transacciones realizadas',
-        icon: '📋',
-        path: '/payment-history',
-        color: 'bg-gray-500 hover:bg-gray-600'
+        title: 'Configuración',
+        description: 'Administrar sistema',
+        icon: '⚙️',
+        path: '/units',
+        color: 'bg-gray-700 hover:bg-gray-800'
       });
     }
 
@@ -160,7 +165,7 @@ const Welcome = () => {
         )}
 
         {/* System Status */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             Estado del Sistema
           </h3>
@@ -179,6 +184,64 @@ const Welcome = () => {
             </div>
           </div>
         </div>
+
+        {/* Permission Debug Panel - Only for development */}
+        {user && process.env.NODE_ENV === 'development' && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              🔧 Panel de Debug - Permisos
+            </h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* User Info */}
+              <div className="bg-white p-4 rounded-lg border">
+                <h4 className="font-semibold text-gray-800 mb-3">Información del Usuario</h4>
+                <div className="space-y-2 text-sm">
+                  <div><strong>Usuario:</strong> {user.username}</div>
+                  <div><strong>Email:</strong> {user.email || 'No especificado'}</div>
+                  <div><strong>Nombre:</strong> {user.first_name} {user.last_name}</div>
+                  <div><strong>Rol:</strong> {userRole || 'Sin rol'}</div>
+                  <div><strong>Grupos:</strong> {user.groups?.join(', ') || 'Ninguno'}</div>
+                  <div><strong>Es Staff:</strong> {user.is_staff ? '✅ Sí' : '❌ No'}</div>
+                  <div><strong>Es Superuser:</strong> {user.is_superuser ? '✅ Sí' : '❌ No'}</div>
+                </div>
+              </div>
+
+              {/* Permission Check */}
+              <div className="bg-white p-4 rounded-lg border">
+                <h4 className="font-semibold text-gray-800 mb-3">Permisos Activos</h4>
+                <div className="space-y-1 text-sm">
+                  {[
+                    'can_manage_users',
+                    'can_view_admin',
+                    'can_access_dashboard',
+                    'can_create_orders',
+                    'can_process_payments',
+                    'can_manage_kitchen'
+                  ].map(permission => (
+                    <div key={permission} className="flex items-center justify-between">
+                      <span className="font-mono text-xs">{permission}</span>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        hasPermission(permission)
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {hasPermission(permission) ? '✅ Sí' : '❌ No'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Raw Permissions Object */}
+            <div className="mt-4 bg-white p-4 rounded-lg border">
+              <h4 className="font-semibold text-gray-800 mb-3">Objeto de Permisos (Raw)</h4>
+              <pre className="text-xs bg-gray-100 p-3 rounded overflow-x-auto">
+                {JSON.stringify(user.permissions || {}, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,13 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { Amplify } from 'aws-amplify';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider } from './contexts/AuthContext';
-import amplifyConfig from './config/amplify';
 import Layout from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import RoleProtectedRoute from './components/auth/RoleProtectedRoute';
-import RoleValidator from './components/auth/RoleValidator';
 import RoleBasedRedirect from './components/RoleBasedRedirect';
 import Welcome from './pages/Welcome';
 import DashboardOperativo from './pages/DashboardOperativo';
@@ -24,31 +20,11 @@ import CashierPayment from './pages/operation/CashierPayment';
 import OrderManagement from './pages/operation/OrderManagement/OrderManagement';
 import OrderTracker from './pages/operation/OrderTracker';
 import PrinterManagement from './pages/admin/PrinterManagement';
+import UserManagement from './pages/admin/UserManagement';
 
 
-// Configure AWS Amplify
-Amplify.configure(amplifyConfig);
-
-// 🔐 AWS Cognito Configuration - Validate credentials
-const isCognitoConfigured = (() => {
-  const hasCredentials = !!(
-    import.meta.env.VITE_AWS_COGNITO_USER_POOL_ID && 
-    import.meta.env.VITE_AWS_COGNITO_APP_CLIENT_ID
-  );
-  
-  if (!hasCredentials) {
-    console.error('🚫 AWS Cognito credentials not configured');
-    console.log('Required environment variables:');
-    console.log('- VITE_AWS_COGNITO_USER_POOL_ID');
-    console.log('- VITE_AWS_COGNITO_APP_CLIENT_ID');
-    console.log('');
-    console.log('Obtén estas credenciales de AWS Console > Cognito > User Pools');
-  } else {
-    // AWS Cognito authentication configured
-  }
-  
-  return hasCredentials;
-})();
+// Django authentication configuration
+console.log('✅ Django authentication configured');
 
 
 const AppContent = () => {
@@ -62,87 +38,93 @@ const AppContent = () => {
               <Welcome />
             </ProtectedRoute>
           } />
+
+          {/* Dashboard routes - Admins and Managers only */}
           <Route path="/dashboard-operativo" element={
-            <RoleProtectedRoute requiredPermission="canViewDashboard">
+            <ProtectedRoute requiredPermission="can_access_dashboard">
               <DashboardOperativo />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/dashboard-financiero" element={
-            <RoleProtectedRoute requiredPermission="canViewDashboard">
+            <ProtectedRoute requiredPermission="can_access_dashboard">
               <DashboardFinanciero />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
 
-          {/* Configuration routes - Solo administradores */}
+          {/* Configuration routes - Admins only */}
           <Route path="/units" element={
-            <RoleProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="can_manage_users">
               <Units />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/zones" element={
-            <RoleProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="can_manage_users">
               <Zones />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/tables" element={
-            <RoleProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="can_manage_users">
               <Tables />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/containers" element={
-            <RoleProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="can_manage_users">
               <Containers />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/printer-management" element={
-            <RoleProtectedRoute requiredPermission="canManageConfig">
+            <ProtectedRoute requiredPermission="can_manage_users">
               <PrinterManagement />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
+          } />
+          <Route path="/user-management" element={
+            <ProtectedRoute requiredPermission="can_manage_users">
+              <UserManagement />
+            </ProtectedRoute>
           } />
 
-          {/* Inventory routes - Solo administradores */}
+          {/* Inventory routes - Admins and Managers */}
           <Route path="/groups" element={
-            <RoleProtectedRoute requiredPermission="canManageInventory">
+            <ProtectedRoute requiredPermission="can_access_dashboard">
               <Groups />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/ingredients" element={
-            <RoleProtectedRoute requiredPermission="canManageInventory">
+            <ProtectedRoute requiredPermission="can_access_dashboard">
               <Ingredients />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
           <Route path="/recipes" element={
-            <RoleProtectedRoute requiredPermission="canManageInventory">
+            <ProtectedRoute requiredPermission="can_access_dashboard">
               <Recipes />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
 
-
-          {/* Operation routes */}
+          {/* Operation routes - Admins, Managers, and Waiters */}
           <Route path="/operations" element={
-            <RoleProtectedRoute requiredPermission="canManageOrders">
+            <ProtectedRoute requiredPermission="can_create_orders">
               <OrderManagement />
-            </RoleProtectedRoute>
+            </ProtectedRoute>
           } />
 
           {/* Payment routes */}
           <Route path="/payment-history" element={
-            <RoleProtectedRoute requiredPermission="canViewHistory">
-              <PaymentHistory />  
-            </RoleProtectedRoute>
-          } />
-          
-          <Route path="/cashier-payment" element={
-            <RoleProtectedRoute requiredPermission="canProcessPayment">
-              <CashierPayment />  
-            </RoleProtectedRoute>
+            <ProtectedRoute requiredPermission="can_access_dashboard">
+              <PaymentHistory />
+            </ProtectedRoute>
           } />
 
-          {/* Order Tracker route */}
+          <Route path="/cashier-payment" element={
+            <ProtectedRoute requiredPermission="can_process_payments">
+              <CashierPayment />
+            </ProtectedRoute>
+          } />
+
+          {/* Order Tracker route - Kitchen staff and managers */}
           <Route path="/order-tracker" element={
-            <RoleProtectedRoute requiredPermission="canViewHistory">
-              <OrderTracker />  
-            </RoleProtectedRoute>
+            <ProtectedRoute requiredPermission="can_manage_kitchen">
+              <OrderTracker />
+            </ProtectedRoute>
           } />
 
 
@@ -171,31 +153,15 @@ const AppContent = () => {
 
 function App() {
   try {
-    if (!isCognitoConfigured) {
-      return (
-        <div style={{ padding: '20px', color: 'red', textAlign: 'center' }}>
-          <h2>Configuration Error</h2>
-          <p>AWS Cognito credentials are required but not configured.</p>
-          <p>Please set the following environment variables:</p>
-          <ul style={{ textAlign: 'left', display: 'inline-block' }}>
-            <li>VITE_AWS_COGNITO_USER_POOL_ID</li>
-            <li>VITE_AWS_COGNITO_APP_CLIENT_ID</li>
-          </ul>
-        </div>
-      );
-    }
-
     return (
       <ToastProvider>
         <AuthProvider>
           <Router>
             <LoginForm>
-              <RoleValidator>
-                <Routes>
-                  {/* All routes - Inside Layout */}
-                  <Route path="/*" element={<AppContent />} />
-                </Routes>
-              </RoleValidator>
+              <Routes>
+                {/* All routes - Inside Layout */}
+                <Route path="/*" element={<AppContent />} />
+              </Routes>
             </LoginForm>
           </Router>
         </AuthProvider>

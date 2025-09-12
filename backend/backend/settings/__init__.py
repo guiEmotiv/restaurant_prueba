@@ -1,23 +1,13 @@
 """
-Django Settings Module Selector
-Automatically imports the correct settings based on ENVIRONMENT variable
+Django Settings Module - Development Only
+Simplified settings for development environment only
 """
 import os
 
-# Get environment from variable
-environment = os.environ.get('ENVIRONMENT', 'development').lower()
+# Force development environment
+environment = 'development'
 
-# Import appropriate settings
-if environment == 'production':
-    from .production import *
-elif environment == 'staging':
-    try:
-        from .staging import *
-    except ImportError:
-        print("⚠️ No staging settings found, using production")
-        from .production import *
-else:
-    # Default to development
-    from .development import *
+# Always use development settings
+from .development import *
 
-print(f"✅ Settings loaded: {environment.upper()}")
+print(f"✅ Settings loaded: DEVELOPMENT (simplified setup)")
