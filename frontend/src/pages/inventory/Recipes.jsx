@@ -60,8 +60,10 @@ const Recipes = () => {
       const data = await apiService.groups.getAll();
       setGroups(Array.isArray(data) ? data : []);
     } catch (error) {
+      console.error('Error loading groups:', error);
     }
   };
+
 
   const loadRecipes = async (silent = false) => {
     try {
@@ -320,6 +322,9 @@ const Recipes = () => {
                   Envase
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Impresora
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Precio Base
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -342,7 +347,7 @@ const Recipes = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {recipes.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
                     No hay recetas disponibles
                   </td>
                 </tr>
@@ -388,6 +393,15 @@ const Recipes = () => {
                         </span>
                       ) : (
                         <span className="text-gray-400 italic">Sin envase</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
+                      {recipe.printer_name ? (
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-teal-100 text-teal-800">
+                          {recipe.printer_name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 italic">Sin impresora</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">

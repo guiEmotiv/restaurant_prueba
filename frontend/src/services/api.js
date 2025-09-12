@@ -201,15 +201,16 @@ api.interceptors.request.use(
       
       // IMPORTANTE: Usar ID Token en lugar de Access Token para obtener grupos
       // El ID Token incluye los grupos del usuario (cognito:groups)
-      if (session.tokens?.idToken) {
-        config.headers.Authorization = `Bearer ${session.tokens.idToken}`;
+      if (session.tokens?.idToken?.toString) {
+        config.headers.Authorization = `Bearer ${session.tokens.idToken.toString()}`;
         logger.info('✅ ID Token attached to request');
-      } else if (session.tokens?.accessToken) {
+      } else if (session.tokens?.accessToken?.toString) {
         // Fallback to access token if ID token not available
-        config.headers.Authorization = `Bearer ${session.tokens.accessToken}`;
-        logger.info('✅ Access Token attached to request');
+        config.headers.Authorization = `Bearer ${session.tokens.accessToken.toString()}`;
+        logger.info('✅ Access Token attached to request (fallback)');
       } else {
         logger.warn('❌ No auth tokens available');
+        // Don't throw error here - let backend handle it
       }
     } catch (error) {
       logger.error('❌ Auth error:', error);
@@ -570,6 +571,7 @@ export const apiService = {
   orders: {
     getAll: () => apiService.getAll('orders'),
     getById: (id) => apiService.getById('orders', id),
+    get: (id) => apiService.getById('orders', id),
     create: (data) => apiService.create('orders', data),
     update: (id, data) => apiService.update('orders', id, data),
     patch: (id, data) => apiService.patch('orders', id, data),
@@ -586,6 +588,10 @@ export const apiService = {
         data.cancellation_reason = cancellationReason;
       }
       const response = await api.post(`/orders/${id}/update_status/`, data);
+      return response.data;
+    },
+    checkPrintStatus: async (id) => {
+      const response = await api.post(`/orders/${id}/check_print_status/`);
       return response.data;
     },
     addItem: async (id, itemData) => {
@@ -630,6 +636,19 @@ export const apiService = {
     },
     resetAll: async () => {
       const response = await api.post('/orders/reset_all/');
+      return response.data;
+    },
+    resetAllTables: async () => {
+      const response = await api.post('/orders/reset_all_tables/');
+      return response.data;
+    },
+    // Nuevos métodos para el flujo de 2 fases
+    retryFailedPrints: async (id) => {
+      const response = await api.post(`/orders/${id}/retry_failed_prints/`);
+      return response.data;
+    },
+    getPrintStatus: async (id) => {
+      const response = await api.get(`/orders/${id}/print_status/`);
       return response.data;
     },
   },
@@ -909,6 +928,92 @@ export const apiService = {
     update: (id, data) => apiService.update('cart-items', id, data),
     delete: (id) => apiService.delete('cart-items', id),
   },
+
+  // PHASE 3: Print Queue - Funciones minimalistas para monitoreo
+  printQueue: {
+    // Obtener estado de la cola (minimalista - solo para badges sutiles)
+    getStatus: async () => {
+      try {
+        // Cache-busting: agregar timestamp único para evitar respuestas cacheadas
+        const response = await api.get(`/print-queue/queue_status/?_t=${Date.now()}`);
+        return response.data;
+      } catch (error) {
+        // Fallar silenciosamente para no interrumpir la UI
+        logger.warn('Print queue status check failed:', error.message);
+        return { pending_count: 0, failed_count: 0 };
+      }
+    },
+
+    // Obtener trabajos de un pedido específico (para badges sutiles)
+    getOrderJobs: async (orderId) => {
+      try {
+        // Cache-busting: agregar timestamp único para evitar respuestas cacheadas
+        const response = await api.get(`/print-queue/?order_id=${orderId}&_t=${Date.now()}`);
+        return response.data.results || response.data || [];
+      } catch (error) {
+        logger.warn('Order print jobs check failed:', error.message);
+        return [];
+      }
+    },
+
+    // Reintentar trabajos fallidos (para botón sutil de retry)
+    retryFailed: async () => {
+      try {
+        const response = await api.post('/print-queue/retry_all_failed/');
+        return response.data;
+      } catch (error) {
+        logger.error('Retry failed jobs error:', error);
+        throw error;
+      }
+    },
+
+    // Reintentar trabajo específico fallido
+    retryJob: async (jobId) => {
+      try {
+        const response = await api.post(`/print-queue/${jobId}/retry_job/`);
+        return response.data;
+      } catch (error) {
+        logger.error('Failed to retry print job:', error);
+        throw error;
+      }
+    },
+
+    // Obtener trabajos de impresión por order item
+    getJobsByOrderItem: async (orderItemId) => {
+      try {
+        // Cache-busting: agregar timestamp único para evitar respuestas cacheadas
+        const response = await api.get(`/print-queue/?order_item_id=${orderItemId}&_t=${Date.now()}`);
+        return response.data.results || response.data || [];
+      } catch (error) {
+        logger.warn('Order item print jobs check failed:', error.message);
+        return [];
+      }
+    },
+
+    // Obtener todos los trabajos de impresión con filtros
+    getAll: async (params = {}) => {
+      try {
+        const queryString = new URLSearchParams(params).toString();
+        const response = await api.get(`/print-queue/${queryString ? '?' + queryString : ''}`);
+        return response.data;
+      } catch (error) {
+        logger.error('Failed to get print queue jobs:', error);
+        throw error;
+      }
+    },
+
+    // Actualizar trabajo específico
+    update: async (jobId, data) => {
+      try {
+        const response = await api.put(`/print-queue/${jobId}/`, data);
+        return response.data;
+      } catch (error) {
+        logger.error('Failed to update print job:', error);
+        throw error;
+      }
+    }
+  },
+
 
 };
 

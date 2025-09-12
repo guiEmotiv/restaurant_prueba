@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, CreditCard, DollarSign, Printer } from 'lucide-react';
 import Button from '../common/Button';
-import bluetoothPrinter from '../../services/bluetoothPrinter';
+import { bluetoothPrinter } from '../../utils/bluetooth';
 import { useToast } from '../../contexts/ToastContext';
 
 const PaymentModal = ({ isOpen, onClose, onSubmit, order }) => {

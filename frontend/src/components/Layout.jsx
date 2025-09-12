@@ -22,9 +22,11 @@ import {
   LogOut,
   Activity,
   DollarSign,
-  Eye
+  Eye,
+  Printer
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+// PrintQueueBadge movido al panel lateral
 
 const Layout = ({ children }) => {
   
@@ -69,6 +71,7 @@ const Layout = ({ children }) => {
         { name: 'Zonas', href: '/zones', icon: MapPin, permission: 'canManageConfig' },
         { name: 'Mesas', href: '/tables', icon: Table, permission: 'canManageConfig' },
         { name: 'Envases', href: '/containers', icon: Package, permission: 'canManageConfig' },
+        { name: 'Impresoras', href: '/printer-management', icon: Printer, permission: 'canManageConfig' },
       ]
     },
     { 
@@ -87,8 +90,7 @@ const Layout = ({ children }) => {
       // Mostrar si tiene cualquier permiso de operaciones (meseros o cocineros)
       permission: null, // Se filtrará por sus hijos
       children: [
-        { name: 'Gestión de Mesas', href: '/operations', icon: Table, permission: 'canManageOrders' },
-        { name: 'Vista de Cocina', href: '/kitchen', icon: ChefHat, permission: 'canViewKitchen' },
+        { name: 'Gestión de Pedidos', href: '/operations', icon: Table, permission: 'canManageOrders' },
       ]
     },
     { 
@@ -161,6 +163,8 @@ const Layout = ({ children }) => {
           )}
         </div>
       </button>
+
+      {/* PrintQueueBadge movido al panel lateral */}
 
       {/* Sidebar Navigation - Responsive */}
       <div className={`${

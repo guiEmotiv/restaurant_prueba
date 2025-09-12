@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, Plus, Minus, Save, Package, AlertTriangle } from 'lucide-react';
+import { X, Plus, Minus, Save, Package, AlertTriangle, Printer } from 'lucide-react';
 import { apiService } from '../../services/api';
+import { httpPrinterService } from '../../services/httpPrinterService';
 import { useToast } from '../../contexts/ToastContext';
 
 /**
@@ -21,6 +22,7 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
     container: '',
     preparation_time: '',
     profit_percentage: '0.00',
+    printer: '',  // Nuevo campo para impresora
     is_active: true
   });
   
@@ -28,6 +30,7 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
   const [availableIngredients, setAvailableIngredients] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
   const [availableContainers, setAvailableContainers] = useState([]);
+  const [availablePrinters, setAvailablePrinters] = useState([]);  // Nuevo estado para impresoras
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   
@@ -41,6 +44,7 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
       container: '',
       preparation_time: '',
       profit_percentage: '0.00',
+      printer: '',  // Resetear impresora
       is_active: true
     });
     setRecipeItems([]);
@@ -76,16 +80,18 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
   const loadReferenceData = useCallback(async () => {
     try {
       // Usar un solo endpoint optimizado que retorne todos los datos
-      const [allIngredients, groups, containers] = await Promise.all([
+      const [allIngredients, groups, containers, printers] = await Promise.all([
         // Usar apiService para manejar autenticación correctamente
         apiService.ingredients.getAll({ show_all: true }),
         apiService.groups.getAll(),
-        apiService.containers.getAll()
+        apiService.containers.getAll(),
+        httpPrinterService.getConfigurations().catch(() => ({ data: [] }))  // Cargar impresoras
       ]);
       
       setAvailableIngredients(allIngredients);
       setAvailableGroups(Array.isArray(groups) ? groups : []);
       setAvailableContainers(Array.isArray(containers) ? containers : []);
+      setAvailablePrinters(Array.isArray(printers?.results) ? printers.results : (Array.isArray(printers) ? printers : []));
     } catch (error) {
     }
   }, []);
@@ -107,6 +113,7 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
           container: recipe.container ? recipe.container.toString() : '',
           preparation_time: recipe.preparation_time || '',
           profit_percentage: recipe.profit_percentage || '0.00',
+          printer: recipe.printer ? recipe.printer.toString() : '',  // Cargar impresora asignada
           is_active: Boolean(recipe.is_active) // Asegurar que sea boolean
         });
         
@@ -278,6 +285,7 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
         version: formData.version.trim() || '1.0',
         group: formData.group ? parseInt(formData.group) : null,
         container: formData.container ? parseInt(formData.container) : null,
+        printer: formData.printer ? parseInt(formData.printer) : null,
         base_price: priceCalculations.finalPrice > 0 ? priceCalculations.finalPrice.toFixed(2) : "0.01",
         profit_percentage: parseFloat(formData.profit_percentage) || 0,
         preparation_time: parseInt(formData.preparation_time),
@@ -289,6 +297,9 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
         }))
       };
       
+      console.log('💾 Datos que se envían al backend:', recipeData);
+      console.log('🖨️ Impresora seleccionada:', formData.printer);
+      
       
       let savedRecipe;
       if (recipe?.id) {
@@ -297,6 +308,8 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
         savedRecipe = await apiService.recipes.create(recipeData);
       }
       
+      console.log('✅ Respuesta del backend:', savedRecipe);
+      console.log('🖨️ Impresora guardada:', savedRecipe?.printer, savedRecipe?.printer_name);
       
       onSave();
       onClose();
@@ -413,8 +426,8 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
                   </div>
                 </div>
 
-                {/* Segunda fila: Envase y Versión */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Segunda fila: Envase, Versión e Impresora */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Envase *
@@ -504,7 +517,39 @@ const RecipeModalOptimized = ({ isOpen, onClose, recipe = null, onSave }) => {
                   </div>
                 </div>
 
-                {/* Cuarta fila: Estado Activo - Simplificado */}
+                {/* Cuarta fila: Impresora */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Printer className="w-4 h-4 inline mr-2" />
+                      Impresora Asignada
+                    </label>
+                    <select
+                      name="printer"
+                      value={formData.printer}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                        errors.printer ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    >
+                      <option value="">Sin impresora asignada</option>
+                      {availablePrinters.filter(p => p.is_active).map((printer) => (
+                        <option key={printer.id} value={printer.id}>
+                          {printer.name} ({printer.usb_port})
+                        </option>
+                      ))}
+                    </select>
+                    {errors.printer && (
+                      <p className="mt-1 text-sm text-red-600">{errors.printer}</p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      La impresora se usará para imprimir etiquetas automáticamente al crear órdenes con esta receta
+                    </p>
+                  </div>
+                  <div></div> {/* Empty column for balance */}
+                </div>
+
+                {/* Quinta fila: Estado Activo - Simplificado */}
                 <div>
                   <label className="flex items-center gap-2">
                     <input

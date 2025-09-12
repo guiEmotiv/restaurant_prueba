@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -11,6 +11,7 @@ from backend.cognito_permissions import (
     CognitoWaiterAndAdminPermission, 
     CognitoReadOnlyForNonAdmins
 )
+from backend.development_permissions import DevelopmentAwarePermission
 import pandas as pd
 import io
 import json
@@ -24,7 +25,7 @@ from .serializers import (
 class UnitViewSet(viewsets.ModelViewSet):
     queryset = Unit.objects.all().order_by('name')
     serializer_class = UnitSerializer
-    permission_classes = [AllowAny]  # Acceso completo en desarrollo
+    permission_classes = [DevelopmentAwarePermission]  # ALWAYS require Cognito authentication
     
     @action(detail=True, methods=['get'])
     def ingredients(self, request, pk=None):
@@ -40,7 +41,7 @@ class UnitViewSet(viewsets.ModelViewSet):
 class ZoneViewSet(viewsets.ModelViewSet):
     queryset = Zone.objects.all().order_by('name')
     serializer_class = ZoneSerializer
-    permission_classes = [AllowAny]  # Acceso completo en desarrollo
+    permission_classes = [DevelopmentAwarePermission]  # ALWAYS require Cognito authentication
     pagination_class = None  # Deshabilitar paginación para zonas
     
     @action(detail=True, methods=['get'])
@@ -57,7 +58,7 @@ class TableViewSet(viewsets.ModelViewSet):
         'order_set__orderitem_set__recipe',
         'order_set__container_sales__container'
     ).order_by('zone__name', 'table_number')
-    permission_classes = [AllowAny]  # Acceso completo en desarrollo
+    permission_classes = [DevelopmentAwarePermission]  # ALWAYS require Cognito authentication
     pagination_class = None  # Deshabilitar paginación para mesas
     
     def get_serializer_class(self):
@@ -101,7 +102,7 @@ class TableViewSet(viewsets.ModelViewSet):
 class ContainerViewSet(viewsets.ModelViewSet):
     serializer_class = ContainerSerializer
     pagination_class = None  # Disable pagination
-    permission_classes = [AllowAny]  # Acceso completo en desarrollo
+    permission_classes = [DevelopmentAwarePermission]  # ALWAYS require Cognito authentication
     
     def get_queryset(self):
         queryset = Container.objects.all().order_by('name')
@@ -114,7 +115,6 @@ class ContainerViewSet(viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def operational_info(request):
     """
     Retorna información operativa básica del restaurante.

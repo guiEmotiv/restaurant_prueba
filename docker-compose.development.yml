@@ -1,0 +1,54 @@
+services:
+  restaurant-web-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.development
+    container_name: ${DOCKER_PROJECT_NAME:-restaurant-web}-backend-${CONTAINER_SUFFIX:-dev}
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=development
+      - DJANGO_SETTINGS_MODULE=backend.settings
+      - ENVIRONMENT=development
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+      - restaurant-data:/app/data
+    networks:
+      - restaurant-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # nginx no necesario en desarrollo - frontend corre en puerto 5173
+  # restaurant-nginx:
+  #   image: nginx:alpine
+  #   container_name: restaurant-nginx-dev
+  #   ports:
+  #     - "8080:80"
+  #   volumes:
+  #     - ./docker/nginx/conf.d:/etc/nginx/conf.d
+  #     - ./frontend/dist:/usr/share/nginx/html
+  #   networks:
+  #     - restaurant-network
+  #   depends_on:
+  #     - restaurant-app
+  #   restart: unless-stopped
+
+volumes:
+  restaurant-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data
+
+networks:
+  restaurant-network:
+    driver: bridge
+    name: ${DOCKER_PROJECT_NAME:-restaurant-web}-network-${CONTAINER_SUFFIX:-dev}

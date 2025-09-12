@@ -226,10 +226,41 @@ def setup_signals():
     def orderitem_updated(sender, instance, created, **kwargs):
         """Signal que se ejecuta cuando se actualiza un OrderItem"""
         
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # Invalidar cache de kitchen board
         cache.delete('kitchen_board_sse_data')
         cache.delete('kitchen_board_data')
         cache.delete('kitchen_view_orders')
+        
+        # AUTO-IMPRESIÓN HABILITADA: Los items se imprimen automáticamente cuando se crean
+        if created and instance.status == 'CREATED':
+            try:
+                # Usar transaction.on_commit para asegurar que PrintQueue job esté disponible
+                from django.db import transaction
+                
+                def print_item():
+                    try:
+                        # El trabajo de impresión ya fue creado por el método save() del OrderItem
+                        # Solo necesitamos enviarlo al RPi4
+                        from .http_printer_service import http_printer_service
+                        
+                        # Obtener el último trabajo creado para este OrderItem
+                        print_job = instance.print_jobs.filter(status='pending').last()
+                        if print_job:
+                            http_printer_service.send_print_job(print_job)
+                        else:
+                            logger.warning(f"No se encontró trabajo de impresión pendiente para OrderItem {instance.id}")
+                            
+                    except Exception as e:
+                        logger.error(f"Error en impresión automática para OrderItem {instance.id}: {e}")
+                
+                # Ejecutar después de que la transacción se confirme
+                transaction.on_commit(print_item)
+                
+            except Exception as e:
+                logger.error(f"Error iniciando impresión automática para OrderItem {instance.id}: {e}")
         
         # Datos del evento
         event_data = {

@@ -4,7 +4,7 @@ import { Receipt, Search, Calendar, Eye, X, Printer } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import bluetoothPrinter from '../../services/bluetoothPrinter';
+import { bluetoothPrinter } from '../../utils/bluetooth';
 import { getPeruDate } from '../../utils/dashboardUtils';
 
 const PaymentHistory = () => {

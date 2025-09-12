@@ -21,10 +21,9 @@ import Ingredients from './pages/inventory/Ingredients';
 import Recipes from './pages/inventory/Recipes';
 import PaymentHistory from './pages/operation/PaymentHistory';
 import CashierPayment from './pages/operation/CashierPayment';
-import TableOrderEcommerce from './pages/operation/TableOrderEcommerce/TableManagement';
-import Kitchen from './pages/operation/Kitchen';
+import OrderManagement from './pages/operation/OrderManagement/OrderManagement';
 import OrderTracker from './pages/operation/OrderTracker';
-import PrinterDiagnostic from './pages/operation/PrinterDiagnostic';
+import PrinterManagement from './pages/admin/PrinterManagement';
 
 
 // Configure AWS Amplify
@@ -95,6 +94,11 @@ const AppContent = () => {
               <Containers />
             </RoleProtectedRoute>
           } />
+          <Route path="/printer-management" element={
+            <RoleProtectedRoute requiredPermission="canManageConfig">
+              <PrinterManagement />
+            </RoleProtectedRoute>
+          } />
 
           {/* Inventory routes - Solo administradores */}
           <Route path="/groups" element={
@@ -117,15 +121,9 @@ const AppContent = () => {
           {/* Operation routes */}
           <Route path="/operations" element={
             <RoleProtectedRoute requiredPermission="canManageOrders">
-              <TableOrderEcommerce />
+              <OrderManagement />
             </RoleProtectedRoute>
           } />
-          <Route path="/table-order" element={
-            <RoleProtectedRoute requiredPermission="canManageOrders">
-              <TableOrderEcommerce />
-            </RoleProtectedRoute>
-          } />
-          
 
           {/* Payment routes */}
           <Route path="/payment-history" element={
@@ -140,13 +138,6 @@ const AppContent = () => {
             </RoleProtectedRoute>
           } />
 
-          {/* Kitchen route */}
-          <Route path="/kitchen" element={
-            <RoleProtectedRoute requiredPermission="canViewKitchen">
-              <Kitchen />  
-            </RoleProtectedRoute>
-          } />
-
           {/* Order Tracker route */}
           <Route path="/order-tracker" element={
             <RoleProtectedRoute requiredPermission="canViewHistory">
@@ -154,12 +145,6 @@ const AppContent = () => {
             </RoleProtectedRoute>
           } />
 
-          {/* Printer Diagnostic route - Temporal para debugging */}
-          <Route path="/printer-diagnostic" element={
-            <ProtectedRoute>
-              <PrinterDiagnostic />  
-            </ProtectedRoute>
-          } />
 
           {/* Role-based redirect for unauthorized paths */}
           <Route path="*" element={

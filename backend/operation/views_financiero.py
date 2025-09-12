@@ -1,7 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
+from backend.development_permissions import DevelopmentAwarePermission
 from django.utils import timezone
 from django.db.models import Sum, Count, Q, F
 from django.db import connection
@@ -19,7 +20,7 @@ class DashboardFinancieroViewSet(viewsets.ViewSet):
     # Use default authentication from settings (Cognito if enabled)
     # Use default authentication from settings (Cognito if enabled)
     
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['get'], permission_classes=[DevelopmentAwarePermission])
     def debug_view(self, request):
         """Debug endpoint para verificar estado de dashboard_operativo_view"""
         try:

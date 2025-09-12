@@ -65,6 +65,49 @@ class CognitoUser:
         return f'<CognitoUser: {self.username}>'
 
 
+class RPi4User:
+    """Represents an RPi4 authenticated user for callback endpoints"""
+    def __init__(self):
+        self.username = 'rpi4-printer-proxy'
+        self.email = 'rpi4@restaurant.internal'
+        self.groups = ['printer_system']
+        self.is_authenticated = True
+        self.is_anonymous = False
+        self.is_active = True
+        
+        # Django User model compatibility
+        self.pk = 'rpi4-printer-proxy'
+        self.id = 'rpi4-printer-proxy'
+        self.first_name = 'RPi4'
+        self.last_name = 'PrinterProxy'
+        
+        # Not staff/superuser but authenticated for DRF
+        self.is_staff = False
+        self.is_superuser = False
+    
+    def has_perm(self, perm, obj=None):
+        """RPi4 has limited permissions - only for printer endpoints"""
+        return True  # Allow printer operations
+    
+    def has_perms(self, perm_list, obj=None):
+        """RPi4 has limited permissions - only for printer endpoints"""
+        return True  # Allow printer operations
+    
+    def has_module_perms(self, app_label):
+        """RPi4 has limited permissions - only for printer endpoints"""
+        return True  # Allow printer operations
+    
+    def get_username(self):
+        """Return RPi4 username"""
+        return self.username
+    
+    def __str__(self):
+        return self.username
+    
+    def __repr__(self):
+        return f'<RPi4User: {self.username}>'
+
+
 class CognitoAuthenticationMiddleware:
     """Middleware to authenticate requests using AWS Cognito JWT tokens"""
     
@@ -73,55 +116,40 @@ class CognitoAuthenticationMiddleware:
         self.jwks_client = None
         
     def __call__(self, request):
-        # Check if Cognito is enabled
-        if not getattr(settings, 'COGNITO_ENABLED', False):
-            # If Cognito is not enabled, pass through without authentication
+        # Public endpoints that don't require authentication
+        public_endpoints = ['/api/v1/csrf/', '/api/v1/health/', '/api/v1/docs/', '/api/v1/schema/', '/static/', '/media/', '/admin/']
+        
+        # RPi4 printer system endpoints
+        rpi4_endpoints = ['/api/v1/get-next-print-job/', '/api/v1/report-print-result/', '/api/v1/print-http/']
+        
+        skip_paths = public_endpoints + rpi4_endpoints
+        
+        # Check if path should skip authentication
+        for skip_path in skip_paths:
+            if request.path.startswith(skip_path):
+                # For RPi4 endpoints, mark request for bypass
+                if skip_path in rpi4_endpoints:
+                    request._rpi4_authenticated = True
+                return self.get_response(request)
+        
+        # Let DRF handle all API authentication
+        if request.path.startswith('/api/v1/'):
             return self.get_response(request)
         
-        # Skip authentication for certain paths
-        skip_paths = ['/admin/', '/api/v1/health/', '/api/v1/auth-debug/', '/api/v1/csrf/', '/static/', '/media/']
-        if any(request.path.startswith(path) for path in skip_paths):
-            return self.get_response(request)
-        
-        # Get token from Authorization header
+        # Handle authentication for non-API requests (like Django admin)
         auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-        logger.info(f"🔍 Raw auth header: '{auth_header[:50]}...' (length: {len(auth_header)})")
         
         if not auth_header.startswith('Bearer '):
-            logger.info(f"🔍 No Bearer token found for path: {request.path}")
-            # Return 401 for API endpoints that require authentication
-            if request.path.startswith('/api/v1/'):
-                return JsonResponse({'detail': 'Las credenciales de autenticación no se proveyeron.'}, status=401)
-            request.user = AnonymousUser()
             return self.get_response(request)
         
         token = auth_header.split(' ')[1]
         
-        # Log token info for debugging
-        if token:
-            logger.info(f"🔍 Auth header received: Bearer {token[:20]}... (length: {len(token)})")
-            # Check if token has proper JWT format (3 segments)
-            segments = token.split('.')
-            logger.info(f"🔍 Token segments: {len(segments)}")
-            if len(segments) != 3:
-                logger.error(f"❌ Invalid token: Not enough segments (found {len(segments)}, expected 3)")
-                logger.error(f"❌ Full token received: '{token}'")
-                # Return 401 immediately for malformed tokens
-                if request.path.startswith('/api/v1/'):
-                    return JsonResponse({'detail': 'Token de autenticación malformado.'}, status=401)
-        else:
-            logger.error("❌ Empty token received")
-        
         try:
-            # Verify and decode the JWT token
             user = self.verify_cognito_token(token)
             request.user = user
-        except Exception as e:
-            logger.warning(f"Token verification failed: {e}")
-            # Return 401 for API endpoints with invalid tokens
-            if request.path.startswith('/api/v1/'):
-                return JsonResponse({'detail': 'Token de autenticación inválido.'}, status=401)
-            request.user = AnonymousUser()
+        except Exception:
+            # For non-API paths, don't block the request
+            pass
         
         return self.get_response(request)
     

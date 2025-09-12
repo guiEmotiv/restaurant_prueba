@@ -81,6 +81,13 @@ class Recipe(models.Model):
         blank=True,
         help_text="Envase recomendado para pedidos para llevar"
     )
+    printer = models.ForeignKey(
+        'operation.PrinterConfig',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Impresora asignada para esta receta"
+    )
     name = models.CharField(max_length=100)
     version = models.CharField(
         max_length=10, 

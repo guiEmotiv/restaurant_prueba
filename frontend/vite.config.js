@@ -1,5 +1,6 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { resolve } from 'path'
 
 // Plugin to inject build time
 const injectBuildTime = () => {
@@ -12,8 +13,14 @@ const injectBuildTime = () => {
 };
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Cargar variables desde la raíz del proyecto
+  const env = loadEnv(mode, resolve(__dirname, '..'), '');
+  
+  return {
   plugins: [react(), injectBuildTime()],
+  envDir: resolve(__dirname, '..'), // Buscar .env en la raíz
+  envPrefix: ['VITE_'], // Solo cargar variables que empiecen con VITE_
   server: {
     port: 5173,
     strictPort: true,
@@ -63,4 +70,5 @@ export default defineConfig({
       }
     }
   }
-})
+  } // Cerrar return
+}) // Cerrar defineConfig

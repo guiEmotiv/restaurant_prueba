@@ -1,782 +1,427 @@
 #!/bin/bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🚀 PROFESSIONAL PRODUCTION DEPLOYMENT SCRIPT
-# Full-Stack Restaurant Web Application - Dev to Production Pipeline
-# Author: DevOps Expert | Version: 1.0 | Date: 2025-09-06
+# 🚀 PRODUCTION DEPLOYMENT ORCHESTRATOR - OPTIMIZED v2.0
+# Restaurant Web Application - Efficient & Clean Deployment
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 set -euo pipefail
-IFS=$'\n\t'
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🔧 CONFIGURATION & CONSTANTS
+# 🔧 CONFIGURATION
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly PROJECT_ROOT="$SCRIPT_DIR"
 readonly DEPLOY_ID="$(date +%Y%m%d_%H%M%S)"
-readonly LOG_FILE="./deployment_${DEPLOY_ID}.log"
+export SSH_KEY="./ubuntu_fds_key.pem"
+export PROD_SERVER="ubuntu@44.248.47.186"
+export REMOTE_DIR="/home/ubuntu/restaurant-web"
+export DOMAIN="www.xn--elfogndedonsoto-zrb.com"
 
-# Production server configuration
-readonly PROD_SERVER="ubuntu@ec2-44-248-47-186.us-west-2.compute.amazonaws.com"
-readonly SSH_KEY="./ubuntu_fds_key.pem"
-readonly REMOTE_DIR="/home/ubuntu/restaurant-web"
-readonly DOMAIN="www.xn--elfogndedonsoto-zrb.com"
+# Performance settings
+export MIN_FREE_SPACE_GB=2
+export MIN_FREE_MEMORY_MB=500
+export MAX_DOCKER_LOG_SIZE="50m"
 
-# Performance thresholds
-readonly MAX_MEMORY_USAGE=85
-readonly MAX_DISK_USAGE=90
-readonly HEALTH_CHECK_TIMEOUT=60
-readonly DEPLOYMENT_TIMEOUT=600
-
-# Colors for output
+# Colors
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
 readonly BLUE='\033[0;34m'
-readonly PURPLE='\033[0;35m'
 readonly CYAN='\033[0;36m'
-readonly BOLD='\033[1m'
 readonly NC='\033[0m'
 
+# Scripts directory
+readonly SCRIPTS_DIR="./scripts/prod"
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 📝 LOGGING SYSTEM
+# 📝 LOGGING
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-log() {
-    local level=$1; shift
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    local color=$NC
+log_info() { printf "${BLUE}[INFO]${NC} $(date '+%Y-%m-%d %H:%M:%S') - %s\n" "$*"; }
+log_success() { printf "${GREEN}[SUCCESS]${NC} $(date '+%Y-%m-%d %H:%M:%S') - %s\n" "$*"; }
+log_warning() { printf "${YELLOW}[WARNING]${NC} $(date '+%Y-%m-%d %H:%M:%S') - %s\n" "$*"; }
+log_error() { printf "${RED}[ERROR]${NC} $(date '+%Y-%m-%d %H:%M:%S') - %s\n" "$*"; exit 1; }
+log_deploy() { printf "${CYAN}[DEPLOY]${NC} $(date '+%Y-%m-%d %H:%M:%S') - %s\n" "$*"; }
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🔧 UTILITY FUNCTIONS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Clean server resources before deployment
+clean_server_resources() {
+    log_deploy "🧹 Cleaning server resources..."
     
-    case $level in
-        INFO)     color=$BLUE ;;
-        SUCCESS)  color=$GREEN ;;
-        WARNING)  color=$YELLOW ;;
-        ERROR)    color=$RED ;;
-        CRITICAL) color=$PURPLE ;;
-        DEPLOY)   color=$CYAN ;;
+    # Check current resource usage
+    log_info "Checking server resources..."
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << 'EOF'
+        export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+        echo "📊 Current Resource Usage:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # Memory info
+        echo "💾 Memory:"
+        /usr/bin/free -h | /bin/grep -E "^Mem|^Swap"
+        
+        # Disk usage
+        echo -e "\n💿 Disk Usage:"
+        /bin/df -h / | /bin/grep -v Filesystem
+        
+        # Docker disk usage
+        echo -e "\n🐳 Docker Disk Usage:"
+        /usr/bin/docker system df 2>/dev/null || echo "Docker not running"
+EOF
+    
+    # Clean Docker resources
+    log_info "Cleaning Docker resources..."
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << 'EOF'
+        export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+        set -e
+        
+        # Stop all containers gracefully
+        if [[ $(/usr/bin/docker ps -q | /usr/bin/wc -l) -gt 0 ]]; then
+            echo "Stopping running containers..."
+            /usr/bin/docker stop $(/usr/bin/docker ps -q) 2>/dev/null || true
+        fi
+        
+        # Remove stopped containers
+        echo "Removing stopped containers..."
+        /usr/bin/docker container prune -f 2>/dev/null || true
+        
+        # Remove unused images (keep last 2 versions)
+        echo "Removing old Docker images..."
+        /usr/bin/docker images | /bin/grep restaurant-web | /usr/bin/tail -n +3 | /usr/bin/awk '{print $3}' | /usr/bin/xargs -r /usr/bin/docker rmi -f 2>/dev/null || true
+        
+        # Remove dangling images
+        /usr/bin/docker image prune -f 2>/dev/null || true
+        
+        # Remove unused volumes (careful - preserves named volumes)
+        echo "Cleaning unused volumes..."
+        /usr/bin/docker volume prune -f 2>/dev/null || true
+        
+        # Remove build cache older than 24h
+        echo "Cleaning build cache..."
+        /usr/bin/docker builder prune -f --filter "until=24h" 2>/dev/null || true
+        
+        # Clean Docker logs
+        echo "Truncating Docker logs..."
+        /usr/bin/find /var/lib/docker/containers -name "*.log" -exec /usr/bin/truncate -s 0 {} \; 2>/dev/null || true
+EOF
+    
+    # Clean system resources
+    log_info "Cleaning system resources..."
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << 'EOF'
+        # Clean apt cache
+        sudo apt-get clean 2>/dev/null || true
+        sudo apt-get autoremove -y 2>/dev/null || true
+        
+        # Clean journal logs older than 2 days
+        sudo journalctl --vacuum-time=2d 2>/dev/null || true
+        
+        # Clean temp files
+        find /tmp -type f -mtime +2 -delete 2>/dev/null || true
+        
+        # Clean npm/yarn cache if exists
+        npm cache clean --force 2>/dev/null || true
+        yarn cache clean 2>/dev/null || true
+EOF
+    
+    # Verify resources after cleaning
+    log_info "Resources after cleaning:"
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << 'EOF'
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📊 Resources After Cleaning:"
+        free -h | grep "^Mem"
+        df -h / | grep -v Filesystem
+        docker system df 2>/dev/null | head -n 2 || echo "Docker cleaned"
+EOF
+    
+    # Check if we have enough resources
+    local free_space=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" \
+        "df / | tail -1 | awk '{print int(\$4/1024/1024)}'")
+    local free_memory=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" \
+        "free -m | grep '^Mem' | awk '{print \$4}'")
+    
+    if [[ $free_space -lt $MIN_FREE_SPACE_GB ]]; then
+        log_error "Insufficient disk space: ${free_space}GB (need ${MIN_FREE_SPACE_GB}GB)"
+    fi
+    
+    if [[ $free_memory -lt $MIN_FREE_MEMORY_MB ]]; then
+        log_warning "Low memory: ${free_memory}MB (recommended ${MIN_FREE_MEMORY_MB}MB)"
+    fi
+    
+    log_success "✅ Server resources cleaned successfully"
+}
+
+execute_phase() {
+    local phase_num="$1"
+    local phase_name="$2"
+    local script_path="$SCRIPTS_DIR/${phase_num}-${phase_name}.sh"
+    
+    if [[ ! -f "$script_path" ]]; then
+        log_error "Script not found: $script_path"
+    fi
+    
+    if [[ ! -x "$script_path" ]]; then
+        chmod +x "$script_path"
+    fi
+    
+    log_deploy "Executing Phase $phase_num: $phase_name"
+    
+    # Source the script to execute its function
+    source "$script_path"
+    
+    # Call the main function from the script
+    local function_name=""
+    case "$phase_name" in
+        "validate") function_name="validate_environment";;
+        "build-frontend") function_name="build_frontend";;
+        "prepare-server") function_name="prepare_server";;
+        "deploy-git") function_name="deploy_with_git";;
+        "deploy-containers") function_name="deploy_containers";;
+        "validate") function_name="validate_deployment";;
     esac
     
-    printf "${color}[%s]${NC} %s - %s\n" "$level" "$timestamp" "$*" | tee -a "$LOG_FILE"
-}
-
-log_info()     { log INFO "$@"; }
-log_success()  { log SUCCESS "$@"; }
-log_warning()  { log WARNING "$@"; }
-log_error()    { log ERROR "$@"; exit 1; }
-log_critical() { log CRITICAL "$@"; }
-log_deploy()   { log DEPLOY "$@"; }
-
-# Progress indicator
-show_progress() {
-    local task="$1"
-    local duration=${2:-3}
-    
-    printf "${CYAN}⏳ %s${NC}" "$task"
-    for i in $(seq 1 $duration); do
-        printf "."
-        sleep 1
-    done
-    printf " ${GREEN}✅${NC}\n"
-}
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🛡️ PHASE 1: ENVIRONMENT VALIDATION
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-validate_local_environment() {
-    log_deploy "🛡️  PHASE 1: Environment Validation"
-    
-    # Check required files
-    [[ -f "$SSH_KEY" ]] || log_error "SSH key not found: $SSH_KEY"
-    [[ -f "./frontend/package.json" ]] || log_error "Frontend package.json not found"
-    [[ -f "./backend/manage.py" ]] || log_error "Backend Django project not found"
-    [[ -f "./docker-compose.prod.yml" ]] || log_error "Production docker-compose not found"
-    [[ -f "./Dockerfile.prod" ]] || log_error "Production Dockerfile not found"
-    
-    # Set SSH key permissions
-    chmod 600 "$SSH_KEY"
-    
-    # Check SSH connectivity
-    log_info "Testing SSH connectivity..."
-    if ! ssh -i "$SSH_KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=no "$PROD_SERVER" 'echo "SSH connection successful"' >/dev/null 2>&1; then
-        log_error "Cannot connect to production server"
+    if [[ -n "$function_name" ]] && declare -f "$function_name" > /dev/null; then
+        "$function_name"
+    else
+        log_error "Function $function_name not found in $script_path"
     fi
-    
-    # Validate environment variables
-    [[ -f ".env" ]] && log_info "Environment file found" || log_warning "No .env file found"
-    
-    log_success "Local environment validation completed"
 }
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🏗️ PHASE 2: BUILD OPTIMIZATION
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-build_frontend() {
-    log_deploy "🏗️  PHASE 2: Production Build Process"
+check_prerequisites() {
+    log_info "🔍 Checking prerequisites..."
     
-    log_info "Building optimized frontend..."
-    cd frontend
+    # Check if scripts directory exists
+    [[ -d "$SCRIPTS_DIR" ]] || log_error "Scripts directory not found: $SCRIPTS_DIR"
     
-    # Clean previous builds
-    rm -rf dist/ node_modules/.cache/ 2>/dev/null || true
-    
-    # Verify dependencies
-    if [[ ! -d "node_modules" ]] || [[ package.json -nt node_modules ]]; then
-        log_info "Installing/updating dependencies..."
-        npm ci --production=false
-    fi
-    
-    # Production build with optimizations
-    log_info "Creating optimized production build..."
-    NODE_ENV=production \
-    VITE_DISABLE_COGNITO=false \
-    VITE_AWS_COGNITO_USER_POOL_ID=us-west-2_bdCwF60ZI \
-    VITE_AWS_COGNITO_APP_CLIENT_ID=4i9hrd7srgbqbtun09p43ncfn0 \
-    VITE_API_BASE_URL=https://${DOMAIN}/api/v1 \
-    npm run build
-    
-    # Verify build success
-    [[ -d "dist" ]] || log_error "Frontend build failed - dist directory not created"
-    [[ -f "dist/index.html" ]] || log_error "Frontend build failed - index.html not found"
-    
-    # Build size analysis
-    local build_size=$(du -sh dist/ | cut -f1)
-    log_info "Frontend build size: $build_size"
-    
-    cd ..
-    log_success "Frontend build completed successfully"
-}
-
-create_deployment_package() {
-    log_info "Creating deployment package..."
-    
-    # Create temporary deployment directory
-    local deploy_tmp="./tmp_deploy_${DEPLOY_ID}"
-    mkdir -p "$deploy_tmp"
-    
-    # Package frontend build
-    tar -czf "$deploy_tmp/frontend-dist.tar.gz" -C frontend dist/
-    
-    # Package backend files
-    tar -czf "$deploy_tmp/backend.tar.gz" \
-        --exclude='**/__pycache__' \
-        --exclude='**/*.pyc' \
-        --exclude='**/migrations/__pycache__' \
-        --exclude='*.sqlite3' \
-        backend/
-    
-    # Package configuration files
-    cp docker-compose.prod.yml Dockerfile.prod "$deploy_tmp/"
-    [[ -f ".env" ]] && cp .env "$deploy_tmp/"
-    
-    # Create deployment info
-    cat > "$deploy_tmp/deployment_info.json" << EOF
-{
-  "deploy_id": "$DEPLOY_ID",
-  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)",
-  "git_commit": "$(git rev-parse HEAD 2>/dev/null || echo 'unknown')",
-  "git_branch": "$(git branch --show-current 2>/dev/null || echo 'unknown')",
-  "build_env": "production",
-  "domain": "$DOMAIN"
-}
-EOF
-    
-    echo "$deploy_tmp"
-    log_success "Deployment package created: $deploy_tmp"
-}
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🚀 PHASE 3: SERVER PREPARATION & CLEANUP
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-prepare_production_server() {
-    log_deploy "🚀 PHASE 3: Production Server Preparation"
-    
-    log_info "Connecting to production server..."
-    
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << 'REMOTE_SCRIPT'
-        set -euo pipefail
-        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        
-        echo "🔍 Server diagnostics:"
-        echo "  Hostname: $(hostname)"
-        echo "  Uptime: $(uptime -p)"
-        echo "  Load: $(uptime | awk -F'load average:' '{print $2}')"
-        
-        # Memory and disk analysis
-        memory_usage=$(free | awk '/^Mem:/ {printf "%.0f", $3/$2 * 100}')
-        disk_usage=$(df / | awk 'NR==2 {print int($3/$2 * 100)}')
-        
-        echo "  Memory usage: ${memory_usage}%"
-        echo "  Disk usage: ${disk_usage}%"
-        
-        # Critical resource check
-        if [[ $memory_usage -gt 90 ]] || [[ $disk_usage -gt 95 ]]; then
-            echo "❌ Critical resource usage detected!"
-            exit 1
-        fi
-        
-        # Aggressive cleanup if needed
-        if [[ $memory_usage -gt 80 ]] || [[ $disk_usage -gt 85 ]]; then
-            echo "🧹 Performing aggressive cleanup..."
-            
-            # Stop current containers
-            sudo docker-compose -f /home/ubuntu/restaurant-web/docker-compose.prod.yml down 2>/dev/null || true
-            
-            # Docker system cleanup
-            sudo docker system prune -af --volumes 2>/dev/null || true
-            sudo docker volume prune -f 2>/dev/null || true
-            sudo docker network prune -f 2>/dev/null || true
-            
-            # System cleanup
-            sudo apt-get autoremove -y 2>/dev/null || true
-            sudo apt-get autoclean 2>/dev/null || true
-            sudo journalctl --vacuum-size=50M 2>/dev/null || true
-            
-            # Clean logs and temp files
-            sudo find /var/log -type f -name "*.log" -mtime +3 -delete 2>/dev/null || true
-            sudo find /tmp -type f -mtime +1 -delete 2>/dev/null || true
-            sudo rm -rf /var/tmp/docker-* /tmp/docker-* 2>/dev/null || true
-            
-            # Update resource usage
-            memory_usage=$(free | awk '/^Mem:/ {printf "%.0f", $3/$2 * 100}')
-            disk_usage=$(df / | awk 'NR==2 {print int($3/$2 * 100)}')
-            echo "  Post-cleanup Memory: ${memory_usage}%"
-            echo "  Post-cleanup Disk: ${disk_usage}%"
-        fi
-        
-        # Ensure project directory
-        mkdir -p /home/ubuntu/restaurant-web
-        cd /home/ubuntu/restaurant-web
-        
-        # Create backup of current database if exists
-        if [[ -f data/restaurant.prod.sqlite3 ]]; then
-            echo "📦 Creating database backup..."
-            mkdir -p data/backups
-            cp data/restaurant.prod.sqlite3 "data/backups/backup_$(date +%Y%m%d_%H%M%S).sqlite3"
-            # Keep only last 5 backups
-            ls -t data/backups/backup_*.sqlite3 | tail -n +6 | xargs -r rm -f
-        fi
-        
-        echo "✅ Server preparation completed"
-REMOTE_SCRIPT
-    
-    log_success "Production server prepared successfully"
-}
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 📦 PHASE 4: DEPLOYMENT TRANSFER
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-deploy_to_server() {
-    local deploy_package="$1"
-    log_deploy "📦 PHASE 4: Deployment Transfer"
-    
-    log_info "Uploading deployment package..."
-    scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "$deploy_package"/* "$PROD_SERVER:$REMOTE_DIR/"
-    
-    log_info "Extracting and configuring on server..."
-    
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << REMOTE_SCRIPT
-        set -euo pipefail
-        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        cd $REMOTE_DIR
-        
-        # Extract frontend
-        echo "📱 Deploying frontend..."
-        rm -rf frontend-dist/
-        mkdir -p frontend-dist/
-        tar -xzf frontend-dist.tar.gz -C frontend-dist/ --strip-components=1
-        
-        # Extract backend
-        echo "🔧 Deploying backend..."
-        rm -rf backend/
-        tar -xzf backend.tar.gz
-        
-        # Set proper permissions
-        sudo mkdir -p data
-        sudo chown -R ubuntu:ubuntu data/
-        chmod 755 data/
-        
-        # Ensure database directory structure
-        mkdir -p data/backups data/logs
-        
-        echo "✅ Deployment files extracted successfully"
-REMOTE_SCRIPT
-    
-    log_success "Deployment transfer completed"
-}
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🗄️ PHASE 5: DATABASE MIGRATION
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-run_migrations() {
-    log_deploy "🗄️  PHASE 5: Database Migration"
-    
-    log_info "Running Django migrations..."
-    
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << 'REMOTE_SCRIPT'
-        set -euo pipefail
-        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        cd /home/ubuntu/restaurant-web
-        
-        # Build the new image with migrations
-        echo "🐳 Building production Docker image..."
-        sudo docker build -f Dockerfile.prod -t restaurant-app:latest .
-        
-        # Run migrations in a temporary container
-        echo "🗄️  Running database migrations..."
-        sudo docker run --rm \
-            -v "$(pwd)/data:/app/data" \
-            -v "$(pwd)/.env:/app/.env" \
-            --entrypoint="" \
-            restaurant-app:latest \
-            python manage.py migrate --no-input
-        
-        # Collect static files
-        echo "📁 Collecting static files..."
-        sudo docker run --rm \
-            -v "$(pwd)/data:/app/data" \
-            -v "$(pwd)/.env:/app/.env" \
-            --entrypoint="" \
-            restaurant-app:latest \
-            python manage.py collectstatic --no-input --clear
-        
-        echo "✅ Database migration completed"
-REMOTE_SCRIPT
-    
-    log_success "Database migrations completed successfully"
-}
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🚢 PHASE 6: CONTAINER ORCHESTRATION
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-deploy_containers() {
-    log_deploy "🚢 PHASE 6: Container Orchestration"
-    
-    log_info "Starting production containers..."
-    
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << 'REMOTE_SCRIPT'
-        set -euo pipefail
-        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        cd /home/ubuntu/restaurant-web
-        
-        # Stop existing containers gracefully
-        echo "🛑 Stopping existing containers..."
-        sudo docker-compose -f docker-compose.prod.yml down --timeout 30 2>/dev/null || true
-        
-        # Remove orphaned containers
-        sudo docker ps -aq --filter "name=restaurant" | xargs -r sudo docker rm -f 2>/dev/null || true
-        
-        # Start new containers
-        echo "🚀 Starting production containers..."
-        export DOCKER_IMAGE=restaurant-app:latest
-        sudo docker-compose -f docker-compose.prod.yml up -d
-        
-        # Wait for services to start
-        echo "⏳ Waiting for services to initialize..."
-        sleep 20
-        
-        # Verify containers are running
-        if ! sudo docker ps | grep -q "restaurant"; then
-            echo "❌ Failed to start containers"
-            sudo docker-compose -f docker-compose.prod.yml logs
-            exit 1
-        fi
-        
-        echo "✅ Containers started successfully"
-REMOTE_SCRIPT
-    
-    log_success "Container orchestration completed"
-}
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🔒 PHASE 7: SSL & NGINX CONFIGURATION
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-configure_nginx() {
-    log_deploy "🔒 PHASE 7: SSL & Nginx Configuration"
-    
-    log_info "Configuring Nginx with SSL..."
-    
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << REMOTE_SCRIPT
-        set -euo pipefail
-        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-        cd /home/ubuntu/restaurant-web
-        
-        # Check SSL certificates
-        ssl_available=false
-        if [[ -d "/etc/letsencrypt/live/$DOMAIN" ]]; then
-            cert_file="/etc/letsencrypt/live/$DOMAIN/cert.pem"
-            if [[ -f "\$cert_file" ]]; then
-                days_left=\$(( (\$(date -d "\$(openssl x509 -enddate -noout -in "\$cert_file" | cut -d= -f2)" +%s) - \$(date +%s)) / 86400 ))
-                if [[ \$days_left -gt 7 ]]; then
-                    ssl_available=true
-                    echo "🔒 SSL certificate valid for \$days_left days"
-                else
-                    echo "⚠️  SSL certificate expires in \$days_left days"
-                fi
-            fi
-        fi
-        
-        # Create Nginx configuration
-        mkdir -p docker/nginx/conf.d/
-        
-        if [[ "\$ssl_available" == "true" ]]; then
-            echo "🔐 Configuring Nginx with SSL/HTTPS..."
-            cat > docker/nginx/conf.d/default.conf << 'EOF'
-# HTTPS Production Configuration
-server_tokens off;
-limit_req_zone \$binary_remote_addr zone=api:10m rate=60r/m;
-limit_req_zone \$binary_remote_addr zone=general:10m rate=200r/m;
-
-# HTTP to HTTPS redirect
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $DOMAIN xn--elfogndedonsoto-zrb.com;
-    
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-        try_files \$uri =404;
-    }
-    
-    location / {
-        return 301 https://\$server_name\$request_uri;
-    }
-}
-
-# HTTPS server
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name $DOMAIN xn--elfogndedonsoto-zrb.com;
-    
-    # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-    ssl_session_timeout 1d;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_tickets off;
-    
-    # Security headers
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    
-    client_max_body_size 10M;
-    
-    # API endpoints
-    location /api/ {
-        limit_req zone=api burst=20 nodelay;
-        proxy_pass http://app:8000/api/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_connect_timeout 60s;
-        proxy_read_timeout 300s;
-    }
-    
-    # Admin interface
-    location /admin/ {
-        proxy_pass http://app:8000/admin/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-    
-    # Static files
-    location /static/ {
-        proxy_pass http://app:8000/static/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    # Frontend
-    location / {
-        limit_req zone=general burst=50 nodelay;
-        proxy_pass http://app:8000/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_connect_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-}
-EOF
-        else
-            echo "🔓 Configuring Nginx with HTTP (SSL not available)..."
-            cat > docker/nginx/conf.d/default.conf << 'EOF'
-# HTTP Configuration (SSL not available)
-server_tokens off;
-limit_req_zone \$binary_remote_addr zone=api:10m rate=60r/m;
-limit_req_zone \$binary_remote_addr zone=general:10m rate=200r/m;
-
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $DOMAIN xn--elfogndedonsoto-zrb.com _;
-    
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    
-    client_max_body_size 10M;
-    
-    # API endpoints
-    location /api/ {
-        limit_req zone=api burst=20 nodelay;
-        proxy_pass http://app:8000/api/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-    
-    # Frontend
-    location / {
-        limit_req zone=general burst=50 nodelay;
-        proxy_pass http://app:8000/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-EOF
-        fi
-        
-        # Restart nginx with new configuration
-        echo "🔄 Reloading Nginx configuration..."
-        sudo docker-compose -f docker-compose.prod.yml restart nginx
-        sleep 10
-        
-        echo "✅ Nginx configuration completed"
-REMOTE_SCRIPT
-    
-    log_success "SSL & Nginx configuration completed"
-}
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ✅ PHASE 8: COMPREHENSIVE VALIDATION
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-validate_deployment() {
-    log_deploy "✅ PHASE 8: Comprehensive Validation"
-    
-    local failed=0
-    local total=0
-    
-    log_info "Running comprehensive health checks..."
-    
-    # Test critical endpoints
-    local endpoints=(
-        "https://$DOMAIN/"
-        "https://$DOMAIN/api/v1/health/"
-        "https://$DOMAIN/api/v1/config/units/"
-        "https://$DOMAIN/api/v1/dashboard-operativo/report/?date=$(date +%Y-%m-%d)"
-        "https://$DOMAIN/admin/"
+    # Check if all required scripts exist
+    local required_scripts=(
+        "01-validate"
+        "02-build-frontend"
+        "03-prepare-server" 
+        "04-deploy-git"
+        "05-deploy-containers"
+        "06-validate"
     )
     
-    for endpoint in "${endpoints[@]}"; do
-        ((total++))
-        local endpoint_name=$(echo "$endpoint" | sed 's/.*\/\([^/?]*\).*/\1/')
-        [[ -z "$endpoint_name" ]] && endpoint_name="homepage"
-        
-        log_info "Testing endpoint: $endpoint_name"
-        
-        if timeout 30 curl -f -s -L "$endpoint" >/dev/null 2>&1; then
-            log_success "✅ $endpoint_name - OK"
-        else
-            log_warning "❌ $endpoint_name - FAILED"
-            ((failed++))
-            
-            # Try HTTP fallback for the main endpoints
-            if [[ "$endpoint" == *"https://"* ]]; then
-                local http_endpoint="${endpoint/https:/http:}"
-                if timeout 30 curl -f -s -L "$http_endpoint" >/dev/null 2>&1; then
-                    log_warning "⚠️  $endpoint_name - HTTP fallback working"
-                    ((failed--))
-                fi
-            fi
-        fi
+    for script in "${required_scripts[@]}"; do
+        [[ -f "$SCRIPTS_DIR/$script.sh" ]] || log_error "Required script missing: $SCRIPTS_DIR/$script.sh"
     done
     
-    # Container health check
-    log_info "Validating container status..."
-    
-    local container_status=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" \
-        'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" && \
-         cd /home/ubuntu/restaurant-web && \
-         sudo docker ps --filter "name=restaurant" --format "{{.Names}}: {{.Status}}"')
-    
-    if [[ -n "$container_status" ]]; then
-        log_success "Container status:"
-        echo "$container_status" | while read -r line; do
-            log_info "  $line"
-        done
-    else
-        log_warning "❌ No containers running"
-        ((failed++))
-    fi
-    
-    # SSL certificate check
-    log_info "Checking SSL certificate..."
-    if timeout 10 openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" </dev/null >/dev/null 2>&1; then
-        local cert_info=$(echo | openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" 2>/dev/null | openssl x509 -noout -dates 2>/dev/null)
-        if [[ -n "$cert_info" ]]; then
-            log_success "✅ SSL certificate valid"
-            log_info "$cert_info"
-        fi
-    else
-        log_warning "⚠️  SSL certificate check failed (may be using HTTP)"
-    fi
-    
-    # Performance check
-    log_info "Performance validation..."
-    local response_time=$(curl -o /dev/null -s -w "%{time_total}" -L "https://$DOMAIN/" 2>/dev/null || echo "timeout")
-    
-    if [[ "$response_time" != "timeout" ]]; then
-        log_info "Homepage response time: ${response_time}s"
-        if (( $(echo "$response_time < 3.0" | bc -l) )); then
-            log_success "✅ Performance acceptable"
-        else
-            log_warning "⚠️  Slow response time: ${response_time}s"
-        fi
-    fi
-    
-    # Final validation summary
-    local success=$((total - failed))
-    log_deploy "Validation Summary:"
-    log_info "  Total checks: $total"
-    log_info "  Successful: $success"
-    log_info "  Failed: $failed"
-    
-    if [[ $failed -eq 0 ]]; then
-        log_success "🎉 All validations passed!"
-        return 0
-    elif [[ $failed -lt $((total / 2)) ]]; then
-        log_warning "⚠️  Deployment partially successful ($failed failures)"
-        return 1
-    else
-        log_error "❌ Deployment validation failed ($failed failures)"
-        return 2
-    fi
+    log_success "All prerequisites checked"
 }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🧹 CLEANUP & FINALIZATION
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-cleanup() {
-    local deploy_package="$1"
-    log_info "Cleaning up temporary files..."
-    
-    if [[ -d "$deploy_package" ]]; then
-        rm -rf "$deploy_package"
-        log_info "Removed deployment package: $deploy_package"
-    fi
-    
-    # Clean up remote temporary files
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" \
-        "cd /home/ubuntu/restaurant-web && rm -f *.tar.gz deployment_info.json" 2>/dev/null || true
-}
-
-generate_deployment_report() {
-    local status="$1"
-    local end_time=$(date '+%Y-%m-%d %H:%M:%S')
-    local duration=$(($(date +%s) - $(date -d "$(head -1 "$LOG_FILE" | awk '{print $2, $3}')" +%s) 2>/dev/null || echo 0))
-    
-    cat << EOF
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 DEPLOYMENT REPORT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📊 SUMMARY
-  Status: $status
-  Deploy ID: $DEPLOY_ID
-  Completed: $end_time
-  Duration: ${duration}s
-
-🌐 ENDPOINTS
-  Production: https://$DOMAIN/
-  API: https://$DOMAIN/api/v1/
-  Admin: https://$DOMAIN/admin/
-
-📋 DEPLOYMENT LOG
-  Full log: $LOG_FILE
-
-🔧 POST-DEPLOYMENT
-  • Monitor application logs: ssh -i $SSH_KEY $PROD_SERVER "sudo docker logs restaurant-app -f"
-  • Check resource usage: ssh -i $SSH_KEY $PROD_SERVER "free -h && df -h"
-  • View container status: ssh -i $SSH_KEY $PROD_SERVER "sudo docker ps"
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-EOF
-}
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 🎯 MAIN EXECUTION FLOW
+# 🎯 MAIN EXECUTION
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 main() {
-    local start_time=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "🚀 PRODUCTION DEPLOYMENT - OPTIMIZED v2.0"
+    echo "   Restaurant Web Application - Efficient & Clean"  
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
-    # Banner
-    cat << 'EOF'
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 PROFESSIONAL PRODUCTION DEPLOYMENT SYSTEM
-   Full-Stack Restaurant Web Application Pipeline
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-EOF
-    
-    log_deploy "Deployment started: $start_time"
+    log_deploy "Deployment started: $(date '+%Y-%m-%d %H:%M:%S')"
     log_deploy "Deploy ID: $DEPLOY_ID"
     log_deploy "Target: $DOMAIN"
+    log_deploy "Architecture: Optimized Modular (7 phases)"
     
-    # Set up cleanup trap
-    local deploy_package=""
-    trap 'cleanup "$deploy_package"' EXIT
+    # Check prerequisites
+    check_prerequisites
     
-    # Execute deployment pipeline
-    validate_local_environment
-    build_frontend
-    deploy_package=$(create_deployment_package)
-    prepare_production_server
-    deploy_to_server "$deploy_package"
-    run_migrations
-    deploy_containers
-    configure_nginx
+    # PHASE 0: Clean server resources FIRST
+    log_deploy "🧹 PHASE 0: Server Resource Cleanup"
+    clean_server_resources
     
-    # Wait for services to stabilize
-    log_info "Waiting for services to stabilize..."
-    show_progress "Service stabilization" 30
+    # Execute deployment phases
+    execute_phase "01" "validate"
+    execute_phase "02" "build-frontend"  
+    execute_phase "03" "prepare-server"
+    execute_phase "04" "deploy-git"
+    execute_phase "05" "deploy-containers"
     
-    # Validation
-    if validate_deployment; then
+    # Final validation
+    log_deploy "Starting final validation..."
+    if execute_phase "06" "validate"; then
         log_success "🎉 DEPLOYMENT SUCCESSFUL!"
-        generate_deployment_report "SUCCESS"
+        echo ""
+        echo "🌐 Application: https://$DOMAIN/"
+        echo "🔧 Admin: https://$DOMAIN/admin/"
+        echo "📊 API: https://$DOMAIN/api/v1/"
+        echo "📋 Deploy ID: $DEPLOY_ID"
+        echo ""
+        
+        # Show final resource usage
+        log_info "📊 Final Resource Status:"
+        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" \
+            "free -h | grep '^Mem' && df -h / | grep -v Filesystem && docker ps --format 'table {{.Names}}\t{{.Status}}'"
+        
         exit 0
     else
-        log_critical "⚠️  DEPLOYMENT COMPLETED WITH WARNINGS"
-        generate_deployment_report "PARTIAL_SUCCESS" 
+        log_warning "⚠️ DEPLOYMENT COMPLETED WITH WARNINGS"
+        echo "📋 Deploy ID: $DEPLOY_ID"
         exit 1
     fi
 }
 
-# Execute main function with all arguments
-main "$@"
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🎮 COMMAND LINE OPTIONS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+show_help() {
+    cat << EOF
+🚀 Production Deployment Script - Optimized v2.0
+
+USAGE:
+    $0 [OPTIONS]
+
+OPTIONS:
+    --help, -h          Show this help message
+    --phase PHASE       Execute only a specific phase (0-6)
+    --list-phases       List all available phases
+    --dry-run          Show what would be executed without running
+    --clean-only        Only clean server resources and exit
+    --skip-clean        Skip resource cleanup phase
+
+PHASES:
+    0  clean-resources    Server resource cleanup (memory, disk, docker)
+    1  validate           Environment validation
+    2  build-frontend     Frontend build process  
+    3  prepare-server     Server preparation and cleanup
+    4  deploy-git         Git deployment and file sync
+    5  deploy-containers  Docker build and deployment
+    6  validate          Post-deployment validation
+
+EXAMPLES:
+    $0                    # Full deployment with cleanup
+    $0 --clean-only       # Only clean server resources
+    $0 --skip-clean       # Deploy without cleanup
+    $0 --phase 0          # Only clean resources
+    $0 --phase 2          # Only build frontend
+    $0 --list-phases      # Show all phases
+    $0 --dry-run          # Show execution plan
+
+TARGET: $DOMAIN
+SERVER: $PROD_SERVER
+EOF
+}
+
+list_phases() {
+    echo "Available deployment phases:"
+    echo "  00-clean-resources    🧹  Server resource cleanup"
+    echo "  01-validate.sh        🛡️  Environment validation"
+    echo "  02-build-frontend.sh  🏗️  Frontend build process"  
+    echo "  03-prepare-server.sh  🚀  Server preparation"
+    echo "  04-deploy-git.sh      📦  Git deployment"
+    echo "  05-deploy-containers.sh 🐳  Docker deployment"
+    echo "  06-validate.sh        ✅  Post-deployment validation"
+}
+
+# Parse command line arguments
+SKIP_CLEAN=false
+CLEAN_ONLY=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        --phase)
+            if [[ -n "${2:-}" ]] && [[ "$2" =~ ^[0-6]$ ]]; then
+                PHASE="$2"
+                shift 2
+            else
+                log_error "Invalid phase number. Use 0-6."
+            fi
+            ;;
+        --list-phases)
+            list_phases
+            exit 0
+            ;;
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --skip-clean)
+            SKIP_CLEAN=true
+            shift
+            ;;
+        --clean-only)
+            CLEAN_ONLY=true
+            shift
+            ;;
+        *)
+            log_error "Unknown option: $1. Use --help for usage."
+            ;;
+    esac
+done
+
+# Execute based on options
+if [[ "$CLEAN_ONLY" == "true" ]]; then
+    # Only clean server resources
+    log_deploy "🧹 Running server cleanup only..."
+    check_prerequisites
+    clean_server_resources
+    log_success "✅ Server cleanup completed successfully"
+    exit 0
+elif [[ -n "${PHASE:-}" ]]; then
+    # Execute single phase
+    check_prerequisites
+    case "$PHASE" in
+        0) clean_server_resources;;
+        1) execute_phase "01" "validate";;
+        2) execute_phase "02" "build-frontend";;
+        3) execute_phase "03" "prepare-server";;
+        4) execute_phase "04" "deploy-git";;
+        5) execute_phase "05" "deploy-containers";;
+        6) execute_phase "06" "validate";;
+    esac
+elif [[ "${DRY_RUN:-false}" == "true" ]]; then
+    # Show what would be executed
+    echo "🔍 Dry run - execution plan:"
+    list_phases
+    echo ""
+    echo "Target: $DOMAIN"
+    echo "Server: $PROD_SERVER"
+    echo "Deploy ID: $DEPLOY_ID"
+    echo "Skip Clean: $SKIP_CLEAN"
+else
+    # Execute full deployment with conditional cleanup
+    if [[ "$SKIP_CLEAN" == "true" ]]; then
+        # Modified main without cleanup
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🚀 PRODUCTION DEPLOYMENT - OPTIMIZED v2.0 (No Cleanup)"
+        echo "   Restaurant Web Application - Efficient & Clean"  
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        log_deploy "Deployment started: $(date '+%Y-%m-%d %H:%M:%S')"
+        log_deploy "Deploy ID: $DEPLOY_ID"
+        log_deploy "Target: $DOMAIN"
+        log_warning "⚠️ Skipping resource cleanup phase"
+        
+        check_prerequisites
+        
+        # Execute deployment phases without cleanup
+        execute_phase "01" "validate"
+        execute_phase "02" "build-frontend"  
+        execute_phase "03" "prepare-server"
+        execute_phase "04" "deploy-git"
+        execute_phase "05" "deploy-containers"
+        
+        # Final validation
+        log_deploy "Starting final validation..."
+        if execute_phase "06" "validate"; then
+            log_success "🎉 DEPLOYMENT SUCCESSFUL!"
+            echo ""
+            echo "🌐 Application: https://$DOMAIN/"
+            echo "📋 Deploy ID: $DEPLOY_ID"
+            exit 0
+        else
+            log_warning "⚠️ DEPLOYMENT COMPLETED WITH WARNINGS"
+            exit 1
+        fi
+    else
+        # Execute full deployment with cleanup
+        main "$@"
+    fi
+fi

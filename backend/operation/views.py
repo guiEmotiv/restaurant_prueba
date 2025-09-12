@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db import transaction
 from django.core.cache import cache
@@ -12,8 +12,9 @@ from backend.cognito_permissions import (
     CognitoOrderStatusPermission,
     CognitoPaymentPermission
 )
+from backend.development_permissions import DevelopmentAwarePermission, DevelopmentAwareAdminPermission
 # Rate limiting moved to Nginx - no longer using Django decorators
-from .models import Order, OrderItem, Payment, PaymentItem, ContainerSale
+from .models import Order, OrderItem, Payment, PaymentItem, ContainerSale, PrinterConfig, PrintQueue
 from .serializers import (
     OrderSerializer, OrderDetailSerializer, OrderCreateSerializer,
     OrderItemSerializer, OrderItemCreateSerializer,
@@ -65,15 +66,32 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Override create to return full order details after creation"""
-        # Buscar pedido activo existente para la mesa
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🟦 BACKEND - OrderViewSet.create INICIADO")
+        logger.info(f"🟦 BACKEND - request.data: {request.data}")
+        
+        items_from_request = request.data.get('items', [])
+        logger.info(f"🟦 BACKEND - Items recibidos en request: {len(items_from_request)}")
+        for i, item in enumerate(items_from_request):
+            logger.info(f"  Item {i+1}: recipe={item.get('recipe')}, quantity={item.get('quantity')}, notes={item.get('notes')}")
+        
+        # Buscar pedido activo existente para la mesa - CREATED o PREPARING
         table_id = request.data.get('table')
+        logger.info(f"🟦 BACKEND - Buscando orden existente para table_id: {table_id}")
         if table_id:
+            # Buscar cualquier orden activa (CREATED o PREPARING) para permitir agregar nuevos items
+            # CREATED = orden recién creada, PREPARING = orden con items enviados a cocina
             active_order = Order.objects.filter(
                 table_id=table_id, 
-                status__in=['CREATED', 'PREPARING']  # Solo considerar órdenes realmente activas
+                status__in=['CREATED', 'PREPARING']
             ).first()
             
+            logger.info(f"🟦 BACKEND - Resultado búsqueda orden existente: {active_order}")
+            
             if active_order:
+                logger.info(f"🟦 BACKEND - Orden existente encontrada: {active_order.id}, agregando items")
                 # Si ya existe un pedido activo, agregar items a ese pedido
                 items = request.data.get('items', [])
                 if not items:
@@ -92,26 +110,48 @@ class OrderViewSet(viewsets.ModelViewSet):
                     active_order.party_size = party_size
                 active_order.save()
                 
-                # Agregar items al pedido existente
+                # Agregar items al pedido existente - crear individuales
                 for item_data in items:
-                    OrderItem.objects.create(
-                        order=active_order,
-                        recipe_id=item_data.get('recipe'),
-                        quantity=item_data.get('quantity', 1),
-                        notes=item_data.get('notes', ''),
-                        is_takeaway=item_data.get('is_takeaway', False),
-                        has_taper=item_data.get('has_taper', False),
-                        container_id=item_data.get('selected_container')
-                    )
+                    quantity = item_data.get('quantity', 1)
+                    # Crear OrderItems individuales (uno por cada cantidad)
+                    for i in range(quantity):
+                        new_item = OrderItem.objects.create(
+                            order=active_order,
+                            recipe_id=item_data.get('recipe'),
+                            quantity=1,  # Cada OrderItem tiene quantity=1
+                            notes=item_data.get('notes', ''),
+                            is_takeaway=item_data.get('is_takeaway', False),
+                            has_taper=item_data.get('has_taper', False),
+                            container_id=item_data.get('selected_container')
+                        )
+                        logger.info(f"🟦 BACKEND - OrderItem creado: ID={new_item.id}, quantity={new_item.quantity}")
+                
+                # Verificar total de items después de agregar
+                total_items = active_order.orderitem_set.count()
+                logger.info(f"🟦 BACKEND - Total items en orden {active_order.id}: {total_items}")
                 
                 # Recalcular total del pedido
                 active_order.calculate_total()
+                
+                # MANTENER el estado actual del Order al agregar nuevos items
+                # Un Order en PREPARING debe permanecer en PREPARING aunque se agreguen nuevos items CREATED
+                # Solo los nuevos items necesitan ser procesados individualmente
+                logger.info(f"🟦 BACKEND - Orden {active_order.id} mantiene estado {active_order.status} (nuevos items agregados: {new_items_count})")
+                
+                # LOG DETALLADO: Estado de la orden después de agregar items
+                logger.info(f"📊 BACKEND - ORDEN #{active_order.id} DESPUÉS DE AGREGAR ITEMS:")
+                logger.info(f"   • Estado Order: {active_order.status}")
+                logger.info(f"   • Total items: {active_order.orderitem_set.count()}")
+                all_items = active_order.orderitem_set.all()
+                for item in all_items:
+                    logger.info(f"   • Item #{item.id}: {item.recipe.name} - Estado: {item.status}")
                 
                 # Devolver el pedido actualizado con detalles completos
                 serializer = OrderDetailSerializer(active_order, context={'request': request})
                 return Response(serializer.data, status=status.HTTP_200_OK)
         
         # Si no hay pedido activo, crear uno nuevo
+        logger.info(f"🟦 BACKEND - NO hay orden existente, creando orden nueva")
         # Validación adicional antes del serializer
         items = request.data.get('items', [])
         if not items:
@@ -120,6 +160,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        logger.info(f"🟦 BACKEND - Llamando serializer para crear orden nueva")
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         order = serializer.save()
@@ -151,6 +192,103 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response(response_serializer.data)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def check_print_status(self, request, pk=None):
+        """Verificar estado de impresión y auto-actualizar items a PREPARING"""
+        order = self.get_object()
+        
+        from .models import PrintQueue
+        from django.utils import timezone
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # Obtener todos los items de la orden
+        order_items = order.orderitem_set.all()
+        status_updates = []
+        
+        for order_item in order_items:
+            # Solo procesar items CREATED
+            if order_item.status != 'CREATED':
+                status_updates.append({
+                    'item_id': order_item.id,
+                    'item_name': order_item.recipe.name,
+                    'current_status': order_item.status,
+                    'print_status': 'n/a',
+                    'action': 'no_change'
+                })
+                continue
+            
+            # Buscar trabajos de impresión para este item
+            print_jobs = PrintQueue.objects.filter(order_item=order_item).order_by('-created_at')
+            
+            if not print_jobs.exists():
+                # No hay trabajos - item no requiere impresión
+                status_updates.append({
+                    'item_id': order_item.id,
+                    'item_name': order_item.recipe.name,
+                    'current_status': order_item.status,
+                    'print_status': 'not_required',
+                    'action': 'no_print_needed'
+                })
+                continue
+            
+            latest_job = print_jobs.first()
+            
+            if latest_job.status == 'printed':
+                # Trabajo completado - solo marcar timestamp, NO cambiar estado
+                if not order_item.printed_at:
+                    order_item.printed_at = timezone.now()
+                    order_item.save()
+                
+                status_updates.append({
+                    'item_id': order_item.id,
+                    'item_name': order_item.recipe.name,
+                    'current_status': order_item.status,
+                    'print_status': 'printed',
+                    'action': 'ready_to_prepare',
+                    'print_job_id': latest_job.id
+                })
+                
+            elif latest_job.status == 'failed':
+                status_updates.append({
+                    'item_id': order_item.id,
+                    'item_name': order_item.recipe.name,
+                    'current_status': 'CREATED',
+                    'print_status': 'failed',
+                    'action': 'needs_retry',
+                    'print_job_id': latest_job.id,
+                    'error_message': latest_job.error_message
+                })
+                
+            else:  # pending, in_progress
+                status_updates.append({
+                    'item_id': order_item.id,
+                    'item_name': order_item.recipe.name,
+                    'current_status': 'CREATED',
+                    'print_status': latest_job.status,
+                    'action': 'waiting',
+                    'print_job_id': latest_job.id
+                })
+        
+        # Verificar si todos los items están en PREPARING
+        order.refresh_from_db()  # Refresh para obtener estados actualizados
+        all_preparing = all(item.status == 'PREPARING' for item in order.orderitem_set.all())
+        
+        logger.info(f"Print status check for Order #{order.id}: {len(status_updates)} items processed")
+        
+        return Response({
+            'order_id': order.id,
+            'all_preparing': all_preparing,
+            'items': status_updates,
+            'summary': {
+                'total_items': len(status_updates),
+                'preparing_count': len([u for u in status_updates if u['current_status'] == 'PREPARING']),
+                'failed_count': len([u for u in status_updates if u['print_status'] == 'failed']),
+                'pending_count': len([u for u in status_updates if u['print_status'] in ['pending', 'in_progress']])
+            }
+        })
     
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
@@ -209,11 +347,8 @@ class OrderViewSet(viewsets.ModelViewSet):
                 order_item = serializer.save()
                 order.calculate_total()
                 
-                # Si el pedido estaba en PREPARING, regresarlo a CREATED para que aparezca en cocina
-                if order.status == 'PREPARING':
-                    order.status = 'CREATED'
-                    order.save()
-                    logger.error(f"ADD_ITEM DEBUG - Order {order.id} status changed from PREPARING to CREATED")
+                # Mantener el status actual de la orden (CREATED o PREPARING)
+                # Los nuevos items se crean con status CREATED y aparecerán para ser enviados a cocina
                 
                 response_serializer = OrderItemSerializer(order_item)
                 return Response(response_serializer.data, status=status.HTTP_201_CREATED)
@@ -441,7 +576,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': f'Error procesando pago dividido: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    @action(detail=False, methods=['post'], permission_classes=[CognitoAdminOnlyPermission])
+    @action(detail=False, methods=['post'], permission_classes=[DevelopmentAwareAdminPermission])
     def reset_all(self, request):
         """Reiniciar todos los pedidos (solo para desarrollo/admin)"""
         try:
@@ -454,6 +589,9 @@ class OrderViewSet(viewsets.ModelViewSet):
             OrderItem.objects.all().delete()
             Order.objects.all().delete()
             
+            # Eliminar solo la cola de impresión, mantener configuración de impresoras
+            PrintQueue.objects.all().delete()
+            
             # Reiniciar el contador de autoincremento en SQLite
             with connection.cursor() as cursor:
                 # Usar nombres de tabla correctos (sin prefijo 'operation_')
@@ -462,14 +600,68 @@ class OrderViewSet(viewsets.ModelViewSet):
                 cursor.execute('DELETE FROM sqlite_sequence WHERE name="payment"')
                 cursor.execute('DELETE FROM sqlite_sequence WHERE name="payment_item"')  # ¡FALTABA!
                 cursor.execute('DELETE FROM sqlite_sequence WHERE name="container_sale"')
+                cursor.execute('DELETE FROM sqlite_sequence WHERE name="print_queue"')
             
             return Response({
-                'message': '✅ Todos los pedidos han sido eliminados y contadores reiniciados',
+                'message': '✅ Todos los pedidos y cola de impresión eliminados y contadores reiniciados (configuraciones de impresoras conservadas)',
                 'status': 'success'
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({
                 'error': f'Error al reiniciar pedidos: {str(e)}',
+                'status': 'error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'], permission_classes=[DevelopmentAwareAdminPermission])
+    def reset_all_tables(self, request):
+        """Reiniciar TODAS las tablas de la base de datos (solo para desarrollo/admin)"""
+        try:
+            from django.db import connection
+            from config.models import Unit, Zone, Table, Container
+            from inventory.models import Group, Ingredient, Recipe, RecipeItem
+            
+            # ADVERTENCIA: Esta operación eliminará TODOS los datos
+            # Eliminar en orden correcto para evitar problemas de foreign keys
+            
+            # 1. Eliminar datos operativos (que tienen foreign keys)
+            PaymentItem.objects.all().delete()
+            Payment.objects.all().delete()
+            ContainerSale.objects.all().delete()
+            OrderItem.objects.all().delete()
+            Order.objects.all().delete()
+            PrintQueue.objects.all().delete()
+            
+            # 2. Eliminar recetas y sus items
+            RecipeItem.objects.all().delete()
+            Recipe.objects.all().delete()
+            
+            # 3. Eliminar configuración
+            PrinterConfig.objects.all().delete()
+            Table.objects.all().delete()
+            Zone.objects.all().delete()
+            Container.objects.all().delete()
+            Ingredient.objects.all().delete()
+            Group.objects.all().delete()
+            Unit.objects.all().delete()
+            
+            # Reiniciar TODOS los contadores de autoincremento en SQLite
+            with connection.cursor() as cursor:
+                table_names = [
+                    'order', 'order_item', 'payment', 'payment_item', 'container_sale',
+                    'print_queue', 'printer_config', 'recipe', 'recipe_item',
+                    'table', 'zone', 'container', 'ingredient', 'group', 'unit'
+                ]
+                
+                for table_name in table_names:
+                    cursor.execute(f'DELETE FROM sqlite_sequence WHERE name="{table_name}"')
+            
+            return Response({
+                'message': '🚨 TODAS las tablas han sido eliminadas y contadores reiniciados - Base de datos completamente limpia',
+                'status': 'success'
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'error': f'Error al reiniciar todas las tablas: {str(e)}',
                 'status': 'error'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
@@ -522,17 +714,21 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response(response_serializer.data)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 
 
 class OrderItemViewSet(viewsets.ModelViewSet):
     queryset = OrderItem.objects.all().order_by('-created_at')
     pagination_class = None  # Deshabilitar paginación para order items
     serializer_class = OrderItemSerializer
-    permission_classes = [AllowAny]  # Acceso completo en desarrollo
+    permission_classes = [DevelopmentAwarePermission]  # ALWAYS require Cognito authentication
     
     def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
+        if self.action in ['create', 'update']:
             return OrderItemCreateSerializer
+        elif self.action == 'partial_update':
+            # Para PATCH (partial_update), usar el serializer principal que permite status
+            return OrderItemSerializer  
         return OrderItemSerializer
     
     def get_queryset(self):
@@ -549,6 +745,28 @@ class OrderItemViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(recipe_id=recipe)
             
         return queryset
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update to handle status changes properly"""
+        instance = self.get_object()
+        
+        # Check if status is being updated
+        new_status = request.data.get('status')
+        if new_status and new_status != instance.status:
+            # Use the proper update_status method instead of serializer
+            try:
+                instance.update_status(new_status, allow_automatic=True)
+                # Return the updated instance
+                serializer = self.get_serializer(instance)
+                return Response(serializer.data)
+            except Exception as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # For non-status changes, use the default partial_update
+        return super().partial_update(request, *args, **kwargs)
     
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
@@ -569,14 +787,9 @@ class OrderItemViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Cancelar el item
-        order_item.status = 'CANCELED'
+        # Cancelar el item usando el método update_status para activar _cancel_print_jobs()
         order_item.cancellation_reason = cancellation_reason
-        order_item.canceled_at = timezone.now()
-        order_item.save()
-        
-        # Invalidar cache
-        cache.delete('kitchen_board_data')
+        order_item.update_status('CANCELED')
         
         serializer = OrderItemSerializer(order_item)
         return Response(serializer.data)
@@ -605,7 +818,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
                 order_item.cancellation_reason = cancellation_reason
                 order_item.canceled_at = timezone.now()
             
-            order_item.update_status(new_status)
+            order_item.update_status(new_status, allow_automatic=True)
             
             # CRITICAL: Invalidate kitchen_board cache immediately after status update
             cache.delete('kitchen_board_data')
@@ -747,7 +960,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
 
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all().order_by('-created_at')
-    permission_classes = [CognitoPaymentPermission]  # Solo administradores pueden procesar pagos
+    permission_classes = [DevelopmentAwareAdminPermission]  # Administradores y cajeros, o acceso libre en development
     serializer_class = PaymentSerializer
     
     def create(self, request, *args, **kwargs):
@@ -1096,7 +1309,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 class ContainerSaleViewSet(viewsets.ModelViewSet):
     queryset = ContainerSale.objects.all().order_by('-created_at')
     serializer_class = ContainerSaleSerializer
-    permission_classes = [AllowAny]  # Acceso completo en desarrollo
+    permission_classes = [DevelopmentAwarePermission]  # ALWAYS require Cognito authentication
     pagination_class = None  # Deshabilitar paginación
 
 

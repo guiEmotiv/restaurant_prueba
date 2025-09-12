@@ -1,6 +1,6 @@
 /**
  * Service para manejar Server-Sent Events (SSE) en tiempo real
- * Proporciona sincronización automática entre vistas Kitchen y TableOrderEcommerce
+ * Proporciona sincronización automática entre vistas Kitchen y OrderManagement
  */
 import { useState, useEffect } from 'react';
 

@@ -1,7 +1,5 @@
-/**
- * Bluetooth Printing Utilities
- * Para impresoras térmicas con soporte Web Bluetooth API
- */
+// Bluetooth Printer Utility for Restaurant Management
+// This module provides Bluetooth connectivity for thermal printers
 
 class BluetoothPrinter {
   constructor() {
@@ -12,225 +10,251 @@ class BluetoothPrinter {
     this.isConnected = false;
   }
 
-  /**
-   * Conectar a impresora Bluetooth
-   */
+  // Check if browser supports Bluetooth
+  static isBluetoothSupported() {
+    return 'bluetooth' in navigator;
+  }
+
+  // Connect to Bluetooth printer
   async connect() {
     try {
       if (!navigator.bluetooth) {
-        throw new Error('Web Bluetooth API no está soportada en este navegador');
+        throw new Error('Bluetooth no está soportado en este navegador');
       }
 
-      
-      // Solicitar dispositivo Bluetooth (impresora térmica)
+      // Request device with printer service
       this.device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Service UUID común para impresoras
+        filters: [
+          { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }, // Generic printer service
+        ],
+        optionalServices: [
+          '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
+          '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
+          '000018f0-0000-1000-8000-00805f9b34fb', // Printer service
+        ]
       });
 
-
-      // Conectar al servidor GATT
+      // Connect to GATT server
       this.server = await this.device.gatt.connect();
-
-      // Obtener servicio de impresión
+      
+      // Get the printer service
       this.service = await this.server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-
-      // Obtener característica de escritura
+      
+      // Get the characteristic for writing
       this.characteristic = await this.service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-
+      
       this.isConnected = true;
-      return true;
-
+      return { success: true, message: 'Conectado a la impresora Bluetooth' };
+      
     } catch (error) {
       this.isConnected = false;
-      throw error;
+      throw new Error(`Error conectando a impresora: ${error.message}`);
     }
   }
 
-  /**
-   * Desconectar impresora
-   */
+  // Disconnect from printer
   async disconnect() {
     try {
       if (this.device && this.device.gatt.connected) {
         await this.device.gatt.disconnect();
       }
       this.isConnected = false;
+      return { success: true, message: 'Desconectado de la impresora' };
     } catch (error) {
-      // Error al desconectar
+      throw new Error(`Error desconectando: ${error.message}`);
     }
   }
 
-  /**
-   * Enviar datos a la impresora
-   */
-  async sendData(data) {
-    if (!this.isConnected || !this.characteristic) {
-      throw new Error('Impresora no conectada');
-    }
-
+  // Print order receipt
+  async printOrderReceipt(orderData) {
     try {
-      const encoder = new TextEncoder();
-      const dataArray = encoder.encode(data);
-      
-      // Dividir en chunks de máximo 20 bytes (limitación Bluetooth LE)
-      const chunkSize = 20;
-      for (let i = 0; i < dataArray.length; i += chunkSize) {
-        const chunk = dataArray.slice(i, i + chunkSize);
-        await this.characteristic.writeValue(chunk);
-        // Pequeña pausa entre chunks
-        await new Promise(resolve => setTimeout(resolve, 50));
+      if (!this.isConnected || !this.characteristic) {
+        throw new Error('No hay conexión con la impresora');
       }
+
+      // Generate receipt content
+      const receiptText = this.generateReceiptText(orderData);
+      
+      // Convert to bytes for thermal printer
+      const bytes = this.textToBytes(receiptText);
+      
+      // Send data to printer in chunks
+      const chunkSize = 20; // Bluetooth LE characteristic limit
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.slice(i, i + chunkSize);
+        await this.characteristic.writeValue(new Uint8Array(chunk));
+        await this.delay(50); // Small delay between chunks
+      }
+
+      return { success: true, message: 'Recibo impreso correctamente' };
       
     } catch (error) {
-      throw error;
+      throw new Error(`Error imprimiendo: ${error.message}`);
     }
   }
 
-  /**
-   * Comandos ESC/POS básicos
-   */
-  getCommands() {
-    return {
-      INIT: '\x1B\x40',           // Inicializar impresora
-      FEED_LINE: '\x0A',          // Avance de línea
-      CUT_PAPER: '\x1D\x56\x00',  // Cortar papel
-      BOLD_ON: '\x1B\x45\x01',    // Texto en negrita
-      BOLD_OFF: '\x1B\x45\x00',   // Desactivar negrita
-      CENTER: '\x1B\x61\x01',     // Centrar texto
-      LEFT: '\x1B\x61\x00',       // Alinear izquierda
-      RIGHT: '\x1B\x61\x02',      // Alinear derecha
-      SIZE_NORMAL: '\x1D\x21\x00', // Tamaño normal
-      SIZE_DOUBLE: '\x1D\x21\x11', // Tamaño doble
-    };
-  }
-
-  /**
-   * Generar recibo de orden (actualizado para pagos parciales)
-   */
-  generateOrderReceipt(orderData) {
-    const cmd = this.getCommands();
-    let receipt = '';
-
-    // Inicializar
-    receipt += cmd.INIT;
+  // Generate receipt text content
+  generateReceiptText(orderData) {
+    const width = 48; // Full width for thermal printer
+    const line = '-'.repeat(width);
+    const doubleLine = '='.repeat(width);
     
-    // Header del restaurante
-    receipt += cmd.CENTER + cmd.SIZE_DOUBLE + cmd.BOLD_ON;
-    receipt += 'RESTAURANT WEB\n';
-    receipt += cmd.SIZE_NORMAL + cmd.BOLD_OFF;
+    let receipt = '\n';
     
-    // Tipo de comprobante
-    receipt += cmd.BOLD_ON + 'COMPROBANTE DE PAGO\n' + cmd.BOLD_OFF;
-    receipt += cmd.FEED_LINE;
-
-    // Información de la orden
-    receipt += cmd.LEFT;
-    receipt += `Fecha: ${new Date().toLocaleString('es-PE')}\n`;
-    receipt += `Orden: #${orderData.id}\n`;
+    // Header
+    receipt += this.centerText('EL FOGON DE DON SOTO', width) + '\n';
+    receipt += this.centerText('RECIBO DE VENTA', width) + '\n';
+    receipt += doubleLine + '\n';
+    
+    // Order info
     receipt += `Mesa: ${orderData.table_name || orderData.table}\n`;
+    receipt += `Cliente: ${orderData.customer_name || 'Cliente'}\n`;
+    receipt += `Pedido #: ${orderData.id}\n`;
+    receipt += `Fecha: ${this.formatDate()}\n`;
+    receipt += line + '\n';
     
-    if (orderData.customer_name) {
-      receipt += `Cliente: ${orderData.customer_name}\n`;
-    }
+    // Items header with column alignment
+    receipt += this.formatColumns('ITEMS', '', '', width) + '\n';
+    receipt += line + '\n';
     
-    if (orderData.party_size) {
-      receipt += `Personas: ${orderData.party_size}\n`;
-    }
-
-    // Información del pago
-    if (orderData.payment_method) {
-      const methodNames = {
-        efectivo: 'EFECTIVO',
-        tarjeta: 'TARJETA',
-        yape: 'YAPE',
-        plin: 'PLIN',
-        transferencia: 'TRANSFERENCIA'
-      };
-      receipt += `Método: ${methodNames[orderData.payment_method] || orderData.payment_method.toUpperCase()}\n`;
-    }
-    
-    receipt += cmd.FEED_LINE;
-
-    // Separator
-    receipt += '================================\n';
-    receipt += cmd.BOLD_ON + 'ITEMS' + cmd.BOLD_OFF + '\n';
-    receipt += '================================\n';
-
-    // Items del pedido
     let total = 0;
     if (orderData.items && orderData.items.length > 0) {
       orderData.items.forEach(item => {
-        const itemTotal = parseFloat(item.total_with_container || item.total_price || 0);
-        total += itemTotal;
+        const itemName = item.recipe_name || item.recipe?.name || 'Item';
+        const itemPrice = parseFloat(item.total_with_container || item.total_price || 0);
+        const quantity = item.quantity || 1;
         
-        receipt += `${item.recipe_name}\n`;
-        receipt += `  x${item.quantity}`;
-        receipt += cmd.RIGHT + `S/ ${itemTotal.toFixed(2)}\n`;
-        receipt += cmd.LEFT;
+        // Format line with quantity, item name, and price aligned
+        const qtyText = `${quantity}x`;
+        const priceText = `S/ ${itemPrice.toFixed(2)}`;
+        const maxItemNameLength = width - qtyText.length - priceText.length - 2; // 2 spaces
+        const truncatedName = itemName.length > maxItemNameLength ? 
+          itemName.substring(0, maxItemNameLength - 3) + '...' : itemName;
         
-        if (item.notes) {
-          receipt += `  Nota: ${item.notes}\n`;
-        }
+        receipt += this.formatColumns(qtyText, truncatedName, priceText, width) + '\n';
         
-        if (item.is_takeaway) {
-          receipt += `  PARA LLEVAR\n`;
-        }
-        
-        receipt += '\n';
+        total += itemPrice;
       });
     }
-
+    
+    receipt += line + '\n';
+    
     // Total
-    receipt += '================================\n';
-    receipt += cmd.BOLD_ON + cmd.SIZE_DOUBLE;
+    receipt += this.rightAlign(`TOTAL: S/ ${total.toFixed(2)}`, width) + '\n';
+    receipt += doubleLine + '\n';
     
-    receipt += cmd.RIGHT + `TOTAL: S/ ${orderData.payment_amount ? parseFloat(orderData.payment_amount).toFixed(2) : total.toFixed(2)}\n`;
+    // Payment info
+    if (orderData.payment_method) {
+      receipt += `Método de pago: ${orderData.payment_method}\n`;
+    }
+    if (orderData.payment_amount) {
+      receipt += `Monto pagado: S/ ${orderData.payment_amount.toFixed(2)}\n`;
+    }
+    if (orderData.is_partial) {
+      receipt += '*** PAGO PARCIAL ***\n';
+    }
     
-    receipt += cmd.SIZE_NORMAL + cmd.BOLD_OFF + cmd.LEFT;
-    receipt += '================================\n';
-    receipt += cmd.FEED_LINE;
-
-    // Footer
-    receipt += cmd.CENTER;
-    receipt += 'Gracias por su visita!\n';
-    receipt += 'Vuelva pronto\n';
-    receipt += cmd.FEED_LINE + cmd.FEED_LINE;
-
-    // Cortar papel
-    receipt += cmd.CUT_PAPER;
-
+    receipt += line + '\n';
+    
+    // Footer  
+    receipt += this.centerText('Gracias por su preferencia!', width) + '\n';
+    receipt += this.centerText('Vuelva pronto', width) + '\n';
+    receipt += '\n\n';
+    
     return receipt;
   }
 
-  /**
-   * Imprimir recibo de orden
-   */
-  async printOrderReceipt(orderData) {
-    try {
-      if (!this.isConnected) {
-        await this.connect();
-      }
-
-      const receipt = this.generateOrderReceipt(orderData);
-      await this.sendData(receipt);
-      
-      return true;
-
-    } catch (error) {
-      throw error;
-    }
+  // Helper method to center text
+  centerText(text, width) {
+    const padding = Math.max(0, Math.floor((width - text.length) / 2));
+    return ' '.repeat(padding) + text;
   }
 
-  /**
-   * Verificar si el navegador soporta Bluetooth
-   */
+  // Helper method to right align text
+  rightAlign(text, width) {
+    const padding = Math.max(0, width - text.length);
+    return ' '.repeat(padding) + text;
+  }
+
+  // Helper method to format columns (quantity, item, price)
+  formatColumns(col1, col2, col3, width) {
+    const col1Len = col1.length;
+    const col3Len = col3.length;
+    const col2MaxLen = width - col1Len - col3Len - 2; // 2 spaces between columns
+    
+    const col2Trimmed = col2.length > col2MaxLen ? 
+      col2.substring(0, col2MaxLen) : col2.padEnd(col2MaxLen);
+    
+    return col1 + ' ' + col2Trimmed + ' ' + col3;
+  }
+
+  // Helper method to format date without special characters
+  formatDate() {
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const year = now.getFullYear();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  }
+
+  // Convert text to bytes for thermal printer
+  textToBytes(text) {
+    const bytes = [];
+    
+    // Initialize printer
+    bytes.push(0x1B, 0x40); // ESC @ - Initialize printer
+    
+    // Set character encoding to CP437 (extended ASCII)
+    bytes.push(0x1B, 0x74, 0x00);
+    
+    // Convert text to bytes
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charAt(i);
+      const code = char.charCodeAt(0);
+      
+      if (code <= 127) {
+        bytes.push(code);
+      } else {
+        // Handle special characters
+        switch (char) {
+          case 'ñ': bytes.push(164); break;
+          case 'Ñ': bytes.push(165); break;
+          case 'á': bytes.push(160); break;
+          case 'é': bytes.push(130); break;
+          case 'í': bytes.push(161); break;
+          case 'ó': bytes.push(162); break;
+          case 'ú': bytes.push(163); break;
+          case 'Á': bytes.push(181); break;
+          case 'É': bytes.push(144); break;
+          case 'Í': bytes.push(214); break;
+          case 'Ó': bytes.push(224); break;
+          case 'Ú': bytes.push(233); break;
+          default: bytes.push(63); // ? for unknown chars
+        }
+      }
+    }
+    
+    // Cut paper
+    bytes.push(0x1D, 0x56, 0x42, 0x00); // GS V B 0 - Partial cut
+    
+    return bytes;
+  }
+
+  // Helper delay function
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Check if Bluetooth is supported
   static isBluetoothSupported() {
     return 'bluetooth' in navigator;
   }
 }
 
-// Instancia singleton
+// Singleton instance
 let printerInstance = null;
 
 export const bluetoothPrinter = {
@@ -256,13 +280,45 @@ export const bluetoothPrinter = {
     return await printer.printOrderReceipt(orderData);
   },
 
-  isConnected() {
+  async printPaymentReceipt(receiptData) {
+    const printer = this.getInstance();
+    return await printer.printOrderReceipt(receiptData);
+  },
+
+  async printTest() {
+    const printer = this.getInstance();
+    const testData = {
+      id: 'TEST',
+      table_name: 'TEST',
+      customer_name: 'Test Customer',
+      items: [{ 
+        recipe_name: 'Test Item', 
+        quantity: 1, 
+        total_price: 10.00 
+      }],
+      payment_method: 'TEST'
+    };
+    return await printer.printOrderReceipt(testData);
+  },
+
+  get isConnected() {
     const printer = this.getInstance();
     return printer.isConnected;
   },
 
   isSupported() {
     return BluetoothPrinter.isBluetoothSupported();
+  },
+
+  isBluetoothSupported() {
+    return BluetoothPrinter.isBluetoothSupported();
+  },
+
+  getBluetoothErrorMessage() {
+    if (!this.isBluetoothSupported()) {
+      return 'Bluetooth no está disponible en este navegador';
+    }
+    return 'Error de conexión Bluetooth';
   }
 };
 

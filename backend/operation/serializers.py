@@ -238,12 +238,17 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         """
-        Crear OrderItems individuales para cada cantidad solicitada.
-        Si quantity=5, crea 5 OrderItems separados con quantity=1 cada uno.
-        Esto permite que la vista de cocina muestre cada item individualmente.
+        Crear UN OrderItem con la quantity original especificada.
+        Mantiene la quantity como está en el frontend (1 item con quantity=N).
         """
+        print(f"🔧 OrderItemCreateSerializer.create() INICIADO")
+        print(f"🔧 validated_data recibido: {validated_data}")
+        
         selected_container_id = validated_data.pop('selected_container', None)
         quantity = validated_data.pop('quantity', 1)  # Remover quantity del validated_data
+        
+        print(f"🔧 quantity extraído: {quantity}")
+        print(f"🔧 selected_container_id extraído: {selected_container_id}")
         
         # Obtener order del contexto
         order = self.context.get('order')
@@ -270,7 +275,10 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
                     "El envase seleccionado no existe o no está disponible"
                 )
         
-        # Crear OrderItems individuales (uno por cada cantidad)
+        # Crear OrderItems individuales para cada cantidad solicitada
+        print(f"🔧 CREANDO {quantity} OrderItems individuales para recipe={validated_data.get('recipe', 'Unknown')}")
+        print(f"🔧 Order: {order}, Container: {container}, Container_price: {container_price}")
+        
         created_items = []
         for i in range(quantity):
             order_item = OrderItem.objects.create(
@@ -281,23 +289,17 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
                 **validated_data
             )
             created_items.append(order_item)
+            print(f"🔧 OrderItem {i+1}/{quantity} creado: ID={order_item.id}, quantity={order_item.quantity}")
+            
+            # Calcular el precio total para este item
+            order_item.calculate_total_price()
+            
+            # Consumir ingredientes para este item
+            validated_data['recipe'].consume_ingredients()
         
-        # Retornar el primer item (para compatibilidad con la API)
-        order_item = created_items[0] if created_items else None
-        
-        # DESHABILITADO: El descuento de stock ahora se maneja automáticamente en OrderItem.save()
-        # Ya no necesitamos crear ContainerSale manualmente aquí
-        
-        # Calcular el precio total para todos los items creados
-        for item in created_items:
-            item.calculate_total_price()
-        
-        # Consumir ingredientes para todos los items creados
-        recipe = validated_data['recipe']
-        for item in created_items:
-            recipe.consume_ingredients()
-        
-        return order_item
+        print(f"🔧 OrderItemCreateSerializer.create() COMPLETADO - Creados {len(created_items)} OrderItems")
+        # Retornar el primer item (aunque se crearon varios)
+        return created_items[0] if created_items else None
 
 
 class OrderItemForCreateSerializer(serializers.ModelSerializer):

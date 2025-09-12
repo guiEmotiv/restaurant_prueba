@@ -7,7 +7,7 @@ import requests
 import json
 from django.conf import settings
 from rest_framework import authentication, exceptions
-from .cognito_auth import CognitoUser
+from .cognito_auth import CognitoUser, RPi4User
 import logging
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,12 @@ class CognitoJWTAuthentication(authentication.BaseAuthentication):
         """
         Authenticate the request and return a two-tuple of (user, token).
         """
+        # Check if RPi4 authentication was already handled by middleware
+        if hasattr(request, '_rpi4_authenticated') and request._rpi4_authenticated:
+            logger.info(f"🤖 Found RPi4 authenticated request, bypassing token authentication")
+            rpi4_user = RPi4User()
+            return (rpi4_user, 'rpi4-proxy-token')  # Return RPi4 user with dummy token
+        
         auth_header = request.META.get('HTTP_AUTHORIZATION', '')
         
         if not auth_header.startswith('Bearer '):

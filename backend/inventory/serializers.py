@@ -61,6 +61,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     group_name = serializers.SerializerMethodField()
     group = serializers.SerializerMethodField()  # Return full group object for frontend compatibility
     container_name = serializers.SerializerMethodField()
+    printer_name = serializers.SerializerMethodField()
     ingredients_count = serializers.SerializerMethodField()
     ingredients_list = serializers.SerializerMethodField()
     is_available_calculated = serializers.SerializerMethodField()
@@ -74,7 +75,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'container', 'container_id', 'container_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage', 
+            'id', 'group', 'group_name', 'container', 'container_id', 'container_name', 'printer', 'printer_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage', 
             'ingredients_cost', 'profit_amount', 'is_available', 'is_active', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'ingredients_list', 'created_at', 'updated_at'
         ]
@@ -94,6 +95,9 @@ class RecipeSerializer(serializers.ModelSerializer):
     
     def get_container_name(self, obj):
         return obj.container.name if obj.container else None
+    
+    def get_printer_name(self, obj):
+        return obj.printer.name if obj.printer else None
     
     def get_ingredients_count(self, obj):
         return obj.recipeitem_set.count()
@@ -164,6 +168,7 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     )
     group_name = serializers.SerializerMethodField()
     container_name = serializers.SerializerMethodField()
+    printer_name = serializers.SerializerMethodField()
     ingredients_count = serializers.SerializerMethodField()
     ingredients_list = serializers.SerializerMethodField()
     is_available_calculated = serializers.SerializerMethodField()
@@ -177,7 +182,7 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'container', 'container_id', 'container_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage',
+            'id', 'group', 'group_name', 'container', 'container_id', 'container_name', 'printer', 'printer_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage',
             'ingredients_cost', 'profit_amount', 'is_available', 'is_active', 'is_available_calculated',
             'preparation_time', 'ingredients_count', 'ingredients_list', 'created_at', 'updated_at', 
             'recipe_items'
@@ -235,6 +240,9 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     
     def get_container_name(self, obj):
         return obj.container.name if obj.container else None
+    
+    def get_printer_name(self, obj):
+        return obj.printer.name if obj.printer else None
     
     def get_ingredients_count(self, obj):
         return obj.recipeitem_set.count()

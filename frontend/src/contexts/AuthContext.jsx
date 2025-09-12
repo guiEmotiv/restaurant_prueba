@@ -16,13 +16,11 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  // Check if we're in development mode
-  const isDevelopmentMode = import.meta.env.VITE_DISABLE_COGNITO === 'true';
-  
-  const [user, setUser] = useState(isDevelopmentMode ? { username: 'dev-user' } : null);
-  const [userRole, setUserRole] = useState(isDevelopmentMode ? USER_ROLES.ADMIN : null);
-  const [loading, setLoading] = useState(false); // ✅ Start as false, LoginForm will handle loading
-  const [isAuthenticated, setIsAuthenticated] = useState(isDevelopmentMode);
+  // ALWAYS use AWS Cognito - no development mode bypass
+  const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Use centralized user roles
   const ROLES = USER_ROLES;
@@ -110,90 +108,84 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthState = async () => {
     try {
+      console.log('🔐 [DEBUG] AuthContext - checkAuthState iniciado');
       setLoading(true);
-      
-      // Skip Cognito authentication in development mode
-      if (isDevelopmentMode) {
-        // Development mode: Bypassing Cognito authentication
-        setUser({ username: 'dev-user' });
-        setUserRole(USER_ROLES.ADMIN);
-        setIsAuthenticated(true);
-        setLoading(false);
-        return;
-      }
       
       // Add a small delay to ensure session is fully established
       await new Promise(resolve => setTimeout(resolve, 500));
       const currentUser = await getCurrentUser();
       
       if (currentUser) {
+        console.log('✅ [DEBUG] AuthContext - usuario encontrado:', currentUser.username);
         setUser(currentUser);
         setIsAuthenticated(true);
         
         // Get user role from Cognito groups
         const role = await getUserRole(currentUser);
+        console.log('👤 [DEBUG] AuthContext - rol obtenido:', role);
         setUserRole(role);
         
       } else {
+        console.log('❌ [DEBUG] AuthContext - usuario no encontrado');
         setUser(null);
         setUserRole(null);
         setIsAuthenticated(false);
       }
     } catch (error) {
+      console.error('💥 [DEBUG] AuthContext - error en checkAuthState:', error);
       setUser(null);
       setUserRole(null);
       setIsAuthenticated(false);
     } finally {
+      console.log('🏁 [DEBUG] AuthContext - checkAuthState completado, loading=false');
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // ✅ NO ejecutar checkAuthState inmediatamente
-    // Esperar a que LoginForm/Authenticator maneje la autenticación
+    console.log('🔄 [DEBUG] AuthContext - useEffect ejecutado, configurando listeners');
     
-    // Listen for custom authentication success event
-    const handleAuthSuccess = (event) => {
-      setTimeout(() => {
+    // Solo ejecutar checkAuthState una vez al inicio
+    let hasCheckedAuth = false;
+    
+    const performInitialCheck = () => {
+      if (!hasCheckedAuth) {
+        console.log('🎯 [DEBUG] AuthContext - ejecutando checkAuthState inicial único');
+        hasCheckedAuth = true;
         checkAuthState();
-      }, 500);
+      } else {
+        console.log('⚠️ [DEBUG] AuthContext - checkAuthState saltado, ya ejecutado');
+      }
     };
     
-    window.addEventListener('cognitoAuthSuccess', handleAuthSuccess);
+    // Ejecutar check inicial después de un delay mínimo
+    const initialTimeout = setTimeout(performInitialCheck, 1000);
     
-    // EMERGENCY FIX: También ejecutar checkAuthState después de un delay
-    // en caso de que el evento se pierda
-    setTimeout(() => {
-      checkAuthState();
-    }, 2000);
-    
-    // Listen for authentication events from Hub
+    // Listen for authentication events from Hub (sin múltiples checkAuthState)
     const hubListenerCancel = Hub.listen('auth', ({ payload }) => {
+      console.log('📡 [DEBUG] AuthContext - Hub event recibido:', payload.event);
+      
       switch (payload.event) {
-        case 'signInWithRedirect':
-        case 'signedIn':
-          setTimeout(() => {
-            checkAuthState();
-          }, 1000);
-          break;
         case 'signedOut':
+          console.log('👋 [DEBUG] AuthContext - usuario deslogueado');
           setUser(null);
           setUserRole(null);
           setIsAuthenticated(false);
           setLoading(false);
           break;
         case 'tokenRefresh':
-          setTimeout(() => {
-            checkAuthState();
-          }, 500);
+          console.log('🔄 [DEBUG] AuthContext - token refreshed, pero NO ejecutar checkAuthState');
+          // No ejecutar checkAuthState en token refresh para evitar bucles
           break;
         default:
+          console.log('ℹ️ [DEBUG] AuthContext - evento Hub ignorado:', payload.event);
           break;
       }
     });
 
     return () => {
-      window.removeEventListener('cognitoAuthSuccess', handleAuthSuccess);
+      console.log('🧹 [DEBUG] AuthContext - limpiando listeners');
+      clearTimeout(initialTimeout);
       hubListenerCancel();
     };
   }, []);

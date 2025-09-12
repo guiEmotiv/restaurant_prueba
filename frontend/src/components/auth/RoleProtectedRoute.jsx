@@ -5,6 +5,15 @@ import { useAuth } from '../../contexts/AuthContext';
 const RoleProtectedRoute = ({ children, requiredPermission }) => {
   const navigate = useNavigate();
   const { hasPermission, getDefaultRoute, loading, isAuthenticated } = useAuth();
+  
+  // 🔍 DEBUG: Log estado del auth
+  console.log('🔐 [DEBUG] RoleProtectedRoute render:', {
+    requiredPermission,
+    loading,
+    isAuthenticated,
+    hasPermission: hasPermission ? hasPermission(requiredPermission) : null,
+    timestamp: new Date().toISOString()
+  });
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -23,6 +32,7 @@ const RoleProtectedRoute = ({ children, requiredPermission }) => {
 
   // Show loading while checking permissions
   if (loading) {
+    console.log('⏳ [DEBUG] RoleProtectedRoute - mostrando loading');
     return (
       <div className="flex items-center justify-center min-h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -32,6 +42,7 @@ const RoleProtectedRoute = ({ children, requiredPermission }) => {
 
   // If user doesn't have permission, show nothing (redirect is in progress)
   if (requiredPermission && !hasPermission(requiredPermission)) {
+    console.log('🚫 [DEBUG] RoleProtectedRoute - sin permisos, redirigiendo');
     return (
       <div className="flex items-center justify-center min-h-64">
         <div className="text-gray-600">Redirigiendo...</div>
@@ -40,6 +51,7 @@ const RoleProtectedRoute = ({ children, requiredPermission }) => {
   }
 
   // User has permission, render the component
+  console.log('✅ [DEBUG] RoleProtectedRoute - renderizando children');
   return children;
 };
 

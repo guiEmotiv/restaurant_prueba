@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { apiService } from '../../services/api';
-import { bluetoothPrinter } from '../../utils/bluetooth';
+import { bluetoothPrinter } from '../../utils/bluetooth.js';
 import { ArrowLeft, Home, CreditCard, Clock, Users } from 'lucide-react';
 
 const CashierPayment = () => {
@@ -18,7 +18,7 @@ const CashierPayment = () => {
   const [paymentMethod, setPaymentMethod] = useState('efectivo');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [selectedItems, setSelectedItems] = useState([]);
-  const [enablePrinting, setEnablePrinting] = useState(true);
+  const [enablePrinting, setEnablePrinting] = useState(false);
 
   // Cargar pedidos en estado SERVED
   const loadServedOrders = useCallback(async () => {
@@ -130,12 +130,20 @@ const CashierPayment = () => {
           
         } catch (printError) {
           console.error('❌ Error imprimiendo recibo:', printError);
-          printResult = { success: false, error: printError.message };
+          console.error('❌ Error details:', {
+            message: printError.message,
+            stack: printError.stack,
+            name: printError.name,
+            cause: printError.cause
+          });
+          
+          const errorMessage = printError.message || 'Error desconocido de impresión';
+          printResult = { success: false, error: errorMessage };
           
           // Preguntar al usuario si continuar sin impresión
           const continueWithoutPrint = confirm(
             '❌ Error al imprimir recibo. ¿Continuar con el pago sin imprimir?\n\n' +
-            `Error: ${printError.message}`
+            `Error: ${errorMessage}`
           );
           
           if (!continueWithoutPrint) {
@@ -600,11 +608,36 @@ const CashierPayment = () => {
                   <input
                     type="checkbox"
                     checked={enablePrinting}
-                    onChange={(e) => setEnablePrinting(e.target.checked)}
+                    onChange={async (e) => {
+                      const checked = e.target.checked;
+                      setEnablePrinting(checked);
+                      
+                      if (checked) {
+                        // Conectar automáticamente cuando se marca
+                        try {
+                          console.log('🖨️ Conectando impresora automáticamente...');
+                          const result = await bluetoothPrinter.connect();
+                          console.log('✅ Resultado conexión:', result);
+                          showToast('🖨️ Impresora conectada', 'success');
+                        } catch (error) {
+                          console.error('❌ Error conectando impresora:', error);
+                          showToast(`❌ ${error.message}`, 'error');
+                          setEnablePrinting(false); // Desmarcar si falla
+                        }
+                      } else {
+                        // Desconectar cuando se desmarca
+                        try {
+                          await bluetoothPrinter.disconnect();
+                          showToast('🖨️ Impresora desconectada', 'info');
+                        } catch (error) {
+                          console.error('❌ Error desconectando:', error);
+                        }
+                      }
+                    }}
                     className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                   />
                   <span className="text-base font-medium text-gray-700">
-                    Imprimir recibo
+                    Conectar impresora e imprimir recibo
                   </span>
                 </label>
               </div>

@@ -180,7 +180,7 @@ terraform.tfvars
 
 # Docker secrets
 docker-compose.override.yml
-docker-compose.prod.yml
+docker-compose.production.yml
 .dockerignore
 
 # Backup and sensitive data
