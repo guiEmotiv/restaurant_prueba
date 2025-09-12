@@ -220,40 +220,20 @@ echo "Opciones: SKIP_CLEANUP=$SKIP_CLEANUP, SKIP_SSL=$SKIP_SSL" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
 # ═══════════════════════════════════════════════════════════════════════════════════════
-# 🎯 EJECUCIÓN DE SCRIPTS DE DEPLOYMENT
+# 🚀 DEPLOYMENT ULTRA-PRÁCTICO
 # ═══════════════════════════════════════════════════════════════════════════════════════
 
-# Paso 1: Limpieza del sistema (opcional)
-if [ "$SKIP_CLEANUP" = false ]; then
-    print_header "PASO 1: LIMPIEZA DEL SISTEMA"
-    execute_script "01-cleanup-system.sh"
+print_header "EJECUTANDO DEPLOYMENT ULTRA"
+print_step "🎯" "Usando script optimizado para primer deploy"
+
+# Ejecutar el script ultra-optimizado
+if bash "${PROJECT_DIR}/scripts/prod/deploy-ultra.sh" 2>&1 | tee -a "$LOG_FILE"; then
+    print_success "Deployment ultra completado exitosamente"
 else
-    print_step "⏭️ " "Omitiendo limpieza del sistema (--skip-cleanup)"
+    print_error "Deployment ultra falló"
+    echo "Ver logs en: $LOG_FILE"
+    exit 1
 fi
-
-# Paso 2: Instalación de dependencias
-print_header "PASO 2: INSTALACIÓN DE DEPENDENCIAS"
-execute_script "02-install-dependencies.sh"
-
-# Paso 3: Configuración de base de datos
-print_header "PASO 3: CONFIGURACIÓN DE BASE DE DATOS"
-execute_script "03-setup-database.sh"
-
-# Paso 4: Build del frontend
-print_header "PASO 4: BUILD DEL FRONTEND"
-execute_script "04-build-frontend.sh"
-
-# Paso 5: Configuración SSL y dominio (opcional)
-if [ "$SKIP_SSL" = false ]; then
-    print_header "PASO 5: CONFIGURACIÓN SSL Y DOMINIO"
-    execute_script "05-setup-ssl-domain.sh"
-else
-    print_step "⏭️ " "Omitiendo configuración SSL (--skip-ssl)"
-fi
-
-# Paso 6: Inicio de servicios
-print_header "PASO 6: INICIO DE SERVICIOS"
-execute_script "06-start-services.sh"
 
 # ═══════════════════════════════════════════════════════════════════════════════════════
 # 🎉 FINALIZACIÓN Y RESUMEN
