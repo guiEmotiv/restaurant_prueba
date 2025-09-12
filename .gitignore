@@ -29,11 +29,11 @@ media/
 
 # Environment variables and sensitive files (ALLOW development .env)
 .env.local
-.env.production
 .env.prod
 .env.*
 !.env
 !.env.development
+!.env.production
 !.env.example
 !.env.*.example
 !.env.credentials.example
@@ -41,7 +41,6 @@ media/
 .env.development.local
 .env.test.local
 .env.production.local
-.env.production
 .env.sqlite
 .env.safe-template
 
@@ -140,7 +139,6 @@ deploy/aws-credentials-*.env
 
 # Production Environment Files
 .env.ec2
-.env.production
 .env.prod
 **/production.env
 
@@ -180,7 +178,6 @@ terraform.tfvars
 
 # Docker secrets
 docker-compose.override.yml
-docker-compose.production.yml
 .dockerignore
 
 # Backup and sensitive data
