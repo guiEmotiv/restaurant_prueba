@@ -82,12 +82,22 @@ class PrintQueueViewSet(viewsets.ModelViewSet):
             'jobs': serializer.data
         })
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[])
     def poll(self, request):
         """Endpoint de polling para RPi4 - obtiene y marca trabajos automáticamente"""
         # Autenticación simple por token (en producción)
         auth_header = request.headers.get('Authorization', '')
-        expected_token = f"Bearer {os.getenv('PRINTER_SECRET', 'dev-token')}"
+        printer_secret = os.getenv('PRINTER_SECRET', 'dev-token')
+        expected_token = f"Bearer {printer_secret}"
+        
+        # Debug temporal
+        if request.GET.get('debug') == '1':
+            return Response({
+                'auth_header_received': auth_header,
+                'printer_secret_env': printer_secret,
+                'expected_token': expected_token,
+                'match': auth_header == expected_token
+            })
         
         if not auth_header == expected_token:
             return Response({

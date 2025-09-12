@@ -13,11 +13,13 @@ services:
     environment:
       - ENVIRONMENT=production
       - DJANGO_SETTINGS_MODULE=backend.settings
+      - PRINTER_SECRET=restaurant-elfogon-2024-x9k2m7p4
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - restaurant-data:/app/data
       - restaurant-staticfiles:/app/staticfiles
+      - restaurant-frontend:/app/frontend/dist
       - restaurant-logs:/app/logs
     networks:
       - restaurant-network
@@ -46,6 +48,7 @@ services:
     volumes:
       - ./docker/nginx/conf.d:/etc/nginx/conf.d
       - restaurant-staticfiles:/var/www/static
+      - restaurant-frontend:/usr/share/nginx/html
       - ./docker/nginx/ssl:/etc/nginx/ssl
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
@@ -69,6 +72,9 @@ volumes:
       device: /home/ubuntu/restaurant-web/data
 
   restaurant-staticfiles:
+    driver: local
+
+  restaurant-frontend:
     driver: local
 
   restaurant-logs:
