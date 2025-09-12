@@ -147,6 +147,13 @@ build_backend() {
     echo '📦 Installing Python dependencies...'
     cd backend
     
+    # Create required directories for Django
+    echo '📁 Creating required directories...'
+    mkdir -p data/logs
+    mkdir -p ../data
+    mkdir -p staticfiles
+    mkdir -p media
+    
     # Create virtual environment if it doesn't exist
     if [[ ! -d venv ]]; then
         python3 -m venv venv
