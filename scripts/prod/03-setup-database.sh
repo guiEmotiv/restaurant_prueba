@@ -6,7 +6,7 @@
 
 set -e
 
-PROJECT_DIR="/home/ubuntu/restaurant-web"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 echo "🗄️  CONFIGURANDO BASE DE DATOS DE PRODUCCIÓN"
 echo "============================================"

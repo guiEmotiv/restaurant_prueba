@@ -17,7 +17,7 @@ set -e
 # ═══════════════════════════════════════════════════════════════════════════════════════
 
 PROJECT_NAME="Restaurant Web"
-PROJECT_DIR="/home/ubuntu/restaurant-web"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DOMAIN="www.xn--elfogndedonsoto-zrb.com"
 LOG_FILE="/tmp/restaurant-deployment-$(date +%Y%m%d_%H%M%S).log"
 
@@ -111,7 +111,7 @@ OPCIONES:
 
 REQUISITOS PREVIOS:
   1. Estar en el servidor EC2 de producción
-  2. Tener los archivos del proyecto en /home/ubuntu/restaurant-web
+  2. Estar en el directorio raíz del proyecto restaurant-web
   3. Archivo .env.production configurado
   4. DNS apuntando a la IP del servidor
 
@@ -191,10 +191,9 @@ if [ ! -d "$PROJECT_DIR" ]; then
     print_error "Directorio del proyecto no encontrado: $PROJECT_DIR"
     echo ""
     echo "🛠️  Pasos para solucionar:"
-    echo "1. cd /home/ubuntu"
-    echo "2. git clone [tu-repositorio] restaurant-web"
-    echo "3. cd restaurant-web"
-    echo "4. ./scripts/prod/deploy-production.sh"
+    echo "1. Asegúrate de estar en el directorio del proyecto"
+    echo "2. cd /path/to/restaurant-web"
+    echo "3. ./scripts/prod/deploy-production.sh"
     exit 1
 fi
 

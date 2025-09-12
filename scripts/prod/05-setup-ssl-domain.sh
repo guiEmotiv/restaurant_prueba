@@ -6,7 +6,7 @@
 
 set -e
 
-PROJECT_DIR="/home/ubuntu/restaurant-web"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DOMAIN="xn--elfogndedonsoto-zrb.com"
 WWW_DOMAIN="www.xn--elfogndedonsoto-zrb.com"
 EMAIL="admin@restaurant.com"
@@ -103,7 +103,7 @@ echo "✅ Certificados SSL obtenidos correctamente"
 
 # Crear configuración Nginx de producción con SSL
 echo "🔧 Configurando Nginx con SSL..."
-sudo tee /etc/nginx/sites-available/restaurant-ssl > /dev/null << 'EOF'
+sudo tee /etc/nginx/sites-available/restaurant-ssl > /dev/null << EOF
 # HTTP server (redirects to HTTPS)
 server {
     listen 80;
@@ -180,7 +180,7 @@ server {
     }
 
     # Frontend - serve React build files
-    root /home/ubuntu/restaurant-web/frontend/dist;
+    root $PROJECT_DIR/frontend/dist;
     index index.html;
     
     # Serve static files with caching

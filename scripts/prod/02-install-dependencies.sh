@@ -113,8 +113,9 @@ sudo ufw status
 # Crear directorios necesarios
 echo "📁 Creando estructura de directorios..."
 sudo mkdir -p /var/www/certbot
-sudo mkdir -p /home/ubuntu/restaurant-web/logs
-sudo chown -R ubuntu:ubuntu /home/ubuntu/restaurant-web
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+sudo mkdir -p "$PROJECT_DIR/logs"
+sudo chown -R $USER:$USER "$PROJECT_DIR"
 
 # Verificar instalaciones
 echo ""

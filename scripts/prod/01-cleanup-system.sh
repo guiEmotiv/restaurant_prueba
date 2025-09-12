@@ -52,8 +52,9 @@ sudo rm -rf ~/.cache/*
 
 # Limpiar builds anteriores del proyecto
 echo "🏗️  Limpiando builds anteriores..."
-if [ -d "/home/ubuntu/restaurant-web" ]; then
-    cd /home/ubuntu/restaurant-web
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+if [ -d "$PROJECT_DIR" ]; then
+    cd "$PROJECT_DIR"
     
     # Limpiar frontend
     if [ -d "frontend/node_modules" ]; then
