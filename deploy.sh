@@ -21,9 +21,8 @@ log_error() { printf "${RED}[ERROR]${NC} %s\n" "$*"; exit 1; }
 # Configuration
 ENVIRONMENT=${1:-production}
 ENV_FILE=".env.$ENVIRONMENT"
-SSH_KEY="ubuntu_fds_key.pem"
-PROD_HOST="ubuntu@44.248.47.186"
-PROD_PATH="/home/ubuntu/restaurant-web"
+
+log_info "🖥️  Running deployment directly on EC2 server"
 
 # Validate environment file
 [[ ! -f "$ENV_FILE" ]] && log_error "Environment file $ENV_FILE not found!"
@@ -44,47 +43,45 @@ clean_server_resources() {
     
     log_info "🧹 Cleaning EC2 memory and disk resources..."
     
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
-        echo '📊 Current Resource Usage BEFORE cleanup:'
-        echo '=========================================='
-        df -h / | grep -v Filesystem
-        free -h | grep '^Mem'
-        echo ''
-        
-        echo '🐳 Cleaning Docker resources...'
-        # Stop containers gracefully
-        sudo docker stop \$(sudo docker ps -q) 2>/dev/null || echo 'No containers to stop'
-        
-        # Aggressive Docker cleanup
-        sudo docker system prune -a -f --volumes 2>/dev/null || true
-        sudo docker image prune -a -f 2>/dev/null || true
-        sudo docker volume prune -f 2>/dev/null || true
-        sudo docker builder prune -a -f 2>/dev/null || true
-        
-        echo '🗑️  Cleaning system resources...'
-        # Clean APT cache
-        sudo apt-get clean 2>/dev/null || true
-        sudo apt-get autoremove -y 2>/dev/null || true
-        sudo apt-get autoclean 2>/dev/null || true
-        
-        # Clean system logs
-        sudo journalctl --vacuum-time=1d 2>/dev/null || true
-        sudo find /var/log -type f -name '*.log' -exec truncate -s 0 {} \\; 2>/dev/null || true
-        
-        # Clean temp files
-        sudo find /tmp -type f -mtime +1 -delete 2>/dev/null || true
-        sudo find /var/tmp -type f -mtime +1 -delete 2>/dev/null || true
-        
-        # Clear memory cache
-        sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
-        
-        echo ''
-        echo '📊 Resource Usage AFTER cleanup:'
-        echo '================================='
-        df -h / | grep -v Filesystem
-        free -h | grep '^Mem'
-        echo ''
-    "
+    echo '📊 Current Resource Usage BEFORE cleanup:'
+    echo '=========================================='
+    df -h / | grep -v Filesystem
+    free -h | grep '^Mem'
+    echo ''
+    
+    echo '🐳 Cleaning Docker resources...'
+    # Stop containers gracefully
+    docker stop $(docker ps -q) 2>/dev/null || echo 'No containers to stop'
+    
+    # Aggressive Docker cleanup
+    docker system prune -a -f --volumes 2>/dev/null || true
+    docker image prune -a -f 2>/dev/null || true
+    docker volume prune -f 2>/dev/null || true
+    docker builder prune -a -f 2>/dev/null || true
+    
+    echo '🗑️  Cleaning system resources...'
+    # Clean APT cache
+    apt-get clean 2>/dev/null || true
+    apt-get autoremove -y 2>/dev/null || true
+    apt-get autoclean 2>/dev/null || true
+    
+    # Clean system logs
+    journalctl --vacuum-time=1d 2>/dev/null || true
+    find /var/log -type f -name '*.log' -exec truncate -s 0 {} \; 2>/dev/null || true
+    
+    # Clean temp files
+    find /tmp -type f -mtime +1 -delete 2>/dev/null || true
+    find /var/tmp -type f -mtime +1 -delete 2>/dev/null || true
+    
+    # Clear memory cache
+    sync && echo 3 > /proc/sys/vm/drop_caches
+    
+    echo ''
+    echo '📊 Resource Usage AFTER cleanup:'
+    echo '================================='
+    df -h / | grep -v Filesystem
+    free -h | grep '^Mem'
+    echo ''
     
     log_success "✅ Server resources cleaned successfully"
 }
@@ -103,37 +100,35 @@ validate_dependencies() {
     
     log_info "🔍 Validating server dependencies and libraries..."
     
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
-        echo '🔧 Checking system dependencies...'
-        
-        # Check essential tools
-        command -v git >/dev/null || { echo 'ERROR: git not installed'; exit 1; }
-        command -v curl >/dev/null || { echo 'ERROR: curl not installed'; exit 1; }
-        command -v unzip >/dev/null || { echo 'ERROR: unzip not installed'; exit 1; }
-        
-        # Check Docker
-        command -v docker >/dev/null || { echo 'ERROR: Docker not installed'; exit 1; }
-        sudo docker --version || { echo 'ERROR: Docker not accessible'; exit 1; }
-        sudo docker compose version >/dev/null 2>&1 || { echo 'ERROR: Docker Compose not available'; exit 1; }
-        
-        # Check Node.js and npm
-        command -v node >/dev/null || { echo 'ERROR: Node.js not installed'; exit 1; }
-        command -v npm >/dev/null || { echo 'ERROR: npm not installed'; exit 1; }
-        
-        # Check Python (for backend)
-        command -v python3 >/dev/null || { echo 'ERROR: Python3 not installed'; exit 1; }
-        command -v pip3 >/dev/null || { echo 'ERROR: pip3 not installed'; exit 1; }
-        
-        echo '✅ All dependencies are installed'
-        echo ''
-        echo '📋 Versions:'
-        echo \"   Git: \$(git --version | cut -d' ' -f3)\"
-        echo \"   Docker: \$(sudo docker --version | cut -d' ' -f3 | tr -d ',')\"
-        echo \"   Node.js: \$(node --version)\"
-        echo \"   npm: \$(npm --version)\"
-        echo \"   Python: \$(python3 --version | cut -d' ' -f2)\"
-        echo ''
-    " || log_error "Dependency validation failed"
+    echo '🔧 Checking system dependencies...'
+    
+    # Check essential tools
+    command -v git >/dev/null || log_error "git not installed"
+    command -v curl >/dev/null || log_error "curl not installed"
+    command -v unzip >/dev/null || log_error "unzip not installed"
+    
+    # Check Docker
+    command -v docker >/dev/null || log_error "Docker not installed"
+    docker --version || log_error "Docker not accessible"
+    docker compose version >/dev/null 2>&1 || log_error "Docker Compose not available"
+    
+    # Check Node.js and npm
+    command -v node >/dev/null || log_error "Node.js not installed"
+    command -v npm >/dev/null || log_error "npm not installed"
+    
+    # Check Python (for backend)
+    command -v python3 >/dev/null || log_error "Python3 not installed"
+    command -v pip3 >/dev/null || log_error "pip3 not installed"
+    
+    echo '✅ All dependencies are installed'
+    echo ''
+    echo '📋 Versions:'
+    echo "   Git: $(git --version | cut -d' ' -f3)"
+    echo "   Docker: $(docker --version | cut -d' ' -f3 | tr -d ',')"
+    echo "   Node.js: $(node --version)"
+    echo "   npm: $(npm --version)"
+    echo "   Python: $(python3 --version | cut -d' ' -f2)"
+    echo ''
     
     log_success "✅ All dependencies validated successfully"
 }
@@ -147,32 +142,29 @@ build_backend() {
         return 0
     fi
     
-    log_info "🏗️  Building backend on server..."
+    log_info "🏗️  Building backend..."
     
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
-        cd $PROD_PATH || exit 1
-        
-        echo '📦 Installing Python dependencies...'
-        cd backend
-        
-        # Create virtual environment if it doesn't exist
-        if [[ ! -d venv ]]; then
-            python3 -m venv venv
-        fi
-        
-        # Activate virtual environment and install dependencies
-        source venv/bin/activate
-        pip install --upgrade pip
-        pip install -r requirements.txt
-        
-        echo '🔧 Running Django setup...'
-        # Django management commands
-        python manage.py collectstatic --noinput --clear
-        python manage.py makemigrations
-        python manage.py migrate
-        
-        # Create superuser if it doesn't exist
-        python manage.py shell -c \"
+    echo '📦 Installing Python dependencies...'
+    cd backend
+    
+    # Create virtual environment if it doesn't exist
+    if [[ ! -d venv ]]; then
+        python3 -m venv venv
+    fi
+    
+    # Activate virtual environment and install dependencies
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    
+    echo '🔧 Running Django setup...'
+    # Django management commands
+    python manage.py collectstatic --noinput --clear
+    python manage.py makemigrations
+    python manage.py migrate
+    
+    # Create superuser if it doesn't exist
+    python manage.py shell -c "
 from django.contrib.auth import get_user_model
 User = get_user_model()
 if not User.objects.filter(username='admin').exists():
@@ -180,11 +172,10 @@ if not User.objects.filter(username='admin').exists():
     print('Superuser created successfully')
 else:
     print('Superuser already exists')
-\"
-        
-        echo '✅ Backend built successfully'
-        cd ..
-    " || log_error "Backend build failed"
+"
+    
+    echo '✅ Backend built successfully'
+    cd ..
     
     log_success "✅ Backend built successfully"
 }
@@ -195,47 +186,22 @@ else:
 build_frontend() {
     log_info "🏗️  Building frontend for $ENVIRONMENT..."
     
-    if [[ "$ENVIRONMENT" == "production" ]]; then
-        # Build on server
-        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
-            cd $PROD_PATH/frontend || exit 1
-            
-            echo '📦 Installing Node.js dependencies...'
-            npm ci --production=false
-            
-            echo '🏗️  Building frontend with production environment...'
-            npm run build
-            
-            # Verify build
-            [[ ! -d dist ]] && { echo 'ERROR: Frontend build failed - no dist directory'; exit 1; }
-            [[ ! -f dist/index.html ]] && { echo 'ERROR: Frontend build failed - no index.html'; exit 1; }
-            
-            local build_size=\$(du -sh dist/ | cut -f1)
-            echo \"✅ Frontend built successfully (\$build_size)\"
-        " || log_error "Frontend build failed"
-    else
-        # Build locally for development
-        cd frontend
-        
-        # Install dependencies if needed
-        [[ ! -d "node_modules" ]] && npm ci
-        
-        # Clean previous build
-        rm -rf dist/
-        
-        # Build with environment variables loaded
-        log_info "Building with VITE_API_BASE_URL=$VITE_API_BASE_URL"
-        npm run build
-        
-        # Verify build
-        [[ ! -d "dist" ]] && log_error "Frontend build failed - no dist directory"
-        [[ ! -f "dist/index.html" ]] && log_error "Frontend build failed - no index.html"
-        
-        local build_size=$(du -sh dist/ | cut -f1)
-        log_success "Frontend built successfully ($build_size)"
-        
-        cd ..
-    fi
+    cd frontend || log_error "Frontend directory not found"
+    
+    echo '📦 Installing Node.js dependencies...'
+    npm ci --production=false
+    
+    echo '🏗️  Building frontend with production environment...'
+    npm run build
+    
+    # Verify build
+    [[ ! -d dist ]] && log_error "Frontend build failed - no dist directory"
+    [[ ! -f dist/index.html ]] && log_error "Frontend build failed - no index.html"
+    
+    local build_size=$(du -sh dist/ | cut -f1)
+    echo "✅ Frontend built successfully ($build_size)"
+    
+    cd ..
     
     log_success "✅ Frontend built successfully"
 }
@@ -251,61 +217,57 @@ configure_https_ssl() {
     
     log_info "🔒 Configuring HTTPS and SSL certificates..."
     
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
-        cd $PROD_PATH || exit 1
+    echo '🔍 Checking SSL certificate status...'
+    
+    # Check if Let's Encrypt certificates exist
+    if [[ -d /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com ]]; then
+        echo "✅ Let's Encrypt certificates found"
         
-        echo '🔍 Checking SSL certificate status...'
+        # Check certificate expiry
+        cert_expiry=$(openssl x509 -enddate -noout -in /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/cert.pem | cut -d= -f2)
+        echo "📅 Certificate expires: $cert_expiry"
         
-        # Check if Let's Encrypt certificates exist
-        if [[ -d /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com ]]; then
-            echo '✅ Let\\'s Encrypt certificates found'
-            
-            # Check certificate expiry
-            cert_expiry=\$(sudo openssl x509 -enddate -noout -in /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/cert.pem | cut -d= -f2)
-            echo \"📅 Certificate expires: \$cert_expiry\"
-            
-            # Check if certificate is expiring soon (less than 30 days)
-            if sudo openssl x509 -checkend 2592000 -noout -in /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/cert.pem; then
-                echo '✅ Certificate is valid for more than 30 days'
-            else
-                echo '⚠️  Certificate expires within 30 days, renewing...'
-                sudo certbot renew --quiet || echo 'Certificate renewal failed'
-            fi
+        # Check if certificate is expiring soon (less than 30 days)
+        if openssl x509 -checkend 2592000 -noout -in /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/cert.pem; then
+            echo '✅ Certificate is valid for more than 30 days'
         else
-            echo '⚠️  Let\\'s Encrypt certificates not found'
-            echo '🔧 Checking for self-signed certificates...'
+            echo '⚠️  Certificate expires within 30 days, renewing...'
+            certbot renew --quiet || echo 'Certificate renewal failed'
+        fi
+    else
+        echo "⚠️  Let's Encrypt certificates not found"
+        echo '🔧 Checking for self-signed certificates...'
+        
+        # Create self-signed certificate if none exists
+        if [[ ! -f docker/nginx/ssl/selfsigned.crt ]]; then
+            echo '🔧 Creating self-signed SSL certificate...'
+            mkdir -p docker/nginx/ssl
             
-            # Create self-signed certificate if none exists
-            if [[ ! -f docker/nginx/ssl/selfsigned.crt ]]; then
-                echo '🔧 Creating self-signed SSL certificate...'
-                mkdir -p docker/nginx/ssl
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout docker/nginx/ssl/selfsigned.key \
+                -out docker/nginx/ssl/selfsigned.crt \
+                -subj "/C=PE/ST=Lima/L=Lima/O=Restaurant/OU=IT Department/CN=xn--elfogndedonsoto-zrb.com"
                 
-                sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
-                    -keyout docker/nginx/ssl/selfsigned.key \\
-                    -out docker/nginx/ssl/selfsigned.crt \\
-                    -subj \"/C=PE/ST=Lima/L=Lima/O=Restaurant/OU=IT Department/CN=xn--elfogndedonsoto-zrb.com\"
-                    
-                echo '✅ Self-signed certificate created'
-            else
-                echo '✅ Self-signed certificate already exists'
-            fi
+            echo '✅ Self-signed certificate created'
+        else
+            echo '✅ Self-signed certificate already exists'
         fi
-        
-        echo '🔧 Verifying nginx SSL configuration...'
-        if [[ -f docker/nginx/conf.d/default.conf ]]; then
-            if grep -q 'ssl_certificate' docker/nginx/conf.d/default.conf; then
-                echo '✅ Nginx SSL configuration found'
-            else
-                echo '⚠️  Nginx SSL configuration missing'
-            fi
+    fi
+    
+    echo '🔧 Verifying nginx SSL configuration...'
+    if [[ -f docker/nginx/conf.d/default.conf ]]; then
+        if grep -q 'ssl_certificate' docker/nginx/conf.d/default.conf; then
+            echo '✅ Nginx SSL configuration found'
+        else
+            echo '⚠️  Nginx SSL configuration missing'
         fi
-        
-        # Set correct permissions
-        sudo chmod 644 docker/nginx/ssl/*.crt 2>/dev/null || true
-        sudo chmod 600 docker/nginx/ssl/*.key 2>/dev/null || true
-        
-        echo '✅ HTTPS/SSL configuration completed'
-    " || log_error "HTTPS/SSL configuration failed"
+    fi
+    
+    # Set correct permissions
+    chmod 644 docker/nginx/ssl/*.crt 2>/dev/null || true
+    chmod 600 docker/nginx/ssl/*.key 2>/dev/null || true
+    
+    echo '✅ HTTPS/SSL configuration completed'
     
     log_success "✅ HTTPS/SSL configured successfully"
 }
@@ -319,55 +281,33 @@ deploy_to_server() {
         return 0
     fi
     
-    log_info "📡 Deploying to production server..."
+    log_info "🚀 Deploying containers..."
     
-    # Test SSH connection first
-    log_info "Testing SSH connection..."
-    if ! ssh -i "$SSH_KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=no "$PROD_HOST" "echo 'SSH connection OK'"; then
-        log_error "Failed to connect to production server"
-    fi
+    echo '📥 Pulling latest code from repository...'
+    git pull origin main || log_error "Git pull failed"
     
-    # Copy environment file to server
-    log_info "Copying environment configuration..."
-    if ! scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$ENV_FILE" "$PROD_HOST:$PROD_PATH/.env"; then
-        log_error "Failed to copy environment file"
-    fi
+    echo '🛑 Stopping existing containers...'
+    docker compose -f docker-compose.production.yml down 2>/dev/null || true
     
-    # Copy frontend build to server
-    log_info "Copying frontend build..."
-    if ! scp -r -i "$SSH_KEY" -o StrictHostKeyChecking=no frontend/dist/* "$PROD_HOST:$PROD_PATH/frontend/dist/"; then
-        log_error "Failed to copy frontend build"
-    fi
+    echo '🧹 Cleaning up Docker resources...'
+    docker system prune -f || true
     
-    # Deploy on server
-    log_info "Executing deployment on server..."
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
-        cd $PROD_PATH || exit 1
-        
-        echo '📥 Pulling latest code from repository...'
-        git pull origin main || exit 1
-        
-        echo '🛑 Stopping existing containers...'
-        docker compose -f docker-compose.production.yml down 2>/dev/null || true
-        
-        echo '🧹 Cleaning up Docker resources...'
-        docker system prune -f || true
-        
-        echo '🚀 Starting containers with new environment...'
-        docker compose -f docker-compose.production.yml up -d --build || exit 1
-        
-        echo '⏳ Waiting for containers to start...'
-        sleep 15
-        
-        echo '📋 Checking container status...'
-        docker compose -f docker-compose.production.yml ps
-        
-        echo '🔍 Checking container logs...'
-        docker compose -f docker-compose.production.yml logs --tail=10 restaurant-web-backend || true
-        
-        echo '🩺 Testing internal health check...'
-        timeout 30 bash -c 'until curl -sf http://localhost:8000/api/v1/health/ > /dev/null; do sleep 2; done' && echo '✅ Backend is healthy' || echo '❌ Backend health check failed'
-    " || log_error "Deployment on server failed"
+    echo '🚀 Starting containers with new environment...'
+    docker compose -f docker-compose.production.yml up -d --build || log_error "Container startup failed"
+    
+    echo '⏳ Waiting for containers to start...'
+    sleep 15
+    
+    echo '📋 Checking container status...'
+    docker compose -f docker-compose.production.yml ps
+    
+    echo '🔍 Checking container logs...'
+    docker compose -f docker-compose.production.yml logs --tail=10 restaurant-web-backend || true
+    
+    echo '🩺 Testing internal health check...'
+    timeout 30 bash -c 'until curl -sf http://localhost:8000/api/v1/health/ > /dev/null; do sleep 2; done' && echo '✅ Backend is healthy' || echo '❌ Backend health check failed'
+    
+    log_success "✅ Containers deployed successfully"
 }
 
 # ─────────────────────────────────────────────────────────────────────
@@ -472,24 +412,20 @@ show_deployment_status() {
     
     log_info "📊 Getting deployment status..."
     
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
-        cd $PROD_PATH
-        
-        echo '📋 Container Status:'
-        docker compose -f docker-compose.production.yml ps
-        
-        echo ''
-        echo '📊 Resource Usage:'
-        docker stats --no-stream --format 'table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}'
-        
-        echo ''
-        echo '📝 Recent Backend Logs:'
-        docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-backend
-        
-        echo ''
-        echo '📝 Recent Nginx Logs:'
-        docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-nginx
-    "
+    echo '📋 Container Status:'
+    docker compose -f docker-compose.production.yml ps
+    
+    echo ''
+    echo '📊 Resource Usage:'
+    docker stats --no-stream --format 'table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}'
+    
+    echo ''
+    echo '📝 Recent Backend Logs:'
+    docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-backend
+    
+    echo ''
+    echo '📝 Recent Nginx Logs:'
+    docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-nginx
 }
 
 # ─────────────────────────────────────────────────────────────────────
@@ -503,58 +439,54 @@ final_docker_validation() {
     
     log_info "🐳 Running complete Docker validation..."
     
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
-        cd $PROD_PATH
-        
-        echo '🔍 Docker Container Health Check:'
-        echo '================================='
-        docker compose -f docker-compose.production.yml ps
-        
-        echo ''
-        echo '📊 Container Resource Usage:'
-        echo '============================'
-        docker stats --no-stream --format 'table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}'
-        
-        echo ''
-        echo '🏥 Container Health Status:'
-        echo '==========================='
-        for container in \$(docker compose -f docker-compose.production.yml ps --services); do
-            health_status=\$(docker inspect --format='{{.State.Health.Status}}' \${container}-prod 2>/dev/null || echo 'no-healthcheck')
-            echo \"   \$container: \$health_status\"
-        done
-        
-        echo ''
-        echo '📝 Recent Container Logs (Last 5 lines each):'
-        echo '=============================================='
-        echo '--- Backend Logs ---'
-        docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-backend 2>/dev/null || echo 'Backend logs not available'
-        
-        echo '--- Nginx Logs ---'
-        docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-nginx 2>/dev/null || echo 'Nginx logs not available'
-        
-        echo ''
-        echo '🔌 Network Connectivity Tests:'
-        echo '==============================='
-        # Test internal connectivity
-        echo 'Backend health (internal): '
-        timeout 10 curl -s http://localhost:8000/api/v1/health/ >/dev/null && echo '✅ OK' || echo '❌ FAILED'
-        
-        echo 'Nginx response (internal): '
-        timeout 10 curl -s http://localhost:80/ >/dev/null && echo '✅ OK' || echo '❌ FAILED'
-        
-        echo ''
-        echo '📊 Docker System Summary:'
-        echo '========================='
-        docker system df
-        
-        echo ''
-        echo '🔍 Volume Status:'
-        echo '================='
-        docker volume ls | grep restaurant
-        
-        echo ''
-        echo '✅ Docker validation completed'
-    " || log_warn "Some Docker validation checks failed"
+    echo '🔍 Docker Container Health Check:'
+    echo '================================='
+    docker compose -f docker-compose.production.yml ps
+    
+    echo ''
+    echo '📊 Container Resource Usage:'
+    echo '============================'
+    docker stats --no-stream --format 'table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}'
+    
+    echo ''
+    echo '🏥 Container Health Status:'
+    echo '==========================='
+    for container in $(docker compose -f docker-compose.production.yml ps --services); do
+        health_status=$(docker inspect --format='{{.State.Health.Status}}' ${container}-prod 2>/dev/null || echo 'no-healthcheck')
+        echo "   $container: $health_status"
+    done
+    
+    echo ''
+    echo '📝 Recent Container Logs (Last 5 lines each):'
+    echo '=============================================='
+    echo '--- Backend Logs ---'
+    docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-backend 2>/dev/null || echo 'Backend logs not available'
+    
+    echo '--- Nginx Logs ---'
+    docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-nginx 2>/dev/null || echo 'Nginx logs not available'
+    
+    echo ''
+    echo '🔌 Network Connectivity Tests:'
+    echo '==============================='
+    # Test internal connectivity
+    echo 'Backend health (internal): '
+    timeout 10 curl -s http://localhost:8000/api/v1/health/ >/dev/null && echo '✅ OK' || echo '❌ FAILED'
+    
+    echo 'Nginx response (internal): '
+    timeout 10 curl -s http://localhost:80/ >/dev/null && echo '✅ OK' || echo '❌ FAILED'
+    
+    echo ''
+    echo '📊 Docker System Summary:'
+    echo '========================='
+    docker system df
+    
+    echo ''
+    echo '🔍 Volume Status:'
+    echo '================='
+    docker volume ls | grep restaurant
+    
+    echo ''
+    echo '✅ Docker validation completed'
     
     log_success "✅ Docker validation completed"
 }
