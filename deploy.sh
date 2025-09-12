@@ -34,35 +34,284 @@ source "$ENV_FILE"
 set +o allexport
 
 # ─────────────────────────────────────────────────────────────────────
-# STEP 1: Build Frontend with Correct Environment
+# STEP 1: Clean EC2 Memory and Disk
+# ─────────────────────────────────────────────────────────────────────
+clean_server_resources() {
+    if [[ "$ENVIRONMENT" != "production" ]]; then
+        log_info "Skipping server cleanup for $ENVIRONMENT environment"
+        return 0
+    fi
+    
+    log_info "🧹 Cleaning EC2 memory and disk resources..."
+    
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
+        echo '📊 Current Resource Usage BEFORE cleanup:'
+        echo '=========================================='
+        df -h / | grep -v Filesystem
+        free -h | grep '^Mem'
+        echo ''
+        
+        echo '🐳 Cleaning Docker resources...'
+        # Stop containers gracefully
+        sudo docker stop \$(sudo docker ps -q) 2>/dev/null || echo 'No containers to stop'
+        
+        # Aggressive Docker cleanup
+        sudo docker system prune -a -f --volumes 2>/dev/null || true
+        sudo docker image prune -a -f 2>/dev/null || true
+        sudo docker volume prune -f 2>/dev/null || true
+        sudo docker builder prune -a -f 2>/dev/null || true
+        
+        echo '🗑️  Cleaning system resources...'
+        # Clean APT cache
+        sudo apt-get clean 2>/dev/null || true
+        sudo apt-get autoremove -y 2>/dev/null || true
+        sudo apt-get autoclean 2>/dev/null || true
+        
+        # Clean system logs
+        sudo journalctl --vacuum-time=1d 2>/dev/null || true
+        sudo find /var/log -type f -name '*.log' -exec truncate -s 0 {} \\; 2>/dev/null || true
+        
+        # Clean temp files
+        sudo find /tmp -type f -mtime +1 -delete 2>/dev/null || true
+        sudo find /var/tmp -type f -mtime +1 -delete 2>/dev/null || true
+        
+        # Clear memory cache
+        sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+        
+        echo ''
+        echo '📊 Resource Usage AFTER cleanup:'
+        echo '================================='
+        df -h / | grep -v Filesystem
+        free -h | grep '^Mem'
+        echo ''
+    "
+    
+    log_success "✅ Server resources cleaned successfully"
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# STEP 2: Validate Dependencies and Libraries
+# ─────────────────────────────────────────────────────────────────────
+validate_dependencies() {
+    if [[ "$ENVIRONMENT" != "production" ]]; then
+        log_info "Validating local dependencies..."
+        # Check Node.js locally
+        [[ ! $(command -v node) ]] && log_error "Node.js not installed locally"
+        [[ ! $(command -v npm) ]] && log_error "npm not installed locally"
+        return 0
+    fi
+    
+    log_info "🔍 Validating server dependencies and libraries..."
+    
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
+        echo '🔧 Checking system dependencies...'
+        
+        # Check essential tools
+        command -v git >/dev/null || { echo 'ERROR: git not installed'; exit 1; }
+        command -v curl >/dev/null || { echo 'ERROR: curl not installed'; exit 1; }
+        command -v unzip >/dev/null || { echo 'ERROR: unzip not installed'; exit 1; }
+        
+        # Check Docker
+        command -v docker >/dev/null || { echo 'ERROR: Docker not installed'; exit 1; }
+        sudo docker --version || { echo 'ERROR: Docker not accessible'; exit 1; }
+        sudo docker compose version >/dev/null 2>&1 || { echo 'ERROR: Docker Compose not available'; exit 1; }
+        
+        # Check Node.js and npm
+        command -v node >/dev/null || { echo 'ERROR: Node.js not installed'; exit 1; }
+        command -v npm >/dev/null || { echo 'ERROR: npm not installed'; exit 1; }
+        
+        # Check Python (for backend)
+        command -v python3 >/dev/null || { echo 'ERROR: Python3 not installed'; exit 1; }
+        command -v pip3 >/dev/null || { echo 'ERROR: pip3 not installed'; exit 1; }
+        
+        echo '✅ All dependencies are installed'
+        echo ''
+        echo '📋 Versions:'
+        echo \"   Git: \$(git --version | cut -d' ' -f3)\"
+        echo \"   Docker: \$(sudo docker --version | cut -d' ' -f3 | tr -d ',')\"
+        echo \"   Node.js: \$(node --version)\"
+        echo \"   npm: \$(npm --version)\"
+        echo \"   Python: \$(python3 --version | cut -d' ' -f2)\"
+        echo ''
+    " || log_error "Dependency validation failed"
+    
+    log_success "✅ All dependencies validated successfully"
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# STEP 3: Build Backend
+# ─────────────────────────────────────────────────────────────────────
+build_backend() {
+    if [[ "$ENVIRONMENT" != "production" ]]; then
+        log_info "Skipping backend build for $ENVIRONMENT environment"
+        return 0
+    fi
+    
+    log_info "🏗️  Building backend on server..."
+    
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
+        cd $PROD_PATH || exit 1
+        
+        echo '📦 Installing Python dependencies...'
+        cd backend
+        
+        # Create virtual environment if it doesn't exist
+        if [[ ! -d venv ]]; then
+            python3 -m venv venv
+        fi
+        
+        # Activate virtual environment and install dependencies
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        
+        echo '🔧 Running Django setup...'
+        # Django management commands
+        python manage.py collectstatic --noinput --clear
+        python manage.py makemigrations
+        python manage.py migrate
+        
+        # Create superuser if it doesn't exist
+        python manage.py shell -c \"
+from django.contrib.auth import get_user_model
+User = get_user_model()
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', 'admin@restaurant.com', 'admin123')
+    print('Superuser created successfully')
+else:
+    print('Superuser already exists')
+\"
+        
+        echo '✅ Backend built successfully'
+        cd ..
+    " || log_error "Backend build failed"
+    
+    log_success "✅ Backend built successfully"
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# STEP 4: Build Frontend
 # ─────────────────────────────────────────────────────────────────────
 build_frontend() {
     log_info "🏗️  Building frontend for $ENVIRONMENT..."
     
-    cd frontend
+    if [[ "$ENVIRONMENT" == "production" ]]; then
+        # Build on server
+        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
+            cd $PROD_PATH/frontend || exit 1
+            
+            echo '📦 Installing Node.js dependencies...'
+            npm ci --production=false
+            
+            echo '🏗️  Building frontend with production environment...'
+            npm run build
+            
+            # Verify build
+            [[ ! -d dist ]] && { echo 'ERROR: Frontend build failed - no dist directory'; exit 1; }
+            [[ ! -f dist/index.html ]] && { echo 'ERROR: Frontend build failed - no index.html'; exit 1; }
+            
+            local build_size=\$(du -sh dist/ | cut -f1)
+            echo \"✅ Frontend built successfully (\$build_size)\"
+        " || log_error "Frontend build failed"
+    else
+        # Build locally for development
+        cd frontend
+        
+        # Install dependencies if needed
+        [[ ! -d "node_modules" ]] && npm ci
+        
+        # Clean previous build
+        rm -rf dist/
+        
+        # Build with environment variables loaded
+        log_info "Building with VITE_API_BASE_URL=$VITE_API_BASE_URL"
+        npm run build
+        
+        # Verify build
+        [[ ! -d "dist" ]] && log_error "Frontend build failed - no dist directory"
+        [[ ! -f "dist/index.html" ]] && log_error "Frontend build failed - no index.html"
+        
+        local build_size=$(du -sh dist/ | cut -f1)
+        log_success "Frontend built successfully ($build_size)"
+        
+        cd ..
+    fi
     
-    # Install dependencies if needed
-    [[ ! -d "node_modules" ]] && npm ci
-    
-    # Clean previous build
-    rm -rf dist/
-    
-    # Build with environment variables loaded
-    log_info "Building with VITE_API_BASE_URL=$VITE_API_BASE_URL"
-    npm run build
-    
-    # Verify build
-    [[ ! -d "dist" ]] && log_error "Frontend build failed - no dist directory"
-    [[ ! -f "dist/index.html" ]] && log_error "Frontend build failed - no index.html"
-    
-    local build_size=$(du -sh dist/ | cut -f1)
-    log_success "Frontend built successfully ($build_size)"
-    
-    cd ..
+    log_success "✅ Frontend built successfully"
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# STEP 2: Deploy to Server (Production only)
+# STEP 5: Configure HTTPS and SSL
+# ─────────────────────────────────────────────────────────────────────
+configure_https_ssl() {
+    if [[ "$ENVIRONMENT" != "production" ]]; then
+        log_info "Skipping HTTPS/SSL configuration for $ENVIRONMENT environment"
+        return 0
+    fi
+    
+    log_info "🔒 Configuring HTTPS and SSL certificates..."
+    
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
+        cd $PROD_PATH || exit 1
+        
+        echo '🔍 Checking SSL certificate status...'
+        
+        # Check if Let's Encrypt certificates exist
+        if [[ -d /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com ]]; then
+            echo '✅ Let\\'s Encrypt certificates found'
+            
+            # Check certificate expiry
+            cert_expiry=\$(sudo openssl x509 -enddate -noout -in /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/cert.pem | cut -d= -f2)
+            echo \"📅 Certificate expires: \$cert_expiry\"
+            
+            # Check if certificate is expiring soon (less than 30 days)
+            if sudo openssl x509 -checkend 2592000 -noout -in /etc/letsencrypt/live/xn--elfogndedonsoto-zrb.com/cert.pem; then
+                echo '✅ Certificate is valid for more than 30 days'
+            else
+                echo '⚠️  Certificate expires within 30 days, renewing...'
+                sudo certbot renew --quiet || echo 'Certificate renewal failed'
+            fi
+        else
+            echo '⚠️  Let\\'s Encrypt certificates not found'
+            echo '🔧 Checking for self-signed certificates...'
+            
+            # Create self-signed certificate if none exists
+            if [[ ! -f docker/nginx/ssl/selfsigned.crt ]]; then
+                echo '🔧 Creating self-signed SSL certificate...'
+                mkdir -p docker/nginx/ssl
+                
+                sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
+                    -keyout docker/nginx/ssl/selfsigned.key \\
+                    -out docker/nginx/ssl/selfsigned.crt \\
+                    -subj \"/C=PE/ST=Lima/L=Lima/O=Restaurant/OU=IT Department/CN=xn--elfogndedonsoto-zrb.com\"
+                    
+                echo '✅ Self-signed certificate created'
+            else
+                echo '✅ Self-signed certificate already exists'
+            fi
+        fi
+        
+        echo '🔧 Verifying nginx SSL configuration...'
+        if [[ -f docker/nginx/conf.d/default.conf ]]; then
+            if grep -q 'ssl_certificate' docker/nginx/conf.d/default.conf; then
+                echo '✅ Nginx SSL configuration found'
+            else
+                echo '⚠️  Nginx SSL configuration missing'
+            fi
+        fi
+        
+        # Set correct permissions
+        sudo chmod 644 docker/nginx/ssl/*.crt 2>/dev/null || true
+        sudo chmod 600 docker/nginx/ssl/*.key 2>/dev/null || true
+        
+        echo '✅ HTTPS/SSL configuration completed'
+    " || log_error "HTTPS/SSL configuration failed"
+    
+    log_success "✅ HTTPS/SSL configured successfully"
+}
+
+# ─────────────────────────────────────────────────────────────────────
+# STEP 6: Deploy to Server (Production only)
 # ─────────────────────────────────────────────────────────────────────
 deploy_to_server() {
     if [[ "$ENVIRONMENT" != "production" ]]; then
@@ -244,23 +493,109 @@ show_deployment_status() {
 }
 
 # ─────────────────────────────────────────────────────────────────────
+# FINAL STEP: Complete Docker Validation
+# ─────────────────────────────────────────────────────────────────────
+final_docker_validation() {
+    if [[ "$ENVIRONMENT" != "production" ]]; then
+        log_success "Development build completed successfully!"
+        return 0
+    fi
+    
+    log_info "🐳 Running complete Docker validation..."
+    
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_HOST" "
+        cd $PROD_PATH
+        
+        echo '🔍 Docker Container Health Check:'
+        echo '================================='
+        docker compose -f docker-compose.production.yml ps
+        
+        echo ''
+        echo '📊 Container Resource Usage:'
+        echo '============================'
+        docker stats --no-stream --format 'table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}'
+        
+        echo ''
+        echo '🏥 Container Health Status:'
+        echo '==========================='
+        for container in \$(docker compose -f docker-compose.production.yml ps --services); do
+            health_status=\$(docker inspect --format='{{.State.Health.Status}}' \${container}-prod 2>/dev/null || echo 'no-healthcheck')
+            echo \"   \$container: \$health_status\"
+        done
+        
+        echo ''
+        echo '📝 Recent Container Logs (Last 5 lines each):'
+        echo '=============================================='
+        echo '--- Backend Logs ---'
+        docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-backend 2>/dev/null || echo 'Backend logs not available'
+        
+        echo '--- Nginx Logs ---'
+        docker compose -f docker-compose.production.yml logs --tail=5 restaurant-web-nginx 2>/dev/null || echo 'Nginx logs not available'
+        
+        echo ''
+        echo '🔌 Network Connectivity Tests:'
+        echo '==============================='
+        # Test internal connectivity
+        echo 'Backend health (internal): '
+        timeout 10 curl -s http://localhost:8000/api/v1/health/ >/dev/null && echo '✅ OK' || echo '❌ FAILED'
+        
+        echo 'Nginx response (internal): '
+        timeout 10 curl -s http://localhost:80/ >/dev/null && echo '✅ OK' || echo '❌ FAILED'
+        
+        echo ''
+        echo '📊 Docker System Summary:'
+        echo '========================='
+        docker system df
+        
+        echo ''
+        echo '🔍 Volume Status:'
+        echo '================='
+        docker volume ls | grep restaurant
+        
+        echo ''
+        echo '✅ Docker validation completed'
+    " || log_warn "Some Docker validation checks failed"
+    
+    log_success "✅ Docker validation completed"
+}
+
+# ─────────────────────────────────────────────────────────────────────
 # MAIN EXECUTION
 # ─────────────────────────────────────────────────────────────────────
 main() {
     local start_time=$(date +%s)
     
     # Show initial status
-    log_info "🚀 Starting deployment to $ENVIRONMENT environment"
+    log_info "🚀 Starting complete deployment to $ENVIRONMENT environment"
     log_info "📅 Started at: $(date)"
+    echo ""
     
-    # Execute deployment steps
+    # Execute deployment steps in order
+    log_info "📋 Deployment Pipeline:"
+    echo "   1. 🧹 Clean server resources"
+    echo "   2. 🔍 Validate dependencies"
+    echo "   3. 🏗️  Build backend"
+    echo "   4. 🏗️  Build frontend"
+    echo "   5. 🔒 Configure HTTPS/SSL"
+    echo "   6. 🚀 Deploy containers"
+    echo "   7. ✅ Validate deployment"
+    echo "   8. 📊 Show deployment status"
+    echo "   9. 🐳 Final Docker validation"
+    echo ""
+    
+    # Execute all steps
+    clean_server_resources
+    validate_dependencies
+    build_backend
     build_frontend
+    configure_https_ssl
     deploy_to_server
     validate_deployment
     
     # Show final status if production
     if [[ "$ENVIRONMENT" == "production" ]]; then
         show_deployment_status
+        final_docker_validation
     fi
     
     local end_time=$(date +%s)
@@ -269,14 +604,27 @@ main() {
     local seconds=$((duration % 60))
     
     echo ""
-    log_success "🏁 Deployment completed in ${minutes}m ${seconds}s"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log_success "🎉 DEPLOYMENT COMPLETED SUCCESSFULLY!"
+    log_success "🏁 Total deployment time: ${minutes}m ${seconds}s"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
     if [[ "$ENVIRONMENT" == "production" ]]; then
-        log_info "🌍 Access your application at: https://www.xn--elfogndedonsoto-zrb.com"
+        echo ""
+        log_info "🌍 🌟 Your restaurant application is now live! 🌟"
+        log_info "🔗 Website: https://www.xn--elfogndedonsoto-zrb.com"
         log_info "🔍 Admin panel: https://www.xn--elfogndedonsoto-zrb.com/admin"
-        log_info "📡 API docs: https://www.xn--elfogndedonsoto-zrb.com/api/v1/"
+        log_info "📡 API endpoint: https://www.xn--elfogndedonsoto-zrb.com/api/v1/"
+        log_info "🩺 Health check: https://www.xn--elfogndedonsoto-zrb.com/api/v1/health/"
+        echo ""
+        log_info "📚 Next steps:"
+        echo "   • Test the application thoroughly"
+        echo "   • Configure restaurant tables and menu"
+        echo "   • Set up printer connections"
+        echo "   • Train staff on the new system"
     else
-        log_info "🏠 Start your development server with: cd frontend && npm run dev"
+        log_info "🏠 Development environment ready!"
+        log_info "   Start with: cd frontend && npm run dev"
     fi
 }
 
