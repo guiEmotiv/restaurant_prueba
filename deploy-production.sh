@@ -21,13 +21,13 @@ export MIN_FREE_SPACE_GB=2
 export MIN_FREE_MEMORY_MB=500
 export MAX_DOCKER_LOG_SIZE="50m"
 
-# Colors
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly CYAN='\033[0;36m'
-readonly NC='\033[0m'
+# Colors - Export for use in child scripts
+export RED='\033[0;31m'
+export GREEN='\033[0;32m'
+export YELLOW='\033[1;33m'
+export BLUE='\033[0;34m'
+export CYAN='\033[0;36m'
+export NC='\033[0m'
 
 # Scripts directory
 readonly SCRIPTS_DIR="./scripts/prod"
