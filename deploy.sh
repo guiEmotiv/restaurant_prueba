@@ -165,20 +165,51 @@ build_backend() {
     pip install -r requirements.txt
     
     echo '🔧 Running Django setup...'
-    # Django management commands
+    
+    # Check for migration conflicts and reset if needed
+    if python manage.py showmigrations 2>&1 | grep -q "NodeNotFoundError\|nonexistent parent node" || 
+       python manage.py makemigrations --dry-run 2>&1 | grep -q "nonexistent parent node"; then
+        echo '⚠️  Migration conflicts detected. Performing fresh migration reset...'
+        
+        # Remove all migration files except __init__.py
+        echo '🗑️  Removing old migration files...'
+        find . -path "*/migrations/*.py" -not -name "__init__.py" -delete 2>/dev/null || true
+        find . -path "*/migrations/__pycache__" -exec rm -rf {} + 2>/dev/null || true
+        
+        # Remove existing database to start fresh
+        echo '🗑️  Removing old database...'
+        rm -f ../data/restaurant.prod.sqlite3
+        rm -f data/restaurant.prod.sqlite3
+        
+        echo '✅ Migration reset completed'
+    fi
+    
+    # Django management commands with fresh migrations
+    echo '📊 Collecting static files...'
     python manage.py collectstatic --noinput --clear
+    
+    echo '🔄 Creating fresh migrations...'
     python manage.py makemigrations
+    
+    echo '🔄 Applying migrations...'
     python manage.py migrate
     
-    # Create superuser if it doesn't exist
+    # Create superuser (will be created fresh after migration reset)
+    echo '👤 Creating superuser account...'
     python manage.py shell -c "
 from django.contrib.auth import get_user_model
 User = get_user_model()
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@restaurant.com', 'admin123')
-    print('Superuser created successfully')
+username = 'admin'
+email = 'admin@restaurant.com'
+password = 'admin123'
+
+if not User.objects.filter(username=username).exists():
+    User.objects.create_superuser(username, email, password)
+    print(f'✅ Superuser \"{username}\" created successfully')
+    print(f'   Email: {email}')
+    print(f'   Password: {password}')
 else:
-    print('Superuser already exists')
+    print(f'ℹ️  Superuser \"{username}\" already exists')
 "
     
     echo '✅ Backend built successfully'
