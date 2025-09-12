@@ -44,48 +44,45 @@ deploy_with_git() {
         # Initialize git repo if needed
         if [[ ! -d .git ]]; then
             echo "🆕 Initializing git repository..."
-            git init
-            git remote add origin https://github.com/your-repo.git 2>/dev/null || true
+            /usr/bin/git init
+            /usr/bin/git remote add origin https://github.com/guiEmotiv/restaurant-web.git 2>/dev/null || true
         fi
         
-        # Pull latest changes (or use your actual repo)
-        echo "📥 Updating code from repository..."
-        git fetch --all 2>/dev/null || echo "Warning: Could not fetch (manual deployment)"
-        git reset --hard HEAD 2>/dev/null || true
+        # Configure git for server (minimal config)
+        /usr/bin/git config --global --add safe.directory $REMOTE_DIR 2>/dev/null || true
+        /usr/bin/git config user.name "Production Server" 2>/dev/null || true
+        /usr/bin/git config user.email "server@restaurant-web.com" 2>/dev/null || true
         
-        # For now, we'll sync manually since we don't have remote repo
-        echo "📝 Repository status updated"
+        # Pull latest changes from GitHub
+        echo "📥 Fetching latest code from GitHub..."
+        /usr/bin/git fetch origin main 2>/dev/null || {
+            echo "🔄 Could not fetch from origin, cloning fresh..."
+            cd /home/ubuntu
+            rm -rf restaurant-web
+            /usr/bin/git clone https://github.com/guiEmotiv/restaurant-web.git
+            cd restaurant-web
+        }
+        
+        # Reset to latest main branch
+        /usr/bin/git reset --hard origin/main 2>/dev/null || /usr/bin/git reset --hard HEAD
+        
+        echo "✅ Repository updated to latest version"
+        /usr/bin/git log --oneline -1 || echo "Git log not available"
 REMOTE_SCRIPT
     
-    # Copy essential files manually (since we don't have actual git remote)
-    log_info "Syncing project files..."
-    rsync -av --delete \
-        --exclude='.git' \
-        --exclude='node_modules' \
-        --exclude='frontend/dist' \
-        --exclude='backend/__pycache__' \
-        --exclude='**/*.pyc' \
-        --exclude='*.sqlite3' \
-        -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
-        ./ "$PROD_SERVER:$REMOTE_DIR/"
+    # Git deployment - no manual file copying needed
     
-    # Copy frontend dist separately to ensure it goes to the right place
-    log_info "Copying frontend build..."
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" "mkdir -p $REMOTE_DIR/frontend-dist"
-    rsync -av -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
-        ./frontend/dist/ "$PROD_SERVER:$REMOTE_DIR/frontend-dist/"
-    
-    # Verify frontend files copied correctly
+    # Verify Git repository and files
     ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$PROD_SERVER" << REMOTE_SCRIPT
         cd $REMOTE_DIR
         
-        # Verify critical files exist
-        [[ -f "frontend-dist/index.html" ]] || { echo "❌ Frontend dist files missing"; exit 1; }
+        # Verify critical files exist from Git
         [[ -f "backend/manage.py" ]] || { echo "❌ Backend files missing"; exit 1; }
+        [[ -f "frontend/package.json" ]] || { echo "❌ Frontend source missing"; exit 1; }
         [[ -f "docker-compose.production.yml" ]] || { echo "❌ Docker compose missing"; exit 1; }
         [[ -f "Dockerfile.production" ]] || { echo "❌ Dockerfile.production missing"; exit 1; }
         
-        echo "✅ All project files verified"
+        echo "✅ All project files verified from Git"
         
         # Set proper permissions
         /usr/bin/sudo chown -R ubuntu:ubuntu . 2>/dev/null || true
