@@ -47,6 +47,8 @@ services:
       - ./docker/nginx/conf.d:/etc/nginx/conf.d
       - restaurant-staticfiles:/var/www/static
       - ./docker/nginx/ssl:/etc/nginx/ssl
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot
     networks:
       - restaurant-network
     depends_on:
