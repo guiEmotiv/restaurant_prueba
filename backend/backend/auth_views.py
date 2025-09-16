@@ -84,9 +84,6 @@ def get_user_data(user: User) -> Dict[str, Any]:
     return {
         'id': user.id,
         'username': user.username,
-        'email': user.email,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
         'is_staff': user.is_staff,
         'is_superuser': user.is_superuser,
         'is_active': user.is_active,
@@ -195,7 +192,7 @@ def login_view(request):
             return AuthResponse.success({
                 'user': get_user_data(user),
                 'session_id': request.session.session_key[:8] + '...',  # Partial session ID for debugging
-            }, f"Bienvenido, {user.first_name or user.username}!")
+            }, f"Bienvenido, {user.username}!")
 
         else:
             # Authentication failed
@@ -374,10 +371,7 @@ def register_view(request):
 
         # Validate required fields
         username = data.get('username', '').strip()
-        email = data.get('email', '').strip()
         password = data.get('password', '')
-        first_name = data.get('first_name', '').strip()
-        last_name = data.get('last_name', '').strip()
         is_staff = data.get('is_staff', False)
         groups = data.get('groups', [])
 
@@ -394,17 +388,11 @@ def register_view(request):
         if User.objects.filter(username=username).exists():
             return AuthResponse.error("El usuario ya existe", "USER_EXISTS")
 
-        if email and User.objects.filter(email=email).exists():
-            return AuthResponse.error("El email ya está registrado", "EMAIL_EXISTS")
-
         # Create user with transaction
         with transaction.atomic():
             user = User.objects.create_user(
                 username=username,
-                email=email,
-                password=password,
-                first_name=first_name,
-                last_name=last_name
+                password=password
             )
 
             if is_staff:
@@ -478,10 +466,7 @@ def user_list(request):
         try:
             data = request.data
             username = data.get('username', '').strip()
-            email = data.get('email', '').strip()
             password = data.get('password', '')
-            first_name = data.get('first_name', '').strip()
-            last_name = data.get('last_name', '').strip()
             is_staff = data.get('is_staff', False)
             is_active = data.get('is_active', True)
             groups = data.get('groups', [])
@@ -497,10 +482,7 @@ def user_list(request):
             with transaction.atomic():
                 user = User.objects.create_user(
                     username=username,
-                    email=email,
                     password=password,
-                    first_name=first_name,
-                    last_name=last_name,
                     is_staff=is_staff,
                     is_active=is_active
                 )
@@ -552,12 +534,6 @@ def user_detail(request, user_id):
             data = request.data
 
             # Update basic fields
-            if 'email' in data:
-                user.email = data['email']
-            if 'first_name' in data:
-                user.first_name = data['first_name']
-            if 'last_name' in data:
-                user.last_name = data['last_name']
             if 'is_staff' in data and not user.is_superuser:
                 user.is_staff = data['is_staff']
             if 'is_active' in data and user.id != request.user.id:

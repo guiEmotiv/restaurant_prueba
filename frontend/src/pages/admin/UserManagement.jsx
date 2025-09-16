@@ -3,7 +3,7 @@ import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Users, UserPlus, Edit, Trash2, Shield,
-  User, Mail, Calendar, Check, X, Key
+  User, Calendar, Check, X, Key, Info
 } from 'lucide-react';
 
 const UserManagement = () => {
@@ -17,10 +17,7 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
     password: '',
-    first_name: '',
-    last_name: '',
     groups: [],
     is_staff: false,
     is_active: true
@@ -43,7 +40,29 @@ const UserManagement = () => {
     try {
       // Fixed API call - now uses proxy correctly
       const response = await api.get('/auth/users/');
-      setUsers(response.data);
+      // Ordenar usuarios por rol (grupo) y luego por username
+      const sortedUsers = response.data.sort((a, b) => {
+        // Definir orden de prioridad para roles
+        const roleOrder = {
+          'Administradores': 1,
+          'Gerentes': 2,
+          'Cajeros': 3,
+          'Meseros': 4,
+          'Cocineros': 5
+        };
+
+        // Obtener el primer rol de cada usuario (o 6 si no tiene rol)
+        const aRole = a.groups && a.groups.length > 0 ? roleOrder[a.groups[0]] || 6 : 6;
+        const bRole = b.groups && b.groups.length > 0 ? roleOrder[b.groups[0]] || 6 : 6;
+
+        // Primero ordenar por rol, luego por username
+        if (aRole !== bRole) {
+          return aRole - bRole;
+        }
+        return a.username.localeCompare(b.username);
+      });
+
+      setUsers(sortedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
       setError('Error al cargar usuarios');
@@ -115,10 +134,7 @@ const UserManagement = () => {
   const resetForm = () => {
     setFormData({
       username: '',
-      email: '',
       password: '',
-      first_name: '',
-      last_name: '',
       groups: [],
       is_staff: false,
       is_active: true
@@ -129,10 +145,7 @@ const UserManagement = () => {
     setSelectedUser(user);
     setFormData({
       username: user.username,
-      email: user.email,
       password: '',
-      first_name: user.first_name,
-      last_name: user.last_name,
       groups: user.groups || [],
       is_staff: user.is_staff,
       is_active: user.is_active
@@ -188,7 +201,6 @@ const UserManagement = () => {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rol</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Último Acceso</th>
@@ -204,22 +216,16 @@ const UserManagement = () => {
                         <User className="w-5 h-5 text-gray-600" />
                       </div>
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-gray-900 flex items-center gap-1">
                           {user.username}
                           {user.is_superuser && (
-                            <Shield className="inline ml-1 w-4 h-4 text-red-500" />
+                            <Shield className="w-4 h-4 text-red-500" title="Superusuario" />
+                          )}
+                          {user.is_staff && !user.is_superuser && (
+                            <Key className="w-4 h-4 text-blue-500" title="Staff - Acceso administrativo" />
                           )}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {user.first_name} {user.last_name}
-                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Mail className="w-4 h-4 mr-1" />
-                      {user.email || 'Sin email'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -331,42 +337,6 @@ const UserManagement = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Apellido
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -384,16 +354,31 @@ const UserManagement = () => {
                 </select>
               </div>
 
-              <div className="flex items-center gap-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_staff}
-                    onChange={(e) => setFormData({ ...formData, is_staff: e.target.checked })}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">Es Staff</span>
-                </label>
+              <div className="space-y-3">
+                <div className="flex items-start gap-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_staff}
+                      onChange={(e) => setFormData({ ...formData, is_staff: e.target.checked })}
+                      className="mr-2"
+                    />
+                    <span className="text-sm font-medium">Es Staff</span>
+                  </label>
+                  <div className="group relative">
+                    <Info className="w-4 h-4 text-blue-500 cursor-help" />
+                    <div className="invisible group-hover:visible absolute left-0 top-5 w-64 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10">
+                      <strong>Permisos de Staff:</strong>
+                      <ul className="mt-1 space-y-1">
+                        <li>• Acceso al panel de administración Django</li>
+                        <li>• Gestión completa de usuarios</li>
+                        <li>• Ver todos los reportes del sistema</li>
+                        <li>• Configurar ajustes globales</li>
+                        <li>• Modificar datos de cualquier mesa/orden</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -401,7 +386,7 @@ const UserManagement = () => {
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                     className="mr-2"
                   />
-                  <span className="text-sm">Activo</span>
+                  <span className="text-sm">Usuario Activo</span>
                 </label>
               </div>
             </div>
@@ -461,42 +446,6 @@ const UserManagement = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Apellido
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -515,17 +464,32 @@ const UserManagement = () => {
                 </select>
               </div>
 
-              <div className="flex items-center gap-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_staff}
-                    onChange={(e) => setFormData({ ...formData, is_staff: e.target.checked })}
-                    className="mr-2"
-                    disabled={selectedUser?.is_superuser}
-                  />
-                  <span className="text-sm">Es Staff</span>
-                </label>
+              <div className="space-y-3">
+                <div className="flex items-start gap-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_staff}
+                      onChange={(e) => setFormData({ ...formData, is_staff: e.target.checked })}
+                      className="mr-2"
+                      disabled={selectedUser?.is_superuser}
+                    />
+                    <span className="text-sm font-medium">Es Staff</span>
+                  </label>
+                  <div className="group relative">
+                    <Info className="w-4 h-4 text-blue-500 cursor-help" />
+                    <div className="invisible group-hover:visible absolute left-0 top-5 w-64 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10">
+                      <strong>Permisos de Staff:</strong>
+                      <ul className="mt-1 space-y-1">
+                        <li>• Acceso al panel de administración Django</li>
+                        <li>• Gestión completa de usuarios</li>
+                        <li>• Ver todos los reportes del sistema</li>
+                        <li>• Configurar ajustes globales</li>
+                        <li>• Modificar datos de cualquier mesa/orden</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
                 <label className="flex items-center">
                   <input
                     type="checkbox"
@@ -534,7 +498,7 @@ const UserManagement = () => {
                     className="mr-2"
                     disabled={selectedUser?.id === currentUser?.id}
                   />
-                  <span className="text-sm">Activo</span>
+                  <span className="text-sm">Usuario Activo</span>
                 </label>
               </div>
             </div>

@@ -67,6 +67,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     is_available_calculated = serializers.SerializerMethodField()
     ingredients_cost = serializers.SerializerMethodField()
     profit_amount = serializers.SerializerMethodField()
+    ingredients = serializers.SerializerMethodField()
     # Aliases para compatibilidad con frontend
     price = serializers.DecimalField(source='base_price', max_digits=10, decimal_places=2, read_only=True)
     unit_price = serializers.DecimalField(source='base_price', max_digits=10, decimal_places=2, read_only=True)
@@ -75,9 +76,9 @@ class RecipeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = [
-            'id', 'group', 'group_name', 'container', 'container_id', 'container_name', 'printer', 'printer_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage', 
+            'id', 'group', 'group_name', 'container', 'container_id', 'container_name', 'printer', 'printer_name', 'name', 'version', 'base_price', 'price', 'unit_price', 'cost', 'profit_percentage',
             'ingredients_cost', 'profit_amount', 'is_available', 'is_active', 'is_available_calculated',
-            'preparation_time', 'ingredients_count', 'ingredients_list', 'created_at', 'updated_at'
+            'preparation_time', 'ingredients_count', 'ingredients_list', 'ingredients', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
@@ -129,6 +130,10 @@ class RecipeSerializer(serializers.ModelSerializer):
             return ingredients_cost * (obj.profit_percentage / 100)
         return 0
 
+    def get_ingredients(self, obj):
+        """Alias para ingredients_list - frontend compatibility"""
+        return self.get_ingredients_list(obj)
+
 
 class RecipeDetailSerializer(RecipeSerializer):
     group_detail = GroupSerializer(source='group', read_only=True)
@@ -162,10 +167,11 @@ class RecipeItemCreateSerializer(serializers.ModelSerializer):
 
 class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     recipe_items = serializers.ListField(
-        child=serializers.DictField(), 
+        child=serializers.DictField(),
         write_only=True,
         required=False
     )
+    recalculate_price = serializers.BooleanField(write_only=True, required=False, default=False)
     group_name = serializers.SerializerMethodField()
     container_name = serializers.SerializerMethodField()
     printer_name = serializers.SerializerMethodField()
@@ -211,26 +217,31 @@ class RecipeWithItemsCreateSerializer(serializers.ModelSerializer):
     
     def update(self, instance, validated_data):
         recipe_items_data = validated_data.pop('recipe_items', None)
-        
+        recalculate_price = validated_data.pop('recalculate_price', False)
+
         # Actualizar campos de la receta
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-        
+
         # Si se proporcionaron recipe_items, reemplazar todos
         if recipe_items_data is not None:
             # Eliminar items existentes
             instance.recipeitem_set.all().delete()
-            
+
             # Crear nuevos items
             for item_data in recipe_items_data:
                 RecipeItem.objects.create(
-                    recipe=instance, 
+                    recipe=instance,
                     ingredient_id=item_data['ingredient'],
                     quantity=item_data['quantity']
                 )
-            
+
             # Actualizar precio base
+            instance.update_base_price()
+
+        # Si se solicita recalcular precio explícitamente
+        elif recalculate_price:
             instance.update_base_price()
         
         return instance

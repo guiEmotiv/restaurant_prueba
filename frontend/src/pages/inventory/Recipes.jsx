@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, ChefHat, Package, Search, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit, Trash2, ChefHat, Package, Search, FileSpreadsheet, Calculator } from 'lucide-react';
 import Button from '../../components/common/Button';
 import { apiService } from '../../services/api';
 import RecipeModal from '../../components/recipe/RecipeModalOptimized';
@@ -160,6 +160,25 @@ const Recipes = () => {
       );
     } catch (error) {
       showError('Error al actualizar el estado de la versión');
+    }
+  };
+
+  const handleRecalculatePrice = async (recipe) => {
+    if (!window.confirm(`¿Recalcular el precio de "${recipe.name}" basado en el costo actual de ingredientes?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Use the dedicated update_price endpoint
+      await apiService.recipes.updatePrice(recipe.id);
+
+      await loadRecipes();
+      showSuccess(`✅ Precio recalculado para "${recipe.name}"`);
+    } catch (error) {
+      showError('Error al recalcular el precio');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -446,6 +465,14 @@ const Recipes = () => {
                           <Edit className="h-4 w-4" />
                         </button>
                         <button
+                          onClick={() => handleRecalculatePrice(recipe)}
+                          className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50 transition-colors"
+                          title="Recalcular precio basado en ingredientes actuales"
+                          disabled={loading}
+                        >
+                          <Calculator className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => handleDelete(recipe)}
                           className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-colors"
                           title="Eliminar receta"
@@ -561,18 +588,27 @@ const Recipes = () => {
                     </div>
                     
                     {/* Action buttons for mobile */}
-                    <div className="flex gap-3 pt-3 border-t border-gray-200">
+                    <div className="flex gap-2 pt-3 border-t border-gray-200">
                       <button
                         onClick={() => handleEdit(recipe)}
-                        className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center flex items-center justify-center gap-2"
+                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center flex items-center justify-center gap-2"
                       >
                         <Edit className="h-4 w-4" />
                         Editar
                       </button>
-                      
+
+                      <button
+                        onClick={() => handleRecalculatePrice(recipe)}
+                        className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors text-center flex items-center justify-center gap-2"
+                        disabled={loading}
+                      >
+                        <Calculator className="h-4 w-4" />
+                        Recalcular
+                      </button>
+
                       <button
                         onClick={() => handleDelete(recipe)}
-                        className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors text-center flex items-center justify-center gap-2"
+                        className="flex-1 bg-red-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors text-center flex items-center justify-center gap-2"
                       >
                         <Trash2 className="h-4 w-4" />
                         Eliminar
