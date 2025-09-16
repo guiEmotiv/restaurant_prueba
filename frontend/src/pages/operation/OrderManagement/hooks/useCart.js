@@ -192,9 +192,29 @@ export const useCart = () => {
         }
       }
       
-      // Solo log si hay cambio real
+      // 🔍 DEBUGGING: Log detallado del cambio de currentOrder
       console.log('🔵 USE CART - setCurrentOrder ACTUALIZADO de:', prevId || 'null', 'a:', newId || 'null');
       console.log('🔵 USE CART - Nueva orden completa:', order);
+
+      // Log específico de pricing data
+      if (order && order.items) {
+        console.log('🔍 USE CART - Items en nueva currentOrder:', {
+          itemsCount: order.items.length,
+          orderTotalAmount: order.total_amount,
+          orderStatus: order.status
+        });
+
+        order.items.forEach((item, index) => {
+          console.log(`🔍 USE CART - Item ${index + 1} en currentOrder:`, {
+            id: item.id,
+            recipe_name: item.recipe_name,
+            unit_price: item.unit_price,
+            total_price: item.total_price,
+            total_with_container: item.total_with_container,
+            status: item.status
+          });
+        });
+      }
       return order;
     });
   }, []);

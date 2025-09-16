@@ -24,11 +24,8 @@ from operation.views import (
 )
 from operation.views_financiero import DashboardFinancieroViewSet
 from operation.views_operativo import DashboardOperativoViewSet
-from operation.sse_views import order_updates_stream
-
 # Printer management imports
 from operation.views_printer_config import PrinterConfigViewSet
-from operation.views_printer_queue import PrintQueueViewSet
 
 # Create router and register viewsets
 router = DefaultRouter()
@@ -55,7 +52,6 @@ router.register(r'dashboard-operativo', DashboardOperativoViewSet, basename='das
 
 # Printer management routes
 router.register(r'printer-config', PrinterConfigViewSet, basename='printer-config')
-router.register(r'print-queue', PrintQueueViewSet, basename='print-queue')
 
 # ELIMINADO: Cart routes
 # Sistema Cart eliminado para simplificar operaciones
@@ -102,66 +98,82 @@ def health_check(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])  # Allow public access for development
 def rpi_scan_ports(request):
-    """Scan available USB ports for printers from RPi4"""
-    import requests
-    
-    # RPi4 HTTP server URL
-    RPI4_BASE_URL = os.getenv('RPI4_HTTP_URL', 'http://raspberrypi.local:3001')
-    
+    """Scan available USB ports for printers directly on the local system"""
+    import os
+    import glob
+    import subprocess
+
+    available_ports = []
+
     try:
-        # Make HTTP request to RPi4 to scan ports
-        response = requests.post(f'{RPI4_BASE_URL}/scan', 
-                                json={}, 
-                                headers={'Content-Type': 'application/json'}, 
-                                timeout=10)
-        
-        if response.status_code == 200:
-            rpi_data = response.json()
-            active_ports = rpi_data.get('active_ports', [])
-            return Response({
-                'available_ports': active_ports,
-                'message': f'Scanned {len(active_ports)} ports from RPi4 at {RPI4_BASE_URL}',
-                'total_found': len(active_ports),
-                'rpi_status': 'connected'
-            }, status=status.HTTP_200_OK)
+        # Scan for USB printer devices
+        # Common USB printer device patterns
+        patterns = [
+            '/dev/usb/lp*',    # USB printers
+            '/dev/ttyUSB*',    # USB serial devices
+            '/dev/lp*',        # Parallel/USB printers
+        ]
+
+        for pattern in patterns:
+            ports = glob.glob(pattern)
+            for port in ports:
+                # Check if the device exists and is accessible
+                if os.path.exists(port):
+                    try:
+                        # Check if we can access the device
+                        os.stat(port)
+                        available_ports.append(port)
+                    except (OSError, PermissionError):
+                        # Device exists but we don't have permission
+                        pass
+
+        # Try to get more info using lsusb if available
+        additional_info = []
+        try:
+            result = subprocess.run(['lsusb'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                for line in lines:
+                    if 'printer' in line.lower() or 'print' in line.lower():
+                        additional_info.append(line)
+        except (subprocess.SubprocessError, FileNotFoundError):
+            pass
+
+        # If no ports found, provide common fallback ports
+        if not available_ports:
+            fallback_ports = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/lp0']
+            # Check which fallback ports actually exist
+            for port in fallback_ports:
+                if os.path.exists(port):
+                    available_ports.append(port)
+
+            if not available_ports:
+                # If still no ports, return the fallback list anyway
+                available_ports = fallback_ports
+                message = 'No USB devices detected, showing common port options'
+            else:
+                message = f'Found {len(available_ports)} USB device(s)'
         else:
-            # RPi4 responded but with error
-            return Response({
-                'available_ports': [],
-                'message': f'RPi4 error: HTTP {response.status_code}',
-                'total_found': 0,
-                'rpi_status': 'error',
-                'error': f'RPi4 returned status {response.status_code}'
-            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-            
-    except requests.exceptions.ConnectionError:
-        # RPi4 not reachable - return fallback
-        fallback_ports = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/ttyUSB0', '/dev/ttyUSB1']
+            message = f'Successfully scanned {len(available_ports)} USB port(s)'
+
+        return Response({
+            'available_ports': sorted(list(set(available_ports))),  # Remove duplicates and sort
+            'message': message,
+            'total_found': len(available_ports),
+            'rpi_status': 'local_scan',
+            'additional_info': additional_info if additional_info else None
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        # If scanning fails, return common ports as fallback
+        fallback_ports = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/lp0']
         return Response({
             'available_ports': fallback_ports,
-            'message': f'RPi4 not reachable at {RPI4_BASE_URL}, using fallback ports',
+            'message': f'Error scanning ports: {str(e)}, showing common options',
             'total_found': len(fallback_ports),
-            'rpi_status': 'unreachable'
-        }, status=status.HTTP_200_OK)
-        
-    except requests.exceptions.Timeout:
-        # RPi4 timeout
-        return Response({
-            'available_ports': [],
-            'message': f'RPi4 timeout at {RPI4_BASE_URL}',
-            'total_found': 0,
-            'rpi_status': 'timeout'
-        }, status=status.HTTP_408_REQUEST_TIMEOUT)
-        
-    except Exception as e:
-        # Other errors
-        return Response({
-            'available_ports': [],
-            'message': f'Error scanning RPi4: {str(e)}',
-            'total_found': 0,
             'rpi_status': 'error',
             'error': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status=status.HTTP_200_OK)
 
 urlpatterns = [
     # Health check endpoint
@@ -170,8 +182,7 @@ urlpatterns = [
     path('csrf/', get_csrf_token, name='csrf-token'),
     # Authentication endpoints
     path('auth/', include('backend.auth_urls')),
-    # Server-Sent Events endpoints
-    path('sse/orders/', order_updates_stream, name='sse-orders'),
+    # REMOVIDO: SSE endpoints - Era específico para kitchen views
     # Import endpoints FIRST to avoid router conflicts
     path('import/units/', import_units_excel, name='import-units-excel'),
     path('restaurant-config/operational_info/', operational_info, name='operational-info'),

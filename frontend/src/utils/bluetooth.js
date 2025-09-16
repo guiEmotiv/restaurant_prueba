@@ -12,25 +12,60 @@ class BluetoothPrinter {
 
   // Check if browser supports Bluetooth
   static isBluetoothSupported() {
-    return 'bluetooth' in navigator;
+    const supported = 'bluetooth' in navigator && navigator.bluetooth !== undefined;
+    console.log('🔍 isBluetoothSupported check:', {
+      hasProperty: 'bluetooth' in navigator,
+      bluetoothObject: navigator.bluetooth,
+      supported,
+      userAgent: navigator.userAgent.substring(0, 60)
+    });
+    return supported;
   }
 
   // Connect to Bluetooth printer
   async connect() {
     try {
+      // 🔍 DEBUGGING: Log detailed browser info
+      console.log('🔍 BLUETOOTH DEBUG - Browser Info:', {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        onLine: navigator.onLine,
+        cookieEnabled: navigator.cookieEnabled
+      });
+
+      console.log('🔍 BLUETOOTH DEBUG - Navigator Properties:', {
+        hasBluetoothProperty: 'bluetooth' in navigator,
+        bluetoothValue: navigator.bluetooth,
+        bluetoothType: typeof navigator.bluetooth,
+        isNull: navigator.bluetooth === null,
+        isUndefined: navigator.bluetooth === undefined
+      });
+
+      console.log('🔍 BLUETOOTH DEBUG - Location Info:', {
+        protocol: window.location.protocol,
+        hostname: window.location.hostname,
+        origin: window.location.origin,
+        isSecureContext: window.isSecureContext
+      });
+
       if (!navigator.bluetooth) {
-        throw new Error('Bluetooth no está soportado en este navegador');
+        console.error('❌ navigator.bluetooth is:', navigator.bluetooth);
+        throw new Error(`Bluetooth no está soportado en este navegador. User Agent: ${navigator.userAgent.substring(0, 100)}...`);
       }
 
-      // Request device with printer service
+      console.log('✅ navigator.bluetooth exists, attempting to connect...');
+
+      // Request any Bluetooth device - let user choose printer manually
       this.device = await navigator.bluetooth.requestDevice({
-        filters: [
-          { services: ['000018f0-0000-1000-8000-00805f9b34fb'] }, // Generic printer service
-        ],
+        acceptAllDevices: true,
         optionalServices: [
           '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
           '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
-          '000018f0-0000-1000-8000-00805f9b34fb', // Printer service
+          '00001101-0000-1000-8000-00805f9b34fb', // Serial Port Profile (most common)
+          '000018f0-0000-1000-8000-00805f9b34fb', // Generic printer service
+          '49535343-fe7d-4ae5-8fa9-9fafd205e455', // Custom printer service
+          '0000180f-0000-1000-8000-00805f9b34fb'  // Battery service
         ]
       });
 

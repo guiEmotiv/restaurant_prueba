@@ -5,11 +5,10 @@ import { apiService } from '../../services/api';
 
 const PrinterManagement = () => {
   const [printers, setPrinters] = useState([]);
-  const [printerJobs, setPrinterJobs] = useState({}); // { printerId: [jobs] }
-  const [expandedPrinters, setExpandedPrinters] = useState({}); // { printerId: boolean }
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
   const [showAddPrinter, setShowAddPrinter] = useState(false);
+  const [availablePorts, setAvailablePorts] = useState([]);
   const [newPrinter, setNewPrinter] = useState({
     name: '',
     usb_port: '',
@@ -38,38 +37,25 @@ const PrinterManagement = () => {
     }
   };
 
-  const loadPrinterJobs = async (printerId) => {
+  const loadAvailablePorts = async () => {
     try {
-      const response = await apiService.printQueue.getAll({ 
-        printer_id: printerId,
-        limit: 20,
-        ordering: '-created_at'
-      });
-      const jobs = response.results || response || [];
-      
-      setPrinterJobs(prev => ({
-        ...prev,
-        [printerId]: jobs
-      }));
+      setActionLoading(prev => ({ ...prev, scanning_ports: true }));
+      const portsData = await httpPrinterService.scanAvailablePorts();
+      setAvailablePorts(portsData.available_ports || []);
+      if (portsData.rpi_status === 'unreachable') {
+        showMessage('RPi no alcanzable, usando puertos comunes', 'warning');
+      }
     } catch (error) {
-      console.error(`Error loading jobs for printer ${printerId}:`, error);
-      showMessage('Error cargando trabajos de impresión', 'error');
+      console.error('Error loading available ports:', error);
+      // Fallback a puertos comunes si falla
+      setAvailablePorts(httpPrinterService.getCommonUsbPorts());
+      showMessage('Error escaneando puertos, usando fallback', 'error');
+    } finally {
+      setActionLoading(prev => ({ ...prev, scanning_ports: false }));
     }
   };
 
-  const togglePrinterExpanded = async (printerId) => {
-    const isExpanded = expandedPrinters[printerId];
-    
-    if (!isExpanded) {
-      // Cargar trabajos al expandir
-      await loadPrinterJobs(printerId);
-    }
-    
-    setExpandedPrinters(prev => ({
-      ...prev,
-      [printerId]: !prev[printerId]
-    }));
-  };
+  // REMOVIDO: loadPrinterJobs y togglePrinterExpanded - Ya no se usa PrintQueue con impresión USB directa
 
 
   const showMessage = (text, type = 'success') => {
@@ -94,13 +80,14 @@ const PrinterManagement = () => {
       
       showMessage(`Impresora "${result.name}" creada exitosamente`);
       setShowAddPrinter(false);
+      setAvailablePorts([]);
       setNewPrinter({
         name: '',
         usb_port: '',
         baud_rate: 9600,
         paper_width_mm: 80
       });
-      
+
       await loadData();
     } catch (error) {
       showMessage('Error creando impresora: ' + (error.response?.data?.error || error.message), 'error');
@@ -183,112 +170,10 @@ const PrinterManagement = () => {
     }
   };
 
-  // Procesar cola pendiente
-  const handleProcessQueue = async () => {
-    setLoading_('process_queue', true);
-    
-    try {
-      const result = await httpPrinterService.processPendingJobs(10);
-      const { processed, successful, failed } = result.processing_results;
-      showMessage(`Cola procesada: ${processed} trabajos (${successful} exitosos, ${failed} fallidos)`);
-      await loadData();
-      if (showQueueDetails) {
-        await loadQueueDetails();
-      }
-    } catch (error) {
-      showMessage('Error procesando cola: ' + error.message, 'error');
-    } finally {
-      setLoading_('process_queue', false);
-    }
-  };
-
-  // Reintentar trabajo fallido
-  const handleRetryJob = async (jobId, printerId) => {
-    setLoading_(`retry_${jobId}`, true);
-    
-    try {
-      await apiService.printQueue.retryJob(jobId);
-      showMessage('Trabajo puesto en cola para reintento');
-      await loadPrinterJobs(printerId);
-    } catch (error) {
-      showMessage('Error reintentando trabajo: ' + (error.response?.data?.error || error.message), 'error');
-    } finally {
-      setLoading_(`retry_${jobId}`, false);
-    }
-  };
-
-  // Cancelar trabajo
-  const handleCancelJob = async (jobId, recipeName, printerId) => {
-    if (!window.confirm(`¿Cancelar impresión de "${recipeName}"?`)) {
-      return;
-    }
-
-    setLoading_(`cancel_${jobId}`, true);
-    
-    try {
-      await apiService.printQueue.update(jobId, { status: 'cancelled' });
-      showMessage('Trabajo cancelado');
-      await loadPrinterJobs(printerId);
-    } catch (error) {
-      showMessage('Error cancelando trabajo: ' + (error.response?.data?.error || error.message), 'error');
-    } finally {
-      setLoading_(`cancel_${jobId}`, false);
-    }
-  };
+  // REMOVIDO: handleProcessQueue, handleRetryJob, handleCancelJob - Ya no se usa PrintQueue con impresión USB directa
 
 
-  // Helper functions para estados de trabajos
-  const getJobStatusIcon = (status) => {
-    switch (status) {
-      case 'pending': return '⏳';
-      case 'in_progress': return '🔄';
-      case 'printed': return '✅';
-      case 'failed': return '❌';
-      case 'cancelled': return '🚫';
-      default: return '❓';
-    }
-  };
-
-  // Agrupar trabajos por impresora
-  const groupJobsByPrinter = (jobs) => {
-    const grouped = {};
-    
-    jobs.forEach(job => {
-      const printerName = job.printer_name || 'Sin Impresora';
-      const printerId = job.printer_id || 'unknown';
-      
-      if (!grouped[printerId]) {
-        grouped[printerId] = {
-          printer_name: printerName,
-          printer_id: printerId,
-          jobs: [],
-          stats: {
-            pending: 0,
-            in_progress: 0,
-            printed: 0,
-            failed: 0,
-            cancelled: 0
-          }
-        };
-      }
-      
-      grouped[printerId].jobs.push(job);
-      grouped[printerId].stats[job.status] = (grouped[printerId].stats[job.status] || 0) + 1;
-    });
-    
-    return Object.values(grouped);
-  };
-
-  const getJobStatusClass = (status) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'printed': return 'bg-green-100 text-green-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      case 'cancelled': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  // REMOVIDO: Helper functions para estados de trabajos - Ya no se usa PrintQueue
 
   if (loading) {
     return (
@@ -316,8 +201,12 @@ const PrinterManagement = () => {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setShowAddPrinter(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            onClick={async () => {
+              setShowAddPrinter(true);
+              await loadAvailablePorts();
+            }}
+            disabled={actionLoading.scanning_ports}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />
             Agregar Impresora
@@ -328,8 +217,10 @@ const PrinterManagement = () => {
       {/* Message */}
       {message && (
         <div className={`p-4 rounded-lg flex items-center gap-2 ${
-          message.type === 'success' 
+          message.type === 'success'
             ? 'bg-green-100 text-green-800 border border-green-200'
+            : message.type === 'warning'
+            ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
             : 'bg-red-100 text-red-800 border border-red-200'
         }`}>
           {message.type === 'success' ? (
@@ -373,8 +264,12 @@ const PrinterManagement = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-2">No hay impresoras configuradas</h3>
             <p className="text-gray-600 mb-4">Agrega tu primera impresora para comenzar</p>
             <button
-              onClick={() => setShowAddPrinter(true)}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+              onClick={async () => {
+                setShowAddPrinter(true);
+                await loadAvailablePorts();
+              }}
+              disabled={actionLoading.scanning_ports}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               Agregar Primera Impresora
             </button>
@@ -413,15 +308,6 @@ const PrinterManagement = () => {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => togglePrinterExpanded(printer.id)}
-                      className="bg-gray-600 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-700 flex items-center gap-1"
-                      title="Ver cola de impresión"
-                    >
-                      <Eye className="w-4 h-4" />
-                      {expandedPrinters[printer.id] ? 'Ocultar Cola' : 'Ver Cola'}
-                    </button>
-                    
                     <button
                       onClick={() => handleTestPrinter(printer)}
                       disabled={actionLoading[`test_${printer.id}`] || !printer.is_active}
@@ -474,8 +360,8 @@ const PrinterManagement = () => {
                 </div>
               </div>
 
-              {/* Cola de impresión expandible */}
-              {expandedPrinters[printer.id] && (
+              {/* REMOVIDO: Cola de impresión - Ya no se usa con impresión USB directa */}
+              {false && (
                 <div className="border-t bg-gray-50">
                   <div className="px-6 py-4">
                     <div className="flex justify-between items-center mb-4">
@@ -609,6 +495,20 @@ const PrinterManagement = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Puerto USB
+                  <button
+                    type="button"
+                    onClick={loadAvailablePorts}
+                    disabled={actionLoading.scanning_ports}
+                    className="ml-2 text-blue-600 hover:text-blue-800 text-sm disabled:opacity-50"
+                    title="Escanear puertos disponibles"
+                  >
+                    {actionLoading.scanning_ports ? (
+                      <RefreshCw className="w-3 h-3 inline animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3 h-3 inline" />
+                    )}
+                    Escanear
+                  </button>
                 </label>
                 <select
                   value={newPrinter.usb_port}
@@ -616,18 +516,38 @@ const PrinterManagement = () => {
                   className="w-full p-2 border border-gray-300 rounded-lg"
                   required
                 >
-                  <option value="">Seleccionar puerto...</option>
-                  {httpPrinterService.getCommonUsbPorts().map(port => (
+                  <option value="">
+                    {actionLoading.scanning_ports
+                      ? "Escaneando puertos..."
+                      : availablePorts.length > 0
+                        ? "Seleccionar puerto..."
+                        : "No hay puertos detectados"}
+                  </option>
+                  {availablePorts.map(port => (
                     <option key={port} value={port}>{port}</option>
                   ))}
                 </select>
+                {availablePorts.length === 0 && !actionLoading.scanning_ports && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Haz clic en "Escanear" para detectar puertos USB disponibles en el RPi
+                  </p>
+                )}
               </div>
 
 
               <div className="flex justify-end gap-2 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowAddPrinter(false)}
+                  onClick={() => {
+                    setShowAddPrinter(false);
+                    setAvailablePorts([]);
+                    setNewPrinter({
+                      name: '',
+                      usb_port: '',
+                      baud_rate: 9600,
+                      paper_width_mm: 80
+                    });
+                  }}
                   className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Cancelar

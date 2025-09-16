@@ -129,34 +129,6 @@ const LoginForm = ({ children }) => {
           </button>
         </form>
 
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600 mb-3 font-semibold">Usuarios disponibles:</p>
-          <div className="space-y-2 text-xs text-gray-600">
-            <div className="flex justify-between">
-              <span><strong>fernando</strong> (Admin)</span>
-              <span>Theboss01@!</span>
-            </div>
-            <div className="flex justify-between">
-              <span><strong>brayan</strong> (Mesero)</span>
-              <span>Mesero010@!</span>
-            </div>
-            <div className="flex justify-between">
-              <span><strong>keyla</strong> (Mesero)</span>
-              <span>Mesero012@!</span>
-            </div>
-            <div className="flex justify-between">
-              <span><strong>rodrigo</strong> (Cocinero)</span>
-              <span>Cusicusa02@!</span>
-            </div>
-            <div className="border-t pt-2 mt-2">
-              <div className="flex justify-between">
-                <span><strong>admin</strong> (Demo)</span>
-                <span>admin123</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

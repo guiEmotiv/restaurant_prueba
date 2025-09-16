@@ -31,6 +31,18 @@ const OrderTracker = () => {
       const response = await apiService.orders.getById(orderNumber.trim());
       
       if (response) {
+        console.log('🔍 [OrderTracker] Pedido encontrado:', response);
+        console.log('🔍 [OrderTracker] Items data:', response.items);
+        console.log('🔍 [OrderTracker] Items count:', response.items?.length);
+        response.items?.forEach((item, index) => {
+          console.log(`🔍 [OrderTracker] Item ${index}:`, {
+            id: item.id,
+            recipe_name: item.recipe_name,
+            status: item.status,
+            preparing_at: item.preparing_at,
+            served_at: item.served_at
+          });
+        });
         setOrderData(response);
         // [OrderTracker] Pedido encontrado
         showToast(`✅ Pedido #${orderNumber} encontrado`, 'success');
@@ -408,12 +420,13 @@ const OrderTracker = () => {
                                 const preparingItems = orderData.items?.filter(item => item.preparing_at) || [];
                                 if (preparingItems.length > 0) {
                                   // Obtener la fecha más temprana de preparing
-                                  const earliestPreparing = preparingItems.reduce((earliest, item) => 
+                                  const earliestPreparing = preparingItems.reduce((earliest, item) =>
                                     !earliest || new Date(item.preparing_at) < new Date(earliest) ? item.preparing_at : earliest
                                   , null);
                                   return formatDateTime(earliestPreparing);
                                 }
-                                return orderData.preparing_at ? formatDateTime(orderData.preparing_at) : 'En proceso...';
+                                // Si no hay items con preparing_at, mostrar un mensaje diferente
+                                return 'En proceso...';
                               })()}
                             </span>
                             <p className="text-xs text-gray-500">Estado: PREPARING</p>
@@ -423,7 +436,13 @@ const OrderTracker = () => {
                           <p>• Items enviados a cocina</p>
                           <p>• Tiempo desde creación: {getElapsedTime(orderData.created_at, orderData.preparing_at)}</p>
                           {orderData.items && (
-                            <p>• Items en cocina: {orderData.items.filter(item => item.status === 'PREPARING').length}</p>
+                            <p>• Items en cocina: {orderData.items.filter(item => item.status === 'PREPARING').length} de {orderData.items.length} total</p>
+                          )}
+                          {!orderData.items && (
+                            <p>• Items: Sin datos de items</p>
+                          )}
+                          {orderData.items && orderData.items.length === 0 && (
+                            <p>• Items: No hay items en este pedido</p>
                           )}
                         </div>
                       </div>

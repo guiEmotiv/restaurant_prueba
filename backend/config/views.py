@@ -7,17 +7,23 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from backend.development_permissions import IsAuthenticatedPermission, IsAdminPermission
+from backend.permissions_logger import log_permissions, PermissionLogger
+from backend.logged_viewsets import LoggedModelViewSet
 import pandas as pd
 import io
 import json
+import logging
 from .models import Unit, Zone, Table, Container
 from .serializers import (
-    UnitSerializer, ZoneSerializer, 
+    UnitSerializer, ZoneSerializer,
     TableSerializer, TableDetailSerializer, ContainerSerializer
 )
 
+# Logger for config views
+logger = logging.getLogger('config.views')
 
-class UnitViewSet(viewsets.ModelViewSet):
+
+class UnitViewSet(LoggedModelViewSet):
     queryset = Unit.objects.all().order_by('name')
     serializer_class = UnitSerializer
     permission_classes = [IsAuthenticatedPermission]  # Django authentication required
@@ -33,7 +39,7 @@ class UnitViewSet(viewsets.ModelViewSet):
     
 
 
-class ZoneViewSet(viewsets.ModelViewSet):
+class ZoneViewSet(LoggedModelViewSet):
     queryset = Zone.objects.all().order_by('name')
     serializer_class = ZoneSerializer
     permission_classes = [IsAuthenticatedPermission]  # Django authentication required
@@ -48,7 +54,7 @@ class ZoneViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class TableViewSet(viewsets.ModelViewSet):
+class TableViewSet(LoggedModelViewSet):
     queryset = Table.objects.select_related('zone').prefetch_related(
         'order_set__orderitem_set__recipe',
         'order_set__container_sales__container'
@@ -94,7 +100,7 @@ class TableViewSet(viewsets.ModelViewSet):
 
 
 
-class ContainerViewSet(viewsets.ModelViewSet):
+class ContainerViewSet(LoggedModelViewSet):
     serializer_class = ContainerSerializer
     pagination_class = None  # Disable pagination
     permission_classes = [IsAuthenticatedPermission]  # Django authentication required

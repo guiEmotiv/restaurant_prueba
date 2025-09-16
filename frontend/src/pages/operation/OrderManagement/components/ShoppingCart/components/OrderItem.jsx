@@ -1,138 +1,26 @@
-import { memo, useState, useEffect } from 'react';
-import { useToast } from '../../../../../../contexts/ToastContext';
-import { apiService } from '../../../../../../services/api';
+import { memo } from 'react';
 import { getItemStatusColor } from '../../../utils/orderHelpers';
 
-const OrderItem = ({ 
-  item, 
-  itemNumber, 
+const OrderItem = ({
+  item,
+  itemNumber,
   onCancelItem,
   onStatusChange,
-  saving = false 
+  onRetryPrint,
+  saving = false
 }) => {
-  const { showError, showSuccess } = useToast();
-  const [printJob, setPrintJob] = useState(null);
-  const [retrying, setRetrying] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  
 
-  // Función para cambiar automáticamente el estado del OrderItem
-  const handleAutoStatusTransition = async (printJobStatus) => {
-    console.log(`🔄 PRINT-FLOW FRONTEND - Item #${item.id} handleAutoStatusTransition called`);
-    console.log(`🔄 PRINT-FLOW FRONTEND - PrintJob status: ${printJobStatus}, Item status: ${item.status}, UpdatingStatus: ${updatingStatus}`);
-    
-    // Solo cambiar CREATED → PREPARING cuando el print job está "printed"
-    if (printJobStatus === 'printed' && item.status === 'CREATED' && !updatingStatus) {
-      console.log(`✅ PRINT-FLOW FRONTEND - Condiciones cumplidas, iniciando transición CREATED → PREPARING para item #${item.id}`);
-      console.log(`📊 PRINT-FLOW FRONTEND - PrintJob completado exitosamente, cambiando OrderItem status`);
-      setUpdatingStatus(true);
-      try {
-        await apiService.orderItems.updateStatus(item.id, { status: 'PREPARING' });
-        console.log(`✅ PRINT-FLOW FRONTEND - Item #${item.id} actualizado exitosamente a PREPARING`);
-        
-        // Notificar al componente padre del cambio de estado
-        if (onStatusChange) {
-          onStatusChange(item.id, 'PREPARING');
-          console.log(`📢 PRINT-FLOW FRONTEND - Notificando al padre del cambio de estado para item #${item.id}`);
-        }
-        
-      } catch (error) {
-        console.error(`❌ PRINT-FLOW FRONTEND - Error al cambiar estado del item #${item.id}:`, error);
-        showError(`Error al cambiar estado del item automáticamente: ${error.message}`);
-      } finally {
-        setUpdatingStatus(false);
-      }
-    } else {
-      console.log(`⚠️ PRINT-FLOW FRONTEND - Transición no realizada para item #${item.id}:`);
-      console.log(`   • PrintJob 'printed': ${printJobStatus === 'printed'}`);
-      console.log(`   • Item 'CREATED': ${item.status === 'CREATED'}`);
-      console.log(`   • Not updating: ${!updatingStatus}`);
-    }
-  };
-
-  // Verificar estado de impresión del item
-  const checkPrintStatus = async () => {
-    if (!item.id) return;
-    
-    console.log(`🔍 PRINT-FLOW FRONTEND - Verificando estado de impresión para item #${item.id}`);
-    
-    try {
-      const jobs = await apiService.printQueue.getJobsByOrderItem(item.id);
-      const latestJob = jobs.length > 0 ? jobs[0] : null;
-      
-      console.log(`🔍 PRINT-FLOW FRONTEND - Item #${item.id} print jobs encontrados: ${jobs.length}`);
-      if (latestJob) {
-        console.log(`🔍 PRINT-FLOW FRONTEND - Item #${item.id} último job: #${latestJob.id} status=${latestJob.status}`);
-      }
-      
-      // Establecer el print job
-      setPrintJob(latestJob);
-      
-      // Verificar si necesitamos transición automática de estado
-      if (latestJob) {
-        await handleAutoStatusTransition(latestJob.status);
-      } else {
-        console.log(`⚠️ PRINT-FLOW FRONTEND - Item #${item.id} no tiene print jobs asociados`);
-      }
-      
-    } catch (error) {
-      console.error(`❌ PRINT-FLOW FRONTEND - Error checking print status for item #${item.id}:`, error);
-    }
-  };
-
-  // Verificar estado al montar y cuando cambia el item
-  useEffect(() => {
-    checkPrintStatus();
-    
-    // Escuchar evento personalizado para refrescar estado
-    const handleRefreshEvent = () => {
-      checkPrintStatus();
-    };
-    
-    window.addEventListener('refreshPrintStatus', handleRefreshEvent);
-    
-    // Polling híbrido inteligente basado en estado del PrintJob
-    // OPTIMIZACIÓN: Velocidad adaptativa según criticidad del estado
-    const getPollingInterval = (status) => {
-      switch (status) {
-        case 'pending': return 2000;      // 2s - verificación rápida cuando creado
-        case 'in_progress': return 1000;  // 1s - súper rápido cuando imprimiendo  
-        case 'failed': return 3000;       // 3s - reintento moderado para errores
-        default: return 1000;             // 1s - estados terminales rápidos para restaurante
-      }
-    };
-    
-    let interval;
-    if (printJob?.status && ['pending', 'in_progress', 'failed'].includes(printJob.status)) {
-      const intervalTime = getPollingInterval(printJob.status);
-      console.log(`🔄 PRINT-FLOW FRONTEND - Iniciando polling HÍBRIDO para Item #${item.id} con status=${printJob.status} (${intervalTime}ms)`);
-      interval = setInterval(checkPrintStatus, intervalTime);
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-      window.removeEventListener('refreshPrintStatus', handleRefreshEvent);
-    };
-  }, [item.id, item.status, printJob?.status]);
-
-  // Manejar reintento de impresión
-  const handleRetryPrint = async () => {
-    if (!printJob?.id) return;
-    
-    setRetrying(true);
-    try {
-      await apiService.printQueue.retryJob(printJob.id);
-      // Eliminado mensaje de éxito innecesario
-      
-      // Verificar estado después del reintento
-      setTimeout(checkPrintStatus, 1000);
-    } catch (error) {
-      console.error('Error retrying print:', error);
-      showError('Error al reintentar impresión');
-    } finally {
-      setRetrying(false);
-    }
-  };
+  // 🔍 DEBUGGING: Log solo si hay problema de pricing
+  if (!item.unit_price || !item.total_price) {
+    console.log('🚨 ORDER-ITEM PRICING ISSUE:', {
+      itemId: item.id,
+      recipe_name: item.recipe_name,
+      unit_price: item.unit_price,
+      total_price: item.total_price,
+      total_with_container: item.total_with_container,
+      fullItem: item
+    });
+  }
 
   // Manejar cancelación del item
   const handleCancelItem = () => {
@@ -141,40 +29,52 @@ const OrderItem = ({
     }
   };
 
-  // Verificar si el item se puede cancelar (CREATED o PREPARING)
-  const canCancel = ['CREATED', 'PREPARING'].includes(item.status);
+  // Usar la verificación de cancelación que viene del componente padre (incluye verificación de roles)
+  const canCancel = item.canCancel;
 
-  // Renderizar indicador de estado de impresión - Botón solo para error, texto para otros
-  const renderPrintStatus = () => {
-    if (!printJob) {
-      return null; // No mostrar nada si no hay trabajo de impresión
+  // Renderizar indicador de estado con información de impresión
+  const renderStatusIndicator = () => {
+    // CREATED sin imprimir = problema de impresión
+    if (item.status === 'CREATED' && !item.print_confirmed) {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+          <span className="text-xs text-red-600 font-medium">Sin imprimir</span>
+        </div>
+      );
     }
 
-    // Solo mostrar el botón de reintento para 'failed', otros estados ocultos para meseros
-
-    switch (printJob.status) {
-      case 'pending':
-        return null; // Oculto para meseros
-      case 'in_progress':
-        return null; // Oculto para meseros  
-      case 'printed':
-        return null; // Oculto para meseros
-      case 'failed':
-        return (
-          <button
-            onClick={handleRetryPrint}
-            disabled={retrying || saving}
-            className="text-xs font-medium text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-            title="Hacer clic para reintentar impresión"
-          >
-            {retrying ? 'Reintentando...' : 'Error - Reintentar'}
-          </button>
-        );
-      case 'cancelled':
-        return null; // Oculto para meseros
-      default:
-        return null; // No mostrar estados desconocidos
+    // CREATED impreso = esperando confirmación
+    if (item.status === 'CREATED' && item.print_confirmed) {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+          <span className="text-xs text-blue-600 font-medium">Impreso</span>
+        </div>
+      );
     }
+
+    // PREPARING = en cocina
+    if (item.status === 'PREPARING') {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+          <span className="text-xs text-yellow-600 font-medium">Preparando</span>
+        </div>
+      );
+    }
+
+    // SERVED = servido
+    if (item.status === 'SERVED') {
+      return (
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+          <span className="text-xs text-green-600 font-medium">Servido</span>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -224,15 +124,30 @@ const OrderItem = ({
           </div>
         </div>
 
-        {/* Estado de impresión y acciones en la derecha extrema */}
+        {/* Estado y acciones en la derecha extrema */}
         <div className="flex-shrink-0 flex items-center gap-2">
-          {/* Estado de impresión */}
+          {/* Indicador de estado */}
           <div>
-            {renderPrintStatus()}
+            {renderStatusIndicator()}
           </div>
-          
-          {/* Icono de cancelar - Solo para CREATED y PREPARING - Oculto en dev */}
-          {canCancel && onCancelItem && import.meta.env.MODE !== 'development' && (
+
+          {/* Botón de reintento de impresión - Solo para CREATED sin imprimir */}
+          {item.status === 'CREATED' && !item.print_confirmed && onRetryPrint && (
+            <button
+              onClick={() => onRetryPrint(item.id)}
+              disabled={saving}
+              className="p-1 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded-full transition-colors disabled:opacity-50"
+              title="Reintentar impresión"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          )}
+
+          {/* Icono de cancelar - Solo para CREATED y PREPARING */}
+          {canCancel && onCancelItem && (
             <button
               onClick={handleCancelItem}
               disabled={saving}
@@ -258,16 +173,17 @@ export default memo(OrderItem, (prevProps, nextProps) => {
     prevProps.item.status !== nextProps.item.status ||
     prevProps.item.recipe_name !== nextProps.item.recipe_name ||
     prevProps.item.quantity !== nextProps.item.quantity ||
-    prevProps.item.total_with_container !== nextProps.item.total_with_container
+    prevProps.item.total_with_container !== nextProps.item.total_with_container ||
+    prevProps.item.print_confirmed !== nextProps.item.print_confirmed
   );
-  
+
   const propsChanged = (
     prevProps.itemNumber !== nextProps.itemNumber ||
     prevProps.saving !== nextProps.saving ||
     prevProps.onStatusChange !== nextProps.onStatusChange ||
     prevProps.onCancelItem !== nextProps.onCancelItem
   );
-  
+
   // Solo re-render si hay cambios reales
   return !itemChanged && !propsChanged;
 });

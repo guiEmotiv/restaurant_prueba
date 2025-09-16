@@ -264,10 +264,19 @@ class Order(models.Model):
             self.preparing_at = now
         elif new_status == 'SERVED':
             self.served_at = now
-            # When order is SERVED, update CREATED and PREPARING items to SERVED
-            # CANCELED items remain CANCELED
-            for item in self.orderitem_set.filter(status__in=['CREATED', 'PREPARING']):
-                item.update_status('SERVED')  # Use proper method to update timestamps
+            # When order is SERVED, we need to handle items correctly:
+            # 1. CREATED items must first go to PREPARING
+            # 2. PREPARING items can go to SERVED
+            # 3. CANCELED items remain CANCELED
+
+            # First, move CREATED items to PREPARING
+            for item in self.orderitem_set.filter(status='CREATED'):
+                item.update_status('PREPARING')  # CREATED → PREPARING
+
+            # Then, move all PREPARING items to SERVED
+            for item in self.orderitem_set.filter(status='PREPARING'):
+                item.update_status('SERVED')  # PREPARING → SERVED
+
             # Release the table
             self.table.release_table()
         elif new_status == 'PAID':
@@ -386,6 +395,7 @@ class OrderItem(models.Model):
     paid_at = models.DateTimeField(null=True, blank=True)
     canceled_at = models.DateTimeField(null=True, blank=True)
     printed_at = models.DateTimeField(null=True, blank=True, verbose_name="Impreso en cocina")
+    print_confirmed = models.BooleanField(default=False, help_text="Confirmación de que la impresión fue exitosa")
     cancellation_reason = models.TextField(blank=True, null=True, verbose_name="Motivo de cancelación")
 
     class Meta:
@@ -437,10 +447,23 @@ class OrderItem(models.Model):
         
         super().save(*args, **kwargs)
         
-        # FASE 2: AUTO-CREACIÓN DE TRABAJOS DE IMPRESIÓN
+        # IMPRESIÓN USB DIRECTA - Reemplaza PrintQueue
         if is_creating and self.status == 'CREATED' and self.recipe.printer:
-            logger.info(f"🖨️ BACKEND - Creando PrintQueue para OrderItem #{self.id}")
-            self._create_print_queue_job()
+            logger.info(f"🖨️ BACKEND - Impresión directa USB para OrderItem #{self.id}")
+            success = self._print_directly_to_usb()
+            if success:
+                # Si imprime exitosamente, confirmar impresión y cambiar automáticamente a PREPARING
+                self.print_confirmed = True
+                super().save(update_fields=['print_confirmed'])  # Solo guardar print_confirmed primero
+                # Usar update_status para cambiar a PREPARING con timestamp correcto
+                self.update_status('PREPARING')
+                logger.info(f"✅ BACKEND - OrderItem #{self.id} IMPRESO confirmado y cambiado a PREPARING")
+            else:
+                # Si falla la impresión, mantener en CREATED sin confirmar
+                self.print_confirmed = False
+                # Segundo save() SOLO para actualizar print_confirmed (sin force_insert)
+                super().save(update_fields=['print_confirmed'])
+                logger.warning(f"⚠️ BACKEND - OrderItem #{self.id} NO impreso, mantiene status CREATED")
         
         # Recalcular total de la orden después de guardar el item
         if self.order_id:
@@ -473,25 +496,19 @@ class OrderItem(models.Model):
         
         # ARQUITECTURA IDEMPOTENTE: Si ya está en el estado deseado, es un éxito
         if self.status == new_status:
-            # Invalidar cache aunque no haya cambio real (para sincronizar vistas)
-            from django.core.cache import cache
-            cache.delete('kitchen_board_data')
             return  # Éxito idempotente - no hay error
         
         # Validar transiciones válidas solo si hay un cambio real
         valid_transitions = {
-            'CREATED': ['PREPARING', 'CANCELED'],  # CREATED puede ir a preparación o cancelarse
+            'CREATED': ['PREPARING', 'CANCELED'],  # CREATED solo puede ir a PREPARING o cancelarse
             'PREPARING': ['SERVED', 'CANCELED'],   # PREPARING puede ir a servido o cancelarse
             'SERVED': ['PAID'],          # SERVED solo puede ir a PAID
             'PAID': [],                  # PAID es estado final
             'CANCELED': []               # CANCELED es estado final
         }
         
-        print(f"DEBUG: Valid transitions for {self.status}: {valid_transitions.get(self.status, [])}")
-        
         if new_status not in valid_transitions.get(self.status, []):
             error_msg = f"No se puede cambiar de {self.status} a {new_status}"
-            print(f"DEBUG: Validation error: {error_msg}")
             raise ValidationError(error_msg)
         
         self.status = new_status
@@ -509,11 +526,6 @@ class OrderItem(models.Model):
             self._cancel_print_jobs()
         
         self.save()
-        
-        # CRITICAL: Invalidate kitchen_board cache whenever status changes
-        from django.core.cache import cache
-        cache.delete('kitchen_board_data')
-        print(f"DEBUG: Cache invalidated after status change to {new_status}")
         
         # Verificar si necesitamos actualizar el estado de la orden
         import logging
@@ -544,22 +556,10 @@ class OrderItem(models.Model):
         """Cancelar automáticamente trabajos de impresión cuando OrderItem se cancela"""
         import logging
         logger = logging.getLogger(__name__)
-        
-        # Buscar todos los trabajos de impresión para este OrderItem
-        print_jobs = self.print_jobs.filter(status__in=['pending', 'in_progress', 'failed'])
-        
-        if print_jobs.exists():
-            logger.info(f"🚫 BACKEND - Cancelando {print_jobs.count()} print jobs para OrderItem #{self.id} CANCELED")
-            
-            # Cancelar todos los trabajos no completados
-            updated_count = print_jobs.update(
-                status='cancelled',
-                error_message='OrderItem fue cancelado por el usuario'
-            )
-            
-            logger.info(f"✅ BACKEND - {updated_count} print jobs cancelados automáticamente para OrderItem #{self.id}")
-        else:
-            logger.info(f"ℹ️ BACKEND - No hay print jobs para cancelar para OrderItem #{self.id}")
+
+        # NOTA: Con impresión USB directa, no hay cola de impresión (PrintJob) que cancelar
+        # Esta función se mantiene por compatibilidad pero no hace nada
+        logger.info(f"ℹ️ BACKEND - OrderItem #{self.id} cancelado - impresión USB directa no requiere cancelación de cola")
     
     def delete(self, *args, **kwargs):
         """Override delete para recalcular el total de la orden"""
@@ -617,43 +617,45 @@ class OrderItem(models.Model):
         
         return item_total
     
-    def _create_print_queue_job(self):
-        """FASE 2: Crear trabajo en la cola de impresión automáticamente"""
+    def _print_directly_to_usb(self):
+        """Impresión directa a USB - Reemplaza PrintQueue"""
+        import logging
+        logger = logging.getLogger(__name__)
+
         try:
-            # NO crear trabajos de impresión para items cancelados
+            # NO imprimir items cancelados
             if self.status == 'CANCELED':
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info(f"🚫 PRINT-FLOW - Skipping PrintQueue job creation for CANCELED OrderItem {self.id}")
-                return None
-            
-            # Importación tardía para evitar circular
-            PrintQueue = apps.get_model('operation', 'PrintQueue')
-            
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"🖨️ PRINT-FLOW - Creando PrintQueue job para OrderItem #{self.id} ({self.recipe.name}) - Estado actual: {self.status}")
-            logger.info(f"🖨️ PRINT-FLOW - Impresora asignada: {self.recipe.printer.name} ({self.recipe.printer.usb_port})")
-            
-            # Crear trabajo de impresión
-            print_job = PrintQueue.objects.create(
-                order_item=self,
-                printer=self.recipe.printer,
-                content=self._generate_label_content(),
-                max_attempts=3  # Intentos por defecto
-            )
-            
-            logger.info(f"✅ PRINT-FLOW - PrintQueue job #{print_job.id} creado exitosamente para OrderItem #{self.id}")
-            logger.info(f"🔄 PRINT-FLOW - Job #{print_job.id} estado inicial: {print_job.status}")
-            
-            return print_job
-            
+                logger.info(f"🚫 USB-PRINT - Skipping print for CANCELED OrderItem {self.id}")
+                return False
+
+            if not self.recipe.printer or not self.recipe.printer.usb_port:
+                logger.error(f"❌ USB-PRINT - OrderItem #{self.id}: Sin impresora o puerto USB configurado")
+                return False
+
+            logger.info(f"🖨️ USB-PRINT - Imprimiendo OrderItem #{self.id} ({self.recipe.name})")
+            logger.info(f"🖨️ USB-PRINT - Puerto: {self.recipe.printer.usb_port}")
+
+            # Generar contenido ESC/POS
+            content = self._generate_label_content()
+
+            # Escribir directamente al puerto USB
+            with open(self.recipe.printer.usb_port, 'wb') as printer:
+                printer.write(content.encode('utf-8'))
+
+            logger.info(f"✅ USB-PRINT - OrderItem #{self.id} impreso exitosamente a {self.recipe.printer.usb_port}")
+            return True
+
+        except FileNotFoundError as e:
+            logger.error(f"❌ USB-PRINT - Puerto USB no encontrado para OrderItem #{self.id}: {self.recipe.printer.usb_port}")
+            logger.error(f"❌ USB-PRINT - Error: {e}")
+            return False
+        except PermissionError as e:
+            logger.error(f"❌ USB-PRINT - Sin permisos para escribir al puerto USB {self.recipe.printer.usb_port}")
+            logger.error(f"❌ USB-PRINT - Error: {e}")
+            return False
         except Exception as e:
-            # Log del error pero no fallar la creación del OrderItem
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"❌ PRINT-FLOW - Error creating PrintQueue job for OrderItem {self.id}: {e}")
-            return None
+            logger.error(f"❌ USB-PRINT - Error imprimiendo OrderItem #{self.id}: {e}")
+            return False
     
     def _generate_label_content(self):
         """Genera el contenido de la etiqueta para imprimir en formato ticket profesional"""
@@ -762,6 +764,39 @@ class OrderItem(models.Model):
             
         return lines
 
+    def retry_print(self):
+        """Método para reintentar impresión de un OrderItem"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Solo permitir reintento si no está confirmado o está en CREATED
+        if self.print_confirmed:
+            logger.warning(f"⚠️ RETRY-PRINT - OrderItem #{self.id} ya está marcado como impreso")
+            return False, "Item ya está impreso"
+
+        if self.status == 'CANCELED':
+            logger.warning(f"⚠️ RETRY-PRINT - OrderItem #{self.id} está cancelado, no se puede imprimir")
+            return False, "Item cancelado"
+
+        logger.info(f"🔄 RETRY-PRINT - Reintentando impresión para OrderItem #{self.id}")
+
+        # Intentar imprimir
+        success = self._print_directly_to_usb()
+
+        if success:
+            # Marcar como impreso y cambiar a PREPARING si estaba en CREATED
+            self.print_confirmed = True
+            if self.status == 'CREATED':
+                self.status = 'PREPARING'
+                self.save(update_fields=['print_confirmed', 'status'])
+                logger.info(f"✅ RETRY-PRINT - OrderItem #{self.id} impreso y cambiado a PREPARING")
+            else:
+                self.save(update_fields=['print_confirmed'])
+                logger.info(f"✅ RETRY-PRINT - OrderItem #{self.id} impreso exitosamente")
+            return True, "Impresión exitosa"
+        else:
+            logger.error(f"❌ RETRY-PRINT - Falló reintento de impresión para OrderItem #{self.id}")
+            return False, "Error en la impresión"
 
 
 class Payment(models.Model):
@@ -926,101 +961,5 @@ def restore_container_stock_signal(sender, instance, **kwargs):
 
 
 # Cola de impresión para arquitectura robusta
-class PrintQueue(models.Model):
-    """Cola de trabajos de impresión para sistema distribuido"""
-    
-    PRINT_STATUS_CHOICES = [
-        ('pending', 'Pendiente'),
-        ('in_progress', 'En Progreso'),
-        ('printed', 'Impreso'),
-        ('failed', 'Fallido'),
-        ('cancelled', 'Cancelado')
-    ]
-    
-    # Relaciones
-    order_item = models.ForeignKey('OrderItem', on_delete=models.CASCADE, related_name='print_jobs')
-    printer = models.ForeignKey('PrinterConfig', on_delete=models.CASCADE, related_name='print_jobs')
-    
-    # Contenido del trabajo
-    content = models.TextField(default='', help_text='Contenido ESC/POS para imprimir')
-    
-    # Estado y control
-    status = models.CharField(max_length=20, choices=PRINT_STATUS_CHOICES, default='pending')
-    attempts = models.PositiveIntegerField(default=0, help_text='Número de intentos de impresión')
-    max_attempts = models.PositiveIntegerField(default=3, help_text='Máximo número de intentos')
-    
-    # Mensajes de error
-    error_message = models.TextField(blank=True, help_text='Último mensaje de error')
-    
-    # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    started_at = models.DateTimeField(null=True, blank=True, help_text='Cuándo se inició la impresión')
-    completed_at = models.DateTimeField(null=True, blank=True, help_text='Cuándo se completó exitosamente')
-    
-    # Metadatos adicionales
-    rpi_worker_id = models.CharField(max_length=100, blank=True, help_text='ID del worker RPi4 que procesa')
-    
-    class Meta:
-        db_table = 'print_queue'
-        ordering = ['created_at']
-        verbose_name = 'Trabajo de Impresión'
-        verbose_name_plural = 'Cola de Impresión'
-        indexes = [
-            models.Index(fields=['status', 'created_at']),
-            models.Index(fields=['printer', 'status']),
-            models.Index(fields=['order_item']),
-        ]
-    
-    def __str__(self):
-        return f"PrintJob #{self.id}: {self.order_item.recipe.name} -> {self.printer.name} ({self.status})"
-    
-    def can_retry(self):
-        """Determinar si el trabajo puede reintentarse"""
-        return self.status in ['failed', 'pending'] and self.attempts < self.max_attempts
-    
-    def mark_in_progress(self, worker_id=None):
-        """Marcar trabajo como en progreso"""
-        self.status = 'in_progress'
-        self.started_at = timezone.now()
-        self.attempts += 1
-        if worker_id:
-            self.rpi_worker_id = worker_id
-        self.save()
-    
-    def mark_completed(self):
-        """Marcar trabajo como completado exitosamente"""
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        logger.info(f"🎯 PRINT-FLOW - Marcando PrintQueue job #{self.id} como completado")
-        logger.info(f"🎯 PRINT-FLOW - OrderItem asociado: #{self.order_item.id} ({self.order_item.recipe.name}) - Estado actual: {self.order_item.status}")
-        
-        self.status = 'printed'
-        self.completed_at = timezone.now()
-        self.error_message = ''  # Limpiar errores previos
-        self.save()
-        
-        logger.info(f"✅ PRINT-FLOW - PrintQueue job #{self.id} marcado como 'printed' exitosamente")
-        logger.info(f"🔄 PRINT-FLOW - Estado del OrderItem #{self.order_item.id} después del print: {self.order_item.status}")
-        
-        # PUNTO CRÍTICO: Aquí debería haber un mecanismo que actualice el OrderItem
-        # pero según el análisis, el frontend debe hacer esta transición automáticamente
-        # cuando detecta que el print job está completado
-        logger.info(f"⚠️ PRINT-FLOW - NOTA: El frontend debería detectar este cambio y actualizar OrderItem a PREPARING")
-    
-    def mark_failed(self, error_message=''):
-        """Marcar trabajo como fallido"""
-        self.status = 'failed'
-        self.error_message = error_message
-        self.save()
-    
-    def reset_for_retry(self):
-        """Resetear trabajo para reintento"""
-        if self.can_retry():
-            self.status = 'pending'
-            self.started_at = None
-            self.rpi_worker_id = ''
-            self.save()
-            return True
-        return False
+# REMOVIDO: PrintQueue model - Ya no se usa con impresión USB directa
 

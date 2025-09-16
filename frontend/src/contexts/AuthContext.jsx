@@ -40,49 +40,8 @@ const USER_ROLES = {
   CASHIER: 'Cajeros'
 };
 
-// Request interceptor for enhanced logging and CSRF handling
-api.interceptors.request.use(
-  async (config) => {
-    console.log(`📤 API Request: ${config.method?.toUpperCase()} ${config.url}`);
-
-    // For POST, PUT, PATCH, DELETE requests, ensure CSRF token is set
-    if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
-      await ensureCSRFToken();
-      const token = getCSRFToken();
-      if (token) {
-        config.headers['X-CSRFToken'] = token;
-        console.log('🛡️ CSRF token added to request');
-      } else {
-        console.warn('⚠️ No CSRF token available for request');
-      }
-    }
-
-    return config;
-  },
-  (error) => {
-    console.error('📤 Request Error:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor for enhanced error handling
-api.interceptors.response.use(
-  (response) => {
-    console.log(`📥 API Response: ${response.status} ${response.config.url}`);
-    return response;
-  },
-  (error) => {
-    console.error(`📥 Response Error: ${error.response?.status || 'Network'} ${error.config?.url}`, error.response?.data);
-
-    // Handle session expiration
-    if (error.response?.status === 401) {
-      console.warn('🚨 Session expired - clearing authentication state');
-      // We'll handle this in the context
-    }
-
-    return Promise.reject(error);
-  }
-);
+// Enhanced logging for auth context (interceptors are handled by api.js)
+console.log('🔐 AuthContext using shared API instance with built-in CSRF handling');
 
 const AuthContext = createContext();
 
@@ -211,7 +170,14 @@ export const AuthProvider = ({ children }) => {
         console.log('✅ User authenticated:', userData.username);
 
         setUser(userData);
-        setUserRole(userData.groups?.[0] || null);
+        const role = userData.groups?.[0] || null;
+        console.log('👥 [AUTH-CONTEXT] Setting user role:', {
+          rawRole: role,
+          normalizedRole: role?.toLowerCase(),
+          allGroups: userData.groups,
+          isAdmin: role?.toLowerCase() === 'administradores'
+        });
+        setUserRole(role?.toLowerCase() || null);
         setIsAuthenticated(true);
         setSessionInfo(sessionData);
       } else {
@@ -241,9 +207,7 @@ export const AuthProvider = ({ children }) => {
 
       console.log(`🔐 Attempting login for user: ${username}`);
 
-      // Ensure we have a CSRF token before attempting login
-      await ensureCSRFToken();
-
+      // CSRF token handling is done by api.js interceptors
       const response = await api.post('/auth/login/', {
         username: username.trim(),
         password
@@ -257,7 +221,14 @@ export const AuthProvider = ({ children }) => {
         console.log('🔐 User permissions:', userData.permissions);
 
         setUser(userData);
-        setUserRole(userData.groups?.[0] || null);
+        const role = userData.groups?.[0] || null;
+        console.log('👥 [AUTH-CONTEXT] Setting user role:', {
+          rawRole: role,
+          normalizedRole: role?.toLowerCase(),
+          allGroups: userData.groups,
+          isAdmin: role?.toLowerCase() === 'administradores'
+        });
+        setUserRole(role?.toLowerCase() || null);
         setIsAuthenticated(true);
 
         // Store session info if provided
@@ -395,13 +366,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     console.log('🚀 AuthContext initializing...');
 
-    // Initialize CSRF token and check auth status
-    const initializeAuth = async () => {
-      await ensureCSRFToken();
-      await checkAuthStatus();
-    };
-
-    initializeAuth();
+    // Check auth status (CSRF token handling is done by api.js)
+    checkAuthStatus();
   }, [checkAuthStatus]);
 
   // Context value

@@ -39,8 +39,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://192.168.1.43:5173",  # Ethernet interface
-    "http://192.168.1.100:5173", # WiFi interface (needed for AP isolation bypass)
 ]
 
 # Get local network IPs from environment
@@ -57,8 +55,6 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://192.168.1.43:5173",  # Ethernet interface
-    "http://192.168.1.100:5173", # WiFi interface (needed for AP isolation bypass)
 ]
 
 if LOCAL_IP:
@@ -76,14 +72,18 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_HTTPONLY = True  # Keep session secure
 
 # ──────────────────────────────────────────────────────────────
-# Logging - More verbose in development
+# Logging - Enhanced authentication debugging in development
 # ──────────────────────────────────────────────────────────────
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '[{levelname}] {asctime} {module} {message}',
+            'format': '[{levelname}] {asctime} {name} {process:d} {thread:d} {funcName} - {message}',
+            'style': '{',
+        },
+        'auth_detailed': {
+            'format': '🔐 [{levelname}] {asctime} {name} - {message}',
             'style': '{',
         },
         'simple': {
@@ -103,6 +103,12 @@ LOGGING = {
             'filename': BASE_DIR / 'data' / 'logs' / 'django_dev.log',
             'formatter': 'verbose',
         },
+        'auth_file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'data' / 'logs' / 'auth_debug.log',
+            'formatter': 'auth_detailed',
+        },
     },
     'root': {
         'handlers': ['console', 'file'],
@@ -119,8 +125,38 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
+        'django.contrib.auth': {
+            'handlers': ['console', 'auth_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django.contrib.sessions': {
+            'handlers': ['console', 'auth_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'backend.auth_views': {
+            'handlers': ['console', 'auth_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
         'backend': {
             'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'config.views': {
+            'handlers': ['console', 'auth_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'inventory.views': {
+            'handlers': ['console', 'auth_file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'operation.views': {
+            'handlers': ['console', 'auth_file'],
             'level': 'DEBUG',
             'propagate': False,
         },

@@ -31,10 +31,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
             'status', 'notes', 'quantity', 'is_takeaway', 'has_taper', 'order_zone', 'order_table', 'order_id',
             'elapsed_time_minutes', 'is_overdue',
             'paid_amount', 'pending_amount', 'is_fully_paid',
-            'container_info', 'total_with_container', 'created_at', 'preparing_at', 'served_at', 'canceled_at', 'printed_at'
+            'container_info', 'total_with_container', 'created_at', 'preparing_at', 'served_at', 'canceled_at', 'printed_at',
+            'print_confirmed'
         ]
         read_only_fields = [
-            'id', 'unit_price', 'total_price', 'created_at', 'preparing_at', 'served_at', 'canceled_at', 'printed_at'
+            'id', 'unit_price', 'total_price', 'created_at', 'preparing_at', 'served_at', 'canceled_at', 'printed_at', 'print_confirmed'
         ]
     
     # get_customizations_count removed - OrderItemIngredient functionality deprecated
@@ -167,20 +168,21 @@ class ContainerSaleSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'unit_price', 'total_price', 'created_at']
 
 
-class OrderDetailSerializer(OrderSerializer):
+class OrderDetailSerializerV1(OrderSerializer):
+    """Legacy OrderDetailSerializer - renamed to avoid conflict"""
     table_detail = TableSerializer(source='table', read_only=True)
     items = OrderItemSerializer(source='orderitem_set', many=True, read_only=True)
     container_sales = ContainerSaleSerializer(many=True, read_only=True)
     payments = serializers.SerializerMethodField()
-    
+
     class Meta(OrderSerializer.Meta):
         fields = OrderSerializer.Meta.fields + ['table_detail', 'items', 'container_sales', 'payments']
-    
+
     def get_payments(self, obj):
         from .serializers import PaymentSerializer
         # Use prefetched payments to avoid N+1 queries
         return PaymentSerializer(obj.payments.all(), many=True).data
-    
+
     @classmethod
     def setup_eager_loading(cls, queryset):
         """
@@ -597,9 +599,11 @@ class OrderStatusUpdateSerializer(serializers.Serializer):
     def validate_status(self, value):
         order = self.context['order']
         
-        # Validar transiciones de estado válidas
+        # Validar transiciones de estado válidas para ORDER (no OrderItem)
+        # Nota: Las órdenes SÍ pueden ir de CREATED → SERVED (cuando el mesero cierra todo)
+        # pero los OrderItems individuales NO pueden (deben pasar por PREPARING)
         valid_transitions = {
-            'CREATED': ['PREPARING', 'PAID', 'CANCELED'],
+            'CREATED': ['PREPARING', 'SERVED', 'PAID', 'CANCELED'],  # Order puede saltarse PREPARING
             'PREPARING': ['SERVED', 'PAID', 'CANCELED'],
             'SERVED': ['PAID', 'CANCELED'],
             'PAID': [],

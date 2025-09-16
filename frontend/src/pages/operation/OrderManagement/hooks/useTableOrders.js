@@ -9,26 +9,61 @@ export const useTableOrders = (showToast) => {
   const [loading, setLoading] = useState(true);
   const [selectedTable, setSelectedTable] = useState(null);
 
+  // DEBUG: Log cuando cambia el estado de tables
+  useEffect(() => {
+    console.log('🟦 [TABLES-STATE] Tables state changed:', {
+      tablesCount: tables.length,
+      loading: loading,
+      tables: tables.map(t => ({ id: t.id, table_number: t.table_number, zone: t.zone_name }))
+    });
+  }, [tables, loading]);
+
   // Load tables and active orders for proper status
   const loadInitialData = useCallback(async () => {
     try {
+      console.log('🟦 [LOAD-INITIAL] Starting loadInitialData...');
       setLoading(true);
-      
+
       // Load tables and active orders in parallel
+      console.log('🟦 [LOAD-INITIAL] Making API calls...');
       const [tablesData, ordersData] = await Promise.all([
         apiService.tables.getAll(),
         apiService.orders.getAll()
       ]);
-      
+
+      console.log('🟦 [LOAD-INITIAL] API responses received:', {
+        tablesCount: tablesData?.length || 0,
+        ordersCount: ordersData?.length || 0,
+        tablesData: tablesData?.map(t => ({ id: t.id, table_number: t.table_number }))
+      });
+
       setTables(tablesData || []);
-      // Filter only active orders (CREATED, PREPARING, SERVED)
-      const activeOrders = ordersData?.filter(o => 
-        ['CREATED', 'PREPARING', 'SERVED'].includes(o.status)
+      // Filter only active orders that occupy tables (CREATED, PREPARING)
+      // SERVED orders don't occupy tables anymore
+      const activeOrders = ordersData?.filter(o =>
+        ['CREATED', 'PREPARING'].includes(o.status)
       ) || [];
+
+      console.log('🟦 [LOAD-INITIAL] Order status breakdown:', {
+        totalOrders: ordersData?.length || 0,
+        filteredActiveOrders: activeOrders.length,
+        ordersByStatus: ordersData?.reduce((acc, o) => {
+          acc[o.status] = (acc[o.status] || 0) + 1;
+          return acc;
+        }, {}) || {}
+      });
+
+      console.log('🟦 [LOAD-INITIAL] Setting state:', {
+        tablesCount: (tablesData || []).length,
+        activeOrdersCount: activeOrders.length
+      });
+
       setAllOrders(activeOrders);
     } catch (error) {
+      console.error('🟦 [LOAD-INITIAL] Error:', error);
       showToast?.(`Error al cargar datos: ${error.message}`, 'error');
     } finally {
+      console.log('🟦 [LOAD-INITIAL] Setting loading to false');
       setLoading(false);
     }
   }, [showToast]);
@@ -51,9 +86,10 @@ export const useTableOrders = (showToast) => {
         return tablesData || [];
       });
       
-      // Actualizar órdenes activas
-      const activeOrders = ordersData?.filter(o => 
-        ['CREATED', 'PREPARING', 'SERVED'].includes(o.status)
+      // Actualizar órdenes activas que ocupan mesas (CREATED, PREPARING)
+      // SERVED orders don't occupy tables anymore
+      const activeOrders = ordersData?.filter(o =>
+        ['CREATED', 'PREPARING'].includes(o.status)
       ) || [];
       
       setAllOrders(prevOrders => {

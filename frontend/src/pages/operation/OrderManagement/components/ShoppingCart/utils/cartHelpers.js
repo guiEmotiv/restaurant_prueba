@@ -17,19 +17,26 @@ export const getStatusColor = (status) => {
 // Helper para procesar items existentes de la orden
 export const processExistingItems = (orderItems, canCancelItem, userRole) => {
   return orderItems.map((item, index) => ({
-    id: `existing-${item.id || index}`,
-    type: 'existing',
-    name: item.recipe_name || item.recipe?.name,
+    // 🔧 MANTENER ESTRUCTURA ORIGINAL para compatibilidad con OrderItem
+    ...item, // Spread original item data first
+
+    // 🔧 Solo agregar campos adicionales necesarios para permissions
+    canCancel: canCancelItem(item) && userRole === 'administradores',
+
+    // 🔧 Mantener campos originales que OrderItem espera
+    id: item.id, // NO cambiar el ID real
+    recipe_name: item.recipe_name || item.recipe?.name,
+    unit_price: item.unit_price,
+    total_price: item.total_price,
+    total_with_container: item.total_with_container,
     quantity: item.quantity,
     is_takeaway: item.is_takeaway,
     notes: item.notes,
-    totalPrice: parseFloat(item.total_with_container || item.total_price || 0),
-    basePrice: parseFloat(item.total_price || 0),
-    containerPrice: item.container_info?.total_price || 0,
-    containerName: item.container_info?.container_name,
-    originalItem: item,
-    canCancel: canCancelItem(item) && userRole === 'administradores',
-    status: item.status || 'CREATED'
+    status: item.status || 'CREATED',
+
+    // 🔧 Metadatos adicionales (opcionales)
+    type: 'existing',
+    originalItem: item
   }));
 };
 

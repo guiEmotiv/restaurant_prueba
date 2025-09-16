@@ -26,25 +26,42 @@ import {
 import { validateTakeawayContainer, validateOrder } from './utils/validations';
 
 const OrderManagement = () => {
-  
+
+  // 🔄 LOG: Component mounting
+  console.log('🏁 [ORDER-MANAGEMENT] Component mounting/rendering');
+
   // Simple mounting reference for polling
   const mountRef = useRef(false);
   useEffect(() => {
+    console.log('🏁 [ORDER-MANAGEMENT] Component mounted, setting up cleanup');
     mountRef.current = true;
     return () => {
+      console.log('🏁 [ORDER-MANAGEMENT] Component unmounting');
       mountRef.current = false;
     };
   }, []);
   
   const { user, userRole, hasPermission } = useAuth();
+
+  // Debug: log user role info
+  console.log('👤 [ORDER-MANAGEMENT] User role info:', {
+    user: user?.username,
+    userRole,
+    isAdmin: userRole === 'administradores',
+    rawUser: user
+  });
   const { showToast } = useToast();
 
   // Estados agrupados para mejor rendimiento
-  const [orderState, setOrderState] = useState({
-    step: 'zones', // 'zones', 'tables', 'menu' - No hay payment aquí
-    selectedZone: null,
-    saving: false,
-    isCartOpen: false
+  const [orderState, setOrderState] = useState(() => {
+    const initialState = {
+      step: 'zones', // 'zones', 'tables', 'menu' - No hay payment aquí
+      selectedZone: null,
+      saving: false,
+      isCartOpen: false
+    };
+    console.log('🏁 [ORDER-MANAGEMENT] Initial state created:', initialState);
+    return initialState;
   });
   
   
@@ -115,23 +132,44 @@ const OrderManagement = () => {
 
   // Load only essential data initially - defer menu data loading
   useEffect(() => {
+    console.log('📊 [ORDER-MANAGEMENT] useEffect for loadInitialData triggered', {
+      hasLoadFunction: !!orderTableHook.loadInitialData,
+      hookLoading: orderTableHook.loading
+    });
+
     if (!orderTableHook.loadInitialData) {
+      console.log('📊 [ORDER-MANAGEMENT] loadInitialData not ready yet, waiting...');
       return; // Esperar hasta que el hook esté listo
     }
-    
+
     const loadMinimalData = async () => {
       try {
+        console.log('📊 [ORDER-MANAGEMENT] Starting minimal data load...');
         // Load just tables first - defer heavy data
         await orderTableHook.loadInitialData();
-        setInitialLoading(false);
+        console.log('📊 [ORDER-MANAGEMENT] Minimal data load completed successfully');
       } catch (error) {
+        console.error('📊 [ORDER-MANAGEMENT] Error loading minimal data:', error);
         showToast('Error al cargar datos iniciales', 'error');
-        setInitialLoading(false);
       }
     };
 
     loadMinimalData();
-  }, [orderTableHook.loadInitialData, showToast]); // Dependencia del método para asegurar que está disponible
+  }, [orderTableHook.loadInitialData, showToast]);
+
+  // Monitor hook loading state to manage initialLoading
+  useEffect(() => {
+    console.log('📊 [ORDER-MANAGEMENT] Monitor loading state triggered:', {
+      hookLoading: orderTableHook.loading,
+      initialLoading: initialLoading,
+      tablesLength: orderTableHook.tables?.length || 0
+    });
+
+    if (!orderTableHook.loading && initialLoading && orderTableHook.tables && orderTableHook.tables.length > 0) {
+      console.log('📊 [ORDER-MANAGEMENT] Conditions met, setting initialLoading to false');
+      setInitialLoading(false);
+    }
+  }, [orderTableHook.loading, orderTableHook.tables, initialLoading]);
 
   // Load menu data when needed (lazy loading)
   const loadMenuData = useCallback(async () => {
@@ -175,12 +213,23 @@ const OrderManagement = () => {
 
   // Navegación optimizada - solo cambiar estado sin recargas innecesarias
   const navigateToStep = useCallback((newStep, stateUpdate = {}) => {
-    setOrderState(prev => ({ 
-      ...prev, 
-      step: newStep,
-      ...stateUpdate 
-    }));
-  }, []);
+    console.log('🧜 [NAVIGATE] Step transition:', {
+      from: orderState.step,
+      to: newStep,
+      stateUpdate: stateUpdate,
+      timestamp: new Date().toISOString()
+    });
+
+    setOrderState(prev => {
+      const newState = {
+        ...prev,
+        step: newStep,
+        ...stateUpdate
+      };
+      console.log('🧜 [NAVIGATE] New state set:', newState);
+      return newState;
+    });
+  }, [orderState.step]);
 
   // Cargar datos específicos solo cuando sea necesario
   const loadDataIfNeeded = useCallback(async (dataType, force = false) => {
@@ -204,35 +253,60 @@ const OrderManagement = () => {
 
   // Handlers para navegación
   const handleZoneSelect = useCallback(async (zone) => {
-    // Navegación inmediata para mejor UX
-    navigateToStep('tables', { 
-      selectedZone: zone, 
-      isCartOpen: false 
+    console.log('🎯 [ZONE-SELECT] Zone button clicked:', {
+      zoneId: zone.id,
+      zoneName: zone.name,
+      timestamp: new Date().toISOString()
     });
-    
+
+    // Navegación inmediata para mejor UX
+    console.log('🎯 [ZONE-SELECT] Navigating to tables step...');
+    navigateToStep('tables', {
+      selectedZone: zone,
+      isCartOpen: false
+    });
+    console.log('🎯 [ZONE-SELECT] Navigation completed');
+
     // Cargar órdenes activas en segundo plano si es necesario
     try {
+      console.log('🎯 [ZONE-SELECT] Loading active orders in background...');
       await orderTableHook.loadActiveOrders();
+      console.log('🎯 [ZONE-SELECT] Active orders loaded successfully');
     } catch (error) {
+      console.error('🎯 [ZONE-SELECT] Error loading active orders:', error);
       // Silently handle error
     }
   }, [navigateToStep, orderTableHook]);
 
   const handleTableSelect = useCallback(async (table) => {
+    console.log('🎯 [TABLE-SELECT] Table button clicked:', {
+      tableId: table.id,
+      tableNumber: table.table_number,
+      zoneId: table.zone.id,
+      zoneName: table.zone.name,
+      timestamp: new Date().toISOString()
+    });
+
     // Navegación inmediata para mejor UX
+    console.log('🎯 [TABLE-SELECT] Navigating to menu step...');
     navigateToStep('menu', { isCartOpen: false });
-    
+    console.log('🎯 [TABLE-SELECT] Navigation completed');
+
     // Configurar mesa seleccionada inmediatamente
+    console.log('🎯 [TABLE-SELECT] Setting selected table...');
     orderTableHook.setSelectedTable(table);
-    
+    console.log('🎯 [TABLE-SELECT] Selected table set');
+
     // Cargar datos en paralelo para mejor rendimiento
+    console.log('🎯 [TABLE-SELECT] Starting parallel data loading...');
     const promises = [
       orderTableHook.loadTableOrders(table.id),
       loadDataIfNeeded('menu') // Solo cargar menú si no lo tenemos
     ];
-    
+
     try {
       await Promise.all(promises);
+      console.log('🎯 [TABLE-SELECT] Parallel data loading completed');
       
       // Verificar si la mesa tiene un pedido activo para cargarlo automáticamente
       const existingOrders = orderTableHook.getTableOrders(table.id);
@@ -370,6 +444,13 @@ const OrderManagement = () => {
       
       showToast(`🍽️ Pedido #${orderId} servido y listo para cobrar`, 'success');
       console.log('🟣 [ORDER-MANAGEMENT] Toast de éxito mostrado');
+
+      // Actualizar estado local inmediatamente para evitar que la mesa aparezca ocupada
+      console.log('🟣 [ORDER-MANAGEMENT] Actualizando estado local inmediatamente...');
+      const currentOrders = orderTableHook.allOrders;
+      const updatedOrders = currentOrders.filter(order => order.id !== orderId);
+      orderTableHook.setAllOrders(updatedOrders);
+      console.log('🟣 [ORDER-MANAGEMENT] Estado local actualizado - orden', orderId, 'removida de lista activa');
       
       // Clean up and navigate
       console.log('🟣 [ORDER-MANAGEMENT] Limpiando estado...');
@@ -524,10 +605,32 @@ const OrderManagement = () => {
         orderId: createdOrder.id,
         orderStatus: createdOrder.status,
         itemsInOrder: createdOrder.items?.length || 0,
-        totalAmount: createdOrder.grand_total,
+        totalAmount: createdOrder.total_amount,
+        grandTotal: createdOrder.grand_total,
         tableNumber: orderTableHook.selectedTable?.table_number,
-        isUpdate: !!orderCartHook.currentOrder
+        isUpdate: !!orderCartHook.currentOrder,
+        rawOrderData: createdOrder
       });
+
+      // 🔍 DEBUGGING: Log detailed order items data
+      console.log('[ORDER-LOG] 🔍 Items en orden creada:', {
+        itemsArray: createdOrder.items,
+        itemsCount: createdOrder.items?.length || 0
+      });
+
+      if (createdOrder.items && createdOrder.items.length > 0) {
+        createdOrder.items.forEach((item, index) => {
+          console.log(`[ORDER-LOG] 📋 Item ${index + 1}:`, {
+            id: item.id,
+            recipe_name: item.recipe_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price,
+            total_with_container: item.total_with_container,
+            status: item.status
+          });
+        });
+      }
       
       if (orderCartHook.currentOrder) {
         showToast(`✅ Pedido #${createdOrder.id} actualizado - ${itemsProcessedCount} items agregados`, 'success');
@@ -547,8 +650,33 @@ const OrderManagement = () => {
         if (orderTableHook.orders && Array.isArray(orderTableHook.orders)) {
           updatedOrder = orderTableHook.orders.find(o => o.id === currentOrderForProcessing.id);
         }
-        
+
+        console.log('[ORDER-LOG] 🔄 Proceso de actualización currentOrder:', {
+          currentOrderForProcessing: {
+            id: currentOrderForProcessing.id,
+            status: currentOrderForProcessing.status,
+            total_amount: currentOrderForProcessing.total_amount,
+            items_count: currentOrderForProcessing.items?.length || 0
+          },
+          updatedOrderFromTable: updatedOrder ? {
+            id: updatedOrder.id,
+            status: updatedOrder.status,
+            total_amount: updatedOrder.total_amount,
+            items_count: updatedOrder.items?.length || 0
+          } : null,
+          willUse: updatedOrder ? 'updatedOrder' : 'currentOrderForProcessing'
+        });
+
         const orderToUse = updatedOrder || currentOrderForProcessing;
+
+        console.log('[ORDER-LOG] 🎯 Setting currentOrder to:', {
+          id: orderToUse.id,
+          status: orderToUse.status,
+          total_amount: orderToUse.total_amount,
+          items_count: orderToUse.items?.length || 0,
+          fullOrder: orderToUse
+        });
+
         orderCartHook.setCurrentOrder(orderToUse);
         orderCartHook.clearCart();
         
@@ -574,12 +702,18 @@ const OrderManagement = () => {
 
   // Handler para abrir modal de cancelación
   const openCancelModal = useCallback((type, id) => {
-    setModals(prev => ({
-      ...prev,
-      cancelTarget: { type, id },
-      cancelReason: '',
-      isCancelModalOpen: true
-    }));
+    console.log('🔴 openCancelModal CALLED:', { type, id });
+
+    setModals(prev => {
+      const newState = {
+        ...prev,
+        cancelTarget: { type, id },
+        cancelReason: '',
+        isCancelModalOpen: true
+      };
+      console.log('🔴 Setting modal state:', newState);
+      return newState;
+    });
   }, []);
 
   const closeCancelModal = useCallback(() => {
@@ -603,20 +737,24 @@ const OrderManagement = () => {
     try {
       console.log('🚫 [ORDER-MANAGEMENT] Pedido cancelado exitosamente, limpiando estado...');
       
+      // Actualizar estado local inmediatamente para evitar que la mesa aparezca ocupada
+      console.log('🚫 [ORDER-MANAGEMENT] Actualizando estado local inmediatamente...');
+      const currentOrders = orderTableHook.allOrders;
+      const updatedOrders = currentOrders.filter(order => order.id !== orderId);
+      orderTableHook.setAllOrders(updatedOrders);
+      console.log('🚫 [ORDER-MANAGEMENT] Estado local actualizado - orden', orderId, 'removida de lista activa');
+
       // Clean up and navigate
       orderCartHook.setCurrentOrder(null);
       orderCartHook.clearCart();
       orderTableHook.setSelectedTable(null);
-      
+
       // Navegación optimizada sin recargas innecesarias
       console.log('🚫 [ORDER-MANAGEMENT] Navegando a vista de zonas...');
-      navigateToStep('zones', { 
-        selectedZone: null, 
-        isCartOpen: false 
+      navigateToStep('zones', {
+        selectedZone: null,
+        isCartOpen: false
       });
-      
-      // Los datos se actualizarán automáticamente con el polling de 15s
-      // No es necesario recargar manualmente
       
     } catch (error) {
       console.error('❌ [ORDER-MANAGEMENT] Error al manejar cancelación de pedido:', error);
@@ -799,34 +937,56 @@ const OrderManagement = () => {
 
   // Obtener zonas únicas disponibles
   const availableZones = useMemo(() => {
+    console.log('🏠 [ZONES-CALC] useMemo triggered for availableZones:', {
+      hasTables: !!orderTableHook.tables,
+      tablesLength: orderTableHook.tables?.length || 0,
+      hasAllOrders: !!orderTableHook.allOrders,
+      allOrdersLength: orderTableHook.allOrders?.length || 0
+    });
+
     if (!orderTableHook.tables || orderTableHook.tables.length === 0) {
+      console.log('🏠 [ZONES-CALC] No tables available, returning empty array');
       return [];
     }
-    
+
     const zonesMap = new Map();
-    orderTableHook.tables.forEach(table => {
+    console.log('🏠 [ZONES-CALC] Processing', orderTableHook.tables.length, 'tables...');
+
+    orderTableHook.tables.forEach((table, index) => {
       const zoneName = table.zone_name || table.zone_detail?.name || 'Sin zona';
       const zoneId = table.zone || table.zone_detail?.id;
-      
+
       if (!zonesMap.has(zoneName)) {
-        const tablesInZone = orderTableHook.tables.filter(t => 
+        console.log(`🏠 [ZONES-CALC] Processing new zone: ${zoneName} (table ${index + 1})`);
+
+        const tablesInZone = orderTableHook.tables.filter(t =>
           (t.zone_name || t.zone_detail?.name || 'Sin zona') === zoneName
         );
-        const occupiedTables = tablesInZone.filter(t => 
-          orderTableHook.getTableStatus(t.id) === 'occupied'
-        ).length;
-        
-        zonesMap.set(zoneName, {
+
+        console.log(`🏠 [ZONES-CALC] Tables in zone ${zoneName}:`, tablesInZone.length);
+
+        const occupiedTables = tablesInZone.filter(t => {
+          const status = orderTableHook.getTableStatus(t.id);
+          console.log(`🏠 [ZONES-CALC] Table ${t.id} status: ${status}`);
+          return status === 'occupied';
+        }).length;
+
+        const zoneData = {
           id: zoneId,
           name: zoneName,
           totalTables: tablesInZone.length,
           occupiedTables,
           availableTables: tablesInZone.length - occupiedTables
-        });
+        };
+
+        console.log(`🏠 [ZONES-CALC] Zone ${zoneName} calculated:`, zoneData);
+        zonesMap.set(zoneName, zoneData);
       }
     });
-    
-    return Array.from(zonesMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+    const finalZones = Array.from(zonesMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    console.log('🏠 [ZONES-CALC] Final zones array:', finalZones);
+    return finalZones;
   }, [orderTableHook.tables, orderTableHook.allOrders]);
 
   // Obtener mesas de la zona seleccionada
@@ -892,8 +1052,15 @@ const OrderManagement = () => {
     );
   }
 
-  // Optimized loading state without debug logs
-  const shouldShowLoading = initialLoading || (orderTableHook.loading && (orderState.step === 'zones' || orderState.step === 'tables'));
+  // SOLUCIÓN SIMPLE: Loading unificado basado en datos disponibles
+  const shouldShowLoading = (
+    // Mostrar loading si no hay datos de tables aún
+    (!orderTableHook.tables || orderTableHook.tables.length === 0) ||
+    // O si estamos en loading inicial
+    initialLoading ||
+    // O si el hook está cargando para zones/tables
+    (orderTableHook.loading && (orderState.step === 'zones' || orderState.step === 'tables'))
+  );
   
   if (shouldShowLoading) {
     return (
@@ -1016,7 +1183,16 @@ const OrderManagement = () => {
           <div className="flex-1"></div>
 
           {/* Botón de reiniciar pedidos (solo para admins) */}
-          {userRole === 'administradores' && (
+          {(() => {
+            console.log('🔍 [HEADER-DEBUG] Verificando visibilidad de botones admin:', {
+              userRole,
+              isAdmin: userRole === 'administradores',
+              user: user?.username || 'no user',
+              userGroups: user?.groups || [],
+              timestamp: new Date().toISOString()
+            });
+            return userRole === 'administradores';
+          })() && (
             <button
               onClick={async () => {
                 if (window.confirm('⚠️ ¿Estás seguro de que quieres reiniciar TODOS los pedidos?\n\n• Se eliminarán todas las órdenes\n• Se eliminarán todos los pagos\n• Se eliminará la cola de impresión\n• Las configuraciones de impresoras se conservarán\n• Se reiniciarán los contadores de ID\n\nEsta acción no se puede deshacer.')) {
@@ -1052,51 +1228,6 @@ const OrderManagement = () => {
             </button>
           )}
 
-          {/* Botón de limpiar base de datos de producción (solo para admins) */}
-          {userRole === 'administradores' && (
-            <button
-              onClick={async () => {
-                if (window.confirm('🚨 ATENCIÓN: LIMPIAR BASE DE DATOS DE PRODUCCIÓN\n\n⚠️ Esta acción eliminará TODOS los pedidos del servidor en producción:\n\n• Se eliminarán todas las órdenes del servidor EC2\n• Se eliminarán todos los pagos del servidor EC2\n• Se eliminará la cola de impresión del servidor EC2\n• Las configuraciones de impresoras se conservarán\n• Se reiniciarán los contadores de ID del servidor EC2\n• Afectará a todos los usuarios conectados\n\n🔴 ESTA ACCIÓN NO SE PUEDE DESHACER\n\n¿Estás COMPLETAMENTE seguro de proceder?')) {
-                  if (window.confirm('🔴 CONFIRMACIÓN FINAL\n\n¿Realmente quieres ELIMINAR TODOS los datos de producción?\n\nEscribe "CONFIRMAR" en el siguiente diálogo para continuar.')) {
-                    const confirmation = window.prompt('Por seguridad, escribe "CONFIRMAR" para proceder:');
-                    if (confirmation === 'CONFIRMAR') {
-                      try {
-                        setOrderState(prev => ({ ...prev, saving: true }));
-                        await apiService.orders.resetAll();
-                        showToast('🚨 BASE DE DATOS DE PRODUCCIÓN LIMPIADA: Todos los pedidos y cola de impresión eliminados (configuraciones de impresoras conservadas)', 'success');
-                        
-                        // Limpiar estado y volver a la vista de zonas
-                        orderTableHook.setSelectedTable(null);
-                        orderCartHook.clearCart();
-                        navigateToStep('zones', { 
-                          selectedZone: null, 
-                          isCartOpen: false 
-                        });
-                        
-                        // Recargar datos en segundo plano sin bloquear UI
-                        orderTableHook.loadInitialData();
-                      } catch (error) {
-                        // Error already shown via showToast
-                        showToast(`❌ Error al limpiar base de datos de producción: ${error.message}`, 'error');
-                      } finally {
-                        setOrderState(prev => ({ ...prev, saving: false }));
-                      }
-                    } else {
-                      showToast('❌ Operación cancelada - Confirmación incorrecta', 'error');
-                    }
-                  } else {
-                    showToast('❌ Operación cancelada por el usuario', 'info');
-                  }
-                }
-              }}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-700 text-white hover:bg-red-800 transition-colors mr-2 border-2 border-red-900"
-              title="⚠️ LIMPIAR base de datos del servidor de producción (EC2)"
-              disabled={orderState.saving}
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">🚨 Reset PROD</span>
-            </button>
-          )}
 
           {/* Botón de resetear TODA la base de datos (solo para admins) */}
           {userRole === 'administradores' && (
@@ -1195,7 +1326,22 @@ const OrderManagement = () => {
                       {zone.name}
                     </h3>
                     <div className="text-lg text-gray-600">
-                      {zone.availableTables} mesas disponibles
+                      {(() => {
+                        const hasTablesData = orderTableHook.tables && orderTableHook.tables.length > 0;
+                        const displayText = hasTablesData
+                          ? `${zone.availableTables} mesas disponibles`
+                          : 'Cargando...';
+
+                        console.log(`🏠 [ZONE-RENDER] Zone ${zone.name} display:`, {
+                          hasTablesData,
+                          tablesLength: orderTableHook.tables?.length || 0,
+                          zoneAvailableTables: zone.availableTables,
+                          displayText,
+                          fullZoneData: zone
+                        });
+
+                        return displayText;
+                      })()}
                     </div>
                   </div>
                 </button>

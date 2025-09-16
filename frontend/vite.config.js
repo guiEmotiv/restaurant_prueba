@@ -51,6 +51,11 @@ export default defineConfig(({ mode }) => {
             console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
           });
         },
+      },
+      '/csrf': {
+        target: backendTarget,
+        changeOrigin: true,
+        secure: false,
       }
     }
   },

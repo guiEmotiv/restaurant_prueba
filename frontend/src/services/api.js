@@ -577,6 +577,10 @@ export const apiService = {
       const response = await api.post(`/order-items/${id}/add_ingredient/`, { ingredient, quantity });
       return response.data;
     },
+    retryPrint: async (id) => {
+      const response = await api.post(`/order-items/${id}/retry_print/`);
+      return response.data;
+    },
   },
 
   orderItemIngredients: {
@@ -824,90 +828,7 @@ export const apiService = {
     delete: (id) => apiService.delete('cart-items', id),
   },
 
-  // PHASE 3: Print Queue - Funciones minimalistas para monitoreo
-  printQueue: {
-    // Obtener estado de la cola (minimalista - solo para badges sutiles)
-    getStatus: async () => {
-      try {
-        // Cache-busting: agregar timestamp único para evitar respuestas cacheadas
-        const response = await api.get(`/print-queue/queue_status/?_t=${Date.now()}`);
-        return response.data;
-      } catch (error) {
-        // Fallar silenciosamente para no interrumpir la UI
-        logger.warn('Print queue status check failed:', error.message);
-        return { pending_count: 0, failed_count: 0 };
-      }
-    },
-
-    // Obtener trabajos de un pedido específico (para badges sutiles)
-    getOrderJobs: async (orderId) => {
-      try {
-        // Cache-busting: agregar timestamp único para evitar respuestas cacheadas
-        const response = await api.get(`/print-queue/?order_id=${orderId}&_t=${Date.now()}`);
-        return response.data.results || response.data || [];
-      } catch (error) {
-        logger.warn('Order print jobs check failed:', error.message);
-        return [];
-      }
-    },
-
-    // Reintentar trabajos fallidos (para botón sutil de retry)
-    retryFailed: async () => {
-      try {
-        const response = await api.post('/print-queue/retry_all_failed/');
-        return response.data;
-      } catch (error) {
-        logger.error('Retry failed jobs error:', error);
-        throw error;
-      }
-    },
-
-    // Reintentar trabajo específico fallido
-    retryJob: async (jobId) => {
-      try {
-        const response = await api.post(`/print-queue/${jobId}/retry_job/`);
-        return response.data;
-      } catch (error) {
-        logger.error('Failed to retry print job:', error);
-        throw error;
-      }
-    },
-
-    // Obtener trabajos de impresión por order item
-    getJobsByOrderItem: async (orderItemId) => {
-      try {
-        // Cache-busting: agregar timestamp único para evitar respuestas cacheadas
-        const response = await api.get(`/print-queue/?order_item_id=${orderItemId}&_t=${Date.now()}`);
-        return response.data.results || response.data || [];
-      } catch (error) {
-        logger.warn('Order item print jobs check failed:', error.message);
-        return [];
-      }
-    },
-
-    // Obtener todos los trabajos de impresión con filtros
-    getAll: async (params = {}) => {
-      try {
-        const queryString = new URLSearchParams(params).toString();
-        const response = await api.get(`/print-queue/${queryString ? '?' + queryString : ''}`);
-        return response.data;
-      } catch (error) {
-        logger.error('Failed to get print queue jobs:', error);
-        throw error;
-      }
-    },
-
-    // Actualizar trabajo específico
-    update: async (jobId, data) => {
-      try {
-        const response = await api.put(`/print-queue/${jobId}/`, data);
-        return response.data;
-      } catch (error) {
-        logger.error('Failed to update print job:', error);
-        throw error;
-      }
-    }
-  },
+  // REMOVIDO: Print Queue - Ya no se usa con impresión USB directa
 
 
 };

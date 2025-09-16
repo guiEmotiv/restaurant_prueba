@@ -99,8 +99,8 @@ const Layout = ({ children }) => {
       permission: null, // Se filtrará por sus hijos
       children: [
         { name: 'Procesar Pagos', href: '/cashier-payment', icon: CreditCard, permission: 'can_process_payments' },
-        { name: 'Historial', href: '/payment-history', icon: History, permission: 'can_access_dashboard' },
-        { name: 'Consultar Pedido', href: '/order-tracker', icon: Eye, permission: 'can_manage_kitchen' },
+        { name: 'Historial', href: '/payment-history', icon: History, permission: 'can_process_payments' },
+        { name: 'Consultar Pedido', href: '/order-tracker', icon: Eye, permission: 'can_process_payments' },
       ]
     },
   ];

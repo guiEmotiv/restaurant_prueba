@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from backend.development_permissions import IsAuthenticatedPermission, IsAdminPermission, DevelopmentAwarePermission, DevelopmentAwareAdminPermission
 # Rate limiting moved to Nginx - no longer using Django decorators
-from .models import Order, OrderItem, Payment, PaymentItem, ContainerSale, PrinterConfig, PrintQueue
+from .models import Order, OrderItem, Payment, PaymentItem, ContainerSale, PrinterConfig
 from .serializers import (
     OrderSerializer, OrderDetailSerializer, OrderCreateSerializer,
     OrderItemSerializer, OrderItemCreateSerializer,
@@ -158,14 +158,9 @@ class OrderViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         order = serializer.save()
-        
-        # Optimize the query for OrderDetailSerializer
-        optimized_order = OrderDetailSerializer.setup_eager_loading(
-            Order.objects.filter(id=order.id)
-        ).first()
-        
-        # Return the order with full details using OrderDetailSerializer
-        response_serializer = OrderDetailSerializer(optimized_order)
+
+        # Return order details using OrderDetailSerializer
+        response_serializer = OrderDetailSerializer(order, context={'request': request})
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['post'])
@@ -187,103 +182,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=True, methods=['post'])
-    def check_print_status(self, request, pk=None):
-        """Verificar estado de impresión y auto-actualizar items a PREPARING"""
-        order = self.get_object()
-        
-        from .models import PrintQueue
-        from django.utils import timezone
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        
-        # Obtener todos los items de la orden
-        order_items = order.orderitem_set.all()
-        status_updates = []
-        
-        for order_item in order_items:
-            # Solo procesar items CREATED
-            if order_item.status != 'CREATED':
-                status_updates.append({
-                    'item_id': order_item.id,
-                    'item_name': order_item.recipe.name,
-                    'current_status': order_item.status,
-                    'print_status': 'n/a',
-                    'action': 'no_change'
-                })
-                continue
-            
-            # Buscar trabajos de impresión para este item
-            print_jobs = PrintQueue.objects.filter(order_item=order_item).order_by('-created_at')
-            
-            if not print_jobs.exists():
-                # No hay trabajos - item no requiere impresión
-                status_updates.append({
-                    'item_id': order_item.id,
-                    'item_name': order_item.recipe.name,
-                    'current_status': order_item.status,
-                    'print_status': 'not_required',
-                    'action': 'no_print_needed'
-                })
-                continue
-            
-            latest_job = print_jobs.first()
-            
-            if latest_job.status == 'printed':
-                # Trabajo completado - solo marcar timestamp, NO cambiar estado
-                if not order_item.printed_at:
-                    order_item.printed_at = timezone.now()
-                    order_item.save()
-                
-                status_updates.append({
-                    'item_id': order_item.id,
-                    'item_name': order_item.recipe.name,
-                    'current_status': order_item.status,
-                    'print_status': 'printed',
-                    'action': 'ready_to_prepare',
-                    'print_job_id': latest_job.id
-                })
-                
-            elif latest_job.status == 'failed':
-                status_updates.append({
-                    'item_id': order_item.id,
-                    'item_name': order_item.recipe.name,
-                    'current_status': 'CREATED',
-                    'print_status': 'failed',
-                    'action': 'needs_retry',
-                    'print_job_id': latest_job.id,
-                    'error_message': latest_job.error_message
-                })
-                
-            else:  # pending, in_progress
-                status_updates.append({
-                    'item_id': order_item.id,
-                    'item_name': order_item.recipe.name,
-                    'current_status': 'CREATED',
-                    'print_status': latest_job.status,
-                    'action': 'waiting',
-                    'print_job_id': latest_job.id
-                })
-        
-        # Verificar si todos los items están en PREPARING
-        order.refresh_from_db()  # Refresh para obtener estados actualizados
-        all_preparing = all(item.status == 'PREPARING' for item in order.orderitem_set.all())
-        
-        logger.info(f"Print status check for Order #{order.id}: {len(status_updates)} items processed")
-        
-        return Response({
-            'order_id': order.id,
-            'all_preparing': all_preparing,
-            'items': status_updates,
-            'summary': {
-                'total_items': len(status_updates),
-                'preparing_count': len([u for u in status_updates if u['current_status'] == 'PREPARING']),
-                'failed_count': len([u for u in status_updates if u['print_status'] == 'failed']),
-                'pending_count': len([u for u in status_updates if u['print_status'] in ['pending', 'in_progress']])
-            }
-        })
-    
+    # ELIMINADO: check_print_status - ya no se necesita con impresión USB directa
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         """Cancelar una orden completa"""
@@ -371,98 +270,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         serializer = OrderSerializer(orders, many=True)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['get'])
-    def kitchen(self, request):
-        """Vista para la cocina - órdenes activas con items pendientes"""
-        # Cache por 5 segundos
-        cache_key = 'kitchen_view_orders'
-        cached_data = cache.get(cache_key)
-        
-        if cached_data is not None:
-            return Response(cached_data)
-        
-        # Solo órdenes CREATED (no canceladas/pagadas) que tienen items CREATED
-        orders = Order.objects.filter(
-            status='CREATED',
-            orderitem__status='CREATED'
-        ).select_related('table__zone').prefetch_related(
-            'orderitem_set__recipe__group'
-        ).distinct().order_by('created_at')[:50]  # Limitar resultados
-        
-        serializer = OrderDetailSerializer(orders, many=True)
-        data = serializer.data
-        
-        # Cache por 5 segundos
-        cache.set(cache_key, data, 5)
-        return Response(data)
-    
-    @action(detail=False, methods=['get'])
-    def kitchen_board(self, request):
-        """Vista de tablero de cocina - cada OrderItem individual como entrada separada"""
-        # Cache por 2 segundos para mejor sincronización multi-usuario
-        cache_key = 'kitchen_board_data'
-        cached_data = cache.get(cache_key)
-        
-        if cached_data is not None:
-            return Response(cached_data)
-        from django.db.models import Q
-        
-        # Obtener todos los order items que están pendientes (CREATED, PREPARING, SERVED)
-        # Incluir SERVED para que se vean tachados en la vista de cocina
-        order_items = OrderItem.objects.filter(
-            status__in=['CREATED', 'PREPARING', 'SERVED']
-        ).exclude(
-            order__status='PAID'  # Excluir solo órdenes ya pagadas
-        ).select_related('recipe', 'recipe__group', 'order', 'order__table', 'order__table__zone').order_by('created_at')
-        
-        # Crear entrada separada para cada OrderItem individual
-        result = []
-        for item in order_items:
-            # Calcular tiempo transcurrido desde la creación
-            from django.utils import timezone
-            elapsed_minutes = int((timezone.now() - item.created_at).total_seconds() / 60)
-            is_overdue = elapsed_minutes > item.recipe.preparation_time
-            
-            item_data = {
-                'id': item.id,
-                'order_id': item.order.id,
-                'order_table': item.order.table.table_number,
-                'order_zone': item.order.table.zone.name,
-                'waiter_name': item.order.waiter if item.order.waiter else 'Sin mesero',
-                'status': item.status,
-                'notes': item.notes,
-                'is_takeaway': item.is_takeaway,
-                'created_at': item.created_at.isoformat(),
-                'preparing_at': item.preparing_at.isoformat() if item.preparing_at else None,
-                'elapsed_time_minutes': elapsed_minutes,
-                'preparation_time': item.recipe.preparation_time,
-                'is_overdue': is_overdue,
-                'customizations_count': 0,  # OrderItemIngredient fue eliminado
-                'recipe_group_name': item.recipe.group.name if item.recipe.group else 'Sin Grupo',
-                'recipe_group_id': item.recipe.group.id if item.recipe.group else None
-            }
-            
-            # Cada OrderItem se convierte en una entrada separada con un solo item
-            result.append({
-                'recipe_name': item.recipe.name,
-                'recipe_group_name': item.recipe.group.name if item.recipe.group else 'Sin Grupo',
-                'recipe_group_id': item.recipe.group.id if item.recipe.group else None,
-                'total_items': 1,  # Siempre 1 porque cada entrada es un item individual
-                'pending_items': 1 if item.status == 'CREATED' else 0,
-                'served_items': 1 if item.status == 'SERVED' else 0,
-                'overdue_items': 1 if is_overdue else 0,
-                'items': [item_data]  # Array con un solo item
-            })
-        
-        # Ordenar por urgencia: primero los retrasados, luego por tiempo de creación
-        result.sort(key=lambda x: (
-            -x['overdue_items'],  # Retrasados primero (orden descendente)
-            x['items'][0]['created_at']  # Luego por tiempo de creación (más antiguos primero)
-        ))
-        
-        # Cache por 2 segundos para mejor sincronización multi-usuario
-        cache.set(cache_key, result, 2)
-        return Response(result)
+    # REMOVIDO: Kitchen endpoints - Ya no se usan, solo gestión de pedidos
     
     @action(detail=True, methods=['post'])
     def process_payment(self, request, pk=None):
@@ -583,8 +391,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             OrderItem.objects.all().delete()
             Order.objects.all().delete()
             
-            # Eliminar solo la cola de impresión, mantener configuración de impresoras
-            PrintQueue.objects.all().delete()
+            # Note: Print functionality has been removed from this project
             
             # Reiniciar el contador de autoincremento en SQLite
             with connection.cursor() as cursor:
@@ -594,10 +401,10 @@ class OrderViewSet(viewsets.ModelViewSet):
                 cursor.execute('DELETE FROM sqlite_sequence WHERE name="payment"')
                 cursor.execute('DELETE FROM sqlite_sequence WHERE name="payment_item"')  # ¡FALTABA!
                 cursor.execute('DELETE FROM sqlite_sequence WHERE name="container_sale"')
-                cursor.execute('DELETE FROM sqlite_sequence WHERE name="print_queue"')
+                # Note: print_queue table removed
             
             return Response({
-                'message': '✅ Todos los pedidos y cola de impresión eliminados y contadores reiniciados (configuraciones de impresoras conservadas)',
+                'message': '✅ Todos los pedidos eliminados y contadores reiniciados',
                 'status': 'success'
             }, status=status.HTTP_200_OK)
         except Exception as e:
@@ -623,14 +430,14 @@ class OrderViewSet(viewsets.ModelViewSet):
             ContainerSale.objects.all().delete()
             OrderItem.objects.all().delete()
             Order.objects.all().delete()
-            PrintQueue.objects.all().delete()
-            
+            # Note: Print functionality has been removed from this project
+
             # 2. Eliminar recetas y sus items
             RecipeItem.objects.all().delete()
             Recipe.objects.all().delete()
             
             # 3. Eliminar configuración
-            PrinterConfig.objects.all().delete()
+            # Note: PrinterConfig removed from this project
             Table.objects.all().delete()
             Zone.objects.all().delete()
             Container.objects.all().delete()
@@ -642,8 +449,8 @@ class OrderViewSet(viewsets.ModelViewSet):
             with connection.cursor() as cursor:
                 table_names = [
                     'order', 'order_item', 'payment', 'payment_item', 'container_sale',
-                    'print_queue', 'printer_config', 'recipe', 'recipe_item',
-                    'table', 'zone', 'container', 'ingredient', 'group', 'unit'
+                    'recipe', 'recipe_item', 'table', 'zone', 'container',
+                    'ingredient', 'group', 'unit'
                 ]
                 
                 for table_name in table_names:
@@ -765,29 +572,79 @@ class OrderItemViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         """Cancelar un item de orden"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            logger.error(f"🔴 CANCEL ENDPOINT - Starting cancel for OrderItem {pk}")
+            order_item = self.get_object()
+            logger.error(f"🔴 CANCEL ENDPOINT - Found OrderItem {order_item.id}, status: {order_item.status}")
+
+            # Verificar que el item puede ser cancelado
+            if order_item.status in ['PAID', 'CANCELED']:
+                logger.error(f"🔴 CANCEL ENDPOINT - Cannot cancel item with status {order_item.status}")
+                return Response(
+                    {'error': f'No se puede cancelar un item con estado {order_item.status}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            cancellation_reason = request.data.get('cancellation_reason', '')
+            logger.error(f"🔴 CANCEL ENDPOINT - Cancellation reason: '{cancellation_reason}'")
+            if not cancellation_reason:
+                logger.error("🔴 CANCEL ENDPOINT - Missing cancellation reason")
+                return Response(
+                    {'error': 'El motivo de cancelación es requerido'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Cancelar el item usando el método update_status para activar _cancel_print_jobs()
+            logger.error(f"🔴 CANCEL ENDPOINT - Setting cancellation reason and calling update_status")
+            order_item.cancellation_reason = cancellation_reason
+            order_item.update_status('CANCELED')
+            logger.error(f"🔴 CANCEL ENDPOINT - Update status completed successfully")
+
+            serializer = OrderItemSerializer(order_item)
+            logger.error(f"🔴 CANCEL ENDPOINT - Serialization completed, returning success")
+            return Response(serializer.data)
+
+        except ValidationError as e:
+            logger.error(f"🔴 CANCEL ENDPOINT - ValidationError: {str(e)}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"🔴 CANCEL ENDPOINT - Unexpected error: {str(e)}")
+            logger.error(f"🔴 CANCEL ENDPOINT - Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"🔴 CANCEL ENDPOINT - Full traceback: {traceback.format_exc()}")
+            return Response(
+                {'error': f'Error al cancelar item: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'])
+    def retry_print(self, request, pk=None):
+        """Reintentar impresión de un item de orden"""
         order_item = self.get_object()
-        
-        # Verificar que el item puede ser cancelado
-        if order_item.status in ['PAID', 'CANCELED']:
-            return Response(
-                {'error': f'No se puede cancelar un item con estado {order_item.status}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        cancellation_reason = request.data.get('cancellation_reason', '')
-        if not cancellation_reason:
-            return Response(
-                {'error': 'El motivo de cancelación es requerido'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Cancelar el item usando el método update_status para activar _cancel_print_jobs()
-        order_item.cancellation_reason = cancellation_reason
-        order_item.update_status('CANCELED')
-        
-        serializer = OrderItemSerializer(order_item)
-        return Response(serializer.data)
-    
+
+        # Usar el método retry_print del modelo
+        success, message = order_item.retry_print()
+
+        if success:
+            # Devolver el item actualizado
+            serializer = OrderItemSerializer(order_item)
+            return Response({
+                'success': True,
+                'message': message,
+                'item': serializer.data
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': message
+            }, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None):
         """Actualizar estado de un item de orden"""
@@ -814,8 +671,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
             
             order_item.update_status(new_status, allow_automatic=True)
             
-            # CRITICAL: Invalidate kitchen_board cache immediately after status update
-            cache.delete('kitchen_board_data')
+            # Status updated successfully
             
             serializer = OrderItemSerializer(order_item)
             return Response(serializer.data)
@@ -848,8 +704,7 @@ class OrderItemViewSet(viewsets.ModelViewSet):
         order_item.printed_at = timezone.now()
         order_item.save()
         
-        # Invalidar cache
-        cache.delete('kitchen_board_data')
+        # Mark as printed completed
         
         serializer = OrderItemSerializer(order_item)
         return Response({

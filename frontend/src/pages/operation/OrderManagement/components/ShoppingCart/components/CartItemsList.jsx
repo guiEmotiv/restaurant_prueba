@@ -1,22 +1,29 @@
 import CartItem from './CartItem';
 import OrderItem from './OrderItem';
+import { processExistingItems } from '../utils/cartHelpers';
 
-const CartItemsList = ({ 
+const CartItemsList = ({
   cart,
   currentOrder,
   onRemoveFromCart,
   onCancelOrderItem,
   onOrderItemStatusChange,
-  saving = false 
+  onRetryPrint,
+  saving = false,
+  // Nuevas props necesarias para verificación de roles
+  canCancelItem,
+  userRole,
+  filterActiveItems
 }) => {
+
+  // Procesar items existentes con verificación de roles correcta
+  const activeItems = currentOrder?.items ? filterActiveItems(currentOrder.items) : [];
+  const processedOrderItems = processExistingItems(activeItems, canCancelItem, userRole);
   
-  // Filtrar items cancelados - no mostrarlos en el panel lateral
-  const visibleOrderItems = currentOrder?.items?.filter(item => item.status !== 'CANCELED') || [];
   
-  
-  // Mostrar items del carrito + items de orden existente (excluyendo cancelados)
+  // Mostrar items del carrito + items de orden existente (ya procesados con verificación de roles)
   const hasCartItems = cart.length > 0;
-  const hasOrderItems = visibleOrderItems.length > 0;
+  const hasOrderItems = processedOrderItems.length > 0;
   
   if (!hasCartItems && !hasOrderItems) {
     return (
@@ -28,14 +35,15 @@ const CartItemsList = ({
 
   return (
     <div className="flex-1 overflow-y-auto">
-        {/* Items de orden existente PRIMERO (ya creados, con estado de impresión) - SOLO VISIBLES (NO CANCELED) */}
-        {visibleOrderItems.map((item, index) => (
+        {/* Items de orden existente PRIMERO (ya procesados con verificación de roles correcta) */}
+        {processedOrderItems.map((item, index) => (
           <OrderItem
-            key={`order-${item.id}`}
+            key={`order-${item.originalItem?.id || item.id}`}
             item={item}
             itemNumber={index + 1}
             onCancelItem={onCancelOrderItem}
             onStatusChange={onOrderItemStatusChange}
+            onRetryPrint={onRetryPrint}
             saving={saving}
           />
         ))}
@@ -45,7 +53,7 @@ const CartItemsList = ({
           <CartItem
             key={`cart-${item.cartIndex || index}`}
             item={item}
-            itemNumber={visibleOrderItems.length + index + 1}
+            itemNumber={processedOrderItems.length + index + 1}
             cartIndex={index}
             onRemoveFromCart={onRemoveFromCart}
             saving={saving}

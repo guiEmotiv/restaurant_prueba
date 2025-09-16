@@ -109,7 +109,7 @@ const AppContent = () => {
 
           {/* Payment routes */}
           <Route path="/payment-history" element={
-            <ProtectedRoute requiredPermission="can_access_dashboard">
+            <ProtectedRoute requiredPermission="can_process_payments">
               <PaymentHistory />
             </ProtectedRoute>
           } />
@@ -120,9 +120,9 @@ const AppContent = () => {
             </ProtectedRoute>
           } />
 
-          {/* Order Tracker route - Kitchen staff and managers */}
+          {/* Order Tracker route - Kitchen staff and cashiers */}
           <Route path="/order-tracker" element={
-            <ProtectedRoute requiredPermission="can_manage_kitchen">
+            <ProtectedRoute requiredPermission="can_process_payments">
               <OrderTracker />
             </ProtectedRoute>
           } />

@@ -1,13 +1,26 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 
-const TableSelection = ({ 
-  tables, 
-  onTableSelect, 
-  getTableStatus, 
-  getTableSummary 
+const TableSelection = ({
+  tables,
+  onTableSelect,
+  getTableStatus,
+  getTableSummary
 }) => {
+
+  // DEBUG: Log cuando cambian las mesas
+  useEffect(() => {
+    console.log('🟨 [TABLE-SELECTION] Tables prop changed:', {
+      tablesCount: tables?.length || 0,
+      tables: tables?.map(t => ({ id: t.id, table_number: t.table_number, zone: t.zone_name || t.zone }))
+    });
+  }, [tables]);
+
   // Manejar selección de mesa
   const handleTableClick = useCallback((table) => {
+    console.log('🟨 [TABLE-SELECTION] Table clicked:', {
+      id: table.id,
+      table_number: table.table_number
+    });
     onTableSelect(table);
   }, [onTableSelect]);
 

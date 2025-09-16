@@ -70,6 +70,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "backend.auth_middleware.AuthDebugMiddleware",  # Custom auth debugging
+    "backend.permissions_logger.DetailedPermissionMiddleware",  # Permission logging
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -127,7 +129,6 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite development server
     "http://127.0.0.1:5173",
-    "http://192.168.1.100:5173",  # Local network IP
 ]
 
 # Allow all origins in development for easier testing
@@ -140,11 +141,16 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",  # Vite development server
     "http://127.0.0.1:5173",
-    "http://192.168.1.100:5173",  # Local network IP
     "http://localhost:8000",  # Backend server
     "http://127.0.0.1:8000",
-    "http://192.168.1.100:8000",  # Backend on network IP
 ]
+
+# Add LOCAL_IP dynamically to CORS and CSRF if available
+LOCAL_IP = os.getenv('LOCAL_IP', '')
+if LOCAL_IP:
+    CORS_ALLOWED_ORIGINS.append(f"http://{LOCAL_IP}:5173")
+    CSRF_TRUSTED_ORIGINS.append(f"http://{LOCAL_IP}:5173")
+    CSRF_TRUSTED_ORIGINS.append(f"http://{LOCAL_IP}:8000")
 
 # Local development CSRF origins only
 

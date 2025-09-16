@@ -5,6 +5,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from backend.development_permissions import IsAuthenticatedPermission, IsAdminPermission
 from django.db import transaction
 from django.conf import settings
 import os
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 class PrinterConfigViewSet(viewsets.ModelViewSet):
     """ViewSet para gestión de configuraciones de impresoras - SIMPLIFICADO SIN PRINTQUEUE"""
     queryset = PrinterConfig.objects.all().order_by('name')
+    permission_classes = [AllowAny]  # Allow any for development
     
     def get_queryset(self):
         """Filtrar por parámetros de query"""
@@ -94,54 +96,195 @@ class PrinterConfigViewSet(viewsets.ModelViewSet):
         logger.info(f"🗑️ Eliminando impresora: {instance.name}")
         return super().destroy(request, *args, **kwargs)
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
     def test_connection(self, request, pk=None):
-        """ELIMINADO: Test de conexión - sin servicio HTTP"""
+        """Test de conexión USB directa - Imprime etiqueta de prueba"""
         printer = self.get_object()
-        logger.info(f"🧪 Test solicitado para: {printer.name} - FUNCIONALIDAD ELIMINADA")
-        
-        return Response({
-            'message': 'Funcionalidad de test eliminada - se usa impresión directa',
-            'printer_name': printer.name,
-            'status': 'disabled'
-        })
+        logger.info(f"🧪 Test de conexión USB para: {printer.name} en {printer.usb_port}")
+
+        # Preparar contenido de prueba con timezone de Perú
+        from django.utils import timezone
+        import pytz
+
+        # Obtener hora actual en timezone de Perú (sin corrección - sistema está correcto)
+        peru_tz = pytz.timezone('America/Lima')
+        now_peru = timezone.now().astimezone(peru_tz)
+
+        logger.info(f"📅 Fecha y hora actual de Perú: {now_peru}")
+
+        test_content = f"""
+================================
+      PRUEBA DE IMPRESORA
+================================
+Impresora: {printer.name}
+Puerto: {printer.usb_port}
+Fecha: {now_peru.strftime('%d/%m/%Y')}
+Hora: {now_peru.strftime('%H:%M:%S')}
+Zona: America/Lima (UTC-5)
+================================
+Test de conectividad exitoso
+Sistema de Restaurant
+================================
+
+\x1B\x6D""".strip()
+
+        try:
+            # Intentar escribir directamente al puerto USB
+            with open(printer.usb_port, 'wb') as usb_printer:
+                usb_printer.write(test_content.encode('utf-8'))
+                usb_printer.flush()
+
+            logger.info(f"✅ Test exitoso en {printer.name}")
+
+            # Actualizar último uso con timezone
+            printer.last_used_at = timezone.now()
+            printer.save(update_fields=['last_used_at'])
+
+            return Response({
+                'test_result': {
+                    'success': True,
+                    'message': f'Test exitoso en {printer.name}'
+                },
+                'printer_name': printer.name,
+                'usb_port': printer.usb_port,
+                'status': 'success'
+            })
+
+        except FileNotFoundError:
+            error_msg = f'Puerto USB no encontrado: {printer.usb_port}'
+            logger.error(f"❌ {error_msg}")
+            return Response({
+                'test_result': {
+                    'success': False,
+                    'error': error_msg
+                },
+                'printer_name': printer.name,
+                'usb_port': printer.usb_port,
+                'status': 'error'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except PermissionError:
+            error_msg = f'Sin permisos para acceder a {printer.usb_port}'
+            logger.error(f"❌ {error_msg}")
+            return Response({
+                'test_result': {
+                    'success': False,
+                    'error': error_msg
+                },
+                'printer_name': printer.name,
+                'usb_port': printer.usb_port,
+                'status': 'error'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            error_msg = f'Error al probar impresora: {str(e)}'
+            logger.error(f"❌ {error_msg}")
+            return Response({
+                'test_result': {
+                    'success': False,
+                    'error': error_msg
+                },
+                'printer_name': printer.name,
+                'usb_port': printer.usb_port,
+                'status': 'error'
+            }, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def test_all(self, request):
-        """ELIMINADO: Test masivo - sin servicio HTTP"""
+        """Test masivo de todas las impresoras activas"""
         active_printers = PrinterConfig.objects.filter(is_active=True)
-        logger.info(f"🧪 Test masivo solicitado - FUNCIONALIDAD ELIMINADA")
-        
+        logger.info(f"🧪 Test masivo de {active_printers.count()} impresoras activas")
+
+        results = []
+        successful = 0
+        failed = 0
+
+        from django.utils import timezone
+        import pytz
+
+        # Obtener hora actual en timezone de Perú (sin corrección - sistema está correcto)
+        peru_tz = pytz.timezone('America/Lima')
+        now_peru = timezone.now().astimezone(peru_tz)
+
+        logger.info(f"📅 Test masivo - Fecha y hora actual de Perú: {now_peru}")
+
+        for printer in active_printers:
+            test_content = f"""
+================================
+      PRUEBA DE IMPRESORA
+================================
+Impresora: {printer.name}
+Puerto: {printer.usb_port}
+Fecha: {now_peru.strftime('%d/%m/%Y')}
+Hora: {now_peru.strftime('%H:%M:%S')}
+Zona: America/Lima (UTC-5)
+================================
+Test masivo de conectividad
+================================
+
+\x1B\x6D""".strip()
+
+            try:
+                with open(printer.usb_port, 'wb') as usb_printer:
+                    usb_printer.write(test_content.encode('utf-8'))
+                    usb_printer.flush()
+
+                printer.last_used_at = timezone.now()
+                printer.save(update_fields=['last_used_at'])
+
+                results.append({
+                    'printer_name': printer.name,
+                    'usb_port': printer.usb_port,
+                    'success': True,
+                    'message': 'Test exitoso'
+                })
+                successful += 1
+                logger.info(f"✅ Test exitoso: {printer.name}")
+
+            except Exception as e:
+                results.append({
+                    'printer_name': printer.name,
+                    'usb_port': printer.usb_port,
+                    'success': False,
+                    'error': str(e)
+                })
+                failed += 1
+                logger.error(f"❌ Test fallido en {printer.name}: {e}")
+
         return Response({
-            'message': 'Funcionalidad de test masivo eliminada - se usa impresión directa',
-            'total_printers': active_printers.count(),
-            'status': 'disabled'
+            'summary': {
+                'total_tested': active_printers.count(),
+                'successful': successful,
+                'failed': failed
+            },
+            'results': results,
+            'status': 'completed'
         })
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
     def activate(self, request, pk=None):
         """Activar una impresora - SIMPLIFICADO"""
         printer = self.get_object()
         printer.is_active = True
         printer.save(update_fields=['is_active'])
-        
+
         logger.info(f"✅ Impresora activada: {printer.name}")
-        
+
         return Response({
             'message': f'Impresora {printer.name} activada',
             'printer_name': printer.name,
             'is_active': True
         })
-    
-    @action(detail=True, methods=['post'])
+
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
     def deactivate(self, request, pk=None):
         """Desactivar una impresora - SIMPLIFICADO"""
         printer = self.get_object()
         printer.is_active = False
         printer.save(update_fields=['is_active'])
-        
+
         logger.info(f"⏸️ Impresora desactivada: {printer.name}")
-        
+
         return Response({
             'message': f'Impresora {printer.name} desactivada',
             'printer_name': printer.name,
@@ -160,7 +303,7 @@ class PrinterConfigViewSet(viewsets.ModelViewSet):
             'status': 'disabled'
         })
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def status_summary(self, request):
         """Obtener resumen del estado de todas las impresoras - SIMPLIFICADO"""
         total_printers = PrinterConfig.objects.count()

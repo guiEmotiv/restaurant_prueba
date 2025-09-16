@@ -122,37 +122,38 @@ export const EXCEL_IMPORT_CONFIGS = {
   recipes: {
     templateConfig: {
       columns: [
-        'name', 'version', 'group', 'container', 
-        'profit_percentage', 'preparation_time', 
-        'ingredient_1', 'quantity_1', 'ingredient_2', 'quantity_2', 
+        'name', 'version', 'group', 'container',
+        'profit_percentage', 'preparation_time', 'is_available', 'is_active',
+        'ingredient_1', 'quantity_1', 'ingredient_2', 'quantity_2',
         'ingredient_3', 'quantity_3', 'ingredient_4', 'quantity_4',
         'ingredient_5', 'quantity_5', 'ingredient_6', 'quantity_6',
         'ingredient_7', 'quantity_7', 'ingredient_8', 'quantity_8'
       ],
       examples: [
         [
-          'Arroz con Pollo', '1.0', 'Platos Principales', 'Envase Mediano', 
-          '15.0', '25', 'Pollo', '0.5', 'Arroz', '0.2', 'Aceite de Oliva', '0.05', '', '', '', '', '', '', '', ''
+          'Arroz con Pollo', '1.0', 'Platos Principales', 'Envase Mediano',
+          '15.0', '25', 'TRUE', 'TRUE', 'Pollo', '0.5', 'Arroz', '0.2', 'Aceite de Oliva', '0.05', '', '', '', '', '', ''
         ],
         [
-          'Ensalada César', '1.0', 'Entradas', 'Envase Pequeño', 
-          '20.0', '10', 'Lechuga', '0.1', 'Huevos', '2', 'Aceite de Oliva', '0.03', '', '', '', '', '', '', '', ''
+          'Ensalada César', '1.0', 'Entradas', 'Envase Pequeño',
+          '20.0', '10', 'TRUE', 'TRUE', 'Lechuga', '0.1', 'Huevos', '2', 'Aceite de Oliva', '0.03', '', '', '', '', '', ''
         ],
         [
-          'Tiramisu', '1.0', 'Postres', 'Envase Pequeño', 
-          '25.0', '5', 'Leche', '0.2', 'Huevos', '1', '', '', '', '', '', '', '', '', '', ''
+          'Tiramisu', '1.0', 'Postres', 'Envase Pequeño',
+          '25.0', '5', 'TRUE', 'TRUE', 'Leche', '0.2', 'Huevos', '1', '', '', '', '', '', '', '', '', '', ''
         ],
         [
-          'Lomo Saltado', '1.0', 'Platos Principales', 'Envase Grande', 
-          '18.0', '20', 'Pollo', '0.3', 'Arroz', '0.15', 'Aceite de Oliva', '0.04', 'Cebolla', '0.1', '', '', '', '', '', ''
+          'Lomo Saltado', '1.0', 'Platos Principales', 'Envase Grande',
+          '18.0', '20', 'TRUE', 'TRUE', 'Pollo', '0.3', 'Arroz', '0.15', 'Aceite de Oliva', '0.04', 'Cebolla', '0.1', '', '', '', ''
         ]
       ],
       filename: 'plantilla_recetas.xlsx'
     },
     formatDescription: [
-      'Columnas requeridas: "name" y al menos un ingrediente',
-      'Columnas opcionales: "version" (por defecto 1.0), "group", "container", "profit_percentage" (por defecto 0), "preparation_time" (por defecto 10)',
-      'PRECIO BASE: Se calcula automáticamente usando: (Costo ingredientes) × (1 + profit_percentage/100)',
+      'Columnas OBLIGATORIAS: "name", "preparation_time" y al menos un ingrediente',
+      'Columnas opcionales: "version" (por defecto 1.0), "group", "container", "profit_percentage" (por defecto 0)',
+      'Disponibilidad: "is_available" y "is_active" (TRUE/FALSE, por defecto TRUE)',
+      'PRECIO BASE: Se calcula automáticamente como: (Costo ingredientes) × (1 + profit_percentage/100)',
       'Ingredientes: Use pares de columnas "ingredient_X" y "quantity_X" (hasta 8 ingredientes por receta)',
       'Ejemplo: ingredient_1="Pollo", quantity_1="0.5", ingredient_2="Arroz", quantity_2="0.2"',
       'Los ingredientes deben existir previamente en el sistema',
